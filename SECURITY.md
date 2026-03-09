@@ -1,4 +1,4 @@
-# Security TODO
+# Security
 
 ## High Priority
 
@@ -16,3 +16,11 @@
 
 - [x] Logging/alerting on 403s — console.warn with IP and path on blocked requests
 - [x] CSP (Content Security Policy) header — restricts scripts, styles, connections, frames
+
+## Infrastructure
+
+- [x] Cloudflare origin IP restriction — AWS Security Group inbound rules for HTTP/HTTPS limited to [Cloudflare IP ranges](https://www.cloudflare.com/ips-v4/) only. SSH restricted to personal IP. Check periodically for new Cloudflare ranges.
+- [x] Proxy uses `cf-connecting-ip` header for real client IP behind Cloudflare
+
+# Temporarily all IPs block
+- [x] When going to production, remove the custom security rule in Cloudflare that blocks everyone except my IP. Cloudflare dashboard → Security 

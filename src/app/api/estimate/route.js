@@ -6,6 +6,8 @@ const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const REQUIRED_FIELDS = ["city", "district", "rooms_count", "area_m2"];
 
 function getClientIp(request) {
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp.trim();
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
   return request.headers.get("x-real-ip") || request.ip || "unknown";

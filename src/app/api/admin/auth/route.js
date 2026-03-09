@@ -14,10 +14,12 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 
+  const useSecure = request.headers.get("x-forwarded-proto") === "https";
+
   const res = NextResponse.json({ ok: true });
   res.cookies.set("admin_token", process.env.ADMIN_TOKEN, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecure,
     sameSite: "strict",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
@@ -26,11 +28,13 @@ export async function POST(request) {
   return res;
 }
 
-export async function DELETE() {
+export async function DELETE(request) {
+  const useSecure = request.headers.get("x-forwarded-proto") === "https";
+
   const res = NextResponse.json({ ok: true });
   res.cookies.set("admin_token", "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: useSecure,
     sameSite: "strict",
     path: "/",
     maxAge: 0,

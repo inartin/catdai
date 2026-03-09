@@ -6,6 +6,9 @@ const ALLOWED_IPS = (process.env.ADMIN_ALLOWED_IPS || "")
   .filter(Boolean);
 
 function getClientIp(request) {
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp.trim();
+
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
 

@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+tmp/
+.cursor/
 
 # next.js
 /.next/

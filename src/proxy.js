@@ -1,0 +1,52 @@
+import { NextResponse } from "next/server";
+
+const ALLOWED_IPS = (process.env.ADMIN_ALLOWED_IPS || "")
+  .split(",")
+  .map((ip) => ip.trim())
+  .filter(Boolean);
+
+function getClientIp(request) {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+
+  return request.ip ?? null;
+}
+
+export function proxy(request) {
+  const ip = getClientIp(request);
+  const { pathname } = request.nextUrl;
+
+  const isDev = process.env.NODE_ENV === "development";
+  const isLocalhost = ip === "127.0.0.1" || ip === "::1" || ip === "localhost";
+
+  if (isDev && isLocalhost) {
+    return NextResponse.next();
+  }
+
+  if (ALLOWED_IPS.length === 0 || !ip || !ALLOWED_IPS.includes(ip)) {
+    console.warn(`[proxy] 403 blocked | ip: ${ip} | path: ${pathname}`);
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
+  const isLoginPage = pathname === "/admin/login";
+  const isAuthApi = pathname === "/api/admin/auth";
+
+  if (!isLoginPage && !isAuthApi) {
+    const token = request.cookies.get("admin_token")?.value;
+    if (token !== process.env.ADMIN_TOKEN) {
+      if (pathname.startsWith("/api/")) {
+        return new NextResponse("Unauthorized", { status: 401 });
+      }
+      return NextResponse.redirect(new URL("/admin/login", request.url));
+    }
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/admin/:path*", "/api/admin/:path*"],
+};

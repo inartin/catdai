@@ -1,12 +1,41 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+
+export const GO_HOME_EVENT = "catdai-go-home";
+
+export function emitGoHome() {
+  if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(GO_HOME_EVENT));
+}
 
 export default function Navbar() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogoClick = (e) => {
+    if (pathname === "/") {
+      e.preventDefault();
+      emitGoHome();
+      router.replace("/");
+    }
+  };
+
   return (
     <header className="bg-white sticky top-0 z-50 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between h-16">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="w-7 h-7 rounded-full bg-primary block" />
-          <span className="text-lg font-semibold tracking-tight">catdai</span>
+        <Link
+          href="/"
+          aria-label="Cât Dai? – Pagina principală"
+          className="flex items-center gap-3 whitespace-nowrap"
+          onClick={handleLogoClick}
+        >
+          <img
+            src="/icon0.svg"
+            alt=""
+            className="h-11 w-auto object-contain"
+          />
+          <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-8 text-sm text-gray-500">
@@ -14,7 +43,7 @@ export default function Navbar() {
             Despre
           </Link>
           <Link href="#" className="hover:text-foreground transition-colors">
-            Blog
+            Noutǎți
           </Link>
           <Link href="#" className="hover:text-foreground transition-colors">
             Pentru Agenți

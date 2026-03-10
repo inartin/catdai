@@ -3,6 +3,7 @@ const categories = [
     name: "Auto",
     cta: "Analiză Piață Auto",
     gradient: "from-red-200 to-red-400",
+    backgroundImage: "/images/cd-auto.webp",
     iconBg: "bg-red-500",
     disabled: true,
     icon: (
@@ -25,6 +26,7 @@ const categories = [
     name: "Imobil",
     cta: "Analizează Piața Imobiliară",
     gradient: "from-green-200 to-emerald-400",
+    backgroundImage: "/images/cd-imobil.webp",
     iconBg: "bg-green-600",
     disabled: false,
     icon: (
@@ -43,9 +45,10 @@ const categories = [
     ),
   },
   {
-    name: "Gadget",
+    name: "Electronice",
     cta: "Analiză Piață Gadget",
     gradient: "from-blue-200 to-indigo-300",
+    backgroundImage: "/images/CD-electronics.webp",
     iconBg: "bg-amber-500",
     disabled: true,
     icon: (
@@ -85,36 +88,41 @@ function EvalIcon() {
 export default function CategoryCards({ onCategorySelect }) {
   return (
     <section className="pb-16 px-4">
-      <h2 className="text-xl font-bold text-center mb-8">
+      {/* <h2 className="text-xl font-bold text-center mb-8">
         Ce vrei să faci azi?
-      </h2>
+      </h2> */}
 
       <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
         {categories.map((cat) => {
           const isActive = !cat.disabled;
 
           return (
-            <button
-              key={cat.name}
-              type="button"
-              disabled={cat.disabled}
-              onClick={() => isActive && onCategorySelect?.(cat.name)}
-              className={`rounded-2xl overflow-hidden bg-white border border-gray-100 text-left transition-all duration-200 ${
-                isActive
-                  ? "shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
-                  : "opacity-60 cursor-default"
-              }`}
-            >
-              <div className="relative">
-                <div className={`h-44 bg-linear-to-br ${cat.gradient}`} />
+            <div key={cat.name} className="group/card w-full h-full min-w-0">
+              <button
+                type="button"
+                disabled={cat.disabled}
+                onClick={() => isActive && onCategorySelect?.(cat.name)}
+                className={`relative w-full h-full rounded-2xl overflow-hidden bg-white border border-gray-100 text-left transition-all duration-200 ${
+                  isActive
+                    ? "shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+                    : "cursor-default"
+                }`}
+              >
                 {cat.disabled && (
-                  <span className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm text-xs font-medium text-gray-500 px-2.5 py-1 rounded-full shadow-sm">
+                  <span className="absolute top-3 right-3 z-20 bg-white border border-gray-200 text-xs font-semibold text-gray-700 px-3 py-1.5 rounded-full shadow-md">
                     În curând
                   </span>
                 )}
-              </div>
 
-              <div className="p-5 text-center space-y-3">
+                <div className={cat.disabled ? "opacity-60" : ""}>
+                  <div className="relative">
+                    <div
+                      className={`h-44 ${cat.backgroundImage ? "bg-cover bg-center bg-no-repeat" : `bg-linear-to-br ${cat.gradient}`} ${cat.disabled && cat.backgroundImage ? "grayscale group-hover/card:grayscale-0 transition-[filter] duration-300" : ""}`}
+                      style={cat.backgroundImage ? { backgroundImage: `url(${cat.backgroundImage})` } : undefined}
+                    />
+                </div>
+
+                <div className="p-5 text-center space-y-3">
                 <div className="flex items-center justify-center gap-2">
                   <span
                     className={`w-7 h-7 rounded-md ${cat.iconBg} flex items-center justify-center`}
@@ -134,8 +142,10 @@ export default function CategoryCards({ onCategorySelect }) {
                   <EvalIcon />
                   {cat.cta}
                 </span>
+                </div>
               </div>
             </button>
+            </div>
           );
         })}
       </div>

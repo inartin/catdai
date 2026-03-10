@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useMemo, Suspense } from "react";
+import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Hero from "@/components/Hero";
 import CategoryCards from "@/components/CategoryCards";
 import HowItWorks from "@/components/HowItWorks";
 import PropertyForm from "@/components/PropertyForm";
+import { GO_HOME_EVENT } from "@/components/Navbar";
 
 function HomeContentInner() {
   const searchParams = useSearchParams();
@@ -28,6 +29,17 @@ function HomeContentInner() {
   }, [searchParams]);
 
   const [view, setView] = useState(prefill ? "imobil" : "landing");
+
+  // When navigating to clean home (e.g. logo click), show landing
+  useEffect(() => {
+    if (!prefill) setView("landing");
+  }, [prefill]);
+
+  useEffect(() => {
+    const onGoHome = () => setView("landing");
+    window.addEventListener(GO_HOME_EVENT, onGoHome);
+    return () => window.removeEventListener(GO_HOME_EVENT, onGoHome);
+  }, []);
 
   const handleCategorySelect = useCallback((category) => {
     if (category === "Imobil") setView("imobil");

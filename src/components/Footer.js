@@ -44,10 +44,10 @@ function InstagramIcon() {
 }
 
 const socialLinks = [
-  { icon: <FacebookIcon />, label: "Facebook" },
-  { icon: <TwitterIcon />, label: "Twitter" },
-  { icon: <YoutubeIcon />, label: "YouTube" },
-  { icon: <InstagramIcon />, label: "Instagram" },
+  // { icon: <FacebookIcon />, label: "Facebook" },
+  // { icon: <TwitterIcon />, label: "Twitter" },
+  // { icon: <YoutubeIcon />, label: "YouTube" },
+  // { icon: <InstagramIcon />, label: "Instagram" },
 ];
 
 export default function Footer() {
@@ -77,7 +77,7 @@ export default function Footer() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-4">
-          © 2024 Catdai. Toate drepturile rezervate.
+          © 2026 Catdai. Toate drepturile rezervate.
         </p>
       </div>
     </footer>

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslation } from "@/context/LanguageContext";
 
 const cities = [
   "Chișinău",
@@ -40,7 +41,7 @@ const districtsByCity = {
 
 const roomOptions = [1, 2, 3, 4, "5+"];
 const buildingTypes = [
-  "Construcţii noi",  // 10,482 listings
+  "Construcţii noi",
   "Secundar", 
 ];
 const renovationTypes = [
@@ -56,7 +57,6 @@ const renovationTypes = [
 ];
 const countOptions = [0, 1, 2, "3+"];
 
-// To do:
 const buildingPlan= [
   "Seria 102",
   "Seria 135",
@@ -84,7 +84,7 @@ function ChevronIcon({ open }) {
   );
 }
 
-function SelectField({ label, required, value, onChange, placeholder, options }) {
+function SelectField({ label, required, value, onChange, placeholder, options, labelFn }) {
   return (
     <div>
       <label className="text-sm text-gray-600 mb-1.5 block">
@@ -100,7 +100,7 @@ function SelectField({ label, required, value, onChange, placeholder, options })
           <option value="">{placeholder}</option>
           {options.map((opt) => (
             <option key={opt} value={opt}>
-              {opt}
+              {labelFn ? labelFn(opt) : opt}
             </option>
           ))}
         </select>
@@ -112,7 +112,7 @@ function SelectField({ label, required, value, onChange, placeholder, options })
   );
 }
 
-function PillGroup({ options, value, onChange, columns }) {
+function PillGroup({ options, value, onChange, columns, labelFn }) {
   const gridClass = columns
     ? `grid gap-2`
     : "flex flex-wrap gap-2";
@@ -132,7 +132,7 @@ function PillGroup({ options, value, onChange, columns }) {
                 : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
               }`}
           >
-            {opt}
+            {labelFn ? labelFn(opt) : opt}
           </button>
         );
       })}
@@ -143,6 +143,7 @@ function PillGroup({ options, value, onChange, columns }) {
 
 export default function PropertyForm({ onBack, initialValues }) {
   const router = useRouter();
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     city: initialValues?.city ?? "",
     district: initialValues?.district ?? "",
@@ -281,7 +282,7 @@ export default function PropertyForm({ onBack, initialValues }) {
           >
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
-          <span className="text-sm font-medium">Înapoi</span>
+          <span className="text-sm font-medium">{t("form.back")}</span>
         </button>
 
         {/* ── Header ── */}
@@ -302,19 +303,19 @@ export default function PropertyForm({ onBack, initialValues }) {
           </span>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              Analiză Piață Imobiliară
+              {t("form.title")}
             </h1>
             <p className="text-sm text-gray-400">
-              Completează detaliile pentru o analiză relevantă pentru vânzare sau cumpărare
+              {t("form.subtitle")}
             </p>
           </div>
         </div>
 
-        {/* ── Accuracy meter (Variable Reward — self-mastery) ── */}
+        {/* ── Accuracy meter ── */}
         <div className="mt-6 mb-8">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-              Precizia estimării
+              {t("form.accuracy")}
             </span>
             <span className={`text-xs font-bold ${meterTextColor}`}>
               {accuracy}%
@@ -337,7 +338,7 @@ export default function PropertyForm({ onBack, initialValues }) {
                 1
               </span>
               <span className="text-sm font-semibold text-gray-900">
-                Locație
+                {t("form.locationSection")}
               </span>
             </div>
 
@@ -347,12 +348,13 @@ export default function PropertyForm({ onBack, initialValues }) {
                 className={`rounded-xl transition-all duration-300 ${highlightField === "city" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
               >
                 <SelectField
-                  label="Oraș"
+                  label={t("form.city")}
                   required
                   value={form.city}
                   onChange={(v) => update("city", v)}
-                  placeholder="Selectează orașul"
+                  placeholder={t("form.selectCity")}
                   options={cities}
+                  labelFn={(v) => t(`data.city.${v}`)}
                 />
               </div>
 
@@ -362,12 +364,13 @@ export default function PropertyForm({ onBack, initialValues }) {
                   className={`animate-fade-in rounded-xl transition-all duration-300 ${highlightField === "district" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
                 >
                   <SelectField
-                    label="Sector / Zonă"
+                    label={t("form.district")}
                     required
                     value={form.district}
                     onChange={(v) => update("district", v)}
-                    placeholder="Selectează sectorul"
+                    placeholder={t("form.selectDistrict")}
                     options={districts}
+                    labelFn={(v) => t(`data.district.${v}`)}
                   />
                 </div>
               )}
@@ -382,7 +385,7 @@ export default function PropertyForm({ onBack, initialValues }) {
                   2
                 </span>
                 <span className="text-sm font-semibold text-gray-900">
-                  Proprietate
+                  {t("form.propertySection")}
                 </span>
               </div>
 
@@ -392,7 +395,7 @@ export default function PropertyForm({ onBack, initialValues }) {
                   className={`rounded-xl transition-all duration-300 ${highlightField === "rooms_count" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
                 >
                   <label className="text-sm text-gray-600 mb-2 block">
-                    Număr camere
+                    {t("form.rooms")}
                     <span className="text-red-400 ml-0.5">*</span>
                   </label>
                   <PillGroup
@@ -408,13 +411,13 @@ export default function PropertyForm({ onBack, initialValues }) {
                   className={`rounded-xl transition-all duration-300 ${highlightField === "area_m2" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
                 >
                   <label className="text-sm text-gray-600 mb-1.5 block">
-                    Suprafață (m²)
+                    {t("form.area")}
                     <span className="text-red-400 ml-0.5">*</span>
                   </label>
                   <input
                     type="number"
                     inputMode="decimal"
-                    placeholder="ex. 65"
+                    placeholder={t("form.areaPlaceholder")}
                     value={form.area_m2}
                     onChange={(e) => update("area_m2", e.target.value)}
                     className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
@@ -426,13 +429,14 @@ export default function PropertyForm({ onBack, initialValues }) {
                   className={`rounded-xl transition-all duration-300 ${highlightField === "building_type" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
                 >
                   <label className="text-sm text-gray-600 mb-2 block">
-                    Tip construcție
+                    {t("form.buildingType")}
                     <span className="text-red-400 ml-0.5">*</span>
                   </label>
                   <PillGroup
                     options={buildingTypes}
                     value={form.building_type}
                     onChange={(v) => update("building_type", v)}
+                    labelFn={(v) => t(`data.buildingType.${v}`)}
                   />
                 </div>
 
@@ -441,20 +445,21 @@ export default function PropertyForm({ onBack, initialValues }) {
                   className={`rounded-xl transition-all duration-300 ${highlightField === "renovation" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
                 >
                   <label className="text-sm text-gray-600 mb-2 block">
-                    Starea reparației
+                    {t("form.renovation")}
                     <span className="text-red-400 ml-0.5">*</span>
                   </label>
                   <PillGroup
                     options={renovationTypes}
                     value={form.renovation}
                     onChange={(v) => update("renovation", v)}
+                    labelFn={(v) => t(`data.renovationType.${v}`)}
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* — Section 3: Optional (Investment loop) — */}
+          {/* — Section 3: Optional — */}
           <div className="p-5 sm:p-6">
             <button
               type="button"
@@ -466,14 +471,14 @@ export default function PropertyForm({ onBack, initialValues }) {
                   +
                 </span>
                 <span className="text-sm font-semibold text-gray-900">
-                  Detalii suplimentare
+                  {t("form.optionalSection")}
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
                 {optionalGain > 0 && (
                   <span className="text-xs text-amber-500 font-medium">
-                    +{optionalGain}% precizie
+                    {t("form.accuracyGain", { gain: optionalGain })}
                   </span>
                 )}
                 <ChevronIcon open={showOptional} />
@@ -485,12 +490,12 @@ export default function PropertyForm({ onBack, initialValues }) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-sm text-gray-600 mb-1.5 block">
-                      Etaj
+                      {t("form.floor")}
                     </label>
                     <input
                       type="number"
                       inputMode="numeric"
-                      placeholder="ex. 4"
+                      placeholder={t("form.floorPlaceholder")}
                       value={form.floor}
                       onChange={(e) => update("floor", e.target.value)}
                       className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
@@ -498,12 +503,12 @@ export default function PropertyForm({ onBack, initialValues }) {
                   </div>
                   <div>
                     <label className="text-sm text-gray-600 mb-1.5 block">
-                      Etaje total
+                      {t("form.totalFloors")}
                     </label>
                     <input
                       type="number"
                       inputMode="numeric"
-                      placeholder="ex. 9"
+                      placeholder={t("form.totalFloorsPlaceholder")}
                       value={form.total_floors}
                       onChange={(e) => update("total_floors", e.target.value)}
                       className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
@@ -514,7 +519,7 @@ export default function PropertyForm({ onBack, initialValues }) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-sm text-gray-600 mb-2 block">
-                      Băi
+                      {t("form.bathrooms")}
                     </label>
                     <PillGroup
                       options={[1, 2, "3+"]}
@@ -525,7 +530,7 @@ export default function PropertyForm({ onBack, initialValues }) {
                   </div>
                   <div>
                     <label className="text-sm text-gray-600 mb-2 block">
-                      Balcoane
+                      {t("form.balconies")}
                     </label>
                     <PillGroup
                       options={countOptions}
@@ -558,12 +563,12 @@ export default function PropertyForm({ onBack, initialValues }) {
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
           </svg>
-          Vezi Analiza Pieței
+          {t("form.submit")}
         </button>
 
         {/* ── Social proof ── */}
         <p className="text-center text-xs text-gray-400 mt-3">
-          Analiză bazată pe anunțuri reale din {form.city}
+          {form.city ? t("form.socialProof", { city: t(`data.city.${form.city}`) }) : ""}
         </p>
       </div>
     </section>

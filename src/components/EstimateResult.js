@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "@/context/LanguageContext";
 
 function formatPrice(num) {
   if (num == null) return "—";
@@ -55,6 +56,8 @@ function FeatureAdjustmentBadge({ item }) {
 }
 
 function DistrictComparison({ districts, currentDistrict, area }) {
+  const { t } = useTranslation();
+
   if (!districts || districts.length < 2) return null;
 
   const maxPpm = Math.max(...districts.map((d) => d.median_ppm));
@@ -62,10 +65,10 @@ function DistrictComparison({ districts, currentDistrict, area }) {
   return (
     <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
       <h3 className="text-base font-semibold text-gray-900 mb-1">
-        Comparație pe sectoare
+        {t("result.districtComparison")}
       </h3>
       <p className="text-sm text-gray-400 mb-5">
-        Aceleași filtre aplicate în alte sectoare
+        {t("result.districtComparisonDesc")}
       </p>
       <div className="space-y-3">
         {districts.map((d) => {
@@ -79,7 +82,7 @@ function DistrictComparison({ districts, currentDistrict, area }) {
                   isCurrent ? "font-bold text-primary" : "text-gray-500"
                 }`}
               >
-                {d.district}
+                {t(`data.district.${d.district}`)}
               </span>
               <div className="flex-1 h-8 bg-gray-50 rounded relative overflow-hidden">
                 <div
@@ -97,15 +100,12 @@ function DistrictComparison({ districts, currentDistrict, area }) {
                   €{totalPrice.toLocaleString("ro-MD")}
                 </span>
               </div>
-              <span className="text-xs text-gray-400 w-12 shrink-0 tabular-nums">
-                ({d.count})
-              </span>
             </div>
           );
         })}
       </div>
       <p className="text-xs text-gray-400 mt-4">
-        Prețul estimat pentru {area}m² · (nr. anunțuri)
+        {t("result.estimatedForArea", { area })}
       </p>
     </div>
   );
@@ -114,11 +114,17 @@ function DistrictComparison({ districts, currentDistrict, area }) {
 export default function EstimateResult({ data, onReset }) {
   const { estimate, range, market_stats, filters_used, district_coefficient, district_comparison, input, feature_adjustments } = data;
   const [copied, setCopied] = useState(false);
+  const { t, lang } = useTranslation();
+
+  const todayFormatted = new Date().toLocaleDateString(
+    lang === "ru" ? "ru-RU" : "ro-RO",
+    { day: "numeric", month: "long", year: "numeric" }
+  );
 
   const confidenceLabel = {
-    high: "Înaltă",
-    medium: "Medie",
-    low: "Scăzută",
+    high: t("result.confidenceHigh"),
+    medium: t("result.confidenceMedium"),
+    low: t("result.confidenceLow"),
   };
   const confidenceColor = {
     high: "bg-emerald-100 text-emerald-700",
@@ -150,16 +156,17 @@ export default function EstimateResult({ data, onReset }) {
   };
 
   const roomsLabel = input.rooms_count === 1
-    ? "1 cameră"
-    : `${input.rooms_count} camere`;
+    ? t("result.oneRoom")
+    : t("result.rooms", { count: input.rooms_count });
 
   const floorLabel = (() => {
     if (!input.floor) return null;
-    if (input.floor === 1) return "Parter";
-    if (input.total_floors && input.floor === input.total_floors) return `Etaj ultim (${input.floor})`;
+    if (input.floor === 1) return t("result.groundFloor");
+    if (input.total_floors && input.floor === input.total_floors)
+      return t("result.lastFloor", { floor: input.floor });
     return input.total_floors
-      ? `Etaj ${input.floor}/${input.total_floors}`
-      : `Etaj ${input.floor}`;
+      ? t("result.floorOf", { floor: input.floor, total: input.total_floors })
+      : t("result.floor", { floor: input.floor });
   })();
 
   return (
@@ -174,22 +181,31 @@ export default function EstimateResult({ data, onReset }) {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-400 mb-1 uppercase tracking-wide font-medium">Profil analizat</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm text-gray-400 uppercase tracking-wide font-medium">{t("result.profileAnalyzed")}</p>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/8 text-xs font-medium text-primary">
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <path d="M16 2v4M8 2v4M3 10h18" />
+                </svg>
+                {todayFormatted}
+              </span>
+            </div>
             <h2 className="text-xl font-bold text-gray-900 leading-snug">
-              Apartament {roomsLabel} · {input.area_m2}m²
+              {t("result.apartment")} {roomsLabel} · {input.area_m2}m²
             </h2>
             <p className="text-base text-gray-500 mt-1">
-              {input.district && `${input.district}, `}{input.city}
+              {input.district && `${t(`data.district.${input.district}`)}, `}{t(`data.city.${input.city}`)}
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
               {input.building_type && (
                 <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                  {input.building_type}
+                  {t(`data.buildingType.${input.building_type}`)}
                 </span>
               )}
               {input.renovation && (
                 <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                  {input.renovation}
+                  {t(`data.renovationType.${input.renovation}`)}
                 </span>
               )}
               {floorLabel && (
@@ -200,15 +216,19 @@ export default function EstimateResult({ data, onReset }) {
               {input.bathrooms_count != null && (
                 <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
                   {input.bathrooms_count === 0
-                    ? "Fără baie"
-                    : `${input.bathrooms_count} ${input.bathrooms_count === 1 ? "baie" : "băi"}`}
+                    ? t("result.noBathroom")
+                    : input.bathrooms_count === 1
+                      ? t("result.oneBathroom")
+                      : t("result.bathrooms", { count: input.bathrooms_count })}
                 </span>
               )}
               {input.balconies_count != null && (
                 <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
                   {input.balconies_count === 0
-                    ? "Fără balcon"
-                    : `${input.balconies_count} ${input.balconies_count === 1 ? "balcon" : "balcoane"}`}
+                    ? t("result.noBalcony")
+                    : input.balconies_count === 1
+                      ? t("result.oneBalcony")
+                      : t("result.balconies", { count: input.balconies_count })}
                 </span>
               )}
             </div>
@@ -219,36 +239,31 @@ export default function EstimateResult({ data, onReset }) {
       {/* Main estimate */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
         <div className="p-6 sm:p-8 text-center border-b border-gray-100">
-          <p className="text-base text-gray-400 mb-2">Nivel de preț estimat în piață</p>
+          <p className="text-base text-gray-400 mb-2">{t("result.estimatedPrice")}</p>
           <p className="text-6xl font-bold tracking-tight text-gray-900">
             {formatPrice(estimate.market_rate)}
           </p>
           <p className="text-base text-gray-500 mt-2">
             {formatPrice(estimate.price_per_m2)}/m²
           </p>
-          {/* <span
-            className={`inline-block mt-4 px-4 py-1.5 rounded-full text-sm font-semibold ${confidenceColor[estimate.confidence] || confidenceColor.low}`}
-          >
-            Încredere: {confidenceLabel[estimate.confidence] || estimate.confidence}
-          </span> */}
         </div>
 
         <div className="grid grid-cols-3 divide-x divide-gray-100">
           <div className="p-5 sm:p-6 text-center">
-            <p className="text-sm text-gray-400 mb-1">Vânzare rapidă</p>
+            <p className="text-sm text-gray-400 mb-1">{t("result.fastSale")}</p>
             <p className="text-xl font-bold text-emerald-600">
               {formatPrice(estimate.fast_sale)}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">-10%</p>
           </div>
           <div className="p-5 sm:p-6 text-center bg-primary/5">
-            <p className="text-sm text-gray-400 mb-1">Preț de piață</p>
+            <p className="text-sm text-gray-400 mb-1">{t("result.marketPrice")}</p>
             <p className="text-xl font-bold text-primary">
               {formatPrice(estimate.market_rate)}
             </p>
           </div>
           <div className="p-5 sm:p-6 text-center">
-            <p className="text-sm text-gray-400 mb-1">Preț țintă (optimist)</p>
+            <p className="text-sm text-gray-400 mb-1">{t("result.targetPrice")}</p>
             <p className="text-xl font-bold text-amber-600">
               {formatPrice(estimate.premium)}
             </p>
@@ -260,10 +275,10 @@ export default function EstimateResult({ data, onReset }) {
       {/* Price position on range */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
         <h3 className="text-base font-semibold text-gray-900 mb-1">
-          Poziția pe piață
+          {t("result.marketPosition")}
         </h3>
         <p className="text-sm text-gray-400 mb-5">
-          Bazat pe analiza anunțurilor comparabile din segment
+          {t("result.marketPositionDesc")}
         </p>
 
         <div className="relative pt-6 pb-1">
@@ -271,9 +286,6 @@ export default function EstimateResult({ data, onReset }) {
             className="absolute top-2 -translate-x-1/2 flex flex-col items-center"
             style={{ left: `${markerPct}%` }}
           >
-            {/* <span className="text-xs font-bold text-primary whitespace-nowrap">
-              Tu
-            </span> */}
             <div className="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[9px] border-t-primary" />
           </div>
 
@@ -289,7 +301,7 @@ export default function EstimateResult({ data, onReset }) {
               {formatPrice(range.low)}
             </span>
             <span className="text-sm text-gray-500 font-medium">
-              Median: {formatPrice(market_stats.median_price_per_m2)}/m²
+              {t("result.median", { price: formatPrice(market_stats.median_price_per_m2) })}
             </span>
             <span className="text-xs text-gray-400">
               {formatPrice(range.high)}
@@ -301,35 +313,39 @@ export default function EstimateResult({ data, onReset }) {
       {/* How we calculated */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
         <h3 className="text-base font-semibold text-gray-900 mb-1">
-          Cum am analizat piața
+          {t("result.howWeAnalyzed")}
         </h3>
         <p className="text-sm text-gray-400 mb-4">
-          Prețul median al anunțurilor similare, filtrate după:
+          {t("result.howWeAnalyzedDesc")}
         </p>
 
         <div className="flex flex-wrap gap-2 mb-4">
-          <FilterBadge label={input.city} active={true} />
+          <FilterBadge label={t(`data.city.${input.city}`)} active={true} />
           {input.district && (
             <FilterBadge
-              label={input.district}
+              label={t(`data.district.${input.district}`)}
               active={filters_used?.district !== false}
             />
           )}
           {input.rooms_count && (
             <FilterBadge
-              label={`${input.rooms_count} ${input.rooms_count === 1 ? "cameră" : "camere"}`}
+              label={
+                input.rooms_count === 1
+                  ? t("result.oneRoomFilter")
+                  : t("result.roomsFilter", { count: input.rooms_count })
+              }
               active={true}
             />
           )}
           {input.building_type && (
             <FilterBadge
-              label={input.building_type}
+              label={t(`data.buildingType.${input.building_type}`)}
               active={filters_used?.building_type !== false}
             />
           )}
           {input.renovation && (
             <FilterBadge
-              label={input.renovation}
+              label={t(`data.renovationType.${input.renovation}`)}
               active={filters_used?.renovation !== false}
             />
           )}
@@ -347,14 +363,15 @@ export default function EstimateResult({ data, onReset }) {
             <FilterBadge
               label={
                 input.floor === 1
-                  ? "Etaj 1 (parter)"
+                  ? t("result.floorGround")
                   : input.total_floors && input.floor === input.total_floors
-                    ? `Etaj ultim (${input.floor})`
-                    : `Etaj ${Math.max(2, input.floor - 2)}–${
-                        input.total_floors
+                    ? t("result.floorLast", { floor: input.floor })
+                    : t("result.floorRange", {
+                        from: Math.max(2, input.floor - 2),
+                        to: input.total_floors
                           ? Math.min(input.total_floors - 1, input.floor + 2)
-                          : input.floor + 2
-                      }`
+                          : input.floor + 2,
+                      })
               }
               active={filters_used?.floor !== false}
             />
@@ -363,25 +380,25 @@ export default function EstimateResult({ data, onReset }) {
 
         {feature_adjustments?.items?.length > 0 && (
           <div className="mb-4">
-            <p className="text-sm text-gray-400 mb-2">Ajustări pentru caracteristici:</p>
+            <p className="text-sm text-gray-400 mb-2">{t("result.featureAdjustments")}</p>
             <div className="flex flex-wrap gap-2">
               {feature_adjustments.items.map((item) => (
                 <FeatureAdjustmentBadge key={item.type} item={item} />
               ))}
             </div>
             <p className="text-xs text-gray-400 mt-2">
-              Ajustare totală:{" "}
+              {t("result.totalAdjustment")}{" "}
               <span className={feature_adjustments.total_pct > 0 ? "text-emerald-600 font-medium" : "text-red-500 font-medium"}>
                 {feature_adjustments.total_pct > 0 ? "+" : ""}{feature_adjustments.total_pct}%
               </span>{" "}
-              față de media comparabilelor
+              {t("result.vsComparables")}
             </p>
           </div>
         )}
 
         {anyDropped && (
           <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-4 py-2.5 mb-4">
-            Filtrele tăiate au fost extinse pentru a avea suficiente anunțuri comparabile.
+            {t("result.droppedFilters")}
           </p>
         )}
 
@@ -391,7 +408,7 @@ export default function EstimateResult({ data, onReset }) {
               <div className="flex items-center gap-4 justify-center">
                 <div className="text-center">
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                    Median oraș
+                    {t("result.cityMedian")}
                   </p>
                   <p className="text-base font-bold text-gray-600">
                     {formatPrice(market_stats.median_price_per_m2)}/m²
@@ -400,7 +417,7 @@ export default function EstimateResult({ data, onReset }) {
                 <span className="text-gray-300 text-lg">×</span>
                 <div className="text-center">
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                    Coef. {input.district}
+                    {t("result.districtCoef", { district: t(`data.district.${input.district}`) })}
                   </p>
                   <p className="text-base font-bold text-gray-600">
                     {district_coefficient.value}
@@ -409,7 +426,7 @@ export default function EstimateResult({ data, onReset }) {
                 <span className="text-gray-300 text-lg">=</span>
                 <div className="text-center">
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                    Ajustat
+                    {t("result.adjusted")}
                   </p>
                   <p className="text-base font-bold text-primary">
                     {formatPrice(estimate.price_per_m2)}/m²
@@ -424,7 +441,7 @@ export default function EstimateResult({ data, onReset }) {
         ) : (
           <div className="p-4 rounded-xl bg-gray-50 text-center">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">
-              Preț median al segmentului
+              {t("result.segmentMedian")}
             </p>
             <p className="text-2xl font-bold text-primary">
               {formatPrice(market_stats.median_price_per_m2)}/m²
@@ -446,27 +463,27 @@ export default function EstimateResult({ data, onReset }) {
       {/* Market stats */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
         <h3 className="text-base font-semibold text-gray-900 mb-4">
-          Statistici piață
+          {t("result.marketStats")}
         </h3>
         <div className="grid grid-cols-2 gap-5">
-          <div>
-            <p className="text-sm text-gray-400 mb-1">Anunțuri comparabile</p>
+          {/* <div>
+            <p className="text-sm text-gray-400 mb-1">{t("result.comparableListings")}</p>
             <p className="text-xl font-bold text-gray-900">{market_stats.comparable_count}</p>
-          </div>
+          </div> */}
           <div>
-            <p className="text-sm text-gray-400 mb-1">Preț mediu/m²</p>
+            <p className="text-sm text-gray-400 mb-1">{t("result.avgPricePerM2")}</p>
             <p className="text-xl font-bold text-gray-900">
               {formatPrice(market_stats.avg_price_per_m2)}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-400 mb-1">Preț median/m²</p>
+            <p className="text-sm text-gray-400 mb-1">{t("result.medianPricePerM2")}</p>
             <p className="text-xl font-bold text-gray-900">
               {formatPrice(market_stats.median_price_per_m2)}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-400 mb-1">Preț mediu total</p>
+            <p className="text-sm text-gray-400 mb-1">{t("result.avgTotalPrice")}</p>
             <p className="text-xl font-bold text-gray-900">
               {formatPrice(market_stats.avg_price)}
             </p>
@@ -485,7 +502,7 @@ export default function EstimateResult({ data, onReset }) {
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
-          Schimbă criteriile
+          {t("result.changeCriteria")}
         </button>
         <button
           type="button"
@@ -497,7 +514,7 @@ export default function EstimateResult({ data, onReset }) {
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
-              Link copiat!
+              {t("result.linkCopied")}
             </>
           ) : (
             <>
@@ -506,7 +523,7 @@ export default function EstimateResult({ data, onReset }) {
                 <polyline points="16 6 12 2 8 6" />
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
-              Trimite analiza
+              {t("result.shareAnalysis")}
             </>
           )}
         </button>

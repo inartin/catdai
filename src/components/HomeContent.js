@@ -42,7 +42,7 @@ function HomeContentInner() {
   }, []);
 
   const handleCategorySelect = useCallback((category) => {
-    if (category === "Imobil") setView("imobil");
+    if (category === "imobil") setView("imobil");
   }, []);
 
   const handleBack = useCallback(() => setView("landing"), []);

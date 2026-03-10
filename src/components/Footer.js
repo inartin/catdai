@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslation } from "@/context/LanguageContext";
 
 function FacebookIcon() {
   return (
@@ -51,15 +54,17 @@ const socialLinks = [
 ];
 
 export default function Footer() {
+  const { t } = useTranslation();
+
   return (
     <footer className="bg-section-bg border-t border-gray-100 mt-8">
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-sm text-gray-500">
           <Link href="#" className="hover:text-foreground transition-colors">
-            Termeni &amp; Condiții
+            {t("footer.terms")}
           </Link>
           <Link href="#" className="hover:text-foreground transition-colors">
-            Politica de Confidențialitate
+            {t("footer.privacy")}
           </Link>
 
           <div className="flex items-center gap-3 text-gray-400">
@@ -77,7 +82,7 @@ export default function Footer() {
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-4">
-          © 2026 Catdai. Toate drepturile rezervate.
+          {t("footer.copyright")}
         </p>
       </div>
     </footer>

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { supabase } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
@@ -61,7 +62,7 @@ function hashIp(ip) {
 
 function logEstimate(row) {
   if (process.env.NODE_ENV === "development") return;
-  supabase
+  supabaseAdmin
     .from("estimate_log")
     .insert(row)
     .then(({ error }) => {

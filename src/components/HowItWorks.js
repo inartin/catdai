@@ -1,6 +1,6 @@
 const steps = [
   {
-    label: "Introduci",
+    label: "Setezi criterii",
     icon: (
       <svg
         viewBox="0 0 24 24"
@@ -19,7 +19,7 @@ const steps = [
     ),
   },
   {
-    label: "Primești",
+    label: "Vezi prețul pieței",
     icon: (
       <svg
         viewBox="0 0 24 24"
@@ -36,7 +36,7 @@ const steps = [
     ),
   },
   {
-    label: "Rafinezi",
+    label: "Ajustezi preferințe",
     icon: (
       <svg
         viewBox="0 0 24 24"
@@ -53,7 +53,7 @@ const steps = [
     ),
   },
   {
-    label: "Compari",
+    label: "Compari scenarii",
     icon: (
       <svg
         viewBox="0 0 24 24"
@@ -93,8 +93,8 @@ export default function HowItWorks() {
   return (
     <section className="py-16 px-4 text-center">
       <p className="text-lg max-w-md mx-auto mb-10">
-        <strong className="italic">Rapid si ușor.</strong> Îndeplinește câțiva
-        pași, apoi <strong>vezi rezultatul</strong>.
+        Spui ce cauți sau ce vinzi. Noi îți arătăm cum arată piața pentru acel
+        profil.
       </p>
 
       <div className="max-w-2xl mx-auto bg-section-bg rounded-2xl py-10 px-6">

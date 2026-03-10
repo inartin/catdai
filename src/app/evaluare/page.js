@@ -91,7 +91,7 @@ function EvaluareContent() {
             strokeLinecap="round"
           />
         </svg>
-        <p className="text-sm text-gray-500">Se calculează estimarea...</p>
+        <p className="text-sm text-gray-500">Analizăm piața pentru criteriile tale...</p>
       </div>
     );
   }

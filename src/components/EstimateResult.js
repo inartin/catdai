@@ -174,7 +174,7 @@ export default function EstimateResult({ data, onReset }) {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm text-gray-400 mb-1 uppercase tracking-wide font-medium">Proprietate evaluată</p>
+            <p className="text-sm text-gray-400 mb-1 uppercase tracking-wide font-medium">Profil analizat</p>
             <h2 className="text-xl font-bold text-gray-900 leading-snug">
               Apartament {roomsLabel} · {input.area_m2}m²
             </h2>
@@ -219,7 +219,7 @@ export default function EstimateResult({ data, onReset }) {
       {/* Main estimate */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
         <div className="p-6 sm:p-8 text-center border-b border-gray-100">
-          <p className="text-base text-gray-400 mb-2">Prețul de piață estimat</p>
+          <p className="text-base text-gray-400 mb-2">Nivel de preț estimat în piață</p>
           <p className="text-6xl font-bold tracking-tight text-gray-900">
             {formatPrice(estimate.market_rate)}
           </p>
@@ -248,7 +248,7 @@ export default function EstimateResult({ data, onReset }) {
             </p>
           </div>
           <div className="p-5 sm:p-6 text-center">
-            <p className="text-sm text-gray-400 mb-1">Premium</p>
+            <p className="text-sm text-gray-400 mb-1">Preț țintă (optimist)</p>
             <p className="text-xl font-bold text-amber-600">
               {formatPrice(estimate.premium)}
             </p>
@@ -301,7 +301,7 @@ export default function EstimateResult({ data, onReset }) {
       {/* How we calculated */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
         <h3 className="text-base font-semibold text-gray-900 mb-1">
-          Cum am calculat
+          Cum am analizat piața
         </h3>
         <p className="text-sm text-gray-400 mb-4">
           Prețul median al anunțurilor similare, filtrate după:
@@ -485,7 +485,7 @@ export default function EstimateResult({ data, onReset }) {
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
-          Editează parametrii
+          Schimbă criteriile
         </button>
         <button
           type="button"
@@ -506,7 +506,7 @@ export default function EstimateResult({ data, onReset }) {
                 <polyline points="16 6 12 2 8 6" />
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
-              Distribuie
+              Trimite analiza
             </>
           )}
         </button>

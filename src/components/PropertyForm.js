@@ -302,10 +302,10 @@ export default function PropertyForm({ onBack, initialValues }) {
           </span>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">
-              Evaluare Imobil
+              Analiză Piață Imobiliară
             </h1>
             <p className="text-sm text-gray-400">
-              Completează detaliile pentru o estimare precisă
+              Completează detaliile pentru o analiză relevantă pentru vânzare sau cumpărare
             </p>
           </div>
         </div>
@@ -558,12 +558,12 @@ export default function PropertyForm({ onBack, initialValues }) {
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
           </svg>
-          Estimează Prețul
+          Vezi Analiza Pieței
         </button>
 
         {/* ── Social proof ── */}
         <p className="text-center text-xs text-gray-400 mt-3">
-          Bazat pe date de piață din {form.city}
+          Analiză bazată pe anunțuri reale din {form.city}
         </p>
       </div>
     </section>

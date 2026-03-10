@@ -7,9 +7,9 @@ const geistSans = Geist({
 });
 
 export const metadata = {
-  title: "Catdai – Nu ghici prețul. Verifică-l.",
+  title: "Catdai - Înțelege piața imobiliară. Decide corect.",
   description:
-    "Află un preț realist în câteva secunde. Evaluare imobile, auto și gadgeturi.",
+    "Pentru vânzători și cumpărători: vezi prețuri realiste și analiza pieței pe criteriile tale (zonă, m², camere, renovare).",
 };
 
 export default function RootLayout({ children }) {

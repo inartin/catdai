@@ -1,7 +1,7 @@
 const categories = [
   {
     name: "Auto",
-    cta: "Evaluare Auto",
+    cta: "Analiză Piață Auto",
     gradient: "from-red-200 to-red-400",
     iconBg: "bg-red-500",
     disabled: true,
@@ -23,7 +23,7 @@ const categories = [
   },
   {
     name: "Imobil",
-    cta: "Evaluare Imobil",
+    cta: "Analizează Piața Imobiliară",
     gradient: "from-green-200 to-emerald-400",
     iconBg: "bg-green-600",
     disabled: false,
@@ -44,7 +44,7 @@ const categories = [
   },
   {
     name: "Gadget",
-    cta: "Evaluare Gadget",
+    cta: "Analiză Piață Gadget",
     gradient: "from-blue-200 to-indigo-300",
     iconBg: "bg-amber-500",
     disabled: true,
@@ -86,7 +86,7 @@ export default function CategoryCards({ onCategorySelect }) {
   return (
     <section className="pb-16 px-4">
       <h2 className="text-xl font-bold text-center mb-8">
-        Ce vrei să evaluezi?
+        Ce vrei să faci azi?
       </h2>
 
       <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">

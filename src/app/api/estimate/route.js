@@ -170,26 +170,28 @@ export async function POST(request) {
 
   data.feature_adjustments = featureAdj;
 
-  logEstimate({
-    device_id: body.device_id || null,
-    session_id: body.session_id || null,
-    evaluation_group_id: body.evaluation_group_id || null,
-    ip_hash: hashIp(ip),
-    city: body.city,
-    district: body.district || null,
-    rooms_count: parsedRooms,
-    area_m2: area,
-    building_type: body.building_type || null,
-    renovation: body.renovation || null,
-    floor: params.p_floor,
-    total_floors: params.p_total_floors,
-    bathrooms_count: params.p_bathrooms_count,
-    balconies_count: params.p_balconies_count,
-    estimated_price: data.estimate?.market_rate ?? null,
-    price_per_m2: data.estimate?.price_per_m2 ?? null,
-    language: body.language || null,
-    response_time_ms: responseTimeMs,
-  });
+  if (body.device_id) {
+    logEstimate({
+      device_id: body.device_id,
+      session_id: body.session_id || null,
+      evaluation_group_id: body.evaluation_group_id || null,
+      ip_hash: hashIp(ip),
+      city: body.city,
+      district: body.district || null,
+      rooms_count: parsedRooms,
+      area_m2: area,
+      building_type: body.building_type || null,
+      renovation: body.renovation || null,
+      floor: params.p_floor,
+      total_floors: params.p_total_floors,
+      bathrooms_count: params.p_bathrooms_count,
+      balconies_count: params.p_balconies_count,
+      estimated_price: data.estimate?.market_rate ?? null,
+      price_per_m2: data.estimate?.price_per_m2 ?? null,
+      language: body.language || null,
+      response_time_ms: responseTimeMs,
+    });
+  }
 
   const res = NextResponse.json(data);
   res.headers.set("X-RateLimit-Remaining", String(remaining));

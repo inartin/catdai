@@ -3,7 +3,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
-import { getDeviceId, getSessionId, computeEvaluationGroupId } from "@/lib/tracking";
 
 const cities = [
   "Chișinău",
@@ -216,18 +215,7 @@ export default function PropertyForm({ onBack, initialValues }) {
     if (form.renovation) params.set("renovation", form.renovation);
     if (form.bathrooms_count != null) params.set("bathrooms", String(form.bathrooms_count));
     if (form.balconies_count != null) params.set("balconies", String(form.balconies_count));
-
-    const deviceId = getDeviceId();
-    const sessionId = getSessionId();
-    const evalGroup = computeEvaluationGroupId({
-      city: form.city,
-      district: form.district,
-      rooms_count: form.rooms_count,
-      building_type: form.building_type,
-    });
-    if (deviceId) params.set("did", deviceId);
-    if (sessionId) params.set("sid", sessionId);
-    if (evalGroup) params.set("egid", evalGroup);
+    params.set("_new", "1");
 
     router.push(`/evaluare?${params.toString()}`);
   };

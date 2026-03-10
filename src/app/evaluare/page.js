@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
 import { useTranslation } from "@/context/LanguageContext";
+import { getDeviceId, getSessionId, computeEvaluationGroupId } from "@/lib/tracking";
 
 function EvaluareContent() {
   const searchParams = useSearchParams();
@@ -36,6 +37,28 @@ function EvaluareContent() {
     const balconiesVal =
       balconiesRaw === "3+" ? 3 : balconiesRaw != null ? parseInt(balconiesRaw, 10) : null;
 
+    const isFreshEvaluation = searchParams.get("_new") === "1";
+
+    if (isFreshEvaluation) {
+      const clean = new URLSearchParams(searchParams.toString());
+      clean.delete("_new");
+      window.history.replaceState(null, "", `/evaluare?${clean.toString()}`);
+    }
+
+    const trackingData = isFreshEvaluation
+      ? {
+          device_id: getDeviceId(),
+          session_id: getSessionId(),
+          evaluation_group_id: computeEvaluationGroupId({
+            city,
+            district,
+            rooms_count: roomsVal,
+            building_type: searchParams.get("building_type") || null,
+          }),
+          language: lang,
+        }
+      : {};
+
     fetch("/api/estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -50,10 +73,7 @@ function EvaluareContent() {
         renovation: searchParams.get("renovation") || null,
         bathrooms_count: bathroomsVal,
         balconies_count: balconiesVal,
-        device_id: searchParams.get("did") || null,
-        session_id: searchParams.get("sid") || null,
-        evaluation_group_id: searchParams.get("egid") || null,
-        language: lang,
+        ...trackingData,
       }),
     })
       .then((res) => res.json().then((data) => ({ ok: res.ok, status: res.status, data })))

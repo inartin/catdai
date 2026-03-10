@@ -6,6 +6,7 @@ import Hero from "@/components/Hero";
 import CategoryCards from "@/components/CategoryCards";
 import HowItWorks from "@/components/HowItWorks";
 import PropertyForm from "@/components/PropertyForm";
+import MarketPositionChart from "@/components/MarketPositionChart";
 import { GO_HOME_EVENT } from "@/components/Navbar";
 
 function HomeContentInner() {

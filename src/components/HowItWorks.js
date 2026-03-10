@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@/context/LanguageContext";
+import MarketPositionChart from "@/components/MarketPositionChart";
 
 function ArrowIcon() {
   return (
@@ -51,8 +52,9 @@ export default function HowItWorks() {
       <p className="text-lg max-w-md mx-auto mb-10">
         {t("howItWorks.intro")}
       </p>
+      <MarketPositionChart />
 
-      <div className="max-w-2xl mx-auto bg-section-bg rounded-2xl py-10 px-6">
+      <div className="max-w-2xl mx-auto bg-section-bg rounded-2xl py-10 px-6 mt-10">
         <div className="flex items-center justify-center gap-4 sm:gap-6">
           {stepKeys.map((key, i) => (
             <div key={key} className="contents">

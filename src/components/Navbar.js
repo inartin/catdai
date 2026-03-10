@@ -71,7 +71,7 @@ export default function Navbar() {
               RU
             </button>
           </div>
-          <Link
+          {/* <Link
             href="#"
             className="bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg px-5 py-2 transition-colors"
           >
@@ -82,7 +82,7 @@ export default function Navbar() {
             className="text-sm text-gray-500 hover:text-foreground transition-colors hidden sm:inline"
           >
             {t("nav.register")}
-          </Link>
+          </Link> */}
         </div>
       </div>
     </header>

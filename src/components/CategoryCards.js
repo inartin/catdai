@@ -96,7 +96,7 @@ export default function CategoryCards({ onCategorySelect }) {
   ];
 
   return (
-    <section className="pb-16 px-4">
+    <section className="pb-8 px-4">
       <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
         {categories.map((cat) => {
           const isActive = !cat.disabled;

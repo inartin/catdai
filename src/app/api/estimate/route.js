@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { supabase } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
@@ -52,6 +53,21 @@ function computeFeatureAdjustments(bathroomsCount, balconiesCount) {
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const REQUIRED_FIELDS = ["city", "district", "rooms_count", "area_m2"];
+const TRACKING_SALT = process.env.TRACKING_SALT || "catdai-default-salt";
+
+function hashIp(ip) {
+  return crypto.createHash("sha256").update(ip + TRACKING_SALT).digest("hex").slice(0, 16);
+}
+
+function logEstimate(row) {
+  if (process.env.NODE_ENV === "development") return;
+  supabase
+    .from("estimate_log")
+    .insert(row)
+    .then(({ error }) => {
+      if (error) console.error("estimate_log insert failed:", error.message);
+    });
+}
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -120,7 +136,9 @@ export async function POST(request) {
     p_balconies_count: body.balconies_count != null ? parseInt(body.balconies_count, 10) : null,
   };
 
+  const rpcStart = Date.now();
   const { data, error } = await supabase.rpc("estimate_price", params);
+  const responseTimeMs = Date.now() - rpcStart;
 
   if (error) {
     console.error("Supabase RPC error:", error);
@@ -151,6 +169,27 @@ export async function POST(request) {
   }
 
   data.feature_adjustments = featureAdj;
+
+  logEstimate({
+    device_id: body.device_id || null,
+    session_id: body.session_id || null,
+    evaluation_group_id: body.evaluation_group_id || null,
+    ip_hash: hashIp(ip),
+    city: body.city,
+    district: body.district || null,
+    rooms_count: parsedRooms,
+    area_m2: area,
+    building_type: body.building_type || null,
+    renovation: body.renovation || null,
+    floor: params.p_floor,
+    total_floors: params.p_total_floors,
+    bathrooms_count: params.p_bathrooms_count,
+    balconies_count: params.p_balconies_count,
+    estimated_price: data.estimate?.market_rate ?? null,
+    price_per_m2: data.estimate?.price_per_m2 ?? null,
+    language: body.language || null,
+    response_time_ms: responseTimeMs,
+  });
 
   const res = NextResponse.json(data);
   res.headers.set("X-RateLimit-Remaining", String(remaining));

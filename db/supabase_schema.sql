@@ -125,3 +125,38 @@ create index listing_price_history_listing_observed_idx
 
 create index listing_price_history_source_updated_at_idx
   on listing_price_history (source_updated_at);
+
+-- ============================================================
+-- estimate_log — tracks every evaluation request for analytics
+-- ============================================================
+create table estimate_log (
+  id                    text primary key default gen_random_uuid()::text,
+  device_id             text,
+  session_id            text,
+  evaluation_group_id   text,
+  ip_hash               text,
+
+  city                  text,
+  district              text,
+  rooms_count           int,
+  area_m2               numeric(10,2),
+  building_type         text,
+  renovation            text,
+  floor                 int,
+  total_floors          int,
+  bathrooms_count       int,
+  balconies_count       int,
+
+  estimated_price       numeric(12,2),
+  price_per_m2          numeric(12,2),
+
+  language              text,
+  response_time_ms      int,
+  created_at            timestamptz not null default now()
+);
+
+create index idx_estimate_log_device  on estimate_log (device_id);
+create index idx_estimate_log_session on estimate_log (session_id);
+create index idx_estimate_log_group   on estimate_log (evaluation_group_id);
+create index idx_estimate_log_created on estimate_log (created_at);
+create index idx_estimate_log_city    on estimate_log (city, district);

@@ -13,7 +13,7 @@ function EvaluareContent() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
 
   useEffect(() => {
     const city = searchParams.get("city");
@@ -50,6 +50,10 @@ function EvaluareContent() {
         renovation: searchParams.get("renovation") || null,
         bathrooms_count: bathroomsVal,
         balconies_count: balconiesVal,
+        device_id: searchParams.get("did") || null,
+        session_id: searchParams.get("sid") || null,
+        evaluation_group_id: searchParams.get("egid") || null,
+        language: lang,
       }),
     })
       .then((res) => res.json().then((data) => ({ ok: res.ok, status: res.status, data })))

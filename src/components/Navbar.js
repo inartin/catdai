@@ -40,18 +40,6 @@ export default function Navbar() {
           <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm text-gray-500">
-          <Link href="#" className="hover:text-foreground transition-colors">
-            {t("nav.about")}
-          </Link>
-          <Link href="#" className="hover:text-foreground transition-colors">
-            {t("nav.news")}
-          </Link>
-          <Link href="#" className="hover:text-foreground transition-colors">
-            {t("nav.forAgents")}
-          </Link>
-        </nav>
-
         <div className="flex items-center gap-4">
           <div
             className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm font-medium"

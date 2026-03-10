@@ -18,7 +18,7 @@
   "categories.electronicsAnalysis": "Analiză Piață Gadget",
   "categories.comingSoon": "În curând",
 
-  "howItWorks.intro": "Spui ce cauți sau ce vinzi. Noi îți arătăm cum arată piața pentru acel profil.",
+  "howItWorks.intro": "Pe baza criteriilor selectate, analizăm date din anunțuri similare și îți arătăm la ce nivel de preț să te aștepți.",
   "howItWorks.step1": "Setezi criterii",
   "howItWorks.step2": "Vezi prețul pieței",
   "howItWorks.step3": "Ajustezi preferințe",
@@ -112,6 +112,15 @@
   "evaluare.suggestionArea": "Ajustezi suprafața mai aproape de media segmentului",
   "evaluare.editCriteria": "Modifică criteriile",
   "evaluare.tryAgain": "Încearcă din nou",
+
+  "about.title": "Despre CatDai",
+  "about.intro": "CatDai te ajută să înțelegi mai bine piața imobiliară (și nu numai) și să vezi un nivel de preț realist pentru proprietăți similare.",
+  "about.dataSourcesTitle": "Din ce date lucrăm",
+  "about.dataSourcesBody": "Analiza noastră se bazează pe anunțuri publice din platforme precum 999.md și Makler.md. Comparăm proprietăți similare din piață pentru a estima un nivel de preț relevant.",
+  "about.howItWorksTitle": "Cum folosim aceste date",
+  "about.howItWorksBody": "Pentru fiecare căutare, filtrăm anunțuri comparabile după criterii precum oraș, sector, suprafață, număr de camere și alte caracteristici relevante. Rezultatul este o estimare orientativă a pieței, nu o evaluare oficială.",
+  "about.disclaimerTitle": "Clarificare importantă",
+  "about.disclaimerBody": "CatDai nu este afiliat, sponsorizat sau aprobat de platformele menționate. Numele lor sunt folosite doar pentru a explica sursele publice de date analizate.",
 
   "footer.terms": "Termeni & Condiții",
   "footer.privacy": "Politica de Confidențialitate",

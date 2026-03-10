@@ -60,10 +60,19 @@ export default function Footer() {
     <footer className="bg-section-bg border-t border-gray-100 mt-8">
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-sm text-gray-500">
-          <Link href="#" className="hover:text-foreground transition-colors">
-            {t("footer.terms")}
+          <Link href="/about" className="hover:text-foreground transition-colors">
+            {t("nav.about")}
           </Link>
           <Link href="#" className="hover:text-foreground transition-colors">
+            {t("nav.news")}
+          </Link>
+          <Link href="#" className="hover:text-foreground transition-colors">
+            {t("nav.forAgents")}
+          </Link>
+          <Link href="/terms" className="hover:text-foreground transition-colors">
+            {t("footer.terms")}
+          </Link>
+          <Link href="/privacy" className="hover:text-foreground transition-colors">
             {t("footer.privacy")}
           </Link>
 

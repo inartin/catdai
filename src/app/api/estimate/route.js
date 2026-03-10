@@ -2,6 +2,54 @@ import { supabase } from "@/lib/supabase";
 import { rateLimit } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
+/**
+ * Balconies baseline: 1 (most Chisinau apartments have exactly 1)
+ * Bathrooms baseline: 1
+ * Adjustments calibrated from Eastern-European appraisal standards
+ * and hedonic regression studies (see research notes).
+ */
+function computeFeatureAdjustments(bathroomsCount, balconiesCount) {
+  const items = [];
+
+  if (balconiesCount !== null && balconiesCount !== undefined) {
+    let pct = 0;
+    if (balconiesCount === 0) pct = -2;
+    else if (balconiesCount === 2) pct = 2;
+    else if (balconiesCount >= 3) pct = 3;
+    // balconiesCount === 1 → baseline, no adjustment
+
+    if (pct !== 0) {
+      items.push({
+        type: "balconies",
+        count: balconiesCount,
+        pct,
+        label: balconiesCount === 0 ? "Fără balcon" : `${balconiesCount} balcoane`,
+      });
+    }
+  }
+
+  if (bathroomsCount !== null && bathroomsCount !== undefined) {
+    let pct = 0;
+    if (bathroomsCount === 0) pct = -4;
+    else if (bathroomsCount === 2) pct = 3;
+    else if (bathroomsCount >= 3) pct = 5;
+    // bathroomsCount === 1 → baseline, no adjustment
+
+    if (pct !== 0) {
+      items.push({
+        type: "bathrooms",
+        count: bathroomsCount,
+        pct,
+        label: bathroomsCount === 0 ? "Fără baie" : `${bathroomsCount} băi`,
+      });
+    }
+  }
+
+  const totalPct = items.reduce((sum, i) => sum + i.pct, 0);
+  const multiplier = 1 + totalPct / 100;
+  return { items, total_pct: totalPct, multiplier };
+}
+
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const REQUIRED_FIELDS = ["city", "district", "rooms_count", "area_m2"];
 
@@ -88,6 +136,21 @@ export async function POST(request) {
       { status: 422 }
     );
   }
+
+  const featureAdj = computeFeatureAdjustments(
+    params.p_bathrooms_count,
+    params.p_balconies_count
+  );
+
+  if (featureAdj.items.length > 0) {
+    const m = featureAdj.multiplier;
+    data.estimate.fast_sale   = Math.round((data.estimate.fast_sale   * m) / 100) * 100;
+    data.estimate.market_rate = Math.round((data.estimate.market_rate * m) / 100) * 100;
+    data.estimate.premium     = Math.round((data.estimate.premium     * m) / 100) * 100;
+    data.estimate.price_per_m2 = Math.round(data.estimate.price_per_m2 * m * 100) / 100;
+  }
+
+  data.feature_adjustments = featureAdj;
 
   const res = NextResponse.json(data);
   res.headers.set("X-RateLimit-Remaining", String(remaining));

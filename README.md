@@ -19,3 +19,4 @@ User inputs property details (zone, m², rooms, floor, renovation, etc.) and rec
 
 
 # Roadmap
+- [x] Telegram/X/Blog news cu statistica pe piata, daily sau saptamanal

@@ -16,3 +16,6 @@ User inputs property details (zone, m², rooms, floor, renovation, etc.) and rec
 - **Free tier**: limited estimates + Adsense ads
 - **Paid tier**: full report / unlimited estimates
 - **Business plan**: for agencies - fast evaluations + PDF export / history
+
+
+# Roadmap

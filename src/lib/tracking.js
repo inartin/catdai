@@ -41,3 +41,19 @@ export function computeEvaluationGroupId({ city, district, rooms_count, building
     .join("|");
   return djb2(raw);
 }
+
+const LOG_ID_PREFIX = "catdai-log-";
+
+export function getOrCreateLogId(evaluationGroupId) {
+  try {
+    const key = LOG_ID_PREFIX + evaluationGroupId;
+    let id = sessionStorage.getItem(key);
+    if (!id) {
+      id = crypto.randomUUID();
+      sessionStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return crypto.randomUUID();
+  }
+}

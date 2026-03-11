@@ -64,9 +64,9 @@ function logEstimate(row) {
   if (process.env.NODE_ENV === "development") return;
   supabaseAdmin
     .from("estimate_log")
-    .insert(row)
+    .upsert(row, { onConflict: "id" })
     .then(({ error }) => {
-      if (error) console.error("estimate_log insert failed:", error.message);
+      if (error) console.error("estimate_log upsert failed:", error.message);
     });
 }
 
@@ -173,6 +173,7 @@ export async function POST(request) {
 
   if (body.device_id) {
     logEstimate({
+      id: body.log_id || undefined,
       device_id: body.device_id,
       session_id: body.session_id || null,
       evaluation_group_id: body.evaluation_group_id || null,

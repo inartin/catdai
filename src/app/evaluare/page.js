@@ -6,7 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
 import { useTranslation } from "@/context/LanguageContext";
-import { getDeviceId, getSessionId, computeEvaluationGroupId } from "@/lib/tracking";
+import { getDeviceId, getSessionId, computeEvaluationGroupId, getOrCreateLogId } from "@/lib/tracking";
 
 function EvaluareContent() {
   const searchParams = useSearchParams();
@@ -46,17 +46,21 @@ function EvaluareContent() {
     }
 
     const trackingData = isFreshEvaluation
-      ? {
-          device_id: getDeviceId(),
-          session_id: getSessionId(),
-          evaluation_group_id: computeEvaluationGroupId({
+      ? (() => {
+          const evalGroupId = computeEvaluationGroupId({
             city,
             district,
             rooms_count: roomsVal,
             building_type: searchParams.get("building_type") || null,
-          }),
-          language: lang,
-        }
+          });
+          return {
+            log_id: getOrCreateLogId(evalGroupId),
+            device_id: getDeviceId(),
+            session_id: getSessionId(),
+            evaluation_group_id: evalGroupId,
+            language: lang,
+          };
+        })()
       : {};
 
     fetch("/api/estimate", {

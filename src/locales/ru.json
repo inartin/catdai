@@ -52,6 +52,7 @@
   "form.bathrooms": "Ванные",
   "form.balconies": "Балконы",
   "form.submit": "Смотреть анализ рынка",
+  "form.cityOnlyNotice": "Пока доступен только для Кишинёва",
   "form.socialProof": "Анализ на основе реальных объявлений из {city}",
 
   "result.confidenceHigh": "Высокая",

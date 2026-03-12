@@ -84,7 +84,7 @@ function ChevronIcon({ open }) {
   );
 }
 
-function SelectField({ label, required, value, onChange, placeholder, options, labelFn }) {
+function SelectField({ label, required, value, onChange, placeholder, options, labelFn, disabled }) {
   return (
     <div>
       <label className="text-sm text-gray-600 mb-1.5 block">
@@ -95,7 +95,8 @@ function SelectField({ label, required, value, onChange, placeholder, options, l
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full appearance-none rounded-xl border border-gray-200 bg-white pl-4 pr-10 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors cursor-pointer"
+          disabled={disabled}
+          className={`w-full appearance-none rounded-xl border border-gray-200 pl-4 pr-10 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors ${disabled ? "bg-gray-50 opacity-60 cursor-not-allowed" : "bg-white cursor-pointer"}`}
         >
           <option value="">{placeholder}</option>
           {options.map((opt) => (
@@ -145,7 +146,7 @@ export default function PropertyForm({ onBack, initialValues }) {
   const router = useRouter();
   const { t } = useTranslation();
   const [form, setForm] = useState({
-    city: initialValues?.city ?? "",
+    city: initialValues?.city ?? "Chișinău",
     district: initialValues?.district ?? "",
     rooms_count: initialValues?.rooms_count ?? null,
     area_m2: initialValues?.area_m2 ?? "",
@@ -356,7 +357,14 @@ export default function PropertyForm({ onBack, initialValues }) {
                   placeholder={t("form.selectCity")}
                   options={cities}
                   labelFn={(v) => t(`data.city.${v}`)}
+                  disabled
                 />
+                <p className="mt-1.5 flex items-center gap-1 text-xs text-blue-600/70">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+                    <path fillRule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
+                  </svg>
+                  {t("form.cityOnlyNotice")}
+                </p>
               </div>
 
               {form.city && districts.length > 0 && (

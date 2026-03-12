@@ -52,6 +52,7 @@
   "form.bathrooms": "Băi",
   "form.balconies": "Balcoane",
   "form.submit": "Vezi Analiza Pieței",
+  "form.cityOnlyNotice": "Momentan disponibil doar pentru Chișinău",
   "form.socialProof": "Analiză bazată pe anunțuri reale din {city}",
 
   "result.confidenceHigh": "Înaltă",

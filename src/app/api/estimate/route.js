@@ -113,6 +113,14 @@ export async function POST(request) {
     );
   }
 
+  const ALLOWED_CITIES = ["Chișinău"];
+  if (!ALLOWED_CITIES.includes(body.city)) {
+    return NextResponse.json(
+      { error: "Only Chișinău is currently supported" },
+      { status: 400 }
+    );
+  }
+
   const area = parseFloat(body.area_m2);
   if (isNaN(area) || area <= 0 || area > 1000) {
     return NextResponse.json(

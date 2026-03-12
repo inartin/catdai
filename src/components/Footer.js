@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useTranslation } from "@/context/LanguageContext";
+import TelegramIcon from "@/components/icons/TelegramIcon";
 
 function FacebookIcon() {
   return (
@@ -47,7 +48,7 @@ function InstagramIcon() {
 }
 
 const socialLinks = [
-  // { icon: <FacebookIcon />, label: "Facebook" },
+  { icon: <TelegramIcon />, label: "Telegram", href: "https://t.me/catdaimd" },
   // { icon: <TwitterIcon />, label: "Twitter" },
   // { icon: <YoutubeIcon />, label: "YouTube" },
   // { icon: <InstagramIcon />, label: "Instagram" },
@@ -80,7 +81,7 @@ export default function Footer() {
             {socialLinks.map((s) => (
               <Link
                 key={s.label}
-                href="#"
+                href={s.href}
                 aria-label={s.label}
                 className="hover:text-foreground transition-colors"
               >

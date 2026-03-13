@@ -13,6 +13,18 @@ function fmtPrice(amount, currency) {
   return `${fmtNum(amount)} ${currency || "\u20AC"}`;
 }
 
+function fmtPct(n) {
+  if (n == null || !Number.isFinite(n)) return "\u2014";
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${n.toFixed(1)}%`;
+}
+
+function fmtChange(n) {
+  if (n == null || !Number.isFinite(n)) return "\u2014";
+  const sign = n > 0 ? "+" : "";
+  return `${sign}${fmtNum(Math.round(n))} \u20AC`;
+}
+
 function fmtDate(d) {
   if (!d) return "\u2014";
   return new Date(d).toLocaleDateString("ro-RO", {
@@ -30,6 +42,60 @@ function StatCard({ label, value, detail }) {
       </p>
       <p className="mt-1 text-2xl font-semibold text-gray-900">{value}</p>
       {detail && <p className="mt-1 text-xs text-gray-400">{detail}</p>}
+    </div>
+  );
+}
+
+function DirectionCard({ label, value, color, detail }) {
+  const colorClasses = {
+    green: "border-green-200 bg-green-50",
+    red: "border-red-200 bg-red-50",
+    gray: "border-gray-100 bg-white",
+  };
+  const valueClasses = {
+    green: "text-green-700",
+    red: "text-red-700",
+    gray: "text-gray-900",
+  };
+  return (
+    <div
+      className={`rounded-xl p-4 shadow-sm border ${colorClasses[color] || colorClasses.gray}`}
+    >
+      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+        {label}
+      </p>
+      <p
+        className={`mt-1 text-xl font-bold ${valueClasses[color] || valueClasses.gray}`}
+      >
+        {value}
+      </p>
+      {detail && <p className="mt-0.5 text-xs text-gray-500">{detail}</p>}
+    </div>
+  );
+}
+
+const PERIOD_OPTIONS = [
+  { key: "24h", label: "24h" },
+  { key: "7d", label: "7 days" },
+  { key: "30d", label: "30 days" },
+];
+
+function PeriodToggle({ selected, onChange }) {
+  return (
+    <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+      {PERIOD_OPTIONS.map((opt) => (
+        <button
+          key={opt.key}
+          onClick={() => onChange(opt.key)}
+          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+            selected === opt.key
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   );
 }
@@ -74,6 +140,7 @@ function DistributionTable({ title, data }) {
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  const [period, setPeriod] = useState("7d");
 
   useEffect(() => {
     fetch("/api/admin/stats")
@@ -93,6 +160,9 @@ export default function AdminDashboard() {
   }
 
   const s = stats;
+  const md = s.marketDirection?.[period] || {};
+  const pc = md.priceChanges || {};
+  const netChange = (md.newListings || 0) - (md.removedListings || 0);
 
   return (
     <div className="space-y-8">
@@ -108,6 +178,78 @@ export default function AdminDashboard() {
         <StatCard label="Owners" value={fmtNum(s.totalOwners)} />
         <StatCard label="Avg Price" value={fmtPrice(s.avgPrice)} />
         <StatCard label="Avg Price/m\u00B2" value={fmtPrice(s.avgPricePerM2)} />
+      </div>
+
+      {/* Market Direction */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Market Direction
+          </h2>
+          <PeriodToggle selected={period} onChange={setPeriod} />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <DirectionCard
+            label="New Ads"
+            value={fmtNum(md.newListings)}
+            color="green"
+          />
+          <DirectionCard
+            label="Removed"
+            value={fmtNum(md.removedListings)}
+            color="red"
+          />
+          <DirectionCard
+            label="Net Change"
+            value={`${netChange >= 0 ? "+" : ""}${fmtNum(netChange)}`}
+            color={netChange > 0 ? "green" : netChange < 0 ? "red" : "gray"}
+          />
+          <DirectionCard
+            label="Price Changes"
+            value={fmtNum(pc.total)}
+            color="gray"
+            detail={
+              pc.total > 0
+                ? `${fmtNum(pc.up)} up / ${fmtNum(pc.down)} down`
+                : null
+            }
+          />
+          <DirectionCard
+            label="Avg Change"
+            value={fmtChange(pc.avgChange)}
+            color={
+              pc.avgChange > 0 ? "green" : pc.avgChange < 0 ? "red" : "gray"
+            }
+            detail={fmtPct(pc.avgChangePct)}
+          />
+          <DirectionCard
+            label="Price Direction"
+            value={
+              pc.total > 0
+                ? pc.down > pc.up
+                  ? "Falling"
+                  : pc.up > pc.down
+                    ? "Rising"
+                    : "Stable"
+                : "\u2014"
+            }
+            color={
+              pc.total > 0
+                ? pc.down > pc.up
+                  ? "red"
+                  : pc.up > pc.down
+                    ? "green"
+                    : "gray"
+                : "gray"
+            }
+            detail={
+              pc.total > 0
+                ? `${Math.round((Math.max(pc.up, pc.down) / pc.total) * 100)}% of changes`
+                : null
+            }
+          />
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">

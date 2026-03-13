@@ -5,6 +5,14 @@ const PAGE = 1000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 let cache = { data: null, ts: 0 };
 
+const PERIODS = {
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+};
+
+const EMPTY_PRICE_CHANGES = { total: 0, up: 0, down: 0, avgChange: 0, avgChangePct: 0 };
+
 async function fetchAllRows(buildQuery) {
   let all = [];
   let from = 0;
@@ -38,35 +46,70 @@ function groupBy(arr, key) {
     .sort((a, b) => b.count - a.count);
 }
 
+async function fetchPriceChangeStats(cutoff) {
+  const params = cutoff ? { since: cutoff } : {};
+  const { data, error } = await supabaseAdmin.rpc("price_change_stats", params);
+  if (error) return null;
+  return data;
+}
+
 export async function GET() {
   if (cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
     return NextResponse.json(cache.data);
   }
 
-  const [countAll, countActive, countOwners, listings, recentRes] =
-    await Promise.all([
-      supabaseAdmin.from("listing").select("*", { count: "exact", head: true }),
-      supabaseAdmin
-        .from("listing")
-        .select("*", { count: "exact", head: true })
-        .eq("is_active", true),
-      supabaseAdmin.from("owner").select("*", { count: "exact", head: true }),
-      fetchAllRows(() =>
-        supabaseAdmin
-          .from("listing")
-          .select(
-            "price_amount, price_per_m2, area_m2, rooms_count, district, sector, city, renovation, building_type"
-          )
-          .eq("is_active", true)
-      ),
+  const now = Date.now();
+  const cutoffs = Object.fromEntries(
+    Object.entries(PERIODS).map(([k, ms]) => [k, new Date(now - ms).toISOString()])
+  );
+
+  const [
+    countAll,
+    countActive,
+    countOwners,
+    listings,
+    recentRes,
+    new24h,
+    new7d,
+    new30d,
+    removed24h,
+    removed7d,
+    removed30d,
+    pc24h,
+    pc7d,
+    pc30d,
+  ] = await Promise.all([
+    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }),
+    supabaseAdmin
+      .from("listing")
+      .select("*", { count: "exact", head: true })
+      .eq("is_active", true),
+    supabaseAdmin.from("owner").select("*", { count: "exact", head: true }),
+    fetchAllRows(() =>
       supabaseAdmin
         .from("listing")
         .select(
-          "id, title, price_amount, price_currency, area_m2, rooms_count, district, sector, is_active, created_at, source_url"
+          "price_amount, price_per_m2, area_m2, rooms_count, district, sector, city, renovation, building_type"
         )
-        .order("created_at", { ascending: false })
-        .limit(10),
-    ]);
+        .eq("is_active", true)
+    ),
+    supabaseAdmin
+      .from("listing")
+      .select(
+        "id, title, price_amount, price_currency, area_m2, rooms_count, district, sector, is_active, created_at, source_url"
+      )
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["24h"]),
+    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["7d"]),
+    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["30d"]),
+    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["24h"]),
+    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["7d"]),
+    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["30d"]),
+    fetchPriceChangeStats(cutoffs["24h"]),
+    fetchPriceChangeStats(cutoffs["7d"]),
+    fetchPriceChangeStats(cutoffs["30d"]),
+  ]);
 
   const priced = listings.filter((l) => l.price_amount != null);
   const prices = priced.map((l) => Number(l.price_amount));
@@ -82,6 +125,23 @@ export async function GET() {
     avgPrice: avg(prices),
     avgPricePerM2: avg(pricesPerM2),
     avgArea: avg(areas),
+    marketDirection: {
+      "24h": {
+        newListings: new24h.count || 0,
+        removedListings: removed24h.count || 0,
+        priceChanges: pc24h || EMPTY_PRICE_CHANGES,
+      },
+      "7d": {
+        newListings: new7d.count || 0,
+        removedListings: removed7d.count || 0,
+        priceChanges: pc7d || EMPTY_PRICE_CHANGES,
+      },
+      "30d": {
+        newListings: new30d.count || 0,
+        removedListings: removed30d.count || 0,
+        priceChanges: pc30d || EMPTY_PRICE_CHANGES,
+      },
+    },
     byDistrict: groupBy(listings, "district").slice(0, 20),
     byRooms: groupBy(listings, "rooms_count"),
     byRenovation: groupBy(listings, "renovation"),

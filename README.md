@@ -25,6 +25,8 @@ User inputs property details (zone, m², rooms, floor, renovation, etc.) and rec
 - [ ] AI specific recomandari bazanduse pe detalii aditionale de utilizator, nu din filtre.
 - [ ] Cauta date cadastrale fara nr cadastral, dupa adresa fixa.
 - [ ] Cadastru cache, store raw building info in db
+- [ ] Verify Google auth in Audience tab
+- [ ] Verify Facebook auth in Audience tab
 
 
 - [ ] Freemium

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import GoogleIcon from "@/components/icons/GoogleIcon";
+import FacebookIcon from "@/components/icons/FacebookIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 
 export default function LoginButton({ className = "", menuAlign = "right" }) {
@@ -15,6 +16,7 @@ export default function LoginButton({ className = "", menuAlign = "right" }) {
     error,
     activeProvider,
     signInWithGoogle,
+    signInWithFacebook,
     signInWithTelegram,
     signOut,
     clearAuthError,
@@ -76,6 +78,21 @@ export default function LoginButton({ className = "", menuAlign = "right" }) {
             <span className="flex items-center justify-center gap-2.5 whitespace-nowrap">
               <GoogleIcon size={16} className="text-[#4285F4]" />
               <span>{activeProvider === "google" ? t("auth.loading") : t("auth.loginWithGoogle")}</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={async () => {
+              await signInWithFacebook();
+            }}
+            aria-label={t("auth.loginWithFacebook")}
+            aria-busy={activeProvider === "facebook"}
+            className="mt-2 w-full rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className="flex items-center justify-center gap-2.5 whitespace-nowrap">
+              <FacebookIcon size={16} className="text-[#1877F2]" />
+              <span>{activeProvider === "facebook" ? t("auth.loading") : t("auth.loginWithFacebook")}</span>
             </span>
           </button>
           {/* <button

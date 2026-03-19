@@ -185,6 +185,10 @@ export function AuthProvider({ children }) {
     return signInWithProviders("google", ["google"]);
   }, [signInWithProviders]);
 
+  const signInWithFacebook = useCallback(async () => {
+    return signInWithProviders("facebook", ["facebook"]);
+  }, [signInWithProviders]);
+
   const signInWithTelegram = useCallback(async () => {
     const configured = process.env.NEXT_PUBLIC_SUPABASE_TELEGRAM_PROVIDER;
     const providers = normalizeProviders([configured, "telegram", "custom:telegram"]);
@@ -210,11 +214,22 @@ export function AuthProvider({ children }) {
       activeProvider,
       isAuthenticated: !!session,
       signInWithGoogle,
+      signInWithFacebook,
       signInWithTelegram,
       signOut,
       clearAuthError: () => setError(null),
     }),
-    [session, user, loading, error, activeProvider, signInWithGoogle, signInWithTelegram, signOut]
+    [
+      session,
+      user,
+      loading,
+      error,
+      activeProvider,
+      signInWithGoogle,
+      signInWithFacebook,
+      signInWithTelegram,
+      signOut,
+    ]
   );
 
   return (

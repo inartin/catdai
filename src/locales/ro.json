@@ -8,6 +8,7 @@
   "nav.register": "înregistrare",
   "auth.loginWithTelegram": "Intră cu Telegram",
   "auth.loginWithGoogle": "Intră cu Google",
+  "auth.loginWithFacebook": "Intră cu Facebook",
   "auth.loading": "Se încarcă...",
 
   "hero.title": "Înțelege piața, apoi decide.",

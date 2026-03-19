@@ -8,6 +8,7 @@
   "nav.register": "Регистрация",
   "auth.loginWithTelegram": "Войти через Telegram",
   "auth.loginWithGoogle": "Войти через Google",
+  "auth.loginWithFacebook": "Войти через Facebook",
   "auth.loading": "Загрузка...",
 
   "hero.title": "Пойми рынок, потом решай.",

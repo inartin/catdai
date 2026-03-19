@@ -8,6 +8,14 @@ function formatPrice(num) {
   return "€" + Math.round(num).toLocaleString("ro-MD");
 }
 
+function LockedValue({ text = "999999", className = "" }) {
+  return (
+    <span aria-hidden className={`inline-block select-none blur-sm ${className}`}>
+      {text}
+    </span>
+  );
+}
+
 function FilterBadge({ label, active }) {
   return (
     <span
@@ -55,12 +63,15 @@ function FeatureAdjustmentBadge({ item }) {
   );
 }
 
-function DistrictComparison({ districts, currentDistrict, area }) {
+function DistrictComparison({ districts, currentDistrict, area, blurValues }) {
   const { t } = useTranslation();
 
   if (!districts || districts.length < 2) return null;
 
-  const maxPpm = Math.max(...districts.map((d) => d.median_ppm));
+  const numericMedians = districts
+    .map((d) => Number(d?.median_ppm))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const maxPpm = numericMedians.length > 0 ? Math.max(...numericMedians) : null;
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
@@ -73,8 +84,17 @@ function DistrictComparison({ districts, currentDistrict, area }) {
       <div className="space-y-3">
         {districts.map((d) => {
           const isCurrent = d.district === currentDistrict;
-          const widthPct = Math.max(8, (d.median_ppm / maxPpm) * 100);
-          const totalPrice = Math.round(d.median_ppm * area);
+          const medianPpm = Number(d?.median_ppm);
+          const relativeWidthFromPayload = Number(d?.relative_width_pct);
+          const widthPct =
+            Number.isFinite(relativeWidthFromPayload)
+              ? relativeWidthFromPayload
+              : (Number.isFinite(medianPpm) && maxPpm
+                  ? Math.max(8, (medianPpm / maxPpm) * 100)
+                  : 8);
+          const totalPrice =
+            Number.isFinite(medianPpm) ? Math.round(medianPpm * area) : null;
+
           return (
             <div key={d.district} className="flex items-center gap-3">
               <span
@@ -97,7 +117,14 @@ function DistrictComparison({ districts, currentDistrict, area }) {
                   } ${isCurrent ? "font-bold text-primary" : "text-gray-600"}`}
                   style={widthPct > 50 ? {} : { left: `calc(${widthPct}% + 8px)` }}
                 >
-                  €{totalPrice.toLocaleString("ro-MD")}
+                  {blurValues || totalPrice == null ? (
+                    <LockedValue
+                      text="€99.999"
+                      className={isCurrent ? "text-primary" : "text-gray-500"}
+                    />
+                  ) : (
+                    `€${totalPrice.toLocaleString("ro-MD")}`
+                  )}
                 </span>
               </div>
             </div>
@@ -126,6 +153,14 @@ export default function EstimateResult({ data, onReset }) {
   const [copied, setCopied] = useState(false);
   const { t, lang } = useTranslation();
 
+  const isPaid = data.access_tier === "paid";
+  const lockedSections = data.locked_sections || {};
+  const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
+  const hideCadastralDetails = !isPaid && lockedSections.cadastral_details !== false;
+  const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
+  const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
+  const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
+
   const todayFormatted = new Date().toLocaleDateString(
     lang === "ru" ? "ru-RU" : "ro-RO",
     { day: "numeric", month: "long", year: "numeric" }
@@ -150,13 +185,16 @@ export default function EstimateResult({ data, onReset }) {
     input.area_m2 && filters_used.area === false,
   ].some(Boolean);
 
-  const rangeMin = market_stats.min_price_per_m2 * input.area_m2;
-  const rangeMax = market_stats.max_price_per_m2 * input.area_m2;
+  const rangeMin = Number(market_stats?.min_price_per_m2) * Number(input.area_m2);
+  const rangeMax = Number(market_stats?.max_price_per_m2) * Number(input.area_m2);
   const rangeSpan = rangeMax - rangeMin || 1;
-  const markerPct = Math.max(
+  const computedMarkerPct = Math.max(
     2,
     Math.min(98, ((estimate.market_rate - rangeMin) / rangeSpan) * 100)
   );
+  const markerPct = Number.isFinite(data?.market_position?.marker_pct)
+    ? data.market_position.marker_pct
+    : (Number.isFinite(computedMarkerPct) ? computedMarkerPct : 50);
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
@@ -262,9 +300,19 @@ export default function EstimateResult({ data, onReset }) {
           <div className="p-5 sm:p-6 text-center">
             <p className="text-sm text-gray-400 mb-1">{t("result.fastSale")}</p>
             <p className="text-xl font-bold text-emerald-600">
-              {formatPrice(estimate.fast_sale)}
+              {hidePriceTiers ? (
+                <LockedValue text="€999.999" className="text-emerald-600" />
+              ) : (
+                formatPrice(estimate.fast_sale)
+              )}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">-10%</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {hidePriceTiers ? (
+                <LockedValue text="-99%" />
+              ) : (
+                "-10%"
+              )}
+            </p>
           </div>
           <div className="p-5 sm:p-6 text-center bg-primary/5">
             <p className="text-sm text-gray-400 mb-1">{t("result.marketPrice")}</p>
@@ -275,12 +323,28 @@ export default function EstimateResult({ data, onReset }) {
           <div className="p-5 sm:p-6 text-center">
             <p className="text-sm text-gray-400 mb-1">{t("result.targetPrice")}</p>
             <p className="text-xl font-bold text-amber-600">
-              {formatPrice(estimate.premium)}
+              {hidePriceTiers ? (
+                <LockedValue text="€999.999" className="text-amber-600" />
+              ) : (
+                formatPrice(estimate.premium)
+              )}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">+8%</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {hidePriceTiers ? (
+                <LockedValue text="+99%" />
+              ) : (
+                "+8%"
+              )}
+            </p>
           </div>
         </div>
       </div>
+
+      {!isPaid && (
+        <p className="text-sm text-gray-600 px-1">
+          {t("result.freeTierUncertaintyLine")}
+        </p>
+      )}
 
       {cadastral && !cadastral.partial && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 shadow-sm p-6 sm:p-8">
@@ -291,8 +355,10 @@ export default function EstimateResult({ data, onReset }) {
             {t("result.cadastralDataTitle")}
           </p>
 
-          {cadastral.apartment?.address && (
-            <p className="text-sm text-emerald-700 mb-3">{cadastral.apartment.address}</p>
+          {(cadastral.apartment?.address || cadastral.building?.address) && (
+            <p className="text-sm text-emerald-700 mb-3">
+              {cadastral.apartment?.address || cadastral.building?.address}
+            </p>
           )}
 
           <p className="text-sm font-medium text-emerald-800 mb-1.5">{t("form.cadastralApartment")}</p>
@@ -301,39 +367,60 @@ export default function EstimateResult({ data, onReset }) {
               <p>{t("form.cadastralArea")}: <span className="font-medium">{cadastral.apartment.area_m2} m²</span></p>
             )}
             {cadastral.apartment?.floor && (
-              <p>{t("")}<span className="font-medium">
+              <p>{t("form.cadastralFloor")}: <span className="font-medium">
                 {cadastral.building?.total_floors
                   ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
                   : cadastral.apartment.floor}
               </span></p>
             )}
-            {cadastral.apartment?.estimated_value_lei && (
-              <p>{t("form.cadastralEstimatedValue")}: <span className="font-medium">{cadastral.apartment.estimated_value_lei} lei</span></p>
+            {hideCadastralDetails ? (
+              <p>
+                {t("form.cadastralEstimatedValue")}:{" "}
+                <LockedValue text="999999 lei" className="font-medium" />
+              </p>
+            ) : (
+              cadastral.apartment?.estimated_value_lei && (
+                <p>{t("form.cadastralEstimatedValue")}: <span className="font-medium">{cadastral.apartment.estimated_value_lei} lei</span></p>
+              )
             )}
           </div>
 
           <p className="text-sm font-medium text-emerald-800 mb-1.5">{t("form.cadastralBuilding")}</p>
           <div className="text-sm text-emerald-700 space-y-1">
-            {cadastral.building?.classifier && (
-              <p>{t("form.cadastralClassifier")}: <span className="font-medium">{cadastral.building.classifier}</span></p>
-            )}
-            {cadastral.building?.condition && (
-              <p>{t("form.cadastralCondition")}: <span className="font-medium">{cadastral.building.condition}</span></p>
-            )}
-            {cadastral.building?.construction_year && (
-              <p>{t("form.cadastralYear")}: <span className="font-medium">{cadastral.building.construction_year}</span></p>
-            )}
-            {cadastral.building?.wall_material && (
-              <p>{t("form.cadastralWallMaterial")}: <span className="font-medium">{cadastral.building.wall_material}</span></p>
-            )}
-            {cadastral.building?.water && (
-              <p>{t("form.cadastralWater")}: <span className="font-medium">{cadastral.building.water}</span></p>
-            )}
-            {cadastral.building?.sewage && (
-              <p>{t("form.cadastralSewage")}: <span className="font-medium">{cadastral.building.sewage}</span></p>
-            )}
-            {cadastral.building?.gas && (
-              <p>{t("form.cadastralGas")}: <span className="font-medium">{cadastral.building.gas}</span></p>
+            {hideCadastralDetails ? (
+              <>
+                <p>{t("form.cadastralClassifier")}: <LockedValue text="999999" className="font-medium" /></p>
+                <p>{t("form.cadastralCondition")}: <LockedValue text="999999" className="font-medium" /></p>
+                <p>{t("form.cadastralYear")}: <LockedValue text="9999" className="font-medium" /></p>
+                <p>{t("form.cadastralWallMaterial")}: <LockedValue text="999999" className="font-medium" /></p>
+                <p>{t("form.cadastralWater")}: <LockedValue text="999999" className="font-medium" /></p>
+                <p>{t("form.cadastralSewage")}: <LockedValue text="999999" className="font-medium" /></p>
+                <p>{t("form.cadastralGas")}: <LockedValue text="999999" className="font-medium" /></p>
+              </>
+            ) : (
+              <>
+                {cadastral.building?.classifier && (
+                  <p>{t("form.cadastralClassifier")}: <span className="font-medium">{cadastral.building.classifier}</span></p>
+                )}
+                {cadastral.building?.condition && (
+                  <p>{t("form.cadastralCondition")}: <span className="font-medium">{cadastral.building.condition}</span></p>
+                )}
+                {cadastral.building?.construction_year && (
+                  <p>{t("form.cadastralYear")}: <span className="font-medium">{cadastral.building.construction_year}</span></p>
+                )}
+                {cadastral.building?.wall_material && (
+                  <p>{t("form.cadastralWallMaterial")}: <span className="font-medium">{cadastral.building.wall_material}</span></p>
+                )}
+                {cadastral.building?.water && (
+                  <p>{t("form.cadastralWater")}: <span className="font-medium">{cadastral.building.water}</span></p>
+                )}
+                {cadastral.building?.sewage && (
+                  <p>{t("form.cadastralSewage")}: <span className="font-medium">{cadastral.building.sewage}</span></p>
+                )}
+                {cadastral.building?.gas && (
+                  <p>{t("form.cadastralGas")}: <span className="font-medium">{cadastral.building.gas}</span></p>
+                )}
+              </>
             )}
           </div>
           <p className="text-xs text-emerald-600 mt-4">{t("result.cadastralDataSource")}</p>
@@ -381,13 +468,25 @@ export default function EstimateResult({ data, onReset }) {
 
           <div className="flex justify-between mt-3">
             <span className="text-xs text-gray-400">
-              {formatPrice(range.low)}
+              {hideMarketPositionNumbers ? (
+                <LockedValue text="€999.999" />
+              ) : (
+                formatPrice(range.low)
+              )}
             </span>
             <span className="text-sm text-gray-500 font-medium">
-              {t("result.median", { price: formatPrice(market_stats.median_price_per_m2) })}
+              {hideMarketPositionNumbers ? (
+                <LockedValue text={t("result.median", { price: "€999.999" })} />
+              ) : (
+                t("result.median", { price: formatPrice(market_stats.median_price_per_m2) })
+              )}
             </span>
             <span className="text-xs text-gray-400">
-              {formatPrice(range.high)}
+              {hideMarketPositionNumbers ? (
+                <LockedValue text="€999.999" />
+              ) : (
+                formatPrice(range.high)
+              )}
             </span>
           </div>
         </div>
@@ -541,6 +640,7 @@ export default function EstimateResult({ data, onReset }) {
         districts={district_comparison}
         currentDistrict={input.district}
         area={input.area_m2}
+        blurValues={hideDistrictComparisonValues}
       />
 
       {/* Market stats */}
@@ -556,19 +656,31 @@ export default function EstimateResult({ data, onReset }) {
           <div>
             <p className="text-sm text-gray-400 mb-1">{t("result.avgPricePerM2")}</p>
             <p className="text-xl font-bold text-gray-900">
-              {formatPrice(market_stats.avg_price_per_m2)}
+              {hideMarketStatsValues ? (
+                <LockedValue text="€999.999" />
+              ) : (
+                formatPrice(market_stats.avg_price_per_m2)
+              )}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-400 mb-1">{t("result.medianPricePerM2")}</p>
             <p className="text-xl font-bold text-gray-900">
-              {formatPrice(market_stats.median_price_per_m2)}
+              {hideMarketStatsValues ? (
+                <LockedValue text="€999.999" />
+              ) : (
+                formatPrice(market_stats.median_price_per_m2)
+              )}
             </p>
           </div>
           <div>
             <p className="text-sm text-gray-400 mb-1">{t("result.avgTotalPrice")}</p>
             <p className="text-xl font-bold text-gray-900">
-              {formatPrice(market_stats.avg_price)}
+              {hideMarketStatsValues ? (
+                <LockedValue text="€999.999" />
+              ) : (
+                formatPrice(market_stats.avg_price)
+              )}
             </p>
           </div>
         </div>

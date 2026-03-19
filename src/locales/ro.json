@@ -132,6 +132,7 @@
   "result.avgPricePerM2": "Preț mediu/m²",
   "result.medianPricePerM2": "Preț median/m²",
   "result.avgTotalPrice": "Preț mediu total",
+  "result.freeTierUncertaintyLine": "Prețul real poate varia cu până la 10%. Vezi mai multe detalii in analiza completă.",
   "result.changeCriteria": "Schimbă criteriile",
   "result.linkCopied": "Link copiat!",
   "result.shareAnalysis": "Trimite analiza",

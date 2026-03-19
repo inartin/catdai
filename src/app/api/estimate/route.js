@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
@@ -76,6 +77,86 @@ function getClientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
   return request.headers.get("x-real-ip") || request.ip || "unknown";
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function computeMarketMarkerPct(payload) {
+  const area = Number(payload?.input?.area_m2);
+  const minPpm = Number(payload?.market_stats?.min_price_per_m2);
+  const maxPpm = Number(payload?.market_stats?.max_price_per_m2);
+  const marketRate = Number(payload?.estimate?.market_rate);
+
+  if (!Number.isFinite(area) || area <= 0) return 50;
+  if (!Number.isFinite(minPpm) || !Number.isFinite(maxPpm) || maxPpm <= minPpm) return 50;
+  if (!Number.isFinite(marketRate)) return 50;
+
+  const rangeMin = minPpm * area;
+  const rangeMax = maxPpm * area;
+  const span = rangeMax - rangeMin;
+  if (!Number.isFinite(span) || span <= 0) return 50;
+
+  return clamp(((marketRate - rangeMin) / span) * 100, 2, 98);
+}
+
+function buildDistrictComparisonPreview(items) {
+  const districts = Array.isArray(items) ? items : [];
+  const medians = districts
+    .map((item) => Number(item?.median_ppm))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  const maxMedian = medians.length > 0 ? Math.max(...medians) : null;
+
+  return districts.map((item) => {
+    const district = item?.district || null;
+    const median = Number(item?.median_ppm);
+
+    if (!district) return null;
+
+    const relativeWidthPct =
+      Number.isFinite(median) && median > 0 && maxMedian && maxMedian > 0
+        ? clamp((median / maxMedian) * 100, 8, 100)
+        : 8;
+
+    return {
+      district,
+      relative_width_pct: relativeWidthPct,
+    };
+  }).filter(Boolean);
+}
+
+function buildEstimatePreview(payload) {
+  return {
+    ...payload,
+    estimate: {
+      ...payload.estimate,
+      fast_sale: null,
+      premium: null,
+    },
+    range: {
+      low: null,
+      high: null,
+    },
+    market_stats: {
+      ...payload.market_stats,
+      avg_price: null,
+      avg_price_per_m2: null,
+      min_price_per_m2: null,
+      max_price_per_m2: null,
+      p10_price_per_m2: null,
+      p90_price_per_m2: null,
+    },
+    district_comparison: buildDistrictComparisonPreview(payload.district_comparison),
+    locked_sections: {
+      price_tiers: true,
+      cadastral_details: true,
+      market_position_numbers: true,
+      district_comparison_values: true,
+      market_stats_values: true,
+    },
+  };
 }
 
 export async function POST(request) {
@@ -178,6 +259,15 @@ export async function POST(request) {
   }
 
   data.feature_adjustments = featureAdj;
+  data.market_position = {
+    marker_pct: computeMarketMarkerPct(data),
+  };
+
+  const access = await resolveAccessTier(request);
+  const isPaid = isPaidAccessTier(access.tier);
+  const responsePayload = isPaid
+    ? { ...data, access_tier: "paid", locked_sections: {} }
+    : { ...buildEstimatePreview(data), access_tier: "free" };
 
   if (body.device_id) {
     logEstimate({
@@ -203,7 +293,7 @@ export async function POST(request) {
     });
   }
 
-  const res = NextResponse.json(data);
+  const res = NextResponse.json(responsePayload);
   res.headers.set("X-RateLimit-Remaining", String(remaining));
   return res;
 }

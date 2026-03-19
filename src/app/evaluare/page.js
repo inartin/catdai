@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
+import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { getDeviceId, getSessionId, computeEvaluationGroupId, getOrCreateLogId } from "@/lib/tracking";
 
@@ -15,102 +16,152 @@ function EvaluareContent() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
   const { t, lang } = useTranslation();
+  const { session, loading: authLoading } = useAuth();
+  const paramsString = searchParams.toString();
 
   useEffect(() => {
-    const city = searchParams.get("city");
-    const district = searchParams.get("district");
-    const rooms = searchParams.get("rooms");
-    const area = searchParams.get("area");
-    const cadastralDataRaw = searchParams.get("cadastral_data");
-    let cadastralData = null;
+    if (authLoading) return;
 
-    if (cadastralDataRaw) {
-      try {
-        const parsed = JSON.parse(cadastralDataRaw);
-        if (parsed && typeof parsed === "object") {
-          cadastralData = parsed;
-        }
-      } catch {
-        cadastralData = null;
+    let cancelled = false;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+
+      const params = new URLSearchParams(paramsString);
+      const city = params.get("city");
+      const district = params.get("district");
+      const rooms = params.get("rooms");
+      const area = params.get("area");
+      const cadastralNumber = params.get("cadastral_number");
+
+      if (!city || !district || !rooms || !area) {
+        router.replace("/");
+        return;
       }
-    }
 
-    if (!city || !district || !rooms || !area) {
-      router.replace("/");
-      return;
-    }
+      const roomsVal = rooms === "5+" ? 5 : parseInt(rooms, 10);
 
-    const roomsRaw = rooms;
-    const roomsVal = roomsRaw === "5+" ? 5 : parseInt(roomsRaw, 10);
+      const bathroomsRaw = params.get("bathrooms");
+      const balconiesRaw = params.get("balconies");
+      const bathroomsVal =
+        bathroomsRaw === "3+" ? 3 : bathroomsRaw ? parseInt(bathroomsRaw, 10) : null;
+      const balconiesVal =
+        balconiesRaw === "3+" ? 3 : balconiesRaw != null ? parseInt(balconiesRaw, 10) : null;
 
-    const bathroomsRaw = searchParams.get("bathrooms");
-    const balconiesRaw = searchParams.get("balconies");
-    const bathroomsVal =
-      bathroomsRaw === "3+" ? 3 : bathroomsRaw ? parseInt(bathroomsRaw, 10) : null;
-    const balconiesVal =
-      balconiesRaw === "3+" ? 3 : balconiesRaw != null ? parseInt(balconiesRaw, 10) : null;
+      const isFreshEvaluation = params.get("_new") === "1";
 
-    const isFreshEvaluation = searchParams.get("_new") === "1";
+      if (isFreshEvaluation) {
+        const clean = new URLSearchParams(paramsString);
+        clean.delete("_new");
+        window.history.replaceState(null, "", `/evaluare?${clean.toString()}`);
+      }
 
-    if (isFreshEvaluation) {
-      const clean = new URLSearchParams(searchParams.toString());
-      clean.delete("_new");
-      window.history.replaceState(null, "", `/evaluare?${clean.toString()}`);
-    }
+      const trackingData = isFreshEvaluation
+        ? (() => {
+            const evalGroupId = computeEvaluationGroupId({
+              city,
+              district,
+              rooms_count: roomsVal,
+              building_type: params.get("building_type") || null,
+            });
+            return {
+              log_id: getOrCreateLogId(evalGroupId),
+              device_id: getDeviceId(),
+              session_id: getSessionId(),
+              evaluation_group_id: evalGroupId,
+              language: lang,
+            };
+          })()
+        : {};
 
-    const trackingData = isFreshEvaluation
-      ? (() => {
-          const evalGroupId = computeEvaluationGroupId({
+      const headers = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+
+      const fetchJson = async (url, options) => {
+        const res = await fetch(url, options);
+        let data = {};
+        try {
+          data = await res.json();
+        } catch {
+          data = {};
+        }
+        return { ok: res.ok, status: res.status, data };
+      };
+
+      try {
+        const estimatePromise = fetchJson("/api/estimate", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
             city,
             district,
             rooms_count: roomsVal,
-            building_type: searchParams.get("building_type") || null,
-          });
-          return {
-            log_id: getOrCreateLogId(evalGroupId),
-            device_id: getDeviceId(),
-            session_id: getSessionId(),
-            evaluation_group_id: evalGroupId,
-            language: lang,
-          };
-        })()
-      : {};
+            area_m2: area,
+            floor: params.get("floor") || null,
+            total_floors: params.get("total_floors") || null,
+            building_type: params.get("building_type") || null,
+            renovation: params.get("renovation") || null,
+            bathrooms_count: bathroomsVal,
+            balconies_count: balconiesVal,
+            ...trackingData,
+          }),
+        });
 
-    fetch("/api/estimate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        city,
-        district,
-        rooms_count: roomsVal,
-        area_m2: area,
-        floor: searchParams.get("floor") || null,
-        total_floors: searchParams.get("total_floors") || null,
-        building_type: searchParams.get("building_type") || null,
-        renovation: searchParams.get("renovation") || null,
-        bathrooms_count: bathroomsVal,
-        balconies_count: balconiesVal,
-        ...trackingData,
-      }),
-    })
-      .then((res) => res.json().then((data) => ({ ok: res.ok, status: res.status, data })))
-      .then(({ ok, status, data }) => {
-        if (!ok) {
+        const cadastralPromise = cadastralNumber
+          ? fetchJson("/api/cadastral", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                cadastral_number: cadastralNumber,
+              }),
+            })
+          : Promise.resolve(null);
+
+        const [estimateResponse, cadastralResponse] = await Promise.all([
+          estimatePromise,
+          cadastralPromise,
+        ]);
+
+        if (cancelled) return;
+
+        if (!estimateResponse.ok) {
           setError({
-            code: data.error || "unknown",
-            status,
+            code: estimateResponse.data.error || "unknown",
+            status: estimateResponse.status,
           });
-        } else {
-          setResult(cadastralData ? { ...data, cadastral: cadastralData } : data);
+          return;
         }
-      })
-      .catch(() => setError({ code: "connection", message: t("evaluare.connectionError") }))
-      .finally(() => setLoading(false));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+        const nextResult =
+          cadastralResponse && cadastralResponse.ok
+            ? { ...estimateResponse.data, cadastral: cadastralResponse.data }
+            : estimateResponse.data;
+
+        setResult(nextResult);
+      } catch {
+        if (!cancelled) {
+          setError({ code: "connection", message: t("evaluare.connectionError") });
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, session?.access_token, paramsString, router, lang, t]);
 
   const handleEdit = () => {
     const editParams = new URLSearchParams();
-    ["city", "district", "rooms", "area", "floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies"].forEach((key) => {
+    ["city", "district", "rooms", "area", "floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
       const val = searchParams.get(key);
       if (val) editParams.set(key, val);
     });

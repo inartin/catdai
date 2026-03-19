@@ -285,7 +285,10 @@ export default function PropertyForm({ onBack, initialValues }) {
     if (form.bathrooms_count != null) params.set("bathrooms", String(form.bathrooms_count));
     if (form.balconies_count != null) params.set("balconies", String(form.balconies_count));
     if (cadastralData && !cadastralError) {
-      params.set("cadastral_data", JSON.stringify(cadastralData));
+      const cadastralNumber = cadastralInput.trim();
+      if (cadastralNumber) {
+        params.set("cadastral_number", cadastralNumber);
+      }
     }
     params.set("_new", "1");
 

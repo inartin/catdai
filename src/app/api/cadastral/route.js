@@ -1,4 +1,5 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
@@ -198,6 +199,38 @@ function buildFormFields(building, apartment) {
   return fields;
 }
 
+function buildCadastralPreview({ cadastralNumber, building, apartment, formFields }) {
+  return {
+    cadastral_number: cadastralNumber,
+    building: {
+      address: building?.address || null,
+      total_floors: building?.total_floors || null,
+      classifier: null,
+      condition: null,
+      construction_year: null,
+      wall_material: null,
+      water: null,
+      sewage: null,
+      gas: null,
+    },
+    apartment: {
+      address: apartment?.address || null,
+      area_m2: apartment?.area_m2 || null,
+      floor: apartment?.floor || null,
+      type: null,
+      toilet: null,
+      bathroom: null,
+      is_last_floor: null,
+      estimated_value_lei: null,
+    },
+    form_fields: formFields,
+    access_tier: "free",
+    locked_sections: {
+      cadastral_details: true,
+    },
+  };
+}
+
 export async function POST(request) {
   const ip = getClientIp(request);
   const { allowed, remaining, retryAfter } = limiter.check(ip);
@@ -239,6 +272,8 @@ export async function POST(request) {
   }
 
   const { code, buildingId, apartmentId } = parseCadastralParts(trimmed);
+  const access = await resolveAccessTier(request);
+  const isPaid = isPaidAccessTier(access.tier);
 
   try {
     const step1Url = `https://geodata.gov.md/geoserver/w_cbi/wfs?service=WFS&version=1.1.0&request=GetFeature&outputFormat=application%2Fjson&maxFeatures=5&typeName=cad_terenuri&cql_filter=(codcadastral+LIKE+%27%25${code}%25%27)&sortBy=codcadastral&srsName=EPSG:4326`;
@@ -295,6 +330,10 @@ export async function POST(request) {
         location,
         form_fields,
         partial: true,
+        access_tier: isPaid ? "paid" : "free",
+        locked_sections: {
+          cadastral_details: !isPaid,
+        },
       });
       res.headers.set("X-RateLimit-Remaining", String(remaining));
       return res;
@@ -305,12 +344,23 @@ export async function POST(request) {
     const form_fields = buildFormFields(building, apartment);
 
 
-    const res = NextResponse.json({
-      cadastral_number: trimmed,
-      building,
-      apartment,
-      form_fields,
-    });
+    const payload = isPaid
+      ? {
+          cadastral_number: trimmed,
+          building,
+          apartment,
+          form_fields,
+          access_tier: "paid",
+          locked_sections: {},
+        }
+      : buildCadastralPreview({
+          cadastralNumber: trimmed,
+          building,
+          apartment,
+          formFields: form_fields,
+        });
+
+    const res = NextResponse.json(payload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     return res;
   } catch (err) {

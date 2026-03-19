@@ -132,6 +132,7 @@
   "result.avgPricePerM2": "Средняя цена/м²",
   "result.medianPricePerM2": "Медианная цена/м²",
   "result.avgTotalPrice": "Средняя цена (общая)",
+  "result.freeTierUncertaintyLine": "Реальная цена может отличаться до 10%. Узнай больше в полном анализе.",
   "result.changeCriteria": "Изменить критерии",
   "result.linkCopied": "Ссылка скопирована!",
   "result.shareAnalysis": "Поделиться",

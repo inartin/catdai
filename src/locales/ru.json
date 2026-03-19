@@ -64,6 +64,7 @@
   "form.cadastralInvalid": "Неверный формат. Пример: 0100106.132.01.090",
   "form.cadastralNotFound": "Кадастровый номер не найден.",
   "form.cadastralFound": "Данные найдены — поля заполнены автоматически",
+  "form.cadastralPartial": "Частичные данные — определено только местоположение, заполните остальное вручную",
   "form.cadastralApartment": "Квартира",
   "form.cadastralArea": "Площадь",
   "form.cadastralFloor": "Этаж",

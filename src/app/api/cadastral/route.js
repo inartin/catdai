@@ -5,23 +5,38 @@ const limiter = rateLimit({ interval: 60_000, limit: 15 });
 
 const CADASTRAL_RE = /^\d{5,7}\.\d{1,4}\.\d{2}\.\d{3}$/;
 
-const DISTRICT_ALIASES = {
-  "Botanica": "Botanica",
-  "Centru": "Centru",
-  "Buiucani": "Buiucani",
-  "Ciocana": "Ciocana",
-  "Râșcani": "Râșcani",
-  "Rîșcani": "Râșcani",
-  "Riscani": "Râșcani",
-  "Telecentru": "Telecentru",
-  "Sculeni": "Sculeni",
-  "Poșta Veche": "Poșta Veche",
-  "Posta Veche": "Poșta Veche",
-  "Durlești": "Durlești",
-  "Durlesti": "Durlești",
-  "Codru": "Codru",
-  "Aeroport": "Aeroport",
-};
+function normalizeDiacritics(str) {
+  return str
+    .replace(/[șş]/g, "s")
+    .replace(/[țţ]/g, "t")
+    .replace(/[âî]/g, "a")
+    .replace(/[ă]/g, "a")
+    .replace(/[ȘŞ]/g, "S")
+    .replace(/[ȚŢ]/g, "T")
+    .replace(/[ÂÎ]/g, "A")
+    .replace(/[Ă]/g, "A")
+    .toLowerCase();
+}
+
+const DISTRICT_MAP = [
+  { normalized: "botanica", value: "Botanica" },
+  { normalized: "centru", value: "Centru" },
+  { normalized: "buiucani", value: "Buiucani" },
+  { normalized: "ciocana", value: "Ciocana" },
+  { normalized: "rascani", value: "Râșcani" },
+  { normalized: "riscani", value: "Râșcani" },
+  { normalized: "telecentru", value: "Telecentru" },
+  { normalized: "sculeni", value: "Sculeni" },
+  { normalized: "posta veche", value: "Poșta Veche" },
+  { normalized: "durlesti", value: "Durlești" },
+  { normalized: "codru", value: "Codru" },
+  { normalized: "aeroport", value: "Aeroport" },
+];
+
+function matchDistrict(raw) {
+  const key = normalizeDiacritics(raw);
+  return DISTRICT_MAP.find((d) => d.normalized === key)?.value || null;
+}
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -107,8 +122,7 @@ function resolveDistrict(address) {
   if (!address) return null;
   const m = address.match(/sect\.\s*([^,\s][^,]*?)(?:\s+(?:str|bd|sos|al)\b|,|$)/i);
   if (!m) return null;
-  const raw = m[1].trim();
-  return DISTRICT_ALIASES[raw] || null;
+  return matchDistrict(m[1].trim());
 }
 
 function resolveCity(address) {
@@ -116,6 +130,33 @@ function resolveCity(address) {
   if (/mun\.\s*Chișinău/i.test(address)) return "Chișinău";
   if (/mun\.\s*Bălți/i.test(address) || /mun\.\s*Balti/i.test(address)) return "Bălți";
   return null;
+}
+
+function resolveDistrictFromSuburb(suburb) {
+  if (!suburb) return null;
+  const cleaned = suburb
+    .replace(/\s*Sector\s*$/i, "")
+    .replace(/^sectorul\s*/i, "")
+    .replace(/^sect\.\s*/i, "")
+    .trim();
+  return matchDistrict(cleaned);
+}
+
+function resolveCityFromNominatim(addr) {
+  const city = addr.city || addr.town || addr.village;
+  if (!city) return null;
+  if (/Chi[sș]in[aă]u/i.test(city)) return "Chișinău";
+  if (/B[aă]l[tț]i/i.test(city)) return "Bălți";
+  return null;
+}
+
+async function fallbackNominatim(lat, lon) {
+  const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&bounded=0&polygon_geojson=1&priority=5`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": "CatDai/1.0" },
+  });
+  if (!res.ok) return null;
+  return res.json();
 }
 
 function buildFormFields(building, apartment) {
@@ -221,20 +262,48 @@ export async function POST(request) {
     const step3 = await fetch(step3Url).then((r) => r.json());
 
     if (!step3.features || step3.features.length === 0) {
-      return NextResponse.json(
-        { error: "not_found", message: "No property data found for this cadastral number" },
-        { status: 404 }
-      );
+
+      const nominatim = await fallbackNominatim(lat, lon);
+      if (!nominatim?.address) {
+        return NextResponse.json(
+          { error: "not_found", message: "No property data found for this cadastral number" },
+          { status: 404 }
+        );
+      }
+
+      const addr = nominatim.address;
+      const form_fields = {};
+      const city = resolveCityFromNominatim(addr);
+      if (city) form_fields.city = city;
+      const district = resolveDistrictFromSuburb(addr.suburb);
+      if (district) form_fields.district = district;
+
+      const location = {
+        display_name: nominatim.display_name,
+        road: addr.road || null,
+        house_number: addr.house_number || null,
+        suburb: addr.suburb || null,
+        city: addr.city || addr.town || addr.village || null,
+        postcode: addr.postcode || null,
+      };
+
+
+      const res = NextResponse.json({
+        cadastral_number: trimmed,
+        building: {},
+        apartment: {},
+        location,
+        form_fields,
+        partial: true,
+      });
+      res.headers.set("X-RateLimit-Remaining", String(remaining));
+      return res;
     }
 
     const html = step3.features[0].properties?.html || "";
     const { building, apartment } = parseHtmlResponse(html, buildingId, apartmentId);
     const form_fields = buildFormFields(building, apartment);
 
-    console.log("[cadastral] Result for", trimmed, "→", code);
-    console.log("[cadastral] Building:", JSON.stringify(building, null, 2));
-    console.log("[cadastral] Apartment:", JSON.stringify(apartment, null, 2));
-    console.log("[cadastral] Form fields:", JSON.stringify(form_fields, null, 2));
 
     const res = NextResponse.json({
       cadastral_number: trimmed,

@@ -214,11 +214,12 @@ export default function PropertyForm({ onBack, initialValues }) {
         return;
       }
 
-      console.log("[cadastral] Response:", data);
 
       setCadastralData({
         building: data.building,
         apartment: data.apartment,
+        location: data.location,
+        partial: data.partial || false,
       });
 
       const f = data.form_fields || {};
@@ -466,7 +467,7 @@ export default function PropertyForm({ onBack, initialValues }) {
                   {t(`form.${cadastralError}`)}
                 </p>
               )}
-              {cadastralData && !cadastralError && (
+              {cadastralData && !cadastralError && !cadastralData.partial && (
                 <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 animate-fade-in">
                   <p className="text-xs font-medium text-emerald-700 flex items-center gap-1.5 mb-2">
                     <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
@@ -490,9 +491,6 @@ export default function PropertyForm({ onBack, initialValues }) {
                           ? t("form.floorOf", { floor: cadastralData.apartment.floor, total: cadastralData.building.total_floors })
                           : cadastralData.apartment.floor}
                       </span></p>
-                    )}
-                    {cadastralData.apartment?.bathroom && (
-                      <p>{t("form.cadastralBathroom")}: <span className="font-medium">{cadastralData.apartment.bathroom}</span></p>
                     )}
                     {cadastralData.apartment?.estimated_value_lei && (
                       <p>{t("form.cadastralEstimatedValue")}: <span className="font-medium">{cadastralData.apartment.estimated_value_lei} lei</span></p>
@@ -523,6 +521,19 @@ export default function PropertyForm({ onBack, initialValues }) {
                       <p>{t("form.cadastralGas")}: <span className="font-medium">{cadastralData.building.gas}</span></p>
                     )}
                   </div>
+                </div>
+              )}
+              {cadastralData && !cadastralError && cadastralData.partial && (
+                <div className="mt-3 rounded-xl bg-sky-50 border border-sky-200 p-3 animate-fade-in">
+                  <p className="text-xs font-medium text-sky-700 flex items-center gap-1.5 mb-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+                      <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
+                    </svg>
+                    {t("form.cadastralPartial")}
+                  </p>
+                  {cadastralData.location?.display_name && (
+                    <p className="text-xs text-sky-600">{cadastralData.location.display_name}</p>
+                  )}
                 </div>
               )}
             </div>

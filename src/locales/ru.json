@@ -89,7 +89,7 @@
   "result.featureAdjustments": "Корректировки по характеристикам:",
   "result.totalAdjustment": "Итого корректировка:",
   "result.vsComparables": "от средней сопоставимых",
-  "result.droppedFilters": "Отсечённые фильтры были расширены для достаточного количества сопоставимых объявлений.",
+  "result.droppedFilters": "Расширенный анализ для большего объёма сопоставимых данных.",
   "result.cityMedian": "Медиана города",
   "result.districtCoef": "Коэф. {district}",
   "result.adjusted": "Скорректировано",

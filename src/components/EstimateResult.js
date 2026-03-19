@@ -397,7 +397,7 @@ export default function EstimateResult({ data, onReset }) {
         )}
 
         {anyDropped && (
-          <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-4 py-2.5 mb-4">
+          <p className="text-sm text-gray-600 bg-gray-100 rounded-lg px-4 py-2.5 mb-4 border border-gray-200">
             {t("result.droppedFilters")}
           </p>
         )}

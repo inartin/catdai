@@ -426,6 +426,8 @@ export default function PropertyForm({ onBack, initialValues }) {
                   <input
                     type="number"
                     inputMode="decimal"
+                    min={1}
+                    max={10000}
                     placeholder={t("form.areaPlaceholder")}
                     value={form.area_m2}
                     onChange={(e) => update("area_m2", e.target.value)}
@@ -504,6 +506,8 @@ export default function PropertyForm({ onBack, initialValues }) {
                     <input
                       type="number"
                       inputMode="numeric"
+                      min={0}
+                      max={100}
                       placeholder={t("form.floorPlaceholder")}
                       value={form.floor}
                       onChange={(e) => update("floor", e.target.value)}
@@ -517,6 +521,8 @@ export default function PropertyForm({ onBack, initialValues }) {
                     <input
                       type="number"
                       inputMode="numeric"
+                      min={0}
+                      max={100}
                       placeholder={t("form.totalFloorsPlaceholder")}
                       value={form.total_floors}
                       onChange={(e) => update("total_floors", e.target.value)}

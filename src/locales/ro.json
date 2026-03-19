@@ -89,7 +89,7 @@
   "result.featureAdjustments": "Ajustări pentru caracteristici:",
   "result.totalAdjustment": "Ajustare totală:",
   "result.vsComparables": "față de media comparabilelor",
-  "result.droppedFilters": "Filtrele tăiate au fost extinse pentru a avea suficiente anunțuri comparabile.",
+  "result.droppedFilters": "Analiză extinsă pentru mai multe date comparabile.",
   "result.cityMedian": "Median oraș",
   "result.districtCoef": "Coef. {district}",
   "result.adjusted": "Ajustat",

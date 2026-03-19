@@ -126,6 +126,8 @@
   "result.districtComparisonDesc": "Те же фильтры в других районах",
   "result.estimatedForArea": "Расчётная цена за {area}м² · (кол-во объявлений)",
   "result.marketStats": "Статистика рынка",
+  "result.cadastralDataTitle": "Официальные кадастровые данные",
+  "result.cadastralDataSource": "Источник: ipcbi.gov.md",
   "result.comparableListings": "Сопоставимые объявления",
   "result.avgPricePerM2": "Средняя цена/м²",
   "result.medianPricePerM2": "Медианная цена/м²",

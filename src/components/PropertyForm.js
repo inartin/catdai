@@ -284,6 +284,9 @@ export default function PropertyForm({ onBack, initialValues }) {
     if (form.renovation) params.set("renovation", form.renovation);
     if (form.bathrooms_count != null) params.set("bathrooms", String(form.bathrooms_count));
     if (form.balconies_count != null) params.set("balconies", String(form.balconies_count));
+    if (cadastralData && !cadastralError) {
+      params.set("cadastral_data", JSON.stringify(cadastralData));
+    }
     params.set("_new", "1");
 
     router.push(`/evaluare?${params.toString()}`);
@@ -481,50 +484,8 @@ export default function PropertyForm({ onBack, initialValues }) {
                   </p>
 
                   {cadastralData.apartment?.address && (
-                    <p className="text-xs text-emerald-600 mb-2">{cadastralData.apartment.address}</p>
+                    <p className="text-xs text-emerald-600">{cadastralData.apartment.address}</p>
                   )}
-
-                  <p className="text-xs font-medium text-emerald-700 mb-1">{t("form.cadastralApartment")}</p>
-                  <div className="text-xs text-emerald-600 space-y-0.5 mb-2">
-                    {cadastralData.apartment?.area_m2 && (
-                      <p>{t("form.cadastralArea")}: <span className="font-medium">{cadastralData.apartment.area_m2} m²</span></p>
-                    )}
-                    {cadastralData.apartment?.floor && (
-                      <p>{t("form.cadastralFloor")}: <span className="font-medium">
-                        {cadastralData.building?.total_floors
-                          ? t("form.floorOf", { floor: cadastralData.apartment.floor, total: cadastralData.building.total_floors })
-                          : cadastralData.apartment.floor}
-                      </span></p>
-                    )}
-                    {cadastralData.apartment?.estimated_value_lei && (
-                      <p>{t("form.cadastralEstimatedValue")}: <span className="font-medium">{cadastralData.apartment.estimated_value_lei} lei</span></p>
-                    )}
-                  </div>
-
-                  <p className="text-xs font-medium text-emerald-700 mb-1">{t("form.cadastralBuilding")}</p>
-                  <div className="text-xs text-emerald-600 space-y-0.5">
-                    {cadastralData.building?.classifier && (
-                      <p>{t("form.cadastralClassifier")}: <span className="font-medium">{cadastralData.building.classifier}</span></p>
-                    )}
-                    {cadastralData.building?.condition && (
-                      <p>{t("form.cadastralCondition")}: <span className="font-medium">{cadastralData.building.condition}</span></p>
-                    )}
-                    {cadastralData.building?.construction_year && (
-                      <p>{t("form.cadastralYear")}: <span className="font-medium">{cadastralData.building.construction_year}</span></p>
-                    )}
-                    {cadastralData.building?.wall_material && (
-                      <p>{t("form.cadastralWallMaterial")}: <span className="font-medium">{cadastralData.building.wall_material}</span></p>
-                    )}
-                    {cadastralData.building?.water && (
-                      <p>{t("form.cadastralWater")}: <span className="font-medium">{cadastralData.building.water}</span></p>
-                    )}
-                    {cadastralData.building?.sewage && (
-                      <p>{t("form.cadastralSewage")}: <span className="font-medium">{cadastralData.building.sewage}</span></p>
-                    )}
-                    {cadastralData.building?.gas && (
-                      <p>{t("form.cadastralGas")}: <span className="font-medium">{cadastralData.building.gas}</span></p>
-                    )}
-                  </div>
                 </div>
               )}
               {cadastralData && !cadastralError && cadastralData.partial && (

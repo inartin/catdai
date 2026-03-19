@@ -126,6 +126,8 @@
   "result.districtComparisonDesc": "Aceleași filtre aplicate în alte sectoare",
   "result.estimatedForArea": "Prețul estimat pentru {area}m² · (nr. anunțuri)",
   "result.marketStats": "Statistici piață",
+  "result.cadastralDataTitle": "Date cadastrale oficiale",
+  "result.cadastralDataSource": "Sursa: ipcbi.gov.md",
   "result.comparableListings": "Anunțuri comparabile",
   "result.avgPricePerM2": "Preț mediu/m²",
   "result.medianPricePerM2": "Preț median/m²",

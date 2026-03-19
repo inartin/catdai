@@ -112,7 +112,17 @@ function DistrictComparison({ districts, currentDistrict, area }) {
 }
 
 export default function EstimateResult({ data, onReset }) {
-  const { estimate, range, market_stats, filters_used, district_coefficient, district_comparison, input, feature_adjustments } = data;
+  const {
+    estimate,
+    range,
+    market_stats,
+    filters_used,
+    district_coefficient,
+    district_comparison,
+    input,
+    feature_adjustments,
+    cadastral,
+  } = data;
   const [copied, setCopied] = useState(false);
   const { t, lang } = useTranslation();
 
@@ -271,6 +281,79 @@ export default function EstimateResult({ data, onReset }) {
           </div>
         </div>
       </div>
+
+      {cadastral && !cadastral.partial && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 shadow-sm p-6 sm:p-8">
+          <p className="text-2xl font-medium text-emerald-700 flex items-center gap-1.5 mb-2">
+            <svg viewBox="0 0 16 16" fill="currentColor" className="w-6 h-6 shrink-0">
+              <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
+            </svg>
+            {t("result.cadastralDataTitle")}
+          </p>
+
+          {cadastral.apartment?.address && (
+            <p className="text-sm text-emerald-700 mb-3">{cadastral.apartment.address}</p>
+          )}
+
+          <p className="text-sm font-medium text-emerald-800 mb-1.5">{t("form.cadastralApartment")}</p>
+          <div className="text-sm text-emerald-700 space-y-1 mb-3">
+            {cadastral.apartment?.area_m2 && (
+              <p>{t("form.cadastralArea")}: <span className="font-medium">{cadastral.apartment.area_m2} m²</span></p>
+            )}
+            {cadastral.apartment?.floor && (
+              <p>{t("")}<span className="font-medium">
+                {cadastral.building?.total_floors
+                  ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
+                  : cadastral.apartment.floor}
+              </span></p>
+            )}
+            {cadastral.apartment?.estimated_value_lei && (
+              <p>{t("form.cadastralEstimatedValue")}: <span className="font-medium">{cadastral.apartment.estimated_value_lei} lei</span></p>
+            )}
+          </div>
+
+          <p className="text-sm font-medium text-emerald-800 mb-1.5">{t("form.cadastralBuilding")}</p>
+          <div className="text-sm text-emerald-700 space-y-1">
+            {cadastral.building?.classifier && (
+              <p>{t("form.cadastralClassifier")}: <span className="font-medium">{cadastral.building.classifier}</span></p>
+            )}
+            {cadastral.building?.condition && (
+              <p>{t("form.cadastralCondition")}: <span className="font-medium">{cadastral.building.condition}</span></p>
+            )}
+            {cadastral.building?.construction_year && (
+              <p>{t("form.cadastralYear")}: <span className="font-medium">{cadastral.building.construction_year}</span></p>
+            )}
+            {cadastral.building?.wall_material && (
+              <p>{t("form.cadastralWallMaterial")}: <span className="font-medium">{cadastral.building.wall_material}</span></p>
+            )}
+            {cadastral.building?.water && (
+              <p>{t("form.cadastralWater")}: <span className="font-medium">{cadastral.building.water}</span></p>
+            )}
+            {cadastral.building?.sewage && (
+              <p>{t("form.cadastralSewage")}: <span className="font-medium">{cadastral.building.sewage}</span></p>
+            )}
+            {cadastral.building?.gas && (
+              <p>{t("form.cadastralGas")}: <span className="font-medium">{cadastral.building.gas}</span></p>
+            )}
+          </div>
+          <p className="text-xs text-emerald-600 mt-4">{t("result.cadastralDataSource")}</p>
+        </div>
+      )}
+
+      {cadastral?.partial && (
+        <div className="rounded-2xl border border-sky-200 bg-sky-50 shadow-sm p-6 sm:p-8">
+          <p className="text-sm font-medium text-sky-700 flex items-center gap-1.5 mb-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4 shrink-0">
+              <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
+            </svg>
+            {t("result.cadastralDataTitle")}
+          </p>
+          {cadastral.location?.display_name && (
+            <p className="text-sm text-sky-700">{cadastral.location.display_name}</p>
+          )}
+          <p className="text-xs text-sky-600 mt-3">{t("result.cadastralDataSource")}</p>
+        </div>
+      )}
 
       {/* Price position on range */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">

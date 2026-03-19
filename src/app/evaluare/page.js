@@ -21,6 +21,19 @@ function EvaluareContent() {
     const district = searchParams.get("district");
     const rooms = searchParams.get("rooms");
     const area = searchParams.get("area");
+    const cadastralDataRaw = searchParams.get("cadastral_data");
+    let cadastralData = null;
+
+    if (cadastralDataRaw) {
+      try {
+        const parsed = JSON.parse(cadastralDataRaw);
+        if (parsed && typeof parsed === "object") {
+          cadastralData = parsed;
+        }
+      } catch {
+        cadastralData = null;
+      }
+    }
 
     if (!city || !district || !rooms || !area) {
       router.replace("/");
@@ -88,7 +101,7 @@ function EvaluareContent() {
             status,
           });
         } else {
-          setResult(data);
+          setResult(cadastralData ? { ...data, cadastral: cadastralData } : data);
         }
       })
       .catch(() => setError({ code: "connection", message: t("evaluare.connectionError") }))

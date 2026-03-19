@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
+import LoginButton from "@/components/LoginButton";
 
 export const GO_HOME_EVENT = "catdai-go-home";
 
@@ -41,6 +42,7 @@ export default function Navbar() {
         </Link>
 
         <div className="flex items-center gap-4">
+          <LoginButton />
           <div
             className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm font-medium"
             role="group"
@@ -71,18 +73,6 @@ export default function Navbar() {
               RU
             </button>
           </div>
-          {/* <Link
-            href="#"
-            className="bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg px-5 py-2 transition-colors"
-          >
-            {t("nav.login")}
-          </Link>
-          <Link
-            href="#"
-            className="text-sm text-gray-500 hover:text-foreground transition-colors hidden sm:inline"
-          >
-            {t("nav.register")}
-          </Link> */}
         </div>
       </div>
     </header>

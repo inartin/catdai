@@ -6,6 +6,9 @@
   "nav.langAriaLabel": "Selectează limba",
   "nav.login": "Loghează-te",
   "nav.register": "înregistrare",
+  "auth.loginWithTelegram": "Intră cu Telegram",
+  "auth.loginWithGoogle": "Intră cu Google",
+  "auth.loading": "Se încarcă...",
 
   "hero.title": "Înțelege piața, apoi decide.",
   "hero.subtitle": "Vinde realist. Cumpără informat.",

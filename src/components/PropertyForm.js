@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
+import LoginButton from "@/components/LoginButton";
 
 const cities = [
   "Chișinău",
@@ -355,29 +356,32 @@ export default function PropertyForm({ onBack, initialValues }) {
         </button>
 
         {/* ── Header ── */}
-        <div className="flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shrink-0">
-            <svg
-              viewBox="0 0 24 24"
-              className="w-5 h-5"
-              fill="none"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-          </span>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {t("form.title")}
-            </h1>
-            <p className="text-sm text-gray-400">
-              {t("form.subtitle")}
-            </p>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shrink-0">
+              <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5"
+                fill="none"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </span>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {t("form.title")}
+              </h1>
+              <p className="text-sm text-gray-400">
+                {t("form.subtitle")}
+              </p>
+            </div>
           </div>
+          <LoginButton className="pt-1" />
         </div>
 
         {/* ── Accuracy meter ── */}

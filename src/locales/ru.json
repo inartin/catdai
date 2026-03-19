@@ -6,6 +6,9 @@
   "nav.langAriaLabel": "Выбрать язык",
   "nav.login": "Войти",
   "nav.register": "Регистрация",
+  "auth.loginWithTelegram": "Войти через Telegram",
+  "auth.loginWithGoogle": "Войти через Google",
+  "auth.loading": "Загрузка...",
 
   "hero.title": "Пойми рынок, потом решай.",
   "hero.subtitle": "Продавай реалистично. Покупай осознанно.",

@@ -160,6 +160,10 @@ export default function PropertyForm({ onBack, initialValues }) {
   const [showOptional, setShowOptional] = useState(
     !!(initialValues?.floor || initialValues?.total_floors || initialValues?.bathrooms_count || initialValues?.balconies_count)
   );
+  const [cadastralInput, setCadastralInput] = useState("");
+  const [cadastralLoading, setCadastralLoading] = useState(false);
+  const [cadastralError, setCadastralError] = useState(null);
+  const [cadastralData, setCadastralData] = useState(null);
   const [highlightField, setHighlightField] = useState(null);
   const refCity = useRef(null);
   const refDistrict = useRef(null);
@@ -175,6 +179,68 @@ export default function PropertyForm({ onBack, initialValues }) {
       if (key === "city" && value !== prev.city) next.district = "";
       return next;
     });
+  };
+
+  const handleCadastralSearch = async () => {
+    const trimmed = cadastralInput.trim();
+    if (!trimmed) return;
+
+    const cadastralRe = /^\d{5,7}\.\d{1,4}\.\d{2}\.\d{3}$/;
+    if (!cadastralRe.test(trimmed)) {
+      setCadastralError("cadastralInvalid");
+      return;
+    }
+
+    setCadastralError(null);
+    setCadastralLoading(true);
+
+    try {
+      const res = await fetch("/api/cadastral", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cadastral_number: trimmed }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (data.error === "not_found") {
+          setCadastralError("cadastralNotFound");
+        } else if (data.error === "invalid_format") {
+          setCadastralError("cadastralInvalid");
+        } else {
+          setCadastralError("cadastralError");
+        }
+        return;
+      }
+
+      console.log("[cadastral] Response:", data);
+
+      setCadastralData({
+        building: data.building,
+        apartment: data.apartment,
+      });
+
+      const f = data.form_fields || {};
+      setForm((prev) => ({
+        ...prev,
+        ...(f.city && { city: f.city }),
+        ...(f.district && { district: f.district }),
+        ...(f.area_m2 && { area_m2: f.area_m2 }),
+        ...(f.floor && { floor: f.floor }),
+        ...(f.total_floors && { total_floors: f.total_floors }),
+        ...(f.building_type && { building_type: f.building_type }),
+        ...(f.bathrooms_count != null && { bathrooms_count: f.bathrooms_count }),
+      }));
+
+      if (f.floor || f.total_floors || f.bathrooms_count != null) {
+        setShowOptional(true);
+      }
+    } catch {
+      setCadastralError("cadastralError");
+    } finally {
+      setCadastralLoading(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -333,6 +399,135 @@ export default function PropertyForm({ onBack, initialValues }) {
 
         {/* ── Form card ── */}
         <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
+          {/* — Cadastral shortcut — */}
+          <div className="p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 text-xs font-bold flex items-center justify-center">
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <span className="text-sm font-semibold text-gray-900">
+                {t("form.cadastralSection")}
+              </span>
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-600 mb-1.5 block">
+                {t("form.cadastralNumber")}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={t("form.cadastralPlaceholder")}
+                  value={cadastralInput}
+                  onChange={(e) => {
+                    setCadastralInput(e.target.value);
+                    if (cadastralError) setCadastralError(null);
+                    if (cadastralData) setCadastralData(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCadastralSearch();
+                  }}
+                  disabled={cadastralLoading}
+                  className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-60"
+                />
+                <button
+                  type="button"
+                  onClick={handleCadastralSearch}
+                  disabled={cadastralLoading || !cadastralInput.trim()}
+                  className="px-5 py-3 rounded-xl text-sm font-medium transition-all duration-150 bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
+                >
+                  {cadastralLoading ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      {t("form.cadastralSearching")}
+                    </>
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8" />
+                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                      </svg>
+                      {t("form.cadastralSearch")}
+                    </>
+                  )}
+                </button>
+              </div>
+              {cadastralError && (
+                <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+                    <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+                  </svg>
+                  {t(`form.${cadastralError}`)}
+                </p>
+              )}
+              {cadastralData && !cadastralError && (
+                <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 animate-fade-in">
+                  <p className="text-xs font-medium text-emerald-700 flex items-center gap-1.5 mb-2">
+                    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+                      <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
+                    </svg>
+                    {t("form.cadastralFound")}
+                  </p>
+
+                  {cadastralData.apartment?.address && (
+                    <p className="text-xs text-emerald-600 mb-2">{cadastralData.apartment.address}</p>
+                  )}
+
+                  <p className="text-xs font-medium text-emerald-700 mb-1">{t("form.cadastralApartment")}</p>
+                  <div className="text-xs text-emerald-600 space-y-0.5 mb-2">
+                    {cadastralData.apartment?.area_m2 && (
+                      <p>{t("form.cadastralArea")}: <span className="font-medium">{cadastralData.apartment.area_m2} m²</span></p>
+                    )}
+                    {cadastralData.apartment?.floor && (
+                      <p>{t("form.cadastralFloor")}: <span className="font-medium">
+                        {cadastralData.building?.total_floors
+                          ? t("form.floorOf", { floor: cadastralData.apartment.floor, total: cadastralData.building.total_floors })
+                          : cadastralData.apartment.floor}
+                      </span></p>
+                    )}
+                    {cadastralData.apartment?.bathroom && (
+                      <p>{t("form.cadastralBathroom")}: <span className="font-medium">{cadastralData.apartment.bathroom}</span></p>
+                    )}
+                    {cadastralData.apartment?.estimated_value_lei && (
+                      <p>{t("form.cadastralEstimatedValue")}: <span className="font-medium">{cadastralData.apartment.estimated_value_lei} lei</span></p>
+                    )}
+                  </div>
+
+                  <p className="text-xs font-medium text-emerald-700 mb-1">{t("form.cadastralBuilding")}</p>
+                  <div className="text-xs text-emerald-600 space-y-0.5">
+                    {cadastralData.building?.classifier && (
+                      <p>{t("form.cadastralClassifier")}: <span className="font-medium">{cadastralData.building.classifier}</span></p>
+                    )}
+                    {cadastralData.building?.condition && (
+                      <p>{t("form.cadastralCondition")}: <span className="font-medium">{cadastralData.building.condition}</span></p>
+                    )}
+                    {cadastralData.building?.construction_year && (
+                      <p>{t("form.cadastralYear")}: <span className="font-medium">{cadastralData.building.construction_year}</span></p>
+                    )}
+                    {cadastralData.building?.wall_material && (
+                      <p>{t("form.cadastralWallMaterial")}: <span className="font-medium">{cadastralData.building.wall_material}</span></p>
+                    )}
+                    {cadastralData.building?.water && (
+                      <p>{t("form.cadastralWater")}: <span className="font-medium">{cadastralData.building.water}</span></p>
+                    )}
+                    {cadastralData.building?.sewage && (
+                      <p>{t("form.cadastralSewage")}: <span className="font-medium">{cadastralData.building.sewage}</span></p>
+                    )}
+                    {cadastralData.building?.gas && (
+                      <p>{t("form.cadastralGas")}: <span className="font-medium">{cadastralData.building.gas}</span></p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* — Section 1: Location — */}
           <div className="p-5 sm:p-6">
             <div className="flex items-center gap-2 mb-4">

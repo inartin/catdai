@@ -91,7 +91,7 @@ export async function POST(request) {
       params[key] = String(body[key]);
     }
   }
-  const canonical = canonicalParams(params);
+  const canonical = JSON.stringify(canonicalParams(params));
 
   // Resolve access tier of the sharer
   const access = await resolveAccessTier(request);
@@ -104,7 +104,7 @@ export async function POST(request) {
       .from("shared_links")
       .select("slug")
       .eq("sharer_user_id", sharerUserId)
-      .eq("params", canonical)
+      .filter("params::text", "eq", canonical)
       .maybeSingle();
 
     if (existing?.slug) {

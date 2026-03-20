@@ -1,4 +1,4 @@
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -54,17 +54,33 @@ export default async function SharedLinkPage({ params }) {
     notFound();
   }
 
-  const searchParams = new URLSearchParams();
-  const storedParams = data.params || {};
-
-  for (const [key, value] of Object.entries(storedParams)) {
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(data.params || {})) {
     if (value != null && value !== "") {
-      searchParams.set(key, String(value));
+      sp.set(key, String(value));
     }
   }
+  sp.set("share_slug", slug);
 
-  // Pass the slug so the estimate API can verify server-side
-  searchParams.set("share_slug", slug);
+  const evaluareUrl = `/evaluare?${sp.toString()}`;
 
-  redirect(`/evaluare?${searchParams.toString()}`);
+  // Render a real HTML page so Next.js includes the OG meta tags in the
+  // response body. Social-media crawlers read those tags without executing JS.
+  // Real users are forwarded instantly by the inline script; the <meta> refresh
+  // handles JS-disabled environments.
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-head-element */}
+      <noscript>
+        <meta httpEquiv="refresh" content={`0;url=${evaluareUrl}`} />
+      </noscript>
+      {/* biome-ignore lint/security/noDangerouslySetInnerHtml */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `window.location.replace(${JSON.stringify(evaluareUrl)})`,
+        }}
+      />
+    </>
+  );
 }
+

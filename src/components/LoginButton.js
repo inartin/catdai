@@ -76,7 +76,7 @@ export default function LoginButton({ className = "", menuAlign = "right" }) {
             className="w-full rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="flex items-center justify-center gap-2.5 whitespace-nowrap">
-              <GoogleIcon size={16} className="text-[#4285F4]" />
+              <GoogleIcon size={16} />
               <span>{activeProvider === "google" ? t("auth.loading") : t("auth.loginWithGoogle")}</span>
             </span>
           </button>

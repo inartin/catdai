@@ -84,7 +84,7 @@ export async function POST(request) {
     );
   }
 
-  // Build canonical params object
+  // Build canonical params object (sorted keys, non-empty values only)
   const params = {};
   for (const key of PARAM_KEYS) {
     if (body[key] != null && body[key] !== "") {
@@ -93,19 +93,29 @@ export async function POST(request) {
   }
   const canonical = JSON.stringify(canonicalParams(params));
 
+  // SHA-256 hash of canonical JSON — used as the reliable dedup key
+  const paramsHash = crypto.createHash("sha256").update(canonical).digest("hex");
+
   // Resolve access tier of the sharer
   const access = await resolveAccessTier(request);
   const sharerIsPaid = isPaidAccessTier(access.tier);
   const sharerUserId = access.user_id || null;
 
-  // Deduplication: check if this user already shared the same params
-  if (sharerUserId) {
-    const { data: existing } = await supabaseAdmin
+  // Deduplication: look up by (sharer_user_id, params_hash) for logged-in users,
+  // or by (params_hash alone) for anonymous users — hash is always reliable.
+  {
+    let query = supabaseAdmin
       .from("shared_links")
       .select("slug")
-      .eq("sharer_user_id", sharerUserId)
-      .filter("params::text", "eq", canonical)
-      .maybeSingle();
+      .eq("params_hash", paramsHash);
+
+    if (sharerUserId) {
+      query = query.eq("sharer_user_id", sharerUserId);
+    } else {
+      query = query.is("sharer_user_id", null);
+    }
+
+    const { data: existing } = await query.maybeSingle();
 
     if (existing?.slug) {
       const appUrl = getAppBaseUrl(request);
@@ -138,12 +148,13 @@ export async function POST(request) {
     );
   }
 
-  // Insert shared link
+  // Insert shared link with params_hash for future dedup lookups
   const { error: insertError } = await supabaseAdmin
     .from("shared_links")
     .insert({
       slug,
-      params: canonical,
+      params: JSON.parse(canonical),
+      params_hash: paramsHash,
       sharer_user_id: sharerUserId,
       sharer_is_paid: sharerIsPaid,
     });
@@ -161,6 +172,7 @@ export async function POST(request) {
   res.headers.set("X-RateLimit-Remaining", String(remaining));
   return res;
 }
+
 
 function getAppBaseUrl(request) {
   // In production, use the canonical domain

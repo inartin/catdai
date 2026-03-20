@@ -25,12 +25,8 @@ export default function RootLayout({ children }) {
         {gaId && (
           <>
             <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-              strategy="afterInteractive"
-            />
-            <Script
-              id="google-analytics"
-              strategy="afterInteractive"
+              id="ga-consent-default"
+              strategy="beforeInteractive"
               dangerouslySetInnerHTML={{
                 __html: `
                   window.dataLayer = window.dataLayer || [];
@@ -41,6 +37,20 @@ export default function RootLayout({ children }) {
                     'ad_user_data': 'denied',
                     'ad_personalization': 'denied',
                   });
+                `,
+              }}
+            />
+            <Script
+              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
+              strategy="afterInteractive"
+            />
+            <Script
+              id="google-analytics"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){window.dataLayer.push(arguments);}
                   gtag('js', new Date());
                   gtag('config', '${gaId}', {
                     page_path: window.location.pathname,

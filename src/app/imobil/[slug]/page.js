@@ -21,9 +21,23 @@ export async function generateMetadata({ params }) {
   const rooms = p.rooms || "";
   const area = p.area || "";
 
+  const title = `Evaluare ${rooms} camere, ${area}m² — ${district}, ${city} | Catdai`;
+  const description = `Analiză imobiliară: apartament ${rooms} camere, ${area}m² în ${district}, ${city}. Preț estimat, comparație pe sectoare și statistici de piață.`;
+
   return {
-    title: `Evaluare ${rooms} camere, ${area}m² — ${district}, ${city} | Catdai`,
-    description: `Analiză imobiliară: apartament ${rooms} camere, ${area}m² în ${district}, ${city}. Preț estimat, comparație pe sectoare și statistici de piață.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      siteName: "Catdai",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
   };
 }
 

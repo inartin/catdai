@@ -138,6 +138,7 @@
   "result.linkCopied": "Link copiat!",
   "result.sharing": "Se generează...",
   "result.shareAnalysis": "Trimite analiza",
+  "result.comingSoon": "În curând",
 
   "evaluare.loading": "Analizăm piața pentru criteriile tale...",
   "evaluare.defaultError": "A apărut o eroare",
@@ -159,6 +160,8 @@
   "about.howItWorksBody": "Pentru fiecare căutare, filtrăm anunțuri comparabile după criterii precum oraș, sector, suprafață, număr de camere și alte caracteristici relevante. Rezultatul este o estimare orientativă a pieței, nu o evaluare oficială.",
   "about.disclaimerTitle": "Clarificare importantă",
   "about.disclaimerBody": "CatDai nu este afiliat, sponsorizat sau aprobat de platformele menționate. Numele lor sunt folosite doar pentru a explica sursele publice de date analizate.",
+  "about.contactTitle": "Contact",
+  "about.contactBody": "Pentru întrebări, sugestii sau colaborări, ne poți contacta la:",
 
   "footer.terms": "Termeni & Condiții",
   "footer.privacy": "Politica de Confidențialitate",

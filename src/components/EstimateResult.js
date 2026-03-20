@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 
@@ -10,9 +10,35 @@ function formatPrice(num) {
 }
 
 function LockedValue({ text = "999999", className = "" }) {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!showTooltip) return;
+    const timer = setTimeout(() => setShowTooltip(false), 2000);
+    return () => clearTimeout(timer);
+  }, [showTooltip]);
+
+  const handleClick = useCallback((e) => {
+    e.stopPropagation();
+    setShowTooltip(true);
+  }, []);
+
   return (
-    <span aria-hidden className={`inline-block select-none blur-sm ${className}`}>
-      {text}
+    <span className="relative inline-block">
+      <span
+        aria-hidden
+        className={`inline-block select-none blur-sm cursor-pointer ${className}`}
+        onClick={handleClick}
+      >
+        {text}
+      </span>
+      {showTooltip && (
+        <span className="absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium whitespace-nowrap shadow-lg animate-fade-in">
+          {t("result.comingSoon")}
+          <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900" />
+        </span>
+      )}
     </span>
   );
 }

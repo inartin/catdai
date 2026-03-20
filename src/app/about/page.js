@@ -47,6 +47,18 @@ export default function AboutPage() {
                   {t("about.disclaimerBody")}
                 </p>
               </section>
+
+              <section>
+                <h2 className="text-xl font-semibold tracking-tight">
+                  {t("about.contactTitle")}
+                </h2>
+                <p className="mt-3 text-gray-600">
+                  {t("about.contactBody")}{" "}
+                  <a href="mailto:info@catdai.md" className="text-blue-600 hover:underline">
+                    info@catdai.md
+                  </a>
+                </p>
+              </section>
             </div>
           </div>
         </section>

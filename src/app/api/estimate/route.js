@@ -264,7 +264,20 @@ export async function POST(request) {
   };
 
   const access = await resolveAccessTier(request);
-  const isPaid = isPaidAccessTier(access.tier);
+  let isPaid = isPaidAccessTier(access.tier);
+
+  // If a share_slug is provided, verify server-side if the sharer was paid
+  if (!isPaid && body.share_slug) {
+    const { data: shareData } = await supabaseAdmin
+      .from("shared_links")
+      .select("sharer_is_paid")
+      .eq("slug", String(body.share_slug))
+      .maybeSingle();
+    if (shareData?.sharer_is_paid) {
+      isPaid = true;
+    }
+  }
+
   const responsePayload = isPaid
     ? { ...data, access_tier: "paid", locked_sections: {} }
     : { ...buildEstimatePreview(data), access_tier: "free" };

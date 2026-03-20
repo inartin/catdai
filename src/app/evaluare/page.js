@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -19,6 +19,9 @@ function EvaluareContent() {
   const { session, loading: authLoading } = useAuth();
   const paramsString = searchParams.toString();
 
+  // Capture share_slug once on first render so it survives URL stripping
+  const shareSlugRef = useRef(searchParams.get("share_slug"));
+
   useEffect(() => {
     if (authLoading) return;
 
@@ -34,6 +37,7 @@ function EvaluareContent() {
       const rooms = params.get("rooms");
       const area = params.get("area");
       const cadastralNumber = params.get("cadastral_number");
+      const shareSlug = shareSlugRef.current;
 
       if (!city || !district || !rooms || !area) {
         router.replace("/");
@@ -51,9 +55,10 @@ function EvaluareContent() {
 
       const isFreshEvaluation = params.get("_new") === "1";
 
-      if (isFreshEvaluation) {
+      if (isFreshEvaluation || shareSlug) {
         const clean = new URLSearchParams(paramsString);
         clean.delete("_new");
+        clean.delete("share_slug");
         window.history.replaceState(null, "", `/evaluare?${clean.toString()}`);
       }
 
@@ -106,6 +111,7 @@ function EvaluareContent() {
             renovation: params.get("renovation") || null,
             bathrooms_count: bathroomsVal,
             balconies_count: balconiesVal,
+            ...(shareSlug ? { share_slug: shareSlug } : {}),
             ...trackingData,
           }),
         });

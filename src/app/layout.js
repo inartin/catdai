@@ -1,7 +1,6 @@
 import { Geist } from "next/font/google";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
-import Script from "next/script";
 import CookieBanner from "@/components/CookieBanner";
 import "./globals.css";
 
@@ -21,12 +20,10 @@ export default function RootLayout({ children }) {
 
   return (
     <html lang="ro">
-      <body className={`${geistSans.variable} antialiased`}>
+      <head>
         {gaId && (
           <>
-            <Script
-              id="ga-consent-default"
-              strategy="beforeInteractive"
+            <script
               dangerouslySetInnerHTML={{
                 __html: `
                   window.dataLayer = window.dataLayer || [];
@@ -40,13 +37,8 @@ export default function RootLayout({ children }) {
                 `,
               }}
             />
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`}
-              strategy="afterInteractive"
-            />
-            <Script
-              id="google-analytics"
-              strategy="afterInteractive"
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
+            <script
               dangerouslySetInnerHTML={{
                 __html: `
                   window.dataLayer = window.dataLayer || [];
@@ -60,6 +52,8 @@ export default function RootLayout({ children }) {
             />
           </>
         )}
+      </head>
+      <body className={`${geistSans.variable} antialiased`}>
         <LanguageProvider>
           <AuthProvider>{children}</AuthProvider>
         </LanguageProvider>

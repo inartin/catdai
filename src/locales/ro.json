@@ -4,20 +4,23 @@
   "nav.news": "Noutǎți",
   "nav.forAgents": "Pentru Agenți",
   "nav.langAriaLabel": "Selectează limba",
-  "nav.login": "Loghează-te",
+  "nav.login": "Login",
+  "nav.profile": "Profil",
+  "profile.logout": "Ieșire",
+  "profile.config": "Setări",
+  "profile.delete": "Șterge Profil",
+  "profile.confirmDelete": "Sigur dorești să ștergi profilul?",
   "nav.register": "înregistrare",
   "auth.loginWithTelegram": "Intră cu Telegram",
   "auth.loginWithGoogle": "Intră cu Google",
   "auth.loginWithFacebook": "Intră cu Facebook",
   "auth.loading": "Se încarcă...",
-
   "hero.title": "Înțelege piața, apoi decide.",
   "hero.subtitle": "Vinde realist. Cumpără informat.",
   "hero.yourPrice": "Prețul tău",
   "hero.zoneFastSale": "Vânzare rapidă",
   "hero.zoneMarketPrice": "Preț de piață",
   "hero.zonePremium": "Premium",
-
   "categories.auto": "Auto",
   "categories.autoAnalysis": "Analiză Piața Auto",
   "categories.realEstate": "Imobil",
@@ -25,13 +28,11 @@
   "categories.electronics": "Electronice",
   "categories.electronicsAnalysis": "Analiză Piața Electronice",
   "categories.comingSoon": "În curând",
-
   "howItWorks.intro": "Pe baza criteriilor selectate, analizăm date din anunțuri similare și îți arătăm la ce nivel de preț să te aștepți.",
   "howItWorks.step1": "Setezi criterii",
   "howItWorks.step2": "Vezi prețul pieței",
   "howItWorks.step3": "Ajustezi preferințe",
   "howItWorks.step4": "Compari scenarii",
-
   "form.back": "Înapoi",
   "form.title": "Analiză Piață Imobiliară",
   "form.subtitle": "Completează detaliile pentru o analiză relevantă pentru vânzare sau cumpărare",
@@ -58,7 +59,6 @@
   "form.submit": "Vezi Analiza Pieței",
   "form.cityOnlyNotice": "Momentan disponibil doar pentru Chișinău",
   "form.socialProof": "Analiză bazată pe anunțuri reale din {city}",
-
   "form.cadastralSection": "Completare rapidă",
   "form.cadastralNumber": "Nr. cadastral (Optional)",
   "form.cadastralPlaceholder": "ex. 0100106.132.01.090",
@@ -83,7 +83,6 @@
   "form.cadastralSewage": "Canalizare",
   "form.cadastralGas": "Gaz",
   "form.floorOf": "Etaj {floor}/{total}",
-
   "result.confidenceHigh": "Înaltă",
   "result.confidenceMedium": "Medie",
   "result.confidenceLow": "Scăzută",
@@ -139,7 +138,6 @@
   "result.sharing": "Se generează...",
   "result.shareAnalysis": "Trimite analiza",
   "result.comingSoon": "În curând",
-
   "evaluare.loading": "Analizăm piața pentru criteriile tale...",
   "evaluare.defaultError": "A apărut o eroare",
   "evaluare.connectionError": "Eroare de conexiune. Încearcă din nou.",
@@ -151,7 +149,6 @@
   "evaluare.suggestionArea": "Ajustezi suprafața mai aproape de media segmentului",
   "evaluare.editCriteria": "Modifică criteriile",
   "evaluare.tryAgain": "Încearcă din nou",
-
   "about.title": "Despre CatDai",
   "about.intro": "CatDai te ajută să înțelegi mai bine piața imobiliară (și nu numai) și să vezi un nivel de preț realist pentru proprietăți similare.",
   "about.dataSourcesTitle": "Din ce date lucrăm",
@@ -162,11 +159,9 @@
   "about.disclaimerBody": "CatDai nu este afiliat, sponsorizat sau aprobat de platformele menționate. Numele lor sunt folosite doar pentru a explica sursele publice de date analizate.",
   "about.contactTitle": "Contact",
   "about.contactBody": "Pentru întrebări, sugestii sau colaborări, ne poți contacta la:",
-
   "footer.terms": "Termeni & Condiții",
   "footer.privacy": "Politica de Confidențialitate",
   "footer.copyright": "© 2026 Catdai. Toate drepturile rezervate.",
-
   "data.city.Chișinău": "Chișinău",
   "data.city.Bălți": "Bălți",
   "data.city.Cahul": "Cahul",
@@ -175,7 +170,6 @@
   "data.city.Orhei": "Orhei",
   "data.city.Edineț": "Edineț",
   "data.city.Comrat": "Comrat",
-
   "data.district.Centru": "Centru",
   "data.district.Botanica": "Botanica",
   "data.district.Buiucani": "Buiucani",
@@ -191,10 +185,8 @@
   "data.district.Dacia": "Dacia",
   "data.district.Slobozia": "Slobozia",
   "data.district.Pământeni": "Pământeni",
-
   "data.buildingType.Construcţii noi": "Construcţii noi",
   "data.buildingType.Secundar": "Secundar",
-
   "data.renovationType.Euroreparație": "Euroreparație",
   "data.renovationType.Variantă albă": "Variantă albă",
   "data.renovationType.Reparație cosmetică": "Reparație cosmetică",

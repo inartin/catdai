@@ -6,9 +6,11 @@ import { useTranslation } from "@/context/LanguageContext";
 import GoogleIcon from "@/components/icons/GoogleIcon";
 import FacebookIcon from "@/components/icons/FacebookIcon";
 import TelegramIcon from "@/components/icons/TelegramIcon";
+import { useRouter } from "next/navigation";
 
 export default function LoginButton({ className = "", menuAlign = "right" }) {
   const { t } = useTranslation();
+  const router = useRouter();
   const {
     user,
     isAuthenticated,
@@ -18,7 +20,6 @@ export default function LoginButton({ className = "", menuAlign = "right" }) {
     signInWithGoogle,
     signInWithFacebook,
     signInWithTelegram,
-    signOut,
     clearAuthError,
   } = useAuth();
   const [open, setOpen] = useState(false);
@@ -51,16 +52,15 @@ export default function LoginButton({ className = "", menuAlign = "right" }) {
         onClick={async () => {
           clearAuthError();
           if (isLoggedIn) {
-            await signOut();
-            setOpen(false);
+            router.push('/profile');
             return;
           }
           setOpen((prev) => !prev);
         }}
         disabled={loading}
-        className={`text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors ${className}`}
+        className={`text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors cursor-pointer ${className}`}
       >
-        {isLoggedIn ? "Logout" : "Login"}
+        {isLoggedIn ? t("nav.profile") : t("nav.login")}
       </button>
 
       {!isLoggedIn && open && (

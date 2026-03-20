@@ -2,6 +2,7 @@ import { Geist } from "next/font/google";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import Script from "next/script";
+import CookieBanner from "@/components/CookieBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,8 +35,16 @@ export default function RootLayout({ children }) {
                 __html: `
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
+                  gtag('consent', 'default', {
+                    'analytics_storage': 'denied',
+                    'ad_storage': 'denied',
+                    'ad_user_data': 'denied',
+                    'ad_personalization': 'denied',
+                  });
                   gtag('js', new Date());
-                  gtag('config', '${gaId}');
+                  gtag('config', '${gaId}', {
+                    page_path: window.location.pathname,
+                  });
                 `,
               }}
             />
@@ -44,6 +53,7 @@ export default function RootLayout({ children }) {
         <LanguageProvider>
           <AuthProvider>{children}</AuthProvider>
         </LanguageProvider>
+        <CookieBanner />
       </body>
     </html>
   );

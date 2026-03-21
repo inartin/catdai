@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
+import { validateEstimateInput } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 /**
@@ -54,7 +55,6 @@ function computeFeatureAdjustments(bathroomsCount, balconiesCount) {
 }
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
-const REQUIRED_FIELDS = ["city", "district", "rooms_count", "area_m2"];
 const TRACKING_SALT = process.env.TRACKING_SALT || "catdai-default-salt";
 
 function hashIp(ip) {
@@ -186,44 +186,39 @@ export async function POST(request) {
     );
   }
 
-  const missing = REQUIRED_FIELDS.filter((f) => !body[f] && body[f] !== 0);
-  if (missing.length > 0) {
+  const validation = validateEstimateInput({
+    city: body.city,
+    district: body.district,
+    rooms_count: body.rooms_count,
+    area_m2: body.area_m2,
+    floor: body.floor,
+    total_floors: body.total_floors,
+    building_type: body.building_type,
+    renovation: body.renovation,
+    bathrooms_count: body.bathrooms_count,
+    balconies_count: body.balconies_count,
+  });
+
+  if (!validation.valid) {
     return NextResponse.json(
-      { error: `Missing required fields: ${missing.join(", ")}` },
+      { error: validation.reason, field: validation.field },
       { status: 400 }
     );
   }
 
-  const ALLOWED_CITIES = ["Chișinău"];
-  if (!ALLOWED_CITIES.includes(body.city)) {
-    return NextResponse.json(
-      { error: "Only Chișinău is currently supported" },
-      { status: 400 }
-    );
-  }
-
-  const area = parseFloat(body.area_m2);
-  if (isNaN(area) || area <= 0 || area > 1000) {
-    return NextResponse.json(
-      { error: "area_m2 must be a number between 1 and 1000" },
-      { status: 400 }
-    );
-  }
-
-  const roomsCount = parseInt(body.rooms_count, 10);
-  const parsedRooms = isNaN(roomsCount) ? null : roomsCount;
+  const v = validation.data;
 
   const params = {
-    p_city: body.city,
-    p_district: body.district || null,
-    p_rooms_count: parsedRooms,
-    p_area_m2: area,
-    p_floor: body.floor ? parseInt(body.floor, 10) : null,
-    p_total_floors: body.total_floors ? parseInt(body.total_floors, 10) : null,
-    p_building_type: body.building_type || null,
-    p_renovation: body.renovation || null,
-    p_bathrooms_count: body.bathrooms_count ? parseInt(body.bathrooms_count, 10) : null,
-    p_balconies_count: body.balconies_count != null ? parseInt(body.balconies_count, 10) : null,
+    p_city: v.city,
+    p_district: v.district,
+    p_rooms_count: v.rooms_count,
+    p_area_m2: v.area_m2,
+    p_floor: v.floor ?? null,
+    p_total_floors: v.total_floors ?? null,
+    p_building_type: v.building_type ?? null,
+    p_renovation: v.renovation ?? null,
+    p_bathrooms_count: v.bathrooms_count ?? null,
+    p_balconies_count: v.balconies_count ?? null,
   };
 
   const rpcStart = Date.now();
@@ -289,12 +284,12 @@ export async function POST(request) {
       session_id: body.session_id || null,
       evaluation_group_id: body.evaluation_group_id || null,
       ip_hash: hashIp(ip),
-      city: body.city,
-      district: body.district || null,
-      rooms_count: parsedRooms,
-      area_m2: area,
-      building_type: body.building_type || null,
-      renovation: body.renovation || null,
+      city: v.city,
+      district: v.district,
+      rooms_count: v.rooms_count,
+      area_m2: v.area_m2,
+      building_type: v.building_type || null,
+      renovation: v.renovation || null,
       floor: params.p_floor,
       total_floors: params.p_total_floors,
       bathrooms_count: params.p_bathrooms_count,

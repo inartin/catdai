@@ -9,6 +9,7 @@ import PropertyForm from "@/components/PropertyForm";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { getDeviceId, getSessionId, computeEvaluationGroupId, getOrCreateLogId } from "@/lib/tracking";
+import { validateEstimateInput, validateCadastralNumber } from "@/lib/validation";
 
 function EvaluareContent() {
   const searchParams = useSearchParams();
@@ -104,9 +105,32 @@ function EvaluareContent() {
         const bVal = bRaw === "3+" ? 3 : bRaw ? parseInt(bRaw, 10) : null;
         const balVal = balRaw === "3+" ? 3 : balRaw != null ? parseInt(balRaw, 10) : null;
 
+        const validation = validateEstimateInput({
+          city, district, rooms_count: roomsVal, area_m2: area,
+          floor: pRaw.get(pFx + "floor") || null,
+          total_floors: pRaw.get(pFx + "total_floors") || null,
+          building_type: pRaw.get(pFx + "building_type") || null,
+          renovation: pRaw.get(pFx + "renovation") || null,
+          bathrooms_count: bVal, balconies_count: balVal,
+        });
+
+        if (!validation.valid) {
+          return { error: { code: validation.reason, field: validation.field } };
+        }
+
+        const v = validation.data;
+
+        const cNum = pRaw.get(pFx + "cadastral_number");
+        if (cNum) {
+          const cadVal = validateCadastralNumber(cNum);
+          if (!cadVal.valid) {
+            return { error: { code: "invalid_cadastral", field: "cadastral_number" } };
+          }
+        }
+
         const trackingData = (isPrimary && isFreshEvaluation) ? (() => {
           const evalGroupId = computeEvaluationGroupId({
-            city, district, rooms_count: roomsVal, building_type: pRaw.get(pFx + "building_type") || null,
+            city: v.city, district: v.district, rooms_count: v.rooms_count, building_type: v.building_type || null,
           });
           return { log_id: getOrCreateLogId(evalGroupId), device_id: getDeviceId(), session_id: getSessionId(), evaluation_group_id: evalGroupId, language: lang };
         })() : {};
@@ -114,18 +138,18 @@ function EvaluareContent() {
         const estReq = fetchJson("/api/estimate", {
           method: "POST", headers,
           body: JSON.stringify({
-            city, district, rooms_count: roomsVal, area_m2: area,
-            floor: pRaw.get(pFx + "floor") || null,
-            total_floors: pRaw.get(pFx + "total_floors") || null,
-            building_type: pRaw.get(pFx + "building_type") || null,
-            renovation: pRaw.get(pFx + "renovation") || null,
-            bathrooms_count: bVal, balconies_count: balVal,
+            city: v.city, district: v.district, rooms_count: v.rooms_count, area_m2: v.area_m2,
+            floor: v.floor ?? null,
+            total_floors: v.total_floors ?? null,
+            building_type: v.building_type ?? null,
+            renovation: v.renovation ?? null,
+            bathrooms_count: v.bathrooms_count ?? null,
+            balconies_count: v.balconies_count ?? null,
             ...(isPrimary && shareSlug ? { share_slug: shareSlug } : {}),
             ...trackingData,
           }),
         });
 
-        const cNum = pRaw.get(pFx + "cadastral_number");
         const cadReq = cNum ? fetchJson("/api/cadastral", { method: "POST", headers, body: JSON.stringify({ cadastral_number: cNum }) }) : Promise.resolve(null);
 
         const [estRes, cadRes] = await Promise.all([estReq, cadReq]);

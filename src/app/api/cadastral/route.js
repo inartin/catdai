@@ -1,43 +1,9 @@
 import { rateLimit } from "@/lib/rate-limit";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
+import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
-
-const CADASTRAL_RE = /^\d{5,7}\.\d{1,4}\.\d{2}\.\d{3}$/;
-
-function normalizeDiacritics(str) {
-  return str
-    .replace(/[șş]/g, "s")
-    .replace(/[țţ]/g, "t")
-    .replace(/[âî]/g, "a")
-    .replace(/[ă]/g, "a")
-    .replace(/[ȘŞ]/g, "S")
-    .replace(/[ȚŢ]/g, "T")
-    .replace(/[ÂÎ]/g, "A")
-    .replace(/[Ă]/g, "A")
-    .toLowerCase();
-}
-
-const DISTRICT_MAP = [
-  { normalized: "botanica", value: "Botanica" },
-  { normalized: "centru", value: "Centru" },
-  { normalized: "buiucani", value: "Buiucani" },
-  { normalized: "ciocana", value: "Ciocana" },
-  { normalized: "rascani", value: "Râșcani" },
-  { normalized: "riscani", value: "Râșcani" },
-  { normalized: "telecentru", value: "Telecentru" },
-  { normalized: "sculeni", value: "Sculeni" },
-  { normalized: "posta veche", value: "Poșta Veche" },
-  { normalized: "durlesti", value: "Durlești" },
-  { normalized: "codru", value: "Codru" },
-  { normalized: "aeroport", value: "Aeroport" },
-];
-
-function matchDistrict(raw) {
-  const key = normalizeDiacritics(raw);
-  return DISTRICT_MAP.find((d) => d.normalized === key)?.value || null;
-}
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");

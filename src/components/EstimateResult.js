@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
+import BookmarkIcon from "@/components/icons/BookmarkIcon";
 
 function formatPrice(num) {
   if (num == null) return "—";
@@ -46,11 +47,10 @@ function LockedValue({ text = "999999", className = "" }) {
 function FilterBadge({ label, active }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${
-        active
-          ? "bg-primary/10 text-primary"
-          : "bg-gray-100 text-gray-400 line-through"
-      }`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${active
+        ? "bg-primary/10 text-primary"
+        : "bg-gray-100 text-gray-400 line-through"
+        }`}
     >
       {active ? (
         <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
@@ -70,11 +70,10 @@ function FeatureAdjustmentBadge({ item }) {
   const isPositive = item.pct > 0;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${
-        isPositive
-          ? "bg-emerald-50 text-emerald-700"
-          : "bg-red-50 text-red-600"
-      }`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${isPositive
+        ? "bg-emerald-50 text-emerald-700"
+        : "bg-red-50 text-red-600"
+        }`}
     >
       {isPositive ? (
         <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="currentColor">
@@ -117,31 +116,28 @@ function DistrictComparison({ districts, currentDistrict, area, blurValues }) {
             Number.isFinite(relativeWidthFromPayload)
               ? relativeWidthFromPayload
               : (Number.isFinite(medianPpm) && maxPpm
-                  ? Math.max(8, (medianPpm / maxPpm) * 100)
-                  : 8);
+                ? Math.max(8, (medianPpm / maxPpm) * 100)
+                : 8);
           const totalPrice =
             Number.isFinite(medianPpm) ? Math.round(medianPpm * area) : null;
 
           return (
             <div key={d.district} className="flex items-center gap-3">
               <span
-                className={`text-sm w-24 shrink-0 truncate text-right ${
-                  isCurrent ? "font-bold text-primary" : "text-gray-500"
-                }`}
+                className={`text-sm w-24 shrink-0 truncate text-right ${isCurrent ? "font-bold text-primary" : "text-gray-500"
+                  }`}
               >
                 {t(`data.district.${d.district}`)}
               </span>
               <div className="flex-1 h-8 bg-gray-50 rounded relative overflow-hidden">
                 <div
-                  className={`h-full rounded transition-all ${
-                    isCurrent ? "bg-primary/20" : "bg-gray-200"
-                  }`}
+                  className={`h-full rounded transition-all ${isCurrent ? "bg-primary/20" : "bg-gray-200"
+                    }`}
                   style={{ width: `${widthPct}%` }}
                 />
                 <span
-                  className={`absolute inset-y-0 flex items-center text-sm tabular-nums ${
-                    widthPct > 50 ? "right-2" : "left-2"
-                  } ${isCurrent ? "font-bold text-primary" : "text-gray-600"}`}
+                  className={`absolute inset-y-0 flex items-center text-sm tabular-nums ${widthPct > 50 ? "right-2" : "left-2"
+                    } ${isCurrent ? "font-bold text-primary" : "text-gray-600"}`}
                   style={widthPct > 50 ? {} : { left: `calc(${widthPct}% + 8px)` }}
                 >
                   {blurValues || totalPrice == null ? (
@@ -179,8 +175,12 @@ export default function EstimateResult({ data, onReset }) {
   } = data;
   const [copied, setCopied] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [favorited, setFavorited] = useState(false);
+  const [favoriteAnimating, setFavoriteAnimating] = useState(false);
+  const [showLoginTooltip, setShowLoginTooltip] = useState(false);
+  const favoriteChecked = useRef(false);
   const { t, lang } = useTranslation();
-  const { session } = useAuth();
+  const { session, isAuthenticated } = useAuth();
 
   const isPaid = data.access_tier === "paid";
   const lockedSections = data.locked_sections || {};
@@ -189,6 +189,59 @@ export default function EstimateResult({ data, onReset }) {
   const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
   const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
   const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
+
+  // Check if this evaluation is already favorited
+  useEffect(() => {
+    if (favoriteChecked.current || !session?.access_token) return;
+    favoriteChecked.current = true;
+
+    const urlPath = window.location.pathname + window.location.search;
+    fetch(`/api/favorites?url_path=${encodeURIComponent(urlPath)}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setFavorited(!!data.favorited))
+      .catch(() => { });
+  }, [session?.access_token]);
+
+  const handleToggleFavorite = async () => {
+    if (!isAuthenticated) {
+      setShowLoginTooltip(true);
+      setTimeout(() => setShowLoginTooltip(false), 2000);
+      return;
+    }
+
+    const urlPath = window.location.pathname + window.location.search;
+    const roomsLbl = input.rooms_count === 1
+      ? t("result.oneRoom")
+      : t("result.rooms", { count: input.rooms_count });
+    const label = `${t("result.apartment")} ${roomsLbl} · ${input.area_m2}m² · ${input.district ? t(`data.district.${input.district}`) + ", " : ""}${t(`data.city.${input.city}`)}`;
+
+    // Optimistic update
+    const next = !favorited;
+    setFavorited(next);
+    setFavoriteAnimating(true);
+    setTimeout(() => setFavoriteAnimating(false), 300);
+
+    try {
+      const res = await fetch("/api/favorites", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ url_path: urlPath, label }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setFavorited(data.favorited);
+      } else {
+        setFavorited(!next); // Revert on error
+      }
+    } catch {
+      setFavorited(!next); // Revert on error
+    }
+  };
 
   const todayFormatted = new Date().toLocaleDateString(
     lang === "ru" ? "ru-RU" : "ro-RO",
@@ -293,13 +346,30 @@ export default function EstimateResult({ data, onReset }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
               <p className="text-sm text-gray-400 uppercase tracking-wide font-medium">{t("result.profileAnalyzed")}</p>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/8 text-xs font-medium text-primary">
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" />
-                  <path d="M16 2v4M8 2v4M3 10h18" />
-                </svg>
-                {todayFormatted}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/8 text-xs font-medium text-primary">
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M16 2v4M8 2v4M3 10h18" />
+                  </svg>
+                  {todayFormatted}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleToggleFavorite}
+                  className={`relative inline-flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer hover:bg-gray-100 transition-all duration-200 ${favoriteAnimating ? "scale-125" : "scale-100"
+                    } ${favorited ? "text-primary" : "text-gray-400 hover:text-gray-600"}`}
+                  title={favorited ? t("result.removeFavorite") : t("result.addFavorite")}
+                >
+                  <BookmarkIcon size={22} filled={favorited} />
+                  {showLoginTooltip && (
+                    <span className="absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium whitespace-nowrap shadow-lg animate-fade-in">
+                      {t("result.loginToFavorite")}
+                      <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900" />
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
             <h2 className="text-xl font-bold text-gray-900 leading-snug">
               {t("result.apartment")} {roomsLabel} · {input.area_m2}m²
@@ -611,11 +681,11 @@ export default function EstimateResult({ data, onReset }) {
                   : input.total_floors && input.floor === input.total_floors
                     ? t("result.floorLast", { floor: input.floor })
                     : t("result.floorRange", {
-                        from: Math.max(2, input.floor - 2),
-                        to: input.total_floors
-                          ? Math.min(input.total_floors - 1, input.floor + 2)
-                          : input.floor + 2,
-                      })
+                      from: Math.max(2, input.floor - 2),
+                      to: input.total_floors
+                        ? Math.min(input.total_floors - 1, input.floor + 2)
+                        : input.floor + 2,
+                    })
               }
               active={filters_used?.floor !== false}
             />

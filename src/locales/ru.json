@@ -144,6 +144,11 @@
   "result.sharing": "Генерация...",
   "result.shareAnalysis": "Поделиться",
   "result.comingSoon": "Скоро",
+  "result.addFavorite": "Добавить в избранное",
+  "result.removeFavorite": "Убрать из избранного",
+  "result.loginToFavorite": "Войдите, чтобы сохранить",
+  "profile.favorites": "Сохранённые оценки",
+  "profile.noFavorites": "Нет сохранённых оценок",
 
   "evaluare.loading": "Анализируем рынок по вашим критериям...",
   "evaluare.defaultError": "Произошла ошибка",

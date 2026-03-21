@@ -8,6 +8,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ConfigIcon from "@/components/icons/ConfigIcon";
 import { ArrowLeft } from "@/components/icons/ArrowsIcons";
+import BookmarkIcon from "@/components/icons/BookmarkIcon";
 
 export default function ProfilePage() {
   const { t } = useTranslation();
@@ -16,6 +17,8 @@ export default function ProfilePage() {
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(true);
 
   const handleDeleteProfile = async () => {
     try {
@@ -48,6 +51,34 @@ export default function ProfilePage() {
       router.push("/");
     }
   }, [loading, isAuthenticated, router]);
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    setFavoritesLoading(true);
+    fetch("/api/favorites", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => setFavorites(data.favorites || []))
+      .catch(() => {})
+      .finally(() => setFavoritesLoading(false));
+  }, [session?.access_token]);
+
+  const handleRemoveFavorite = async (urlPath) => {
+    setFavorites((prev) => prev.filter((f) => f.url_path !== urlPath));
+    try {
+      await fetch("/api/favorites", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ url_path: urlPath }),
+      });
+    } catch {
+      // Silently fail — the item is already removed from UI
+    }
+  };
 
   if (loading || !isAuthenticated) {
     return (
@@ -113,6 +144,42 @@ export default function ProfilePage() {
                 >
                   {t("profile.delete")}
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* Favorites Section */}
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">{t("profile.favorites")}</h3>
+            {favoritesLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400" />
+              </div>
+            ) : favorites.length === 0 ? (
+              <p className="text-sm text-gray-400 py-6 text-center">{t("profile.noFavorites")}</p>
+            ) : (
+              <div className="space-y-2">
+                {favorites.map((fav) => (
+                  <div
+                    key={fav.id}
+                    className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors group"
+                  >
+                    <a
+                      href={fav.url_path}
+                      className="flex-1 min-w-0 text-sm font-medium text-gray-700 truncate hover:text-primary transition-colors"
+                    >
+                      {fav.label || fav.url_path}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFavorite(fav.url_path)}
+                      className="shrink-0 p-1.5 rounded-lg text-primary hover:bg-red-50 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                      title={t("result.removeFavorite")}
+                    >
+                      <BookmarkIcon size={16} filled />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

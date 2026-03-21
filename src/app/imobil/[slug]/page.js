@@ -3,6 +3,34 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
+// ── Label maps (Romanian) ──
+
+const BUILDING_TYPE = {
+  "Construcţii noi": "Construcții noi",
+  Secundar: "Secundar",
+};
+
+const RENOVATION = {
+  Euroreparație: "Euroreparație",
+  "Variantă albă": "Variantă albă",
+  "Reparație cosmetică": "Reparație cosmetică",
+  "Design individual": "Design individual",
+  "Fără reparație": "Fără reparație",
+  "Construcție nefinisată": "Nefinisată",
+  "Are nevoie de reparație": "Nevoie reparație",
+  "Dat în exploatare": "Dat în exploatare",
+  "Variantă sură": "Variantă sură",
+};
+
+function floorLabel(floor, totalFloors) {
+  if (!floor) return null;
+  const f = Number(floor);
+  const t = totalFloors ? Number(totalFloors) : null;
+  if (f === 1) return "Parter";
+  if (t && f === t) return `Etaj ultim (${f})`;
+  return t ? `Etaj ${f}/${t}` : `Etaj ${f}`;
+}
+
 export async function generateMetadata({ params }) {
   const { slug } = await params;
   const { data } = await supabaseAdmin
@@ -16,13 +44,31 @@ export async function generateMetadata({ params }) {
   }
 
   const p = data.params || {};
-  const city = p.city || "";
+  const city = p.city || "Chișinău";
   const district = p.district || "";
   const rooms = p.rooms || "";
   const area = p.area || "";
+  const buildingType = BUILDING_TYPE[p.building_type] || p.building_type || "";
+  const renovation = RENOVATION[p.renovation] || p.renovation || "";
+  const floor = floorLabel(p.floor, p.total_floors);
+  const balconies = (() => {
+    const b = p.balconies;
+    if (b == null || b === "") return null;
+    const n = Number(b);
+    if (n === 0) return "Fără balcon";
+    if (n === 1) return "1 balcon";
+    return `${n} balcoane`;
+  })();
 
-  const title = `Evaluare ${rooms} camere, ${area}m² — ${district}, ${city} | Catdai`;
-  const description = `Analiză imobiliară: apartament ${rooms} camere, ${area}m² în ${district}, ${city}. Preț estimat, comparație pe sectoare și statistici de piață.`;
+  const roomsLabel =
+    rooms === "1" ? "1 cameră" : rooms ? `${rooms} camere` : "";
+  const titleParts = [roomsLabel, area ? `${area}m²` : ""].filter(Boolean);
+  const title = titleParts.length
+    ? `Apartament ${titleParts.join(" · ")} — ${[district, city].filter(Boolean).join(", ")} | Catdai`
+    : "Evaluare apartament | Catdai";
+
+  const details = [buildingType, renovation, floor, balconies].filter(Boolean);
+  const description = `Analiza Pieții: ${roomsLabel}${area ? `, ${area}m²` : ""} în ${[district, city].filter(Boolean).join(", ")}.${details.length ? ` ${details.join(" · ")}.` : ""} Preț estimat, comparație pe sectoare și statistici de piață.`;
 
   return {
     title,
@@ -34,7 +80,7 @@ export async function generateMetadata({ params }) {
       siteName: "Catdai",
     },
     twitter: {
-      card: "summary_large_image",
+      card: "summary",
       title,
       description,
     },

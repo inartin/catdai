@@ -29,6 +29,7 @@ User inputs property details (zone, m², rooms, floor, renovation, etc.) and rec
 - [ ] Verify Google auth in Audience tab
 - [ ] Verify Facebook auth in Audience tab
 - [ ] Compara
+- [ ] Istoricul de prețuri favoritelor
 
 
 - [ ] Freemium

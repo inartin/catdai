@@ -162,7 +162,7 @@ export default function ProfilePage() {
                 {favorites.map((fav) => (
                   <div
                     key={fav.id}
-                    className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50 hover:bg-gray-100 transition-colors group"
+                    className="flex items-center gap-3 p-3 rounded-2xl border border-gray-100 bg-white shadow-sm hover:bg-gray-50 transition-colors group"
                   >
                     <a
                       href={fav.url_path}

@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
+import PropertyForm from "@/components/PropertyForm";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { getDeviceId, getSessionId, computeEvaluationGroupId, getOrCreateLogId } from "@/lib/tracking";
@@ -15,12 +16,20 @@ function EvaluareContent() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const [isComparing, setIsComparing] = useState(false);
+  const [result2, setResult2] = useState(null);
+  const [error2, setError2] = useState(null);
+  const [loading2, setLoading2] = useState(false);
+
   const { t, lang } = useTranslation();
   const { session, loading: authLoading } = useAuth();
   const paramsString = searchParams.toString();
 
   // Capture share_slug once on first render so it survives URL stripping
   const shareSlugRef = useRef(searchParams.get("share_slug"));
+  const loadedPrimaryParamsRef = useRef(null);
+  const loadedCompareParamsRef = useRef(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -28,32 +37,9 @@ function EvaluareContent() {
     let cancelled = false;
 
     const run = async () => {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams(paramsString);
-      const city = params.get("city");
-      const district = params.get("district");
-      const rooms = params.get("rooms");
-      const area = params.get("area");
-      const cadastralNumber = params.get("cadastral_number");
+      const pRaw = new URLSearchParams(paramsString);
+      const isFreshEvaluation = pRaw.get("_new") === "1";
       const shareSlug = shareSlugRef.current;
-
-      if (!city || !district || !rooms || !area) {
-        router.replace("/");
-        return;
-      }
-
-      const roomsVal = rooms === "5+" ? 5 : parseInt(rooms, 10);
-
-      const bathroomsRaw = params.get("bathrooms");
-      const balconiesRaw = params.get("balconies");
-      const bathroomsVal =
-        bathroomsRaw === "3+" ? 3 : bathroomsRaw ? parseInt(bathroomsRaw, 10) : null;
-      const balconiesVal =
-        balconiesRaw === "3+" ? 3 : balconiesRaw != null ? parseInt(balconiesRaw, 10) : null;
-
-      const isFreshEvaluation = params.get("_new") === "1";
 
       if (isFreshEvaluation || shareSlug) {
         const clean = new URLSearchParams(paramsString);
@@ -62,98 +48,134 @@ function EvaluareContent() {
         window.history.replaceState(null, "", `/evaluare?${clean.toString()}`);
       }
 
-      const trackingData = isFreshEvaluation
-        ? (() => {
-            const evalGroupId = computeEvaluationGroupId({
-              city,
-              district,
-              rooms_count: roomsVal,
-              building_type: params.get("building_type") || null,
-            });
-            return {
-              log_id: getOrCreateLogId(evalGroupId),
-              device_id: getDeviceId(),
-              session_id: getSessionId(),
-              evaluation_group_id: evalGroupId,
-              language: lang,
-            };
-          })()
-        : {};
+      const p1Params = new URLSearchParams();
+      const p2Params = new URLSearchParams();
+      pRaw.forEach((val, key) => {
+        if (key === "_new" || key === "share_slug") return;
+        if (key.startsWith("c_")) p2Params.set(key, val);
+        else p1Params.set(key, val);
+      });
+      p1Params.sort();
+      p2Params.sort();
+      const primaryStr = p1Params.toString();
+      const compareStr = p2Params.toString();
+
+      const hasCompare = !!pRaw.get("c_city");
+      const needsPrimaryFetch = primaryStr && primaryStr !== loadedPrimaryParamsRef.current;
+      const needsCompareFetch = hasCompare && compareStr !== loadedCompareParamsRef.current;
+
+      if (!needsPrimaryFetch && !needsCompareFetch) {
+        if (!hasCompare && loadedCompareParamsRef.current !== null) {
+          setResult2(null);
+          loadedCompareParamsRef.current = null;
+        }
+        return;
+      }
+
+      if (needsPrimaryFetch) {
+        setLoading(true);
+        setError(null);
+      }
+      if (needsCompareFetch) {
+        setLoading2(true);
+        setError2(null);
+      }
 
       const headers = { "Content-Type": "application/json" };
-      if (session?.access_token) {
-        headers.Authorization = `Bearer ${session.access_token}`;
-      }
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
       const fetchJson = async (url, options) => {
         const res = await fetch(url, options);
         let data = {};
-        try {
-          data = await res.json();
-        } catch {
-          data = {};
-        }
+        try { data = await res.json(); } catch { data = {}; }
         return { ok: res.ok, status: res.status, data };
       };
 
-      try {
-        const estimatePromise = fetchJson("/api/estimate", {
-          method: "POST",
-          headers,
+      const fetchProperty = async (pFx, isPrimary) => {
+        const city = pRaw.get(pFx + "city");
+        const district = pRaw.get(pFx + "district");
+        const rooms = pRaw.get(pFx + "rooms");
+        const area = pRaw.get(pFx + "area");
+        if (!city || !district || !rooms || !area) return null;
+
+        const roomsVal = rooms === "5+" ? 5 : parseInt(rooms, 10);
+        const bRaw = pRaw.get(pFx + "bathrooms");
+        const balRaw = pRaw.get(pFx + "balconies");
+        const bVal = bRaw === "3+" ? 3 : bRaw ? parseInt(bRaw, 10) : null;
+        const balVal = balRaw === "3+" ? 3 : balRaw != null ? parseInt(balRaw, 10) : null;
+
+        const trackingData = (isPrimary && isFreshEvaluation) ? (() => {
+          const evalGroupId = computeEvaluationGroupId({
+            city, district, rooms_count: roomsVal, building_type: pRaw.get(pFx + "building_type") || null,
+          });
+          return { log_id: getOrCreateLogId(evalGroupId), device_id: getDeviceId(), session_id: getSessionId(), evaluation_group_id: evalGroupId, language: lang };
+        })() : {};
+
+        const estReq = fetchJson("/api/estimate", {
+          method: "POST", headers,
           body: JSON.stringify({
-            city,
-            district,
-            rooms_count: roomsVal,
-            area_m2: area,
-            floor: params.get("floor") || null,
-            total_floors: params.get("total_floors") || null,
-            building_type: params.get("building_type") || null,
-            renovation: params.get("renovation") || null,
-            bathrooms_count: bathroomsVal,
-            balconies_count: balconiesVal,
-            ...(shareSlug ? { share_slug: shareSlug } : {}),
+            city, district, rooms_count: roomsVal, area_m2: area,
+            floor: pRaw.get(pFx + "floor") || null,
+            total_floors: pRaw.get(pFx + "total_floors") || null,
+            building_type: pRaw.get(pFx + "building_type") || null,
+            renovation: pRaw.get(pFx + "renovation") || null,
+            bathrooms_count: bVal, balconies_count: balVal,
+            ...(isPrimary && shareSlug ? { share_slug: shareSlug } : {}),
             ...trackingData,
           }),
         });
 
-        const cadastralPromise = cadastralNumber
-          ? fetchJson("/api/cadastral", {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                cadastral_number: cadastralNumber,
-              }),
-            })
-          : Promise.resolve(null);
+        const cNum = pRaw.get(pFx + "cadastral_number");
+        const cadReq = cNum ? fetchJson("/api/cadastral", { method: "POST", headers, body: JSON.stringify({ cadastral_number: cNum }) }) : Promise.resolve(null);
 
-        const [estimateResponse, cadastralResponse] = await Promise.all([
-          estimatePromise,
-          cadastralPromise,
-        ]);
+        const [estRes, cadRes] = await Promise.all([estReq, cadReq]);
+        if (!estRes.ok) return { error: { code: estRes.data.error || "unknown", status: estRes.status } };
+        const data = cadRes && cadRes.ok ? { ...estRes.data, cadastral: cadRes.data } : estRes.data;
+        return { data };
+      };
 
-        if (cancelled) return;
-
-        if (!estimateResponse.ok) {
-          setError({
-            code: estimateResponse.data.error || "unknown",
-            status: estimateResponse.status,
-          });
-          return;
+      try {
+        if (needsPrimaryFetch) {
+          const res1 = await fetchProperty("", true);
+          if (cancelled) return;
+          if (!res1) {
+            router.replace("/");
+            return;
+          }
+          if (res1.error) {
+            setError(res1.error);
+            loadedPrimaryParamsRef.current = null;
+          } else {
+            setResult(res1.data);
+            loadedPrimaryParamsRef.current = primaryStr;
+          }
         }
 
-        const nextResult =
-          cadastralResponse && cadastralResponse.ok
-            ? { ...estimateResponse.data, cadastral: cadastralResponse.data }
-            : estimateResponse.data;
-
-        setResult(nextResult);
+        if (hasCompare) {
+          setIsComparing(true);
+          if (needsCompareFetch) {
+            const res2 = await fetchProperty("c_", false);
+            if (cancelled) return;
+            if (res2) {
+              if (res2.error) {
+                setError2(res2.error);
+                loadedCompareParamsRef.current = null;
+              } else {
+                setResult2(res2.data);
+                loadedCompareParamsRef.current = compareStr;
+              }
+            }
+          }
+        } else {
+          setResult2(null);
+          loadedCompareParamsRef.current = null;
+        }
       } catch {
-        if (!cancelled) {
-          setError({ code: "connection", message: t("evaluare.connectionError") });
-        }
+        if (!cancelled) setError({ code: "connection", message: t("evaluare.connectionError") });
       } finally {
         if (!cancelled) {
-          setLoading(false);
+          if (needsPrimaryFetch) setLoading(false);
+          if (needsCompareFetch) setLoading2(false);
         }
       }
     };
@@ -172,6 +194,58 @@ function EvaluareContent() {
       if (val) editParams.set(key, val);
     });
     router.push(`/?${editParams.toString()}`);
+  };
+
+  const startCompare = () => {
+    setIsComparing(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleCompareSubmit = (newParams) => {
+    setLoading2(true);
+    const merged = new URLSearchParams(searchParams.toString());
+    newParams.forEach((value, key) => {
+      if (key !== "_new") merged.set(`c_${key}`, value);
+    });
+    router.replace(`/evaluare?${merged.toString()}`);
+  };
+
+  const handleCloseRight = () => {
+    setResult2(null);
+    setIsComparing(false);
+    loadedCompareParamsRef.current = null;
+    const clean = new URLSearchParams(searchParams.toString());
+    Array.from(clean.keys()).forEach(k => {
+      if (k.startsWith("c_")) clean.delete(k);
+    });
+    router.replace(`/evaluare?${clean.toString()}`, { scroll: false });
+  };
+
+  const handleCloseLeft = () => {
+    if (!result2) {
+      setIsComparing(false);
+      router.replace("/", { scroll: false });
+      return;
+    }
+    
+    // Move result2 to primary perfectly, so component doesn't blink
+    setResult(result2);
+    setResult2(null);
+    setIsComparing(false);
+
+    const newParams = new URLSearchParams();
+    searchParams.forEach((value, key) => {
+      if (key.startsWith("c_")) {
+        newParams.set(key.substring(2), value);
+      }
+    });
+    
+    // Alias cache to skip re-fetching
+    newParams.sort();
+    loadedPrimaryParamsRef.current = newParams.toString();
+    loadedCompareParamsRef.current = null;
+
+    router.replace(`/evaluare?${newParams.toString()}`, { scroll: false });
   };
 
   if (loading) {
@@ -257,10 +331,82 @@ function EvaluareContent() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-10 px-4">
-      {result && (
-        <EstimateResult data={result} onReset={handleEdit} />
-      )}
+    <div className={`mx-auto py-10 px-4 transition-all duration-300 ${isComparing ? "max-w-[90rem]" : "max-w-2xl"}`}>
+      <div className={`flex flex-col ${isComparing ? "md:flex-row items-start justify-center gap-6" : ""}`}>
+        {/* Left Side: Primary */}
+        <div className={`w-full ${isComparing ? "md:w-1/2 max-w-2xl" : ""}`}>
+          {result && (
+            <EstimateResult 
+              data={result} 
+              onReset={handleEdit} 
+              onCompare={startCompare} 
+              onClose={isComparing ? handleCloseLeft : undefined}
+            />
+          )}
+        </div>
+
+        {/* Middle Divider & vs Icon */}
+        {isComparing && (
+          <div className="hidden md:flex flex-col items-center w-0 z-10 relative self-stretch border-none pt-[3.5rem]">
+            {/* The line */}
+            <div className="absolute inset-y-0 w-[2px] bg-primary opacity-70" />
+
+            {/* The icon, if result2 is loaded */}
+            {result2 && (
+              <div className="relative shrink-0 w-12 h-12 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center text-primary">
+                <svg viewBox="0 0 24 24" className="w-6 h-6 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M16 3h5v5" />
+                  <path d="M8 3H3v5" />
+                  <path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" />
+                  <path d="m15 9 6-6" />
+                </svg>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Right Side: Secondary form or result */}
+        {isComparing && (
+          <div className={`w-full md:w-1/2 max-w-2xl ${result2 ? "" : "bg-white rounded-2xl border border-gray-100 shadow-sm"}`}>
+            {loading2 ? (
+              <div className="flex flex-col items-center justify-center py-24 gap-4">
+                <svg className="w-10 h-10 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                  <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                <p className="text-sm text-gray-500">{t("evaluare.loading")}</p>
+              </div>
+            ) : result2 ? (
+              <EstimateResult
+                data={result2}
+                onReset={() => {
+                  setResult2(null);
+                  const clean = new URLSearchParams(searchParams.toString());
+                  Array.from(clean.keys()).forEach(k => {
+                    if (k.startsWith("c_")) clean.delete(k);
+                  });
+                  router.replace(`/evaluare?${clean.toString()}`);
+                }}
+                onClose={handleCloseRight}
+              />
+            ) : error2 ? (
+              <div className="p-6 text-center">
+                <div className="p-5 rounded-2xl bg-red-50 border border-red-100 text-sm text-red-600 mb-6">
+                  {error2.code === "connection" ? t("evaluare.connectionError") : t("evaluare.defaultError")}
+                </div>
+                <button type="button" onClick={() => setResult2(null)} className="py-3 px-6 rounded-2xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                  {t("evaluare.tryAgain")}
+                </button>
+              </div>
+            ) : (
+              <PropertyForm
+                onBack={() => setIsComparing(false)}
+                onSubmit={handleCompareSubmit}
+              />
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

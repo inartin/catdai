@@ -143,7 +143,7 @@ function PillGroup({ options, value, onChange, columns, labelFn }) {
 }
 
 
-export default function PropertyForm({ onBack, initialValues }) {
+export default function PropertyForm({ onBack, initialValues, onSubmit }) {
   const router = useRouter();
   const { t } = useTranslation();
   const [form, setForm] = useState({
@@ -291,6 +291,11 @@ export default function PropertyForm({ onBack, initialValues }) {
       }
     }
     params.set("_new", "1");
+
+    if (onSubmit) {
+      onSubmit(params);
+      return;
+    }
 
     router.push(`/evaluare?${params.toString()}`);
   };

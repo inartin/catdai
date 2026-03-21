@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
+import CloseIcon from "@/components/icons/CloseIcon";
 
 function formatPrice(num) {
   if (num == null) return "—";
@@ -161,7 +162,7 @@ function DistrictComparison({ districts, currentDistrict, area, blurValues }) {
   );
 }
 
-export default function EstimateResult({ data, onReset }) {
+export default function EstimateResult({ data, onReset, onCompare, onClose }) {
   const {
     estimate,
     range,
@@ -369,6 +370,15 @@ export default function EstimateResult({ data, onReset }) {
                     </span>
                   )}
                 </button>
+                {onClose && (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer hover:bg-red-50 transition-all duration-200 text-gray-400 hover:text-red-500"
+                  >
+                    <CloseIcon size={20} />
+                  </button>
+                )}
               </div>
             </div>
             <h2 className="text-xl font-bold text-gray-900 leading-snug">
@@ -819,48 +829,63 @@ export default function EstimateResult({ data, onReset }) {
       </div>
 
       {/* Actions */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={onReset}
+            className="py-5 rounded-2xl text-base font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            {t("result.changeCriteria")}
+          </button>
+          <button
+            type="button"
+            onClick={handleShare}
+            className="py-5 rounded-2xl text-base font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
+          >
+            {sharing ? (
+              <>
+                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                  <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                {t("result.sharing")}
+              </>
+            ) : copied ? (
+              <>
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+                {t("result.linkCopied")}
+              </>
+            ) : (
+              <>
+                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+                {t("result.shareAnalysis")}
+              </>
+            )}
+          </button>
+        </div>
         <button
           type="button"
-          onClick={onReset}
-          className="py-5 rounded-2xl text-base font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          onClick={onCompare}
+          className="w-full py-5 rounded-2xl text-base font-semibold border border-primary/50 text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
         >
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            <circle cx="18" cy="18" r="3" />
+            <circle cx="6" cy="6" r="3" />
+            <path d="M13 6h3a2 2 0 0 1 2 2v7" />
+            <path d="M11 18H8a2 2 0 0 1-2-2V9" />
           </svg>
-          {t("result.changeCriteria")}
-        </button>
-        <button
-          type="button"
-          onClick={handleShare}
-          className="py-5 rounded-2xl text-base font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
-        >
-          {sharing ? (
-            <>
-              <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-              {t("result.sharing")}
-            </>
-          ) : copied ? (
-            <>
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 6L9 17l-5-5" />
-              </svg>
-              {t("result.linkCopied")}
-            </>
-          ) : (
-            <>
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                <polyline points="16 6 12 2 8 6" />
-                <line x1="12" y1="2" x2="12" y2="15" />
-              </svg>
-              {t("result.shareAnalysis")}
-            </>
-          )}
+          {t("result.compare")}
         </button>
       </div>
     </div>

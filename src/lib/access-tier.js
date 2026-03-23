@@ -33,22 +33,6 @@ export async function resolveAccessTier(request) {
 
   const userId = authData.user.id;
 
-  const { data: entitlement, error: entitlementError } = await supabaseAdmin
-    .from("user_entitlements")
-    .select("tier, expires_at")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (entitlementError) {
-    // If the table is not deployed yet, fail safely to free tier.
-    if (entitlementError.code !== "42P01") {
-      console.error("[access-tier] entitlement lookup failed:", entitlementError.message);
-    }
-    return { tier: "free", user_id: userId };
-  }
-
-  const tier = String(entitlement?.tier || "").toLowerCase();
-  const paid = PAID_TIERS.has(tier) && !isExpired(entitlement?.expires_at);
-
-  return { tier: paid ? "paid" : "free", user_id: userId };
+  // Temporary: all authenticated users get paid access until payments are implemented
+  return { tier: "paid", user_id: userId };
 }

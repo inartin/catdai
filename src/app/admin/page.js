@@ -168,6 +168,17 @@ export default function AdminDashboard() {
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
 
+      {/* Users & App Usage */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Registered Users" value={fmtNum(s.totalUsers)} />
+          <StatCard label="Total Estimations" value={fmtNum(s.totalEstimations)} />
+          <StatCard label="Shared Links" value={fmtNum(s.totalSharedLinks)} />
+          <StatCard label="Favorites" value={fmtNum(s.totalFavorites)} />
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Total Listings" value={fmtNum(s.totalListings)} />
         <StatCard label="Active" value={fmtNum(s.activeListings)} />

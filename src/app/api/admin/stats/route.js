@@ -53,6 +53,18 @@ async function fetchPriceChangeStats(cutoff) {
   return data;
 }
 
+async function countAllUsers() {
+  let total = 0;
+  let page = 1;
+  while (true) {
+    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    total += users.length;
+    if (users.length < 1000) break;
+    page++;
+  }
+  return total;
+}
+
 export async function GET() {
   if (cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
     return NextResponse.json(cache.data);
@@ -78,6 +90,10 @@ export async function GET() {
     pc24h,
     pc7d,
     pc30d,
+    totalUsers,
+    countEstimations,
+    countSharedLinks,
+    countFavorites,
   ] = await Promise.all([
     supabaseAdmin.from("listing").select("*", { count: "exact", head: true }),
     supabaseAdmin
@@ -109,6 +125,10 @@ export async function GET() {
     fetchPriceChangeStats(cutoffs["24h"]),
     fetchPriceChangeStats(cutoffs["7d"]),
     fetchPriceChangeStats(cutoffs["30d"]),
+    countAllUsers(),
+    supabaseAdmin.from("estimate_log").select("*", { count: "exact", head: true }),
+    supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
+    supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
   ]);
 
   const priced = listings.filter((l) => l.price_amount != null);
@@ -119,6 +139,10 @@ export async function GET() {
     arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
 
   const result = {
+    totalUsers: totalUsers || 0,
+    totalEstimations: countEstimations.count || 0,
+    totalSharedLinks: countSharedLinks.count || 0,
+    totalFavorites: countFavorites.count || 0,
     totalListings: countAll.count || 0,
     activeListings: countActive.count || 0,
     totalOwners: countOwners.count || 0,

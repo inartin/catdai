@@ -489,83 +489,108 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
       )}
 
       {cadastral && !cadastral.partial && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 shadow-sm p-6 sm:p-8">
-          <p className="text-2xl font-medium text-emerald-700 flex items-center gap-1.5 mb-2">
-            <svg viewBox="0 0 16 16" fill="currentColor" className="w-6 h-6 shrink-0">
+        <div className="rounded-2xl border-2 border-emerald-200 bg-white shadow-md overflow-hidden">
+          <div className="bg-emerald-700 px-6 py-4 flex items-center gap-2.5">
+            <svg viewBox="0 0 16 16" fill="currentColor" className="w-6 h-6 shrink-0 text-white">
               <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
             </svg>
-            {t("result.cadastralDataTitle")}
-          </p>
+            <span className="text-xl font-semibold text-white">{t("result.cadastralDataTitle")}</span>
+          </div>
 
-          {(cadastral.apartment?.address || cadastral.building?.address) && (
-            <p className="text-sm text-emerald-700 mb-3">
-              {cadastral.apartment?.address || cadastral.building?.address}
-            </p>
-          )}
-
-          <p className="text-sm font-medium text-emerald-800 mb-1.5">{t("form.cadastralApartment")}</p>
-          <div className="text-sm text-emerald-700 space-y-1 mb-3">
-            {cadastral.apartment?.area_m2 && (
-              <p>{t("form.cadastralArea")}: <span className="font-medium">{cadastral.apartment.area_m2} m²</span></p>
-            )}
-            {cadastral.apartment?.floor && (
-              <p>{t("form.cadastralFloor")}: <span className="font-medium">
-                {cadastral.building?.total_floors
-                  ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
-                  : cadastral.apartment.floor}
-              </span></p>
-            )}
-            {hideCadastralDetails ? (
-              <p>
-                {t("form.cadastralEstimatedValue")}:{" "}
-                <LockedValue text="999999 lei" className="font-medium" />
+          <div className="p-6 sm:p-8 space-y-5">
+            {(cadastral.apartment?.address || cadastral.building?.address) && (
+              <p className="text-base text-gray-600">
+                {cadastral.apartment?.address || cadastral.building?.address}
               </p>
-            ) : (
-              cadastral.apartment?.estimated_value_lei && (
-                <p>{t("form.cadastralEstimatedValue")}: <span className="font-medium">{cadastral.apartment.estimated_value_lei} lei</span></p>
-              )
             )}
-          </div>
 
-          <p className="text-sm font-medium text-emerald-800 mb-1.5">{t("form.cadastralBuilding")}</p>
-          <div className="text-sm text-emerald-700 space-y-1">
-            {hideCadastralDetails ? (
-              <>
-                <p>{t("form.cadastralClassifier")}: <LockedValue text="999999" className="font-medium" /></p>
-                <p>{t("form.cadastralCondition")}: <LockedValue text="999999" className="font-medium" /></p>
-                <p>{t("form.cadastralYear")}: <LockedValue text="9999" className="font-medium" /></p>
-                <p>{t("form.cadastralWallMaterial")}: <LockedValue text="999999" className="font-medium" /></p>
-                <p>{t("form.cadastralWater")}: <LockedValue text="999999" className="font-medium" /></p>
-                <p>{t("form.cadastralSewage")}: <LockedValue text="999999" className="font-medium" /></p>
-                <p>{t("form.cadastralGas")}: <LockedValue text="999999" className="font-medium" /></p>
-              </>
-            ) : (
-              <>
-                {cadastral.building?.classifier && (
-                  <p>{t("form.cadastralClassifier")}: <span className="font-medium">{cadastral.building.classifier}</span></p>
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700 mb-2.5">{t("form.cadastralApartment")}</p>
+              <div className="space-y-2.5">
+                {cadastral.apartment?.area_m2 && (
+                  <div className="flex justify-between text-base">
+                    <span className="text-gray-500">{t("form.cadastralArea")}</span>
+                    <span className="font-medium text-gray-900">{cadastral.apartment.area_m2} m²</span>
+                  </div>
                 )}
-                {cadastral.building?.condition && (
-                  <p>{t("form.cadastralCondition")}: <span className="font-medium">{cadastral.building.condition}</span></p>
+                {cadastral.apartment?.floor && (
+                  <div className="flex justify-between text-base">
+                    <span className="text-gray-500">{t("form.cadastralFloor")}</span>
+                    <span className="font-medium text-gray-900">
+                      {cadastral.building?.total_floors
+                        ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
+                        : cadastral.apartment.floor}
+                    </span>
+                  </div>
                 )}
-                {cadastral.building?.construction_year && (
-                  <p>{t("form.cadastralYear")}: <span className="font-medium">{cadastral.building.construction_year}</span></p>
+                {hideCadastralDetails ? (
+                  <div className="flex justify-between text-base">
+                    <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
+                    <LockedValue text="999999 lei" className="font-medium" />
+                  </div>
+                ) : (
+                  cadastral.apartment?.estimated_value_lei && (
+                    <div className="flex justify-between text-base">
+                      <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
+                      <span className="font-medium text-gray-900">{cadastral.apartment.estimated_value_lei} lei</span>
+                    </div>
+                  )
                 )}
-                {cadastral.building?.wall_material && (
-                  <p>{t("form.cadastralWallMaterial")}: <span className="font-medium">{cadastral.building.wall_material}</span></p>
+              </div>
+            </div>
+
+            <div className="border-t border-emerald-100" />
+
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700 mb-2.5">{t("form.cadastralBuilding")}</p>
+              <div className="space-y-2.5">
+                {hideCadastralDetails ? (
+                  <>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><LockedValue text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><LockedValue text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><LockedValue text="9999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><LockedValue text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><LockedValue text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><LockedValue text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><LockedValue text="999999" className="font-medium" /></div>
+                  </>
+                ) : (
+                  <>
+                    {cadastral.building?.classifier && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><span className="font-medium text-gray-900">{cadastral.building.classifier}</span></div>
+                    )}
+                    {cadastral.building?.condition && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><span className="font-medium text-gray-900">{cadastral.building.condition}</span></div>
+                    )}
+                    {cadastral.building?.construction_year && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><span className="font-medium text-gray-900">{cadastral.building.construction_year}</span></div>
+                    )}
+                    {cadastral.building?.wall_material && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><span className="font-medium text-gray-900">{cadastral.building.wall_material}</span></div>
+                    )}
+                    {cadastral.building?.water && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><span className="font-medium text-gray-900">{cadastral.building.water}</span></div>
+                    )}
+                    {cadastral.building?.sewage && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><span className="font-medium text-gray-900">{cadastral.building.sewage}</span></div>
+                    )}
+                    {cadastral.building?.gas && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><span className="font-medium text-gray-900">{cadastral.building.gas}</span></div>
+                    )}
+                  </>
                 )}
-                {cadastral.building?.water && (
-                  <p>{t("form.cadastralWater")}: <span className="font-medium">{cadastral.building.water}</span></p>
-                )}
-                {cadastral.building?.sewage && (
-                  <p>{t("form.cadastralSewage")}: <span className="font-medium">{cadastral.building.sewage}</span></p>
-                )}
-                {cadastral.building?.gas && (
-                  <p>{t("form.cadastralGas")}: <span className="font-medium">{cadastral.building.gas}</span></p>
-                )}
-              </>
-            )}
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+                {t("result.cadastralDataSource")}
+              </span>
+            </div>
           </div>
-          <p className="text-xs text-emerald-600 mt-4">{t("result.cadastralDataSource")}</p>
         </div>
       )}
 

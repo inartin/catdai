@@ -11,6 +11,16 @@ export function LanguageProvider({ children }) {
   const [lang, setLangState] = useState("ro");
 
   useEffect(() => {
+    // Check URL path for language prefix (e.g. /ru/... or /ro/...)
+    const path = window.location.pathname;
+    const pathLangMatch = path.match(/^\/(ro|ru)(\/|$)/);
+    if (pathLangMatch && translations[pathLangMatch[1]]) {
+      const urlLang = pathLangMatch[1];
+      setLangState(urlLang);
+      localStorage.setItem("catdai-lang", urlLang);
+      return;
+    }
+    // Fall back to saved preference
     const saved = localStorage.getItem("catdai-lang");
     if (saved && translations[saved]) setLangState(saved);
   }, []);

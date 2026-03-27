@@ -19,8 +19,21 @@ function getClientIp(request) {
 }
 
 export function proxy(request) {
-  const ip = getClientIp(request);
   const { pathname } = request.nextUrl;
+
+  // Language prefix rewrite: /ru/... or /ro/... → serve the actual route
+  const langMatch = pathname.match(/^\/(ro|ru)(\/.*)?$/);
+  if (langMatch) {
+    const rest = langMatch[2] || "/";
+    // Don't rewrite API routes
+    if (!rest.startsWith("/api/")) {
+      const url = request.nextUrl.clone();
+      url.pathname = rest;
+      return NextResponse.rewrite(url);
+    }
+  }
+
+  const ip = getClientIp(request);
 
   const isDev = process.env.NODE_ENV === "development";
   const isLocalhost = ip === "127.0.0.1" || ip === "::1" || ip === "localhost";
@@ -51,5 +64,5 @@ export function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/ro/:path*", "/ru/:path*"],
 };

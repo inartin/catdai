@@ -186,7 +186,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
     const trimmed = cadastralInput.trim();
     if (!trimmed) return;
 
-    const cadastralRe = /^\d{5,7}\.\d{1,4}\.\d{2}\.\d{3}$/;
+    const cadastralRe = /^(?:\d{5,7}\.\d{1,4}\.\d{2}\.\d{3}|\d{7,12}\.\d{2}\.\d{3})$/;
     if (!cadastralRe.test(trimmed)) {
       setCadastralError("cadastralInvalid");
       return;

@@ -15,6 +15,12 @@ function getClientIp(request) {
 
 function parseCadastralParts(cadastralNumber) {
   const parts = cadastralNumber.split(".");
+  if (parts.length === 3) {
+    const code = parts[0];
+    const buildingId = code + "." + parts[1];
+    const apartmentId = code + "." + parts[1] + "." + parts[2];
+    return { code, buildingId, apartmentId };
+  }
   const code = parts[0] + "0" + parts[1];
   const buildingId = code + "." + parts[2];
   const apartmentId = code + "." + parts[2] + "." + parts[3];

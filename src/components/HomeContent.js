@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Hero from "@/components/Hero";
 import CategoryCards from "@/components/CategoryCards";
 import HowItWorks from "@/components/HowItWorks";
+import ExampleResults from "@/components/ExampleResults";
 import PropertyForm from "@/components/PropertyForm";
 import MarketPositionChart from "@/components/MarketPositionChart";
 import { GO_HOME_EVENT } from "@/components/Navbar";
@@ -61,6 +62,7 @@ function HomeContentInner() {
       <Hero />
       <CategoryCards onCategorySelect={handleCategorySelect} />
       <HowItWorks />
+      <ExampleResults />
     </div>
   );
 }

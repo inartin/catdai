@@ -23,6 +23,11 @@ export function isPaidAccessTier(tier) {
 }
 
 export async function resolveAccessTier(request) {
+  // Temporary: give everyone paid access (no login required)
+  // To restore login-gated access, uncomment the block below and remove the early return
+  return { tier: "paid", user_id: null };
+
+  /*
   const token = getBearerToken(request);
   if (!token) return { tier: "free", user_id: null };
 
@@ -32,7 +37,6 @@ export async function resolveAccessTier(request) {
   }
 
   const userId = authData.user.id;
-
-  // Temporary: all authenticated users get paid access until payments are implemented
   return { tier: "paid", user_id: userId };
+  */
 }

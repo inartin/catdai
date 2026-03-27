@@ -19,7 +19,7 @@ export default function ExampleResults() {
   const close = useCallback(() => setLightbox(null), []);
 
   return (
-    <section className="py-16 px-4">
+    <section className="pt-0 pb-16 px-4">
       <div className="max-w-5xl mx-auto text-center">
         <h2 className="text-xl font-bold text-gray-800 mb-2">
           {t("examples.title")}

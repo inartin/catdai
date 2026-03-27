@@ -55,6 +55,7 @@ export default function CategoryCards({ onCategorySelect }) {
       backgroundImage: "/images/cd-imobil.webp",
       iconBg: "bg-green-600",
       disabled: false,
+      highlighted: true,
       icon: (
         <svg
           viewBox="0 0 24 24"
@@ -102,16 +103,17 @@ export default function CategoryCards({ onCategorySelect }) {
           const isActive = !cat.disabled;
 
           return (
-            <div key={cat.id} className="group/card w-full h-full min-w-0">
+            <div key={cat.id} className={`group/card w-full h-full min-w-0 ${cat.highlighted ? "z-10 sm:scale-110" : ""}`}>
               <button
                 type="button"
                 disabled={cat.disabled}
                 onClick={() => isActive && onCategorySelect?.(cat.id)}
-                className={`relative w-full h-full rounded-2xl overflow-hidden bg-white border border-gray-100 text-left transition-all duration-200 ${
-                  isActive
-                    ? "shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
-                    : "cursor-default"
-                }`}
+                className={`relative w-full h-full rounded-2xl overflow-hidden bg-white border border-gray-100 text-left transition-all duration-200 ${cat.highlighted
+                    ? "shadow-lg hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+                    : isActive
+                      ? "shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+                      : "cursor-default"
+                  }`}
               >
                 {cat.disabled && (
                   <span className="absolute top-3 right-3 z-20 bg-white border border-gray-200 text-xs font-semibold text-gray-700 px-3 py-1.5 rounded-full shadow-md">
@@ -122,34 +124,33 @@ export default function CategoryCards({ onCategorySelect }) {
                 <div className={cat.disabled ? "opacity-60" : ""}>
                   <div className="relative">
                     <div
-                      className={`h-44 ${cat.backgroundImage ? "bg-cover bg-center bg-no-repeat" : `bg-linear-to-br ${cat.gradient}`} ${cat.disabled && cat.backgroundImage ? "grayscale group-hover/card:grayscale-0 transition-[filter] duration-300" : ""}`}
+                      className={`${cat.highlighted ? "h-52" : "h-44"} ${cat.backgroundImage ? "bg-cover bg-center bg-no-repeat" : `bg-linear-to-br ${cat.gradient}`} ${cat.disabled && cat.backgroundImage ? "grayscale group-hover/card:grayscale-0 transition-[filter] duration-300" : ""}`}
                       style={cat.backgroundImage ? { backgroundImage: `url(${cat.backgroundImage})` } : undefined}
                     />
-                </div>
+                  </div>
 
-                <div className="p-5 text-center space-y-3">
-                <div className="flex items-center justify-center gap-2">
-                  <span
-                    className={`w-7 h-7 rounded-md ${cat.iconBg} flex items-center justify-center`}
-                  >
-                    {cat.icon}
-                  </span>
-                  <span className="font-bold text-base">{cat.name}</span>
-                </div>
+                  <div className="p-5 text-center space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <span
+                        className={`w-7 h-7 rounded-md ${cat.iconBg} flex items-center justify-center`}
+                      >
+                        {cat.icon}
+                      </span>
+                      <span className="font-bold text-base">{cat.name}</span>
+                    </div>
 
-                <span
-                  className={`inline-flex items-center gap-1.5 font-medium text-sm ${
-                    isActive
-                      ? "text-primary"
-                      : "text-gray-400"
-                  }`}
-                >
-                  <EvalIcon />
-                  {cat.cta}
-                </span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 font-medium text-sm ${isActive
+                          ? "text-primary"
+                          : "text-gray-400"
+                        }`}
+                    >
+                      <EvalIcon />
+                      {cat.cta}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </button>
+              </button>
             </div>
           );
         })}

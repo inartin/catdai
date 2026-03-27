@@ -15,14 +15,12 @@
   "auth.loginWithGoogle": "Войти через Google",
   "auth.loginWithFacebook": "Войти через Facebook",
   "auth.loading": "Загрузка...",
-
   "hero.title": "Пойми рынок, потом решай.",
-  "hero.subtitle": "Продавай реалистично. Покупай осознанно.",
+  "hero.subtitle": "Узнай реальную цену на рынке",
   "hero.yourPrice": "Твоя цена",
   "hero.zoneFastSale": "Быстрая продажа",
   "hero.zoneMarketPrice": "Рыночная цена",
   "hero.zonePremium": "Премиум",
-
   "categories.auto": "Авто",
   "categories.autoAnalysis": "Анализ авторынка",
   "categories.realEstate": "Недвижимость",
@@ -30,13 +28,11 @@
   "categories.electronics": "Электроника",
   "categories.electronicsAnalysis": "Анализ рынка гаджетов",
   "categories.comingSoon": "Скоро",
-
   "howItWorks.intro": "На основе выбранных критериев мы анализируем данные похожих объявлений и показываем, на какой уровень цен стоит ориентироваться.",
   "howItWorks.step1": "Задай критерии",
-  "howItWorks.step2": "Узнай цену рынка",
-  "howItWorks.step3": "Настрой предпочтения",
+  "howItWorks.step2": "Узнай оценку",
+  "howItWorks.step3": "Уточни параметры",
   "howItWorks.step4": "Сравни сценарии",
-
   "form.back": "Назад",
   "form.title": "Анализ рынка недвижимости",
   "form.subtitle": "Заполни данные для актуального анализа продажи или покупки",
@@ -63,7 +59,6 @@
   "form.submit": "Смотреть анализ рынка",
   "form.cityOnlyNotice": "Пока доступен только для Кишинёва",
   "form.socialProof": "Анализ на основе реальных объявлений из {city}",
-
   "form.cadastralSection": "Быстрое заполнение",
   "form.cadastralNumber": "Кадастровый номер (Опционально)",
   "form.cadastralPlaceholder": "напр. 0100106.132.01.090",
@@ -88,7 +83,6 @@
   "form.cadastralSewage": "Канализация",
   "form.cadastralGas": "Газ",
   "form.floorOf": "Этаж {floor}/{total}",
-
   "result.confidenceHigh": "Высокая",
   "result.confidenceMedium": "Средняя",
   "result.confidenceLow": "Низкая",
@@ -150,7 +144,6 @@
   "result.loginToFavorite": "Войдите, чтобы сохранить",
   "profile.favorites": "Сохранённые оценки",
   "profile.noFavorites": "Нет сохранённых оценок",
-
   "evaluare.loading": "Анализируем рынок по вашим критериям...",
   "evaluare.defaultError": "Произошла ошибка",
   "evaluare.connectionError": "Ошибка подключения. Попробуй снова.",
@@ -162,7 +155,6 @@
   "evaluare.suggestionArea": "Скорректировать площадь ближе к средней по сегменту",
   "evaluare.editCriteria": "Изменить критерии",
   "evaluare.tryAgain": "Попробовать снова",
-
   "about.title": "О CatDai",
   "about.intro": "CatDai помогает лучше понять рынок недвижимости и увидеть реалистичный уровень цены для похожих объектов.",
   "about.dataSourcesTitle": "На каких данных мы работаем",
@@ -173,11 +165,9 @@
   "about.disclaimerBody": "CatDai не аффилирован, не спонсируется и не одобрен указанными платформами. Их названия используются только для пояснения публичных источников данных, которые анализирует сервис.",
   "about.contactTitle": "Контакт",
   "about.contactBody": "По вопросам, предложениям или сотрудничеству вы можете связаться с нами по адресу:",
-
   "footer.terms": "Условия использования",
   "footer.privacy": "Политика конфиденциальности",
   "footer.copyright": "© 2026 Catdai. Все права защищены.",
-
   "data.city.Chișinău": "Кишинёв",
   "data.city.Bălți": "Бэлць",
   "data.city.Cahul": "Кагул",
@@ -186,7 +176,6 @@
   "data.city.Orhei": "Орхей",
   "data.city.Edineț": "Единец",
   "data.city.Comrat": "Комрат",
-
   "data.district.Centru": "Центр",
   "data.district.Botanica": "Ботаника",
   "data.district.Buiucani": "Буюканы",
@@ -202,10 +191,8 @@
   "data.district.Dacia": "Дачия",
   "data.district.Slobozia": "Слободзея",
   "data.district.Pământeni": "Пэмынтень",
-
   "data.buildingType.Construcţii noi": "Новостройка",
   "data.buildingType.Secundar": "Вторичка",
-
   "data.renovationType.Euroreparație": "Евроремонт",
   "data.renovationType.Variantă albă": "Белый вариант",
   "data.renovationType.Reparație cosmetică": "Косметический ремонт",

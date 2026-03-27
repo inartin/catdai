@@ -43,7 +43,7 @@ const districtsByCity = {
 const roomOptions = [1, 2, 3, 4, "5+"];
 const buildingTypes = [
   "Construcţii noi",
-  "Secundar", 
+  "Secundar",
 ];
 const renovationTypes = [
   "Euroreparație",
@@ -58,7 +58,7 @@ const renovationTypes = [
 ];
 const countOptions = [0, 1, 2, "3+"];
 
-const buildingPlan= [
+const buildingPlan = [
   "Seria 102",
   "Seria 135",
   "Seria 143",
@@ -73,7 +73,7 @@ function ChevronIcon({ open }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+      className={`w-4 h-4 text-gray-400 transition-transform duration-200 cursor-pointer ${open ? "rotate-180" : ""}`}
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -130,8 +130,8 @@ function PillGroup({ options, value, onChange, columns, labelFn }) {
             type="button"
             onClick={() => onChange(opt)}
             className={`py-2.5 px-3 rounded-xl text-sm font-medium border transition-all duration-150 ${active
-                ? "bg-primary text-white border-primary shadow-sm"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              ? "bg-primary text-white border-primary shadow-sm"
+              : "bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
               }`}
           >
             {labelFn ? labelFn(opt) : opt}
@@ -453,7 +453,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
                   type="button"
                   onClick={handleCadastralSearch}
                   disabled={cadastralLoading || !cadastralInput.trim()}
-                  className="px-5 py-3 rounded-xl text-sm font-medium transition-all duration-150 bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
+                  className="px-5 py-3 rounded-xl text-sm font-medium transition-all duration-150 bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
                 >
                   {cadastralLoading ? (
                     <>
@@ -656,7 +656,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
               onClick={() => setShowOptional((p) => !p)}
               className="w-full flex items-center justify-between"
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center cursor-pointer gap-2">
                 <span className="w-6 h-6 rounded-full bg-amber-50 text-amber-500 text-xs font-bold flex items-center justify-center">
                   +
                 </span>
@@ -666,11 +666,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
               </div>
 
               <div className="flex items-center gap-2">
-                {optionalGain > 0 && (
+                {/* {optionalGain > 0 && (
                   <span className="text-xs text-amber-500 font-medium">
                     {t("form.accuracyGain", { gain: optionalGain })}
                   </span>
-                )}
+                )} */}
                 <ChevronIcon open={showOptional} />
               </div>
             </button>

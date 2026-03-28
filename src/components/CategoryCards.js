@@ -12,6 +12,18 @@ function formatListings(n) {
   return String(n);
 }
 
+function timeAgo(isoString, t) {
+  if (!isoString) return "";
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return t("categories.lastUpdatedJustNow");
+  if (mins < 60) return t("categories.lastUpdatedMins", { count: mins });
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return t("categories.lastUpdatedHours", { count: hours });
+  const days = Math.floor(hours / 24);
+  return t("categories.lastUpdatedDays", { count: days });
+}
+
 function LivePriceBadge({ t, priceData }) {
   const cn = priceData?.constructii_noi?.median_ppm;
   const sec = priceData?.secundar?.median_ppm;
@@ -28,7 +40,13 @@ function LivePriceBadge({ t, priceData }) {
           border: "1px solid rgba(74, 222, 128, 0.1)",
         }}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="group/tip relative flex items-center gap-1.5">
+          {priceData?.updated_at && (
+            <span className="pointer-events-none absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium whitespace-nowrap shadow-lg opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150">
+              {timeAgo(priceData.updated_at, t)}
+              <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900" />
+            </span>
+          )}
           <span className="relative inline-flex w-2.5 h-2.5 shrink-0 items-center justify-center">
             <span
               className="absolute w-1.5 h-1.5 rounded-full"

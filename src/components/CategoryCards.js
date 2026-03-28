@@ -61,16 +61,16 @@ function LivePriceBadge({ t, priceData }) {
           <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">
             {t("categories.livePrices")}
           </span>
-          <span className="text-[10px] text-white/70 ml-auto">Chișinău · {t("categories.today")}</span>
+          <span className="text-[11px] text-white/70 ml-auto">Chișinău · {t("categories.today")}</span>
         </div>
-        <div className="grid grid-cols-[1fr_auto] gap-x-4 mt-1.5 leading-tight">
-          <span className="text-[10px] text-gray-200">{t("categories.newConstruction")}</span>
-          <span className="text-xs font-bold text-white tabular-nums text-right">€{cn ?? "—"}<span className="text-[9px] font-medium text-gray-300">/m²</span>{trend && <>{" "}<span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} text-[8px]`}>{TREND_ARROWS[trend.direction] || "→"}</span></>}</span>
-          <span className="text-[10px] text-gray-200">{t("categories.secondary")}</span>
-          <span className="text-xs font-bold text-white tabular-nums text-right">€{sec ?? "—"}<span className="text-[9px] font-medium text-gray-300">/m²</span>{trend && <>{" "}<span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} text-[8px]`}>{TREND_ARROWS[trend.direction] || "→"}</span></>}</span>
+        <div className="grid grid-cols-[1fr_auto] gap-x-4 mt-2 leading-tight items-baseline">
+          <span className="text-[11px] text-gray-200">{t("categories.newConstruction")}</span>
+          <span className="text-[15px] font-bold text-white tabular-nums text-right">€{cn ?? "—"}<span className="text-[10px] font-medium text-gray-300 ml-0.5">/m²</span>{trend && <>{" "}<span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} text-[10px]`}>{TREND_ARROWS[trend.direction] || "→"}</span></>}</span>
+          <span className="text-[11px] text-gray-200 mt-0.5">{t("categories.secondary")}</span>
+          <span className="text-[15px] font-bold text-white tabular-nums text-right mt-0.5">€{sec ?? "—"}<span className="text-[10px] font-medium text-gray-300 ml-0.5">/m²</span>{trend && <>{" "}<span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} text-[10px]`}>{TREND_ARROWS[trend.direction] || "→"}</span></>}</span>
         </div>
-        <div className="mt-1 border-t border-white/10 pt-1">
-          <span className="text-[9px] text-white/40">{formatListings(total)} {t("categories.listingsAnalyzed")}</span>
+        <div className="mt-1.5 border-t border-white/10 pt-1">
+          <span className="text-[10px] text-white/40">{formatListings(total)} {t("categories.listingsAnalyzed")}</span>
         </div>
       </div>
     </div>

@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 
 export async function POST(request) {
+  const { searchParams } = new URL(request.url);
+  const key = searchParams.get("key");
+
+  if (!key || key !== process.env.ADMIN_LOGIN_KEY) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   let body;
   try {
     body = await request.json();
@@ -20,7 +27,7 @@ export async function POST(request) {
   res.cookies.set("admin_token", process.env.ADMIN_TOKEN, {
     httpOnly: true,
     secure: useSecure,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
@@ -35,7 +42,7 @@ export async function DELETE(request) {
   res.cookies.set("admin_token", "", {
     httpOnly: true,
     secure: useSecure,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   });

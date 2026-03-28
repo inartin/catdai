@@ -56,11 +56,20 @@ async function fetchPriceChangeStats(cutoff) {
 async function countAllUsers() {
   let total = 0;
   let page = 1;
-  while (true) {
-    const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
-    total += users.length;
-    if (users.length < 1000) break;
-    page++;
+  try {
+    while (true) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error) {
+        console.error("Failed to list users:", error);
+        break;
+      }
+      if (!data || !data.users) break;
+      total += data.users.length;
+      if (data.users.length < 1000) break;
+      page++;
+    }
+  } catch (err) {
+    console.error("Error in countAllUsers:", err);
   }
   return total;
 }
@@ -74,6 +83,49 @@ export async function GET() {
   const cutoffs = Object.fromEntries(
     Object.entries(PERIODS).map(([k, ms]) => [k, new Date(now - ms).toISOString()])
   );
+
+  let dataResults;
+  try {
+    dataResults = await Promise.all([
+      supabaseAdmin.from("listing").select("*", { count: "exact", head: true }),
+      supabaseAdmin
+        .from("listing")
+        .select("*", { count: "exact", head: true })
+        .eq("is_active", true),
+      supabaseAdmin.from("owner").select("*", { count: "exact", head: true }),
+      fetchAllRows(() =>
+        supabaseAdmin
+          .from("listing")
+          .select(
+            "price_amount, price_per_m2, area_m2, rooms_count, district, sector, city, renovation, building_type"
+          )
+          .eq("is_active", true)
+      ),
+      supabaseAdmin
+        .from("listing")
+        .select(
+          "id, title, price_amount, price_currency, area_m2, rooms_count, district, sector, is_active, created_at, source_url"
+        )
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["24h"]),
+      supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["7d"]),
+      supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["30d"]),
+      supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["24h"]),
+      supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["7d"]),
+      supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["30d"]),
+      fetchPriceChangeStats(cutoffs["24h"]),
+      fetchPriceChangeStats(cutoffs["7d"]),
+      fetchPriceChangeStats(cutoffs["30d"]),
+      countAllUsers(),
+      supabaseAdmin.from("estimate_log").select("*", { count: "exact", head: true }),
+      supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
+      supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
+    ]);
+  } catch (err) {
+    console.error("Failed to load stats:", err);
+    return NextResponse.json({ error: "Failed to load complete stats from database" }, { status: 500 });
+  }
 
   const [
     countAll,
@@ -94,42 +146,7 @@ export async function GET() {
     countEstimations,
     countSharedLinks,
     countFavorites,
-  ] = await Promise.all([
-    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }),
-    supabaseAdmin
-      .from("listing")
-      .select("*", { count: "exact", head: true })
-      .eq("is_active", true),
-    supabaseAdmin.from("owner").select("*", { count: "exact", head: true }),
-    fetchAllRows(() =>
-      supabaseAdmin
-        .from("listing")
-        .select(
-          "price_amount, price_per_m2, area_m2, rooms_count, district, sector, city, renovation, building_type"
-        )
-        .eq("is_active", true)
-    ),
-    supabaseAdmin
-      .from("listing")
-      .select(
-        "id, title, price_amount, price_currency, area_m2, rooms_count, district, sector, is_active, created_at, source_url"
-      )
-      .order("created_at", { ascending: false })
-      .limit(10),
-    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["24h"]),
-    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["7d"]),
-    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("first_seen_at", cutoffs["30d"]),
-    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["24h"]),
-    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["7d"]),
-    supabaseAdmin.from("listing").select("*", { count: "exact", head: true }).gte("deleted_at", cutoffs["30d"]),
-    fetchPriceChangeStats(cutoffs["24h"]),
-    fetchPriceChangeStats(cutoffs["7d"]),
-    fetchPriceChangeStats(cutoffs["30d"]),
-    countAllUsers(),
-    supabaseAdmin.from("estimate_log").select("*", { count: "exact", head: true }),
-    supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
-    supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
-  ]);
+  ] = dataResults;
 
   const priced = listings.filter((l) => l.price_amount != null);
   const prices = priced.map((l) => Number(l.price_amount));

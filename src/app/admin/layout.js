@@ -1,10 +1,16 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import AdminSidebar from "@/components/admin/AdminSidebar";
 
-export const metadata = {
-  title: "Admin — CatDai",
-};
-
 export default function AdminLayout({ children }) {
+  const pathname = usePathname();
+  const isLoginPage = pathname === "/admin/login";
+
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="min-h-screen flex bg-gray-50">
       <AdminSidebar />

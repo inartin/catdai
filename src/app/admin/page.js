@@ -87,11 +87,10 @@ function PeriodToggle({ selected, onChange }) {
         <button
           key={opt.key}
           onClick={() => onChange(opt.key)}
-          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-            selected === opt.key
-              ? "bg-white text-gray-900 shadow-sm"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
+          className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${selected === opt.key
+            ? "bg-white text-gray-900 shadow-sm"
+            : "text-gray-500 hover:text-gray-700"
+            }`}
         >
           {opt.label}
         </button>
@@ -140,13 +139,21 @@ function DistributionTable({ title, data }) {
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  const [error, setError] = useState(null);
   const [period, setPeriod] = useState("7d");
 
   useEffect(() => {
     fetch("/api/admin/stats")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
       .then((data) => {
         setStats(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.message || "Failed to load stats");
         setLoading(false);
       });
   }, []);
@@ -155,6 +162,32 @@ export default function AdminDashboard() {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-gray-400">Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    const isAuthError = error.includes("401");
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-2">
+          {isAuthError ? (
+            <>
+              <p className="text-red-500 font-medium">Session Expired</p>
+            </>
+          ) : (
+            <>
+              <p className="text-red-500 font-medium">Failed to load dashboard</p>
+              <p className="text-sm text-gray-400">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-2 px-4 py-1.5 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              >
+                Retry
+              </button>
+            </>
+          )}
+        </div>
       </div>
     );
   }
@@ -323,11 +356,10 @@ export default function AdminDashboard() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                        l.is_active
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
+                      className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${l.is_active
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                        }`}
                     >
                       {l.is_active ? "Active" : "Inactive"}
                     </span>

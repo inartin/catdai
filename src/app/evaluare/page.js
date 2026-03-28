@@ -97,7 +97,7 @@ function EvaluareContent() {
         const district = pRaw.get(pFx + "district");
         const rooms = pRaw.get(pFx + "rooms");
         const area = pRaw.get(pFx + "area");
-        if (!city || !district || !rooms || !area) return null;
+        if (!city || !rooms || !area) return null;
 
         const roomsVal = rooms === "5+" ? 5 : parseInt(rooms, 10);
         const bRaw = pRaw.get(pFx + "bathrooms");

@@ -19,6 +19,7 @@ function normalizeDiacritics(str) {
 
 const CITIES = {
   chisinau: "Chișinău",
+  durlesti: "Durlești",
   balti: "Bălți",
   cahul: "Cahul",
   ungheni: "Ungheni",
@@ -116,8 +117,12 @@ export function validateEstimateInput(raw) {
   const city = matchCity(raw.city);
   if (!city) return { valid: false, field: "city", reason: "invalid_city" };
 
-  const district = matchDistrict(raw.district, city);
-  if (!district) return { valid: false, field: "district", reason: "invalid_district" };
+  const cityHasDistricts = (DISTRICTS_BY_CITY[city] || []).length > 0;
+  let district = null;
+  if (cityHasDistricts) {
+    district = matchDistrict(raw.district, city);
+    if (!district) return { valid: false, field: "district", reason: "invalid_district" };
+  }
 
   const roomsCount = Number(raw.rooms_count);
   if (!Number.isInteger(roomsCount) || roomsCount < 1 || roomsCount > 5) {
@@ -129,7 +134,7 @@ export function validateEstimateInput(raw) {
     return { valid: false, field: "area_m2", reason: "invalid_area" };
   }
 
-  const data = { city, district, rooms_count: roomsCount, area_m2: area };
+  const data = { city, district: district || null, rooms_count: roomsCount, area_m2: area };
 
   if (raw.floor != null && raw.floor !== "") {
     const floor = parseInt(raw.floor, 10);

@@ -7,13 +7,7 @@ import LoginButton from "@/components/LoginButton";
 
 const cities = [
   "Chișinău",
-  "Bălți",
-  "Cahul",
-  "Ungheni",
-  "Soroca",
-  "Orhei",
-  "Edineț",
-  "Comrat",
+  "Durlești",
 ];
 
 const districtsByCity = {
@@ -31,13 +25,6 @@ const districtsByCity = {
     "Aeroport",
     "Periferie"
   ],
-  Bălți: ["Centru", "Dacia", "Slobozia", "Pământeni"],
-  Cahul: ["Centru"],
-  Ungheni: ["Centru"],
-  Soroca: ["Centru"],
-  Orhei: ["Centru"],
-  Edineț: ["Centru"],
-  Comrat: ["Centru"],
 };
 
 const roomOptions = [1, 2, 3, 4, "5+"];
@@ -246,9 +233,10 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
   };
 
   const handleSubmit = () => {
+    const needsDistrict = (districtsByCity[form.city] || []).length > 0;
     const firstMissing = !form.city
       ? "city"
-      : !form.district
+      : needsDistrict && !form.district
         ? "district"
         : form.rooms_count == null
           ? "rooms_count"
@@ -275,7 +263,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
 
     const params = new URLSearchParams();
     params.set("city", form.city);
-    params.set("district", form.district);
+    if (form.district) params.set("district", form.district);
     params.set("rooms", String(form.rooms_count));
     params.set("area", String(form.area_m2));
     if (form.floor) params.set("floor", String(form.floor));
@@ -325,7 +313,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
   }, [form]);
 
   const isValid =
-    form.city && form.district && form.rooms_count != null && form.area_m2 && form.building_type && form.renovation;
+    form.city && ((districtsByCity[form.city] || []).length === 0 || form.district) && form.rooms_count != null && form.area_m2 && form.building_type && form.renovation;
 
   const districts = districtsByCity[form.city] || [];
 
@@ -536,7 +524,6 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
                   placeholder={t("form.selectCity")}
                   options={cities}
                   labelFn={(v) => t(`data.city.${v}`)}
-                  disabled
                 />
                 <p className="mt-1.5 flex items-center gap-1 text-xs text-blue-600/70">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
@@ -566,7 +553,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
           </div>
 
           {/* — Section 2: Property basics — */}
-          {form.city && form.district && (
+          {form.city && ((districtsByCity[form.city] || []).length === 0 || form.district) && (
             <div className="p-5 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">

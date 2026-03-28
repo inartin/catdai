@@ -178,7 +178,7 @@ export default function CategoryCards({ onCategorySelect }) {
           const isActive = !cat.disabled;
 
           return (
-            <div key={cat.id} className={`group/card w-full h-full min-w-0 ${cat.highlighted ? "z-10 sm:scale-110" : ""}`}>
+            <div key={cat.id} className={`group/card w-full h-full min-w-0 ${cat.highlighted ? "z-10 sm:scale-110 -order-1 sm:order-none" : ""}`}>
               <button
                 type="button"
                 disabled={cat.disabled}

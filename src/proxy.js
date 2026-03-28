@@ -1,23 +1,5 @@
 import { NextResponse } from "next/server";
 
-const ALLOWED_IPS = (process.env.ADMIN_ALLOWED_IPS || "")
-  .split(",")
-  .map((ip) => ip.trim())
-  .filter(Boolean);
-
-function getClientIp(request) {
-  const cfIp = request.headers.get("cf-connecting-ip");
-  if (cfIp) return cfIp.trim();
-
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-
-  return request.ip ?? null;
-}
-
 export function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -33,30 +15,26 @@ export function proxy(request) {
     }
   }
 
-  const ip = getClientIp(request);
+  // Admin routes: secret key + password + cookie token authentication
+  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
+    const isLoginPage = pathname === "/admin/login";
+    const isAuthApi = pathname === "/api/admin/auth";
 
-  const isDev = process.env.NODE_ENV === "development";
-  const isLocalhost = ip === "127.0.0.1" || ip === "::1" || ip === "localhost";
-
-  if (isDev && isLocalhost) {
-    return NextResponse.next();
-  }
-
-  if (ALLOWED_IPS.length === 0 || !ip || !ALLOWED_IPS.includes(ip)) {
-    console.warn(`[proxy] 403 blocked | ip: ${ip} | path: ${pathname}`);
-    return new NextResponse("Forbidden", { status: 403 });
-  }
-
-  const isLoginPage = pathname === "/admin/login";
-  const isAuthApi = pathname === "/api/admin/auth";
-
-  if (!isLoginPage && !isAuthApi) {
-    const token = request.cookies.get("admin_token")?.value;
-    if (token !== process.env.ADMIN_TOKEN) {
-      if (pathname.startsWith("/api/")) {
-        return new NextResponse("Unauthorized", { status: 401 });
+    // Login page & auth API require a secret key in the URL
+    if (isLoginPage || isAuthApi) {
+      const key = request.nextUrl.searchParams.get("key");
+      if (key !== process.env.ADMIN_LOGIN_KEY) {
+        return new NextResponse("Not Found", { status: 404 });
       }
-      return NextResponse.redirect(new URL("/admin/login", request.url));
+    } else {
+      // All other admin routes require a valid session cookie
+      const token = request.cookies.get("admin_token")?.value;
+      if (token !== process.env.ADMIN_TOKEN) {
+        if (pathname.startsWith("/api/")) {
+          return new NextResponse("Unauthorized", { status: 401 });
+        }
+        return new NextResponse("Not Found", { status: 404 });
+      }
     }
   }
 

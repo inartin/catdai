@@ -6,7 +6,7 @@ export default function MarketPositionChart() {
   const { t } = useTranslation();
 
   return (
-    <div className="max-w-md mx-auto px-4 mt-8 rounded-2xl bg-white border border-gray-100 shadow-[0_4px_32px_rgba(0,0,0,0.06)] p-6 sm:p-8">
+    <div className="w-full rounded-2xl bg-white border border-gray-100 shadow-[0_4px_32px_rgba(0,0,0,0.06)] p-6 sm:p-8">
       <div className="relative pt-16">
         {/* Animated price marker */}
         <div

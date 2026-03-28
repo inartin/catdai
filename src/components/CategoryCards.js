@@ -1,6 +1,62 @@
 "use client";
 
 import { useTranslation } from "@/context/LanguageContext";
+import { useLivePrices } from "@/lib/useLivePrices";
+
+const TREND_ARROWS = { up: "↑", down: "↓", stable: "→" };
+const TREND_COLORS = { up: "text-emerald-400/40", down: "text-red-400/40", stable: "text-gray-300/40" };
+
+function formatListings(n) {
+  if (!n) return "—";
+  if (n >= 1000) return `~${Math.round(n / 1000)}k`;
+  return String(n);
+}
+
+function LivePriceBadge({ t, priceData }) {
+  const cn = priceData?.constructii_noi?.median_ppm;
+  const sec = priceData?.secundar?.median_ppm;
+  const trend = priceData?.trend;
+  const total = priceData?.total_active;
+  return (
+    <div className="absolute bottom-0 left-0 right-0 z-10" style={{ transform: "translateY(8px)" }}>
+      <div
+        className="px-3 py-2"
+        style={{
+          background: "rgba(10, 20, 15, 0.6)",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+          border: "1px solid rgba(74, 222, 128, 0.1)",
+        }}
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="relative inline-flex w-2.5 h-2.5 shrink-0 items-center justify-center">
+            <span
+              className="absolute w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: "#4ade80",
+                boxShadow: "0 0 6px 2px rgba(74, 222, 128, 0.7), 0 0 12px 4px rgba(74, 222, 128, 0.35)",
+                animation: "live-glow 2s ease-in-out infinite",
+              }}
+            />
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+            {t("categories.livePrices")}
+          </span>
+          <span className="text-[10px] text-white/70 ml-auto">Chișinău · {t("categories.today")}</span>
+        </div>
+        <div className="grid grid-cols-[1fr_auto] gap-x-4 mt-1.5 leading-tight">
+          <span className="text-[10px] text-gray-200">{t("categories.newConstruction")}</span>
+          <span className="text-xs font-bold text-white tabular-nums text-right">€{cn ?? "—"}<span className="text-[9px] font-medium text-gray-300">/m²</span>{trend && <>{" "}<span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} text-[8px]`}>{TREND_ARROWS[trend.direction] || "→"}</span></>}</span>
+          <span className="text-[10px] text-gray-200">{t("categories.secondary")}</span>
+          <span className="text-xs font-bold text-white tabular-nums text-right">€{sec ?? "—"}<span className="text-[9px] font-medium text-gray-300">/m²</span>{trend && <>{" "}<span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} text-[8px]`}>{TREND_ARROWS[trend.direction] || "→"}</span></>}</span>
+        </div>
+        <div className="mt-1 border-t border-white/10 pt-1">
+          <span className="text-[9px] text-white/40">{formatListings(total)} {t("categories.listingsAnalyzed")}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function EvalIcon() {
   return (
@@ -21,6 +77,7 @@ function EvalIcon() {
 
 export default function CategoryCards({ onCategorySelect }) {
   const { t } = useTranslation();
+  const { data: priceData } = useLivePrices();
 
   const categories = [
     {
@@ -109,10 +166,10 @@ export default function CategoryCards({ onCategorySelect }) {
                 disabled={cat.disabled}
                 onClick={() => isActive && onCategorySelect?.(cat.id)}
                 className={`relative w-full h-full rounded-2xl overflow-hidden bg-white border border-gray-100 text-left transition-all duration-200 ${cat.highlighted
-                    ? "shadow-lg hover:shadow-xl hover:-translate-y-1 cursor-pointer"
-                    : isActive
-                      ? "shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
-                      : "cursor-default"
+                  ? "shadow-lg hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+                  : isActive
+                    ? "shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+                    : "cursor-default"
                   }`}
               >
                 {cat.disabled && (
@@ -127,9 +184,10 @@ export default function CategoryCards({ onCategorySelect }) {
                       className={`${cat.highlighted ? "h-52" : "h-44"} ${cat.backgroundImage ? "bg-cover bg-center bg-no-repeat" : `bg-linear-to-br ${cat.gradient}`} ${cat.disabled && cat.backgroundImage ? "grayscale group-hover/card:grayscale-0 transition-[filter] duration-300" : ""}`}
                       style={cat.backgroundImage ? { backgroundImage: `url(${cat.backgroundImage})` } : undefined}
                     />
+                    {cat.id === "imobil" && <LivePriceBadge t={t} priceData={priceData} />}
                   </div>
 
-                  <div className="p-5 text-center space-y-3">
+                  <div className="px-5 pt-5 pb-5 text-center space-y-3">
                     <div className="flex items-center justify-center gap-2">
                       <span
                         className={`w-7 h-7 rounded-md ${cat.iconBg} flex items-center justify-center`}
@@ -141,8 +199,8 @@ export default function CategoryCards({ onCategorySelect }) {
 
                     <span
                       className={`inline-flex items-center gap-1.5 font-medium text-sm ${isActive
-                          ? "text-primary"
-                          : "text-gray-400"
+                        ? "text-primary"
+                        : "text-gray-400"
                         }`}
                     >
                       <EvalIcon />

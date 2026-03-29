@@ -15,6 +15,8 @@ function readCache() {
     const age = Date.now() - new Date(parsed.updated_at).getTime();
     if (age < TWENTY_FOUR_HOURS_MS) return parsed;
 
+    // Cache expired, remove it proactively
+    localStorage.removeItem(STORAGE_KEY);
     return null;
   } catch {
     return null;

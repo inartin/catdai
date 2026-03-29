@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 // ── In-memory cache ─────────────────────────────────────────
@@ -17,6 +19,7 @@ async function fetchFromParser() {
   const res = await fetch(`${baseUrl}/api/prices/latest`, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(10_000),
+    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -29,20 +32,26 @@ async function fetchFromParser() {
 export async function GET() {
   // 1. Return cached data if updated_at is < 24h old
   if (cache && isCacheFresh(cache.updated_at)) {
-    return NextResponse.json(cache.data);
+    return NextResponse.json(cache.data, {
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
   }
 
   // 2. Fetch fresh data from parser API
   try {
     const data = await fetchFromParser();
     cache = { data, updated_at: data.updated_at };
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
   } catch (err) {
     console.error("Failed to fetch prices from parser:", err.message);
 
     // 3. Return stale cache if available
     if (cache) {
-      return NextResponse.json(cache.data);
+      return NextResponse.json(cache.data, {
+        headers: { "Cache-Control": "no-store, max-age=0" },
+      });
     }
 
     return NextResponse.json(

@@ -128,27 +128,38 @@ function buildDistrictComparisonPreview(items) {
 }
 
 function buildEstimatePreview(payload) {
+  const maskEstimateData = (estData) => {
+    if (!estData) return null;
+    return {
+      ...estData,
+      estimate: {
+        ...estData.estimate,
+        fast_sale: null,
+        premium: null,
+      },
+      range: {
+        low: null,
+        high: null,
+      },
+      market_stats: {
+        ...estData.market_stats,
+        avg_price: null,
+        avg_price_per_m2: null,
+        min_price_per_m2: null,
+        max_price_per_m2: null,
+        p10_price_per_m2: null,
+        p90_price_per_m2: null,
+      },
+    };
+  };
+
   return {
-    ...payload,
-    estimate: {
-      ...payload.estimate,
-      fast_sale: null,
-      premium: null,
-    },
-    range: {
-      low: null,
-      high: null,
-    },
-    market_stats: {
-      ...payload.market_stats,
-      avg_price: null,
-      avg_price_per_m2: null,
-      min_price_per_m2: null,
-      max_price_per_m2: null,
-      p10_price_per_m2: null,
-      p90_price_per_m2: null,
-    },
+    ...maskEstimateData(payload),
     district_comparison: buildDistrictComparisonPreview(payload.district_comparison),
+    estimates_by_seller: payload.estimates_by_seller ? {
+      individual: maskEstimateData(payload.estimates_by_seller.individual),
+      agency: maskEstimateData(payload.estimates_by_seller.agency),
+    } : null,
     locked_sections: {
       price_tiers: true,
       cadastral_details: true,
@@ -222,40 +233,64 @@ export async function POST(request) {
   };
 
   const rpcStart = Date.now();
-  const { data, error } = await supabase.rpc("estimate_price", params);
+  const [overallRes, individualRes, agencyRes] = await Promise.all([
+    supabase.rpc("estimate_price", params),
+    supabase.rpc("estimate_price", { ...params, p_seller_categories: ["Persoană fizică"] }),
+    supabase.rpc("estimate_price", { ...params, p_seller_categories: ["Agenție", "Dezvoltator imobiliar"] }),
+  ]);
   const responseTimeMs = Date.now() - rpcStart;
 
-  if (error) {
-    console.error("Supabase RPC error:", error);
+  if (overallRes.error) {
+    console.error("Supabase RPC error:", overallRes.error);
     return NextResponse.json(
       { error: "Failed to compute estimate" },
       { status: 500 }
     );
   }
 
-  if (data?.error) {
+  if (overallRes.data?.error) {
     return NextResponse.json(
-      { error: data.error, message: data.message },
+      { error: overallRes.data.error, message: overallRes.data.message },
       { status: 422 }
     );
   }
+
+  const data = overallRes.data;
 
   const featureAdj = computeFeatureAdjustments(
     params.p_bathrooms_count,
     params.p_balconies_count
   );
 
-  if (featureAdj.items.length > 0) {
-    const m = featureAdj.multiplier;
-    data.estimate.fast_sale   = Math.round((data.estimate.fast_sale   * m) / 100) * 100;
-    data.estimate.market_rate = Math.round((data.estimate.market_rate * m) / 100) * 100;
-    data.estimate.premium     = Math.round((data.estimate.premium     * m) / 100) * 100;
-    data.estimate.price_per_m2 = Math.round(data.estimate.price_per_m2 * m * 100) / 100;
+  function applyAdjustments(item) {
+    if (!item || item.error || !item.estimate) return;
+    if (featureAdj.items.length > 0) {
+      const m = featureAdj.multiplier;
+      item.estimate.fast_sale = Math.round((item.estimate.fast_sale * m) / 100) * 100;
+      item.estimate.market_rate = Math.round((item.estimate.market_rate * m) / 100) * 100;
+      item.estimate.premium = Math.round((item.estimate.premium * m) / 100) * 100;
+      item.estimate.price_per_m2 = Math.round(item.estimate.price_per_m2 * m * 100) / 100;
+    }
   }
+
+  applyAdjustments(data);
+  const individualData = individualRes.data?.error ? null : individualRes.data;
+  const agencyData = agencyRes.data?.error ? null : agencyRes.data;
+  if (individualData) applyAdjustments(individualData);
+  if (agencyData) applyAdjustments(agencyData);
 
   data.feature_adjustments = featureAdj;
   data.market_position = {
     marker_pct: computeMarketMarkerPct(data),
+  };
+
+  data.estimates_by_seller = {
+    individual: individualData
+      ? { estimate: individualData.estimate, range: individualData.range, market_stats: individualData.market_stats }
+      : null,
+    agency: agencyData
+      ? { estimate: agencyData.estimate, range: agencyData.range, market_stats: agencyData.market_stats }
+      : null,
   };
 
   const access = await resolveAccessTier(request);

@@ -21,7 +21,8 @@ CREATE OR REPLACE FUNCTION estimate_price(
   p_building_type text DEFAULT NULL,
   p_renovation text DEFAULT NULL,
   p_bathrooms_count int DEFAULT NULL,
-  p_balconies_count int DEFAULT NULL
+  p_balconies_count int DEFAULT NULL,
+  p_seller_categories text[] DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -102,7 +103,8 @@ BEGIN
             )
         END
       ))
-      AND (NOT use_area OR area_m2 BETWEEN p_area_m2 * (1 - area_tolerance) AND p_area_m2 * (1 + area_tolerance));
+      AND (NOT use_area OR area_m2 BETWEEN p_area_m2 * (1 - area_tolerance) AND p_area_m2 * (1 + area_tolerance))
+      AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories));
 
     comparable_count := COALESCE(base_stats.total, 0);
 
@@ -146,7 +148,8 @@ BEGIN
     FROM listing
     WHERE is_active = true
       AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
-      AND city = p_city;
+      AND city = p_city
+      AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories));
 
     SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)
     INTO district_median_ppm
@@ -154,7 +157,8 @@ BEGIN
     WHERE is_active = true
       AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
       AND city = p_city
-      AND district = p_district;
+      AND district = p_district
+      AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories));
 
     IF city_median_ppm > 0 AND district_median_ppm IS NOT NULL THEN
       district_coeff := district_median_ppm / city_median_ppm;
@@ -198,6 +202,7 @@ BEGIN
       AND (p_rooms_count IS NULL OR l.rooms_count = p_rooms_count)
       AND (p_building_type IS NULL OR l.building_type = p_building_type)
       AND (p_renovation IS NULL OR l.renovation = p_renovation)
+      AND (p_seller_categories IS NULL OR l.attributes->>'sellerCategory' = ANY(p_seller_categories))
     GROUP BY l.district
     HAVING count(*) >= 3
   ) d;

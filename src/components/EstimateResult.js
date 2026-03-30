@@ -333,6 +333,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
       : t("result.floor", { floor: input.floor });
   })();
 
+  const indRate = data.estimates_by_seller?.individual?.estimate?.market_rate;
+  const agRate = data.estimates_by_seller?.agency?.estimate?.market_rate;
+  const sellerDelta = (indRate && agRate) ? (agRate - indRate) : null;
+  const sellerDeltaPct = (indRate && agRate) ? ((sellerDelta / indRate) * 100) : null;
+
   return (
     <div className="animate-fade-in space-y-5">
       {/* Property summary header */}
@@ -486,6 +491,58 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
         <p className="text-sm text-gray-600 px-1">
           {t("result.freeTierUncertaintyLine")}
         </p>
+      )}
+
+      {/* Seller category breakdown */}
+      {(data.estimates_by_seller?.individual || data.estimates_by_seller?.agency) && (
+        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">{t("result.sellerBreakdown")}</h3>
+              <p className="text-xs text-gray-500 mt-0.5">{t("result.sellerBreakdownDesc")}</p>
+            </div>
+            {indRate && agRate && (
+              <div className="flex flex-wrap items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{t("result.sellerDifference")}</span>
+                <span className={`text-sm font-bold ${sellerDelta > 0 ? "text-amber-600" : sellerDelta < 0 ? "text-emerald-600" : "text-gray-900"}`}>
+                  {sellerDelta > 0 ? "+" : ""}€{Math.abs(sellerDelta).toLocaleString("ro-MD")} ({sellerDelta > 0 ? "+" : ""}{sellerDeltaPct.toFixed(1)}%)
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-gray-100">
+            <div className="p-4 sm:p-5 text-center">
+              <p className="text-sm text-gray-500 mb-1 font-medium">{t("result.sellerIndividual")}</p>
+              {data.estimates_by_seller.individual?.estimate?.market_rate ? (
+                <>
+                  <p className="text-xl font-bold text-gray-900">
+                    {formatPrice(data.estimates_by_seller.individual.estimate.market_rate)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-400 italic py-2 mt-1">{t("result.noData")}</p>
+              )}
+            </div>
+            <div className="p-4 sm:p-5 text-center">
+              <p className="text-sm text-gray-500 mb-1 font-medium">{t("result.sellerAgency")}</p>
+              {data.estimates_by_seller.agency?.estimate?.market_rate ? (
+                <>
+                  <p className="text-xl font-bold text-gray-900">
+                    {formatPrice(data.estimates_by_seller.agency.estimate.market_rate)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-400 italic py-2 mt-1">{t("result.noData")}</p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {cadastral && !cadastral.partial && (

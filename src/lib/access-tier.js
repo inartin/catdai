@@ -23,20 +23,13 @@ export function isPaidAccessTier(tier) {
 }
 
 export async function resolveAccessTier(request) {
-  // Temporary: give everyone paid access (no login required)
-  // To restore login-gated access, uncomment the block below and remove the early return
-  return { tier: "paid", user_id: null };
-
-  /*
   const token = getBearerToken(request);
-  if (!token) return { tier: "free", user_id: null };
+  if (!token) return { tier: "paid", user_id: null };
 
   const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
   if (authError || !authData?.user?.id) {
-    return { tier: "free", user_id: null };
+    return { tier: "paid", user_id: null };
   }
 
-  const userId = authData.user.id;
-  return { tier: "paid", user_id: userId };
-  */
+  return { tier: "paid", user_id: authData.user.id };
 }

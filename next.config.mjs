@@ -2,7 +2,21 @@
 const nextConfig = {
   async headers() {
     const allowedOrigin = process.env.APP_URL || "";
+    const noIndexHeader = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+
     return [
+      {
+        source: "/admin/:path*",
+        headers: noIndexHeader,
+      },
+      {
+        source: "/profile/:path*",
+        headers: noIndexHeader,
+      },
+      {
+        source: "/evaluare/:path*",
+        headers: noIndexHeader,
+      },
       {
         source: "/(.*)",
         headers: [
@@ -41,6 +55,7 @@ const nextConfig = {
           { key: "Access-Control-Allow-Methods", value: "GET, POST, OPTIONS" },
           { key: "Access-Control-Allow-Headers", value: "Content-Type" },
           { key: "Access-Control-Max-Age", value: "86400" },
+          ...noIndexHeader,
         ],
       },
     ];

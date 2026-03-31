@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { toAbsoluteUrl } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,8 @@ export async function generateMetadata({ params }) {
   const title = titleParts.length
     ? `Apartament ${titleParts.join(" · ")} — ${[district, city].filter(Boolean).join(", ")} | Catdai`
     : "Evaluare apartament | Catdai";
+  const canonicalPath = `/imobil/${slug}`;
+  const canonicalUrl = toAbsoluteUrl(canonicalPath);
 
   const details = [buildingType, renovation, floor, balconies].filter(Boolean);
   const description = `Analiza Pieții: ${roomsLabel}${area ? `, ${area}m²` : ""} în ${[district, city].filter(Boolean).join(", ")}.${details.length ? ` ${details.join(" · ")}.` : ""} Preț estimat, comparație pe sectoare și statistici de piață.`;
@@ -73,11 +76,15 @@ export async function generateMetadata({ params }) {
   return {
     title,
     description,
+    alternates: {
+      canonical: canonicalPath,
+    },
     openGraph: {
       title,
       description,
       type: "article",
       siteName: "Catdai",
+      url: canonicalUrl,
     },
     twitter: {
       card: "summary",
@@ -116,7 +123,6 @@ export default async function SharedLinkPage({ params }) {
   // handles JS-disabled environments.
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-head-element */}
       <noscript>
         <meta httpEquiv="refresh" content={`0;url=${evaluareUrl}`} />
       </noscript>
@@ -129,4 +135,3 @@ export default async function SharedLinkPage({ params }) {
     </>
   );
 }
-

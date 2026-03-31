@@ -2,6 +2,7 @@ import { Geist } from "next/font/google";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import CookieBanner from "@/components/CookieBanner";
+import { getCanonicalSiteUrl } from "@/lib/seo";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -10,6 +11,7 @@ const geistSans = Geist({
 });
 
 export const metadata = {
+  metadataBase: new URL(getCanonicalSiteUrl()),
   title: "Catdai - Înțelege piața imobiliară. Decide corect.",
   description:
     "Pentru vânzători și cumpărători: vezi prețuri realiste și analiza pieței pe criteriile tale (zonă, m², camere, renovare).",

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { toAbsoluteUrl } from "@/lib/seo";
+import { serializeJsonLd, toAbsoluteUrl } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -32,28 +32,17 @@ function floorLabel(floor, totalFloors) {
   return t ? `Etaj ${f}/${t}` : `Etaj ${f}`;
 }
 
-export async function generateMetadata({ params }) {
-  const { slug } = await params;
-  const { data } = await supabaseAdmin
-    .from("shared_links")
-    .select("params")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (!data) {
-    return { title: "Link inexistent — Catdai" };
-  }
-
-  const p = data.params || {};
-  const city = p.city || "Chișinău";
-  const district = p.district || "";
-  const rooms = p.rooms || "";
-  const area = p.area || "";
-  const buildingType = BUILDING_TYPE[p.building_type] || p.building_type || "";
-  const renovation = RENOVATION[p.renovation] || p.renovation || "";
-  const floor = floorLabel(p.floor, p.total_floors);
+function buildListingSeo(params = {}, slug = "") {
+  const city = params.city || "Chișinău";
+  const district = params.district || "";
+  const rooms = params.rooms || "";
+  const area = params.area || "";
+  const buildingType =
+    BUILDING_TYPE[params.building_type] || params.building_type || "";
+  const renovation = RENOVATION[params.renovation] || params.renovation || "";
+  const floor = floorLabel(params.floor, params.total_floors);
   const balconies = (() => {
-    const b = p.balconies;
+    const b = params.balconies;
     if (b == null || b === "") return null;
     const n = Number(b);
     if (n === 0) return "Fără balcon";
@@ -67,29 +56,44 @@ export async function generateMetadata({ params }) {
   const title = titleParts.length
     ? `Apartament ${titleParts.join(" · ")} — ${[district, city].filter(Boolean).join(", ")} | Catdai`
     : "Evaluare apartament | Catdai";
+  const details = [buildingType, renovation, floor, balconies].filter(Boolean);
+  const description = `Analiza Pieții: ${roomsLabel}${area ? `, ${area}m²` : ""} în ${[district, city].filter(Boolean).join(", ")}.${details.length ? ` ${details.join(" · ")}.` : ""} Preț estimat, comparație pe sectoare și statistici de piață.`;
   const canonicalPath = `/imobil/${slug}`;
   const canonicalUrl = toAbsoluteUrl(canonicalPath);
 
-  const details = [buildingType, renovation, floor, balconies].filter(Boolean);
-  const description = `Analiza Pieții: ${roomsLabel}${area ? `, ${area}m²` : ""} în ${[district, city].filter(Boolean).join(", ")}.${details.length ? ` ${details.join(" · ")}.` : ""} Preț estimat, comparație pe sectoare și statistici de piață.`;
+  return { title, description, canonicalPath, canonicalUrl };
+}
+
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  const { data } = await supabaseAdmin
+    .from("shared_links")
+    .select("params")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (!data) {
+    return { title: "Link inexistent — Catdai" };
+  }
+  const seo = buildListingSeo(data.params || {}, slug);
 
   return {
-    title,
-    description,
+    title: seo.title,
+    description: seo.description,
     alternates: {
-      canonical: canonicalPath,
+      canonical: seo.canonicalPath,
     },
     openGraph: {
-      title,
-      description,
+      title: seo.title,
+      description: seo.description,
       type: "article",
       siteName: "Catdai",
-      url: canonicalUrl,
+      url: seo.canonicalUrl,
     },
     twitter: {
       card: "summary",
-      title,
-      description,
+      title: seo.title,
+      description: seo.description,
     },
   };
 }
@@ -116,6 +120,35 @@ export default async function SharedLinkPage({ params }) {
   sp.set("share_slug", slug);
 
   const evaluareUrl = `/evaluare?${sp.toString()}`;
+  const seo = buildListingSeo(data.params || {}, slug);
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Acasă",
+        item: toAbsoluteUrl("/"),
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: seo.title,
+        item: seo.canonicalUrl,
+      },
+    ],
+  };
+
+  const webPageJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: seo.title,
+    description: seo.description,
+    url: seo.canonicalUrl,
+    inLanguage: "ro",
+  };
 
   // Render a real HTML page so Next.js includes the OG meta tags in the
   // response body. Social-media crawlers read those tags without executing JS.
@@ -123,6 +156,14 @@ export default async function SharedLinkPage({ params }) {
   // handles JS-disabled environments.
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(webPageJsonLd) }}
+      />
       <noscript>
         <meta httpEquiv="refresh" content={`0;url=${evaluareUrl}`} />
       </noscript>

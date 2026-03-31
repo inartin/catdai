@@ -50,3 +50,7 @@ export function getCanonicalSiteUrl() {
 export function toAbsoluteUrl(pathname = "/") {
   return new URL(pathname, getCanonicalSiteUrl()).toString();
 }
+
+export function serializeJsonLd(payload) {
+  return JSON.stringify(payload).replace(/</g, "\\u003c");
+}

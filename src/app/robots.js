@@ -8,10 +8,9 @@ export default function robots() {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/admin/*", "/profile", "/evaluare", "/api/*"],
+        disallow: ["/admin", "/admin/", "/profile", "/profile/", "/evaluare", "/api/"],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
-    host: siteUrl,
   };
 }

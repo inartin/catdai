@@ -81,6 +81,11 @@ export default function CategoryCards({ onCategorySelect }) {
   const { t } = useTranslation();
   const { data: priceData } = useLivePrices();
 
+  const trackSubmitLeadForm = () => {
+    if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+    window.gtag("event", "SUBMIT_LEAD_FORM");
+  };
+
   const categories = [
     {
       id: "auto",
@@ -166,7 +171,11 @@ export default function CategoryCards({ onCategorySelect }) {
               <button
                 type="button"
                 disabled={cat.disabled}
-                onClick={() => isActive && onCategorySelect?.(cat.id)}
+                onClick={() => {
+                  if (!isActive) return;
+                  if (cat.id === "imobil") trackSubmitLeadForm();
+                  onCategorySelect?.(cat.id);
+                }}
                 className={`relative w-full h-full rounded-2xl overflow-hidden bg-white border border-gray-100 text-left transition-all duration-200 ${cat.highlighted
                   ? "shadow-lg hover:shadow-xl hover:-translate-y-1 cursor-pointer"
                   : isActive

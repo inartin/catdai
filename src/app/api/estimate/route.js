@@ -315,6 +315,7 @@ export async function POST(request) {
   if (body.device_id) {
     logEstimate({
       id: body.log_id || undefined,
+      user_id: access.user_id || null,
       device_id: body.device_id,
       session_id: body.session_id || null,
       evaluation_group_id: body.evaluation_group_id || null,

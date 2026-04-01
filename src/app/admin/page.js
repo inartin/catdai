@@ -34,9 +34,30 @@ function fmtDate(d) {
   });
 }
 
-function StatCard({ label, value, detail }) {
+function StatCard({ label, value, detail, onClick, active = false }) {
+  const cardClassName = `bg-white rounded-xl p-5 shadow-sm border transition-colors ${active
+    ? "border-primary/40 ring-1 ring-primary/20"
+    : "border-gray-100"
+    }`;
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${cardClassName} text-left hover:border-primary/40 hover:ring-1 hover:ring-primary/20 cursor-pointer`}
+      >
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          {label}
+        </p>
+        <p className="mt-1 text-2xl font-semibold text-gray-900">{value}</p>
+        {detail && <p className="mt-1 text-xs text-gray-400">{detail}</p>}
+      </button>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+    <div className={cardClassName}>
       <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
         {label}
       </p>
@@ -141,6 +162,10 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [period, setPeriod] = useState("7d");
+  const [showUsersList, setShowUsersList] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState(null);
 
   useEffect(() => {
     fetch("/api/admin/stats")
@@ -157,6 +182,29 @@ export default function AdminDashboard() {
         setLoading(false);
       });
   }, []);
+
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    setUsersError(null);
+    try {
+      const res = await fetch("/api/admin/users");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setUsers(Array.isArray(data.users) ? data.users : []);
+    } catch (err) {
+      setUsersError(err.message || "Failed to load users");
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const toggleUsersList = () => {
+    const next = !showUsersList;
+    setShowUsersList(next);
+    if (next && users.length === 0 && !usersLoading) {
+      loadUsers();
+    }
+  };
 
   if (loading) {
     return (
@@ -205,11 +253,74 @@ export default function AdminDashboard() {
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Registered Users" value={fmtNum(s.totalUsers)} />
+          <StatCard
+            label="Registered Users"
+            value={fmtNum(s.totalUsers)}
+            detail={showUsersList ? "Click to hide list" : "Click to view all users"}
+            onClick={toggleUsersList}
+            active={showUsersList}
+          />
           <StatCard label="Total Estimations" value={fmtNum(s.totalEstimations)} />
           <StatCard label="Shared Links" value={fmtNum(s.totalSharedLinks)} />
           <StatCard label="Favorites" value={fmtNum(s.totalFavorites)} />
         </div>
+        {showUsersList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Registered Users</h3>
+              <button
+                type="button"
+                onClick={loadUsers}
+                disabled={usersLoading}
+                className="text-xs text-primary hover:underline disabled:text-gray-400 disabled:no-underline"
+              >
+                {usersLoading ? "Loading..." : "Refresh"}
+              </button>
+            </div>
+
+            {usersError ? (
+              <div className="px-5 py-8 text-center">
+                <p className="text-sm text-red-500 font-medium">Failed to load users</p>
+                <p className="text-xs text-gray-400 mt-1">{usersError}</p>
+              </div>
+            ) : usersLoading && users.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">Loading users...</div>
+            ) : users.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No users found</div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3 text-right">Estimations</th>
+                      <th className="px-4 py-3 text-right">Shared Links</th>
+                      <th className="px-4 py-3 text-right">Favorites</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {users.map((u) => (
+                      <tr key={u.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-900 font-medium">
+                          {u.name || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtNum(u.totalEstimations)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtNum(u.sharedLinks)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtNum(u.favorites)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">

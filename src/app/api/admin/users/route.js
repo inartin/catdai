@@ -1,0 +1,116 @@
+import { supabaseAdmin } from "@/lib/supabase-admin";
+import { NextResponse } from "next/server";
+
+const PAGE = 1000;
+const CACHE_TTL_MS = 60 * 1000;
+let cache = { data: null, ts: 0 };
+
+function isMissingSchemaError(error) {
+  const code = String(error?.code || "");
+  return code === "42703" || code === "42P01";
+}
+
+async function listAllUsers() {
+  let users = [];
+  let page = 1;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: PAGE });
+    if (error) {
+      throw new Error(`listUsers failed: ${error.message}`);
+    }
+
+    const chunk = data?.users || [];
+    users = users.concat(chunk);
+    if (chunk.length < PAGE) break;
+    page += 1;
+  }
+
+  return users;
+}
+
+async function fetchUserIdRows(table, column) {
+  let rows = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from(table)
+      .select(column)
+      .not(column, "is", null)
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      if (isMissingSchemaError(error)) return [];
+      throw new Error(`${table}.${column} query failed: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) break;
+    rows = rows.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return rows;
+}
+
+function toCountMap(rows, key) {
+  const map = new Map();
+  for (const row of rows) {
+    const id = row?.[key];
+    if (!id) continue;
+    map.set(id, (map.get(id) || 0) + 1);
+  }
+  return map;
+}
+
+function userDisplayName(user) {
+  const meta = user?.user_metadata || {};
+  const composed = [meta.first_name, meta.last_name].filter(Boolean).join(" ").trim();
+
+  return (
+    meta.full_name ||
+    meta.name ||
+    meta.display_name ||
+    composed ||
+    user?.email ||
+    user?.phone ||
+    user?.id ||
+    "Unknown"
+  );
+}
+
+export async function GET() {
+  if (cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
+    return NextResponse.json(cache.data);
+  }
+
+  try {
+    const [users, estimationRows, sharedRows, favoriteRows] = await Promise.all([
+      listAllUsers(),
+      fetchUserIdRows("estimate_log", "user_id"),
+      fetchUserIdRows("shared_links", "sharer_user_id"),
+      fetchUserIdRows("user_favorites", "user_id"),
+    ]);
+
+    const estimationsByUser = toCountMap(estimationRows, "user_id");
+    const sharedByUser = toCountMap(sharedRows, "sharer_user_id");
+    const favoritesByUser = toCountMap(favoriteRows, "user_id");
+
+    const data = {
+      users: users.map((user) => ({
+        id: user.id,
+        name: userDisplayName(user),
+        totalEstimations: estimationsByUser.get(user.id) || 0,
+        sharedLinks: sharedByUser.get(user.id) || 0,
+        favorites: favoritesByUser.get(user.id) || 0,
+      })),
+    };
+
+    cache = { data, ts: Date.now() };
+    return NextResponse.json(data);
+  } catch (err) {
+    console.error("Failed to load admin users stats:", err);
+    return NextResponse.json({ error: "Failed to load users stats" }, { status: 500 });
+  }
+}

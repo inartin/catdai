@@ -131,6 +131,7 @@ create index listing_price_history_source_updated_at_idx
 -- ============================================================
 create table estimate_log (
   id                    text primary key default gen_random_uuid()::text,
+  user_id               uuid references auth.users(id) on delete set null,
   device_id             text,
   session_id            text,
   evaluation_group_id   text,
@@ -156,6 +157,7 @@ create table estimate_log (
 );
 
 create index idx_estimate_log_device  on estimate_log (device_id);
+create index idx_estimate_log_user    on estimate_log (user_id);
 create index idx_estimate_log_session on estimate_log (session_id);
 create index idx_estimate_log_group   on estimate_log (evaluation_group_id);
 create index idx_estimate_log_created on estimate_log (created_at);

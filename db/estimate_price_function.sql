@@ -41,6 +41,19 @@ DECLARE
   use_area boolean := (p_area_m2 IS NOT NULL AND p_area_m2 > 0);
   area_tolerance numeric := 0.20;  -- ±20%, widens to ±35%, then drops
   use_renovation boolean := (p_renovation IS NOT NULL);
+  renovation_filters text[] := CASE
+    WHEN p_renovation = 'Euroreparație' THEN ARRAY['Euroreparație', 'Design individual']
+    WHEN p_renovation = 'Reparație cosmetică' THEN ARRAY['Reparație cosmetică']
+    WHEN p_renovation = 'Fără reparație' THEN ARRAY[
+      'Fără reparație',
+      'Construcție nefinisată',
+      'Are nevoie de reparație',
+      'Variantă sură',
+      'Dat în exploatare'
+    ]
+    WHEN p_renovation IS NOT NULL THEN ARRAY[p_renovation]
+    ELSE NULL
+  END;
   use_building_type boolean := (p_building_type IS NOT NULL);
   use_district boolean := (p_district IS NOT NULL);
 
@@ -87,7 +100,7 @@ BEGIN
       AND (NOT use_district OR district = p_district)
       AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
       AND (NOT use_building_type OR building_type = p_building_type)
-      AND (NOT use_renovation OR renovation = p_renovation)
+      AND (NOT use_renovation OR renovation = ANY(renovation_filters))
       AND (NOT use_floor OR (
         CASE
           WHEN p_floor = 1 THEN
@@ -201,7 +214,7 @@ BEGIN
       AND l.district IS NOT NULL
       AND (p_rooms_count IS NULL OR l.rooms_count = p_rooms_count)
       AND (p_building_type IS NULL OR l.building_type = p_building_type)
-      AND (p_renovation IS NULL OR l.renovation = p_renovation)
+      AND (p_renovation IS NULL OR l.renovation = ANY(renovation_filters))
       AND (p_seller_categories IS NULL OR l.attributes->>'sellerCategory' = ANY(p_seller_categories))
     GROUP BY l.district
     HAVING count(*) >= 3

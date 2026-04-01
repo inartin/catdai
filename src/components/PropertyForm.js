@@ -20,10 +20,8 @@ const districtsByCity = {
     "Telecentru",
     "Sculeni",
     "Poșta Veche",
-    "Durlești",
     "Codru",
-    "Aeroport",
-    "Periferie"
+    "Aeroport"
   ],
 };
 
@@ -34,15 +32,31 @@ const buildingTypes = [
 ];
 const renovationTypes = [
   "Euroreparație",
-  "Variantă albă",
   "Reparație cosmetică",
-  "Design individual",
+  "Variantă albă",
   "Fără reparație",
-  "Construcție nefinisată",
-  "Are nevoie de reparație",
-  "Dat în exploatare",
-  "Variantă sură",
 ];
+
+const renovationTypeGroups = {
+  "Euroreparație": ["Euroreparație", "Design individual"],
+  "Reparație cosmetică": ["Reparație cosmetică"],
+  "Variantă albă": ["Variantă albă"],
+  "Fără reparație": [
+    "Fără reparație",
+    "Construcție nefinisată",
+    "Are nevoie de reparație",
+    "Variantă sură",
+    "Dat în exploatare",
+  ],
+};
+
+function normalizeRenovationSelection(value) {
+  if (!value) return "";
+  for (const [label, members] of Object.entries(renovationTypeGroups)) {
+    if (members.includes(value)) return label;
+  }
+  return value;
+}
 const countOptions = [0, 1, 2, "3+"];
 
 const buildingPlan = [
@@ -141,7 +155,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
     floor: initialValues?.floor ?? "",
     total_floors: initialValues?.total_floors ?? "",
     building_type: initialValues?.building_type ?? "",
-    renovation: initialValues?.renovation ?? "",
+    renovation: normalizeRenovationSelection(initialValues?.renovation ?? ""),
     bathrooms_count: initialValues?.bathrooms_count ?? null,
     balconies_count: initialValues?.balconies_count ?? null,
   });

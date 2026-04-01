@@ -14,17 +14,79 @@ function formatPrice(num) {
 }
 
 function LockedValue({ text = "999999", className = "", onClick }) {
+  const { t } = useTranslation();
+  const [showTooltip, setShowTooltip] = useState(false);
+  const triggerRef = useRef(null);
+  const [tooltipPos, setTooltipPos] = useState(null);
+
+  const updateTooltipPosition = useCallback(() => {
+    if (!triggerRef.current || typeof window === "undefined") return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const baseLeft = rect.left + rect.width / 2;
+    const top = rect.top - 8;
+    const halfTooltip = 140;
+    const clampedLeft = Math.min(
+      Math.max(baseLeft, halfTooltip),
+      window.innerWidth - halfTooltip
+    );
+    setTooltipPos({
+      left: clampedLeft,
+      top,
+      arrowOffset: baseLeft - clampedLeft,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!showTooltip) return;
+    updateTooltipPosition();
+    const onReposition = () => updateTooltipPosition();
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    return () => {
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+    };
+  }, [showTooltip, updateTooltipPosition]);
+
   return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick?.();
-      }}
-      className={`inline-block select-none blur-sm cursor-pointer bg-transparent border-0 p-0 ${className}`}
-    >
-      {text}
-    </button>
+    <span className="relative inline-block">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick?.();
+        }}
+        onMouseEnter={() => {
+          updateTooltipPosition();
+          setShowTooltip(true);
+        }}
+        onMouseLeave={() => setShowTooltip(false)}
+        onFocus={() => {
+          updateTooltipPosition();
+          setShowTooltip(true);
+        }}
+        onBlur={() => setShowTooltip(false)}
+        className={`inline-block select-none blur-sm cursor-pointer bg-transparent border-0 p-0 ${className}`}
+      >
+        {text}
+      </button>
+      {showTooltip && tooltipPos && typeof document !== "undefined"
+        ? createPortal(
+            <span
+              className="pointer-events-none fixed z-[70] left-1/2 top-0 -translate-x-1/2 -translate-y-full px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium text-center max-w-[280px] leading-tight shadow-lg animate-fade-in"
+              style={{ left: tooltipPos.left, top: tooltipPos.top }}
+            >
+              {t("result.loginToSeeFullAnalysis")}
+              <span
+                className="absolute top-full -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900"
+                style={{ left: `calc(50% + ${tooltipPos.arrowOffset}px)` }}
+              />
+            </span>,
+            document.body
+          )
+        : null}
+    </span>
   );
 }
 

@@ -162,3 +162,13 @@ create index idx_estimate_log_session on estimate_log (session_id);
 create index idx_estimate_log_group   on estimate_log (evaluation_group_id);
 create index idx_estimate_log_created on estimate_log (created_at);
 create index idx_estimate_log_city    on estimate_log (city, district);
+
+-- ============================================================
+-- user_activity — last authenticated user visit timestamp
+-- ============================================================
+create table user_activity (
+  user_id      uuid primary key references auth.users(id) on delete cascade,
+  last_seen_at timestamptz not null default now()
+);
+
+create index idx_user_activity_last_seen on user_activity (last_seen_at desc);

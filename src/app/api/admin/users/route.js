@@ -54,12 +54,55 @@ async function fetchUserIdRows(table, column) {
   return rows;
 }
 
+async function fetchActivityRows() {
+  let rows = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from("user_activity")
+      .select("user_id, last_seen_at")
+      .not("user_id", "is", null)
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      if (isMissingSchemaError(error)) return [];
+      throw new Error(`user_activity query failed: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) break;
+    rows = rows.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return rows;
+}
+
 function toCountMap(rows, key) {
   const map = new Map();
   for (const row of rows) {
     const id = row?.[key];
     if (!id) continue;
     map.set(id, (map.get(id) || 0) + 1);
+  }
+  return map;
+}
+
+function toLatestTimestampMap(rows, idKey, tsKey) {
+  const map = new Map();
+  for (const row of rows) {
+    const id = row?.[idKey];
+    const ts = row?.[tsKey];
+    if (!id || !ts) continue;
+    const next = Date.parse(ts);
+    if (Number.isNaN(next)) continue;
+
+    const prevRaw = map.get(id);
+    const prev = prevRaw ? Date.parse(prevRaw) : Number.NaN;
+    if (Number.isNaN(prev) || next > prev) {
+      map.set(id, ts);
+    }
   }
   return map;
 }
@@ -86,16 +129,18 @@ export async function GET() {
   }
 
   try {
-    const [users, estimationRows, sharedRows, favoriteRows] = await Promise.all([
+    const [users, estimationRows, sharedRows, favoriteRows, activityRows] = await Promise.all([
       listAllUsers(),
       fetchUserIdRows("estimate_log", "user_id"),
       fetchUserIdRows("shared_links", "sharer_user_id"),
       fetchUserIdRows("user_favorites", "user_id"),
+      fetchActivityRows(),
     ]);
 
     const estimationsByUser = toCountMap(estimationRows, "user_id");
     const sharedByUser = toCountMap(sharedRows, "sharer_user_id");
     const favoritesByUser = toCountMap(favoriteRows, "user_id");
+    const lastVisitByUser = toLatestTimestampMap(activityRows, "user_id", "last_seen_at");
 
     const data = {
       users: users.map((user) => ({
@@ -104,6 +149,7 @@ export async function GET() {
         totalEstimations: estimationsByUser.get(user.id) || 0,
         sharedLinks: sharedByUser.get(user.id) || 0,
         favorites: favoritesByUser.get(user.id) || 0,
+        lastVisitAt: lastVisitByUser.get(user.id) || null,
       })),
     };
 

@@ -34,6 +34,17 @@ function fmtDate(d) {
   });
 }
 
+function fmtDateTime(d) {
+  if (!d) return "\u2014";
+  return new Date(d).toLocaleString("ro-RO", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function StatCard({ label, value, detail, onClick, active = false }) {
   const cardClassName = `bg-white rounded-xl p-5 shadow-sm border transition-colors ${active
     ? "border-primary/40 ring-1 ring-primary/20"
@@ -293,6 +304,7 @@ export default function AdminDashboard() {
                   <thead className="sticky top-0">
                     <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
                       <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Last Visit</th>
                       <th className="px-4 py-3 text-right">Estimations</th>
                       <th className="px-4 py-3 text-right">Shared Links</th>
                       <th className="px-4 py-3 text-right">Favorites</th>
@@ -303,6 +315,9 @@ export default function AdminDashboard() {
                       <tr key={u.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-900 font-medium">
                           {u.name || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {fmtDateTime(u.lastVisitAt)}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600">
                           {fmtNum(u.totalEstimations)}

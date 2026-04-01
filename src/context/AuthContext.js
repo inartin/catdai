@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { supabase } from "@/lib/supabase";
 
 const AuthContext = createContext(null);
+const ACTIVITY_PING_INTERVAL_MS = 5 * 60 * 1000;
 const OAUTH_URL_KEYS = [
   "access_token",
   "refresh_token",
@@ -76,6 +77,18 @@ function stripOAuthParamsFromUrl() {
   }
 }
 
+function pingUserActivity(accessToken) {
+  if (!accessToken) return;
+
+  fetch("/api/activity/ping", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    keepalive: true,
+  }).catch(() => {
+    // Activity ping is best-effort and should never block UI/auth flows.
+  });
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
@@ -142,6 +155,32 @@ export function AuthProvider({ children }) {
       data.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const accessToken = session?.access_token;
+    if (!accessToken) return;
+
+    pingUserActivity(accessToken);
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        pingUserActivity(accessToken);
+      }
+    }, ACTIVITY_PING_INTERVAL_MS);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        pingUserActivity(accessToken);
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [session?.access_token]);
 
   const signInWithProviders = useCallback(async (providerKey, providers) => {
     setActiveProvider(providerKey);

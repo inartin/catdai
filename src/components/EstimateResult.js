@@ -1,47 +1,30 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
 import CloseIcon from "@/components/icons/CloseIcon";
+import AuthOptions from "@/components/AuthOptions";
 
 function formatPrice(num) {
   if (num == null) return "—";
   return "€" + Math.round(num).toLocaleString("ro-MD");
 }
 
-function LockedValue({ text = "999999", className = "" }) {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const { t } = useTranslation();
-
-  useEffect(() => {
-    if (!showTooltip) return;
-    const timer = setTimeout(() => setShowTooltip(false), 2000);
-    return () => clearTimeout(timer);
-  }, [showTooltip]);
-
-  const handleClick = useCallback((e) => {
-    e.stopPropagation();
-    setShowTooltip(true);
-  }, []);
-
+function LockedValue({ text = "999999", className = "", onClick }) {
   return (
-    <span className="relative inline-block">
-      <span
-        aria-hidden
-        className={`inline-block select-none blur-sm cursor-pointer ${className}`}
-        onClick={handleClick}
-      >
-        {text}
-      </span>
-      {showTooltip && (
-        <span className="absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium whitespace-nowrap shadow-lg animate-fade-in">
-          {t("result.comingSoon")}
-          <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900" />
-        </span>
-      )}
-    </span>
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+      className={`inline-block select-none blur-sm cursor-pointer bg-transparent border-0 p-0 ${className}`}
+    >
+      {text}
+    </button>
   );
 }
 
@@ -90,7 +73,7 @@ function FeatureAdjustmentBadge({ item }) {
   );
 }
 
-function DistrictComparison({ districts, currentDistrict, area, blurValues }) {
+function DistrictComparison({ districts, currentDistrict, area, blurValues, onLockedClick }) {
   const { t } = useTranslation();
 
   if (!districts || districts.length < 2) return null;
@@ -145,6 +128,7 @@ function DistrictComparison({ districts, currentDistrict, area, blurValues }) {
                     <LockedValue
                       text="€99.999"
                       className={isCurrent ? "text-primary" : "text-gray-500"}
+                      onClick={onLockedClick}
                     />
                   ) : (
                     `€${totalPrice.toLocaleString("ro-MD")}`
@@ -179,9 +163,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
   const [favorited, setFavorited] = useState(false);
   const [favoriteAnimating, setFavoriteAnimating] = useState(false);
   const [showLoginTooltip, setShowLoginTooltip] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const favoriteChecked = useRef(false);
   const { t, lang } = useTranslation();
-  const { session, isAuthenticated } = useAuth();
+  const { session, isAuthenticated, clearAuthError } = useAuth();
 
   const isPaid = data.access_tier === "paid";
   const lockedSections = data.locked_sections || {};
@@ -190,6 +175,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
   const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
   const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
   const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
+  const hideSellerBreakdownValues = !isPaid && lockedSections.seller_breakdown_values !== false;
 
   // Check if this evaluation is already favorited
   useEffect(() => {
@@ -204,6 +190,32 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
       .then((data) => setFavorited(!!data.favorited))
       .catch(() => { });
   }, [session?.access_token]);
+
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isAuthModalOpen]);
+
+  useEffect(() => {
+    if (!isAuthModalOpen) return;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsAuthModalOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [isAuthModalOpen]);
+
+  const openAuthModal = useCallback(() => {
+    if (isAuthenticated) return;
+    clearAuthError();
+    setIsAuthModalOpen(true);
+  }, [clearAuthError, isAuthenticated]);
 
   const handleToggleFavorite = async () => {
     if (!isAuthenticated) {
@@ -338,8 +350,43 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
   const sellerDelta = (indRate && agRate) ? (agRate - indRate) : null;
   const sellerDeltaPct = (indRate && agRate) ? ((sellerDelta / indRate) * 100) : null;
 
+  const authModal =
+    isAuthModalOpen && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 cursor-zoom-out"
+            onClick={() => setIsAuthModalOpen(false)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl bg-white p-6 sm:p-7 cursor-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(false)}
+                aria-label="Close"
+                className="absolute top-3 right-3 inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              >
+                <CloseIcon size={18} />
+              </button>
+
+              <p className="text-center text-base font-medium text-gray-800 mb-4 px-8">
+                {t("result.comingSoon")}
+              </p>
+
+              <AuthOptions variant="freeContinue" />
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
   return (
     <div className="animate-fade-in space-y-5">
+      {authModal}
+
       {/* Property summary header */}
       <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
         <div className="flex items-start gap-4">
@@ -448,14 +495,14 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
             <p className="text-sm text-gray-400 mb-1">{t("result.fastSale")}</p>
             <p className="text-xl font-bold text-emerald-600">
               {hidePriceTiers ? (
-                <LockedValue text="€999.999" className="text-emerald-600" />
+                <LockedValue onClick={openAuthModal} text="€999.999" className="text-emerald-600" />
               ) : (
                 formatPrice(estimate.fast_sale)
               )}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
               {hidePriceTiers ? (
-                <LockedValue text="-99%" />
+                <LockedValue onClick={openAuthModal} text="-99%" />
               ) : (
                 "-10%"
               )}
@@ -471,14 +518,14 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
             <p className="text-sm text-gray-400 mb-1">{t("result.targetPrice")}</p>
             <p className="text-xl font-bold text-amber-600">
               {hidePriceTiers ? (
-                <LockedValue text="€999.999" className="text-amber-600" />
+                <LockedValue onClick={openAuthModal} text="€999.999" className="text-amber-600" />
               ) : (
                 formatPrice(estimate.premium)
               )}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
               {hidePriceTiers ? (
-                <LockedValue text="+99%" />
+                <LockedValue onClick={openAuthModal} text="+99%" />
               ) : (
                 "+8%"
               )}
@@ -504,9 +551,13 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
             {indRate && agRate && (
               <div className="flex flex-wrap items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
                 <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{t("result.sellerDifference")}</span>
-                <span className={`text-sm font-bold ${sellerDelta > 0 ? "text-amber-600" : sellerDelta < 0 ? "text-emerald-600" : "text-gray-900"}`}>
-                  {sellerDelta > 0 ? "+" : ""}€{Math.abs(sellerDelta).toLocaleString("ro-MD")} ({sellerDelta > 0 ? "+" : ""}{sellerDeltaPct.toFixed(1)}%)
-                </span>
+                {hideSellerBreakdownValues ? (
+                  <LockedValue onClick={openAuthModal} text="+€99.999 (+9.9%)" className="text-gray-700" />
+                ) : (
+                  <span className={`text-sm font-bold ${sellerDelta > 0 ? "text-amber-600" : sellerDelta < 0 ? "text-emerald-600" : "text-gray-900"}`}>
+                    {sellerDelta > 0 ? "+" : ""}€{Math.abs(sellerDelta).toLocaleString("ro-MD")} ({sellerDelta > 0 ? "+" : ""}{sellerDeltaPct.toFixed(1)}%)
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -516,10 +567,18 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
               {data.estimates_by_seller.individual?.estimate?.market_rate ? (
                 <>
                   <p className="text-xl font-bold text-gray-900">
-                    {formatPrice(data.estimates_by_seller.individual.estimate.market_rate)}
+                    {hideSellerBreakdownValues ? (
+                      <LockedValue onClick={openAuthModal} text="€999.999" className="text-gray-900" />
+                    ) : (
+                      formatPrice(data.estimates_by_seller.individual.estimate.market_rate)
+                    )}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²
+                    {hideSellerBreakdownValues ? (
+                      <LockedValue onClick={openAuthModal} text="€9.999/m²" className="text-gray-400" />
+                    ) : (
+                      `${formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²`
+                    )}
                   </p>
                 </>
               ) : (
@@ -531,10 +590,18 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
               {data.estimates_by_seller.agency?.estimate?.market_rate ? (
                 <>
                   <p className="text-xl font-bold text-gray-900">
-                    {formatPrice(data.estimates_by_seller.agency.estimate.market_rate)}
+                    {hideSellerBreakdownValues ? (
+                      <LockedValue onClick={openAuthModal} text="€999.999" className="text-gray-900" />
+                    ) : (
+                      formatPrice(data.estimates_by_seller.agency.estimate.market_rate)
+                    )}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    {formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²
+                    {hideSellerBreakdownValues ? (
+                      <LockedValue onClick={openAuthModal} text="€9.999/m²" className="text-gray-400" />
+                    ) : (
+                      `${formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²`
+                    )}
                   </p>
                 </>
               ) : (
@@ -583,7 +650,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
                 {hideCadastralDetails ? (
                   <div className="flex justify-between text-base">
                     <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
-                    <LockedValue text="999999 lei" className="font-medium" />
+                    <LockedValue onClick={openAuthModal} text="999999 lei" className="font-medium" />
                   </div>
                 ) : (
                   cadastral.apartment?.estimated_value_lei && (
@@ -603,13 +670,13 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
               <div className="space-y-2.5">
                 {hideCadastralDetails ? (
                   <>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><LockedValue text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><LockedValue text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><LockedValue text="9999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><LockedValue text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><LockedValue text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><LockedValue text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><LockedValue text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><LockedValue onClick={openAuthModal} text="9999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
                   </>
                 ) : (
                   <>
@@ -693,21 +760,21 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
           <div className="flex justify-between mt-3">
             <span className="text-xs text-gray-400">
               {hideMarketPositionNumbers ? (
-                <LockedValue text="€999.999" />
+                <LockedValue onClick={openAuthModal} text="€999.999" />
               ) : (
                 formatPrice(range.low)
               )}
             </span>
             <span className="text-sm text-gray-500 font-medium">
               {hideMarketPositionNumbers ? (
-                <LockedValue text={t("result.median", { price: "€999.999" })} />
+                <LockedValue onClick={openAuthModal} text={t("result.median", { price: "€999.999" })} />
               ) : (
                 t("result.median", { price: formatPrice(market_stats.median_price_per_m2) })
               )}
             </span>
             <span className="text-xs text-gray-400">
               {hideMarketPositionNumbers ? (
-                <LockedValue text="€999.999" />
+                <LockedValue onClick={openAuthModal} text="€999.999" />
               ) : (
                 formatPrice(range.high)
               )}
@@ -865,6 +932,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
         currentDistrict={input.district}
         area={input.area_m2}
         blurValues={hideDistrictComparisonValues}
+        onLockedClick={openAuthModal}
       />
 
       {/* Market stats */}
@@ -881,7 +949,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
             <p className="text-sm text-gray-400 mb-1">{t("result.avgPricePerM2")}</p>
             <p className="text-xl font-bold text-gray-900">
               {hideMarketStatsValues ? (
-                <LockedValue text="€999.999" />
+                <LockedValue onClick={openAuthModal} text="€999.999" />
               ) : (
                 formatPrice(market_stats.avg_price_per_m2)
               )}
@@ -891,7 +959,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
             <p className="text-sm text-gray-400 mb-1">{t("result.medianPricePerM2")}</p>
             <p className="text-xl font-bold text-gray-900">
               {hideMarketStatsValues ? (
-                <LockedValue text="€999.999" />
+                <LockedValue onClick={openAuthModal} text="€999.999" />
               ) : (
                 formatPrice(market_stats.median_price_per_m2)
               )}
@@ -901,7 +969,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
             <p className="text-sm text-gray-400 mb-1">{t("result.avgTotalPrice")}</p>
             <p className="text-xl font-bold text-gray-900">
               {hideMarketStatsValues ? (
-                <LockedValue text="€999.999" />
+                <LockedValue onClick={openAuthModal} text="€999.999" />
               ) : (
                 formatPrice(market_stats.avg_price)
               )}

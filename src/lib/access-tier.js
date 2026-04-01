@@ -24,12 +24,13 @@ export function isPaidAccessTier(tier) {
 
 export async function resolveAccessTier(request) {
   const token = getBearerToken(request);
-  if (!token) return { tier: "paid", user_id: null };
+  if (!token) return { tier: "free", user_id: null };
 
   const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
   if (authError || !authData?.user?.id) {
-    return { tier: "paid", user_id: null };
+    return { tier: "free", user_id: null };
   }
 
+  // Temporary: all authenticated users get paid access until payments are implemented.
   return { tier: "paid", user_id: authData.user.id };
 }

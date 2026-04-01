@@ -166,6 +166,7 @@ function buildEstimatePreview(payload) {
       market_position_numbers: true,
       district_comparison_values: true,
       market_stats_values: true,
+      seller_breakdown_values: true,
     },
   };
 }

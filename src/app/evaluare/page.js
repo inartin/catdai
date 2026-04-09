@@ -217,7 +217,7 @@ function EvaluareContent() {
       const val = searchParams.get(key);
       if (val) editParams.set(key, val);
     });
-    router.push(`/?${editParams.toString()}`);
+    router.push(`/estimeaza?${editParams.toString()}`);
   };
 
   const startCompare = () => {

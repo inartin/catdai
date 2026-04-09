@@ -55,7 +55,8 @@ const socialLinks = [
 ];
 
 export default function Footer() {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
+  const faqHref = lang === "ru" ? "/ru/faq" : "/ro/faq";
 
   return (
     <footer className="bg-section-bg border-t border-gray-100 mt-8">
@@ -75,6 +76,9 @@ export default function Footer() {
           </Link>
           <Link href="/privacy" className="hover:text-foreground transition-colors">
             {t("footer.privacy")}
+          </Link>
+          <Link href={faqHref} className="hover:text-foreground transition-colors">
+            {t("footer.faq")}
           </Link>
 
           <div className="flex items-center gap-3 text-gray-400">

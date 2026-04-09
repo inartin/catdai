@@ -24,6 +24,15 @@ export default function Navbar() {
     }
   };
 
+  const handleLangChange = (nextLang) => {
+    setLang(nextLang);
+
+    if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {
+      const target = `/${nextLang}/faq`;
+      if (pathname !== target) router.replace(target);
+    }
+  };
+
   return (
     <header className="bg-white sticky top-0 z-50 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between h-16">
@@ -50,7 +59,7 @@ export default function Navbar() {
           >
             <button
               type="button"
-              onClick={() => setLang("ro")}
+              onClick={() => handleLangChange("ro")}
               className={`cursor-pointer rounded-md px-3 py-1.5 transition-colors ${
                 lang === "ro"
                   ? "bg-white text-foreground shadow-sm"
@@ -62,7 +71,7 @@ export default function Navbar() {
             </button>
             <button
               type="button"
-              onClick={() => setLang("ru")}
+              onClick={() => handleLangChange("ru")}
               className={`cursor-pointer rounded-md px-3 py-1.5 transition-colors ${
                 lang === "ru"
                   ? "bg-white text-foreground shadow-sm"

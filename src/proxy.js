@@ -6,6 +6,12 @@ export function proxy(request) {
   // Language prefix rewrite: /ru/... or /ro/... → serve the actual route
   const langMatch = pathname.match(/^\/(ro|ru)(\/.*)?$/);
   if (langMatch) {
+    // Keep explicit localized FAQ routes as-is (no rewrite), so they can be
+    // indexed separately and avoid rewrite/redirect loops with /faq.
+    if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {
+      return NextResponse.next();
+    }
+
     const rest = langMatch[2] || "/";
     // Don't rewrite API routes
     if (!rest.startsWith("/api/")) {

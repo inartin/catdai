@@ -1,5 +1,14 @@
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  turbopack: {
+    root: __dirname,
+  },
+
   async headers() {
     const allowedOrigin = process.env.APP_URL || "";
     const noIndexHeader = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];

@@ -19,6 +19,10 @@ User inputs property details (zone, m², rooms, floor, renovation, etc.) and rec
 
 
 # Roadmap
+- [ ] Foloseste UTM tracking, de exemplu: 
+      https://999.md/ro/1234567?utm_source=catdai_app&utm_medium=telegram_bot
+
+- [ ] Some listings are in MDL, convert it to EUR
 - [ ] Case pe pamant
 - [ ] Loturi teren
 - [x] Telegram/X/Blog news cu statistica pe piata, daily sau saptamanal

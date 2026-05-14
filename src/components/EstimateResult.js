@@ -208,7 +208,322 @@ function DistrictComparison({ districts, currentDistrict, area, blurValues, onLo
   );
 }
 
-export default function EstimateResult({ data, onReset, onCompare, onClose }) {
+function PlainFilterChip({ children }) {
+  return (
+    <span className="inline-flex items-center rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700">
+      {children}
+    </span>
+  );
+}
+
+function ListingsPreviewCard({ listing }) {
+  return (
+    <article className="flex gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
+      <div className="flex aspect-[4/3] w-24 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-300 sm:w-28">
+        <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5Z" />
+          <path d="M9 21v-7h6v7" />
+          <path d="M7 11h2M15 11h2" />
+        </svg>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h4 className="truncate text-sm font-semibold text-gray-900">{listing.title}</h4>
+            <p className="mt-0.5 text-xs text-gray-400">{listing.meta}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-sm font-bold text-gray-900">{formatPrice(listing.price)}</p>
+            <p className="text-xs text-gray-400">{formatPrice(listing.pricePerM2)}/m²</p>
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {listing.tags.map((tag) => (
+            <span key={tag} className="rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-500">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function RelevantListingsPreview({ t, count, listings, onViewAll }) {
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+      <div className="p-6 sm:p-8 border-b border-gray-100">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{t("result.relevantListings")}</h3>
+            <p className="mt-1 text-sm text-gray-400">{t("result.relevantListingsDesc")}</p>
+          </div>
+          <span className="shrink-0 rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-bold text-primary">
+            {count.toLocaleString("ro-MD")}
+          </span>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {listings.map((listing) => (
+            <ListingsPreviewCard key={listing.title} listing={listing} />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <p className="text-sm text-gray-500">{t("result.listingsPreviewNote")}</p>
+        <button
+          type="button"
+          onClick={onViewAll}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary-dark"
+        >
+          {t("result.viewListings", { count: count.toLocaleString("ro-MD") })}
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14" />
+            <path d="m13 6 6 6-6 6" />
+          </svg>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function FilterInput({ label, value, placeholder, onChange }) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm text-gray-600">{label}</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+      />
+    </label>
+  );
+}
+
+function SegmentedOption({ active, children, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${active
+        ? "border-primary bg-primary text-white shadow-sm"
+        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+        }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function CheckboxOption({ checked, children, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
+    >
+      <span>{children}</span>
+      <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${checked ? "border-primary bg-primary text-white" : "border-gray-300 text-transparent"}`}>
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m3.5 8 3 3 6-6" />
+        </svg>
+      </span>
+    </button>
+  );
+}
+
+function ListingsFilterView({
+  t,
+  count,
+  marketFilterChips,
+  filters,
+  alertSaved,
+  onBack,
+  onFilterChange,
+  onSaveAlert,
+}) {
+  return (
+    <div className="animate-fade-in space-y-5">
+      <button
+        type="button"
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-sm font-medium text-gray-400 transition-colors hover:text-gray-700"
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5" />
+          <path d="m12 19-7-7 7-7" />
+        </svg>
+        {t("result.backToMarketAnalysis")}
+      </button>
+
+      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-wide text-primary">{t("result.listingsViewEyebrow")}</p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-gray-900">{t("result.listingsViewTitle")}</h2>
+            <p className="mt-2 text-sm text-gray-500">{t("result.listingsViewDesc")}</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 px-4 py-3 text-left sm:text-right">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">{t("result.marketListings")}</p>
+            <p className="text-xl font-bold text-gray-900">{count.toLocaleString("ro-MD")}</p>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+            <h3 className="text-base font-semibold text-gray-900">{t("result.baseMarketFilters")}</h3>
+            <p className="mt-1 text-sm text-gray-400">{t("result.baseMarketFiltersDesc")}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {marketFilterChips.map((chip) => (
+                <PlainFilterChip key={chip}>{chip}</PlainFilterChip>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">{t("result.listingFilters")}</h3>
+                <p className="mt-1 text-sm text-gray-400">{t("result.listingFiltersDesc")}</p>
+              </div>
+              <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-600">
+                {t("result.uiDraft")}
+              </span>
+            </div>
+
+            <div className="mt-5 space-y-5">
+              <div>
+                <p className="mb-3 text-sm font-semibold text-gray-900">{t("result.budget")}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <FilterInput
+                    label={t("result.priceFrom")}
+                    value={filters.priceMin}
+                    placeholder="60 000"
+                    onChange={(value) => onFilterChange("priceMin", value)}
+                  />
+                  <FilterInput
+                    label={t("result.priceTo")}
+                    value={filters.priceMax}
+                    placeholder="120 000"
+                    onChange={(value) => onFilterChange("priceMax", value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FilterInput
+                  label={t("result.maxPricePerM2")}
+                  value={filters.maxPricePerM2}
+                  placeholder="1 700"
+                  onChange={(value) => onFilterChange("maxPricePerM2", value)}
+                />
+                <FilterInput
+                  label={t("result.floorFrom")}
+                  value={filters.floorMin}
+                  placeholder="2"
+                  onChange={(value) => onFilterChange("floorMin", value)}
+                />
+                <FilterInput
+                  label={t("result.floorTo")}
+                  value={filters.floorMax}
+                  placeholder="8"
+                  onChange={(value) => onFilterChange("floorMax", value)}
+                />
+              </div>
+
+              <div>
+                <p className="mb-3 text-sm font-semibold text-gray-900">{t("result.sellerTypeFilter")}</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {["all", "owner", "agency"].map((option) => (
+                    <SegmentedOption
+                      key={option}
+                      active={filters.sellerType === option}
+                      onClick={() => onFilterChange("sellerType", option)}
+                    >
+                      {t(`result.sellerType.${option}`)}
+                    </SegmentedOption>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-3 text-sm font-semibold text-gray-900">{t("result.publishedFilter")}</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {["any", "3d", "7d"].map((option) => (
+                    <SegmentedOption
+                      key={option}
+                      active={filters.published === option}
+                      onClick={() => onFilterChange("published", option)}
+                    >
+                      {t(`result.published.${option}`)}
+                    </SegmentedOption>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <CheckboxOption
+                  checked={filters.activeOnly}
+                  onChange={(value) => onFilterChange("activeOnly", value)}
+                >
+                  {t("result.activeOnly")}
+                </CheckboxOption>
+                <CheckboxOption
+                  checked={filters.withPhotos}
+                  onChange={(value) => onFilterChange("withPhotos", value)}
+                >
+                  {t("result.withPhotos")}
+                </CheckboxOption>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside className="space-y-5">
+          <section className="rounded-2xl border border-primary/20 bg-primary/5 p-6 shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-white">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+              </svg>
+            </div>
+            <h3 className="mt-4 text-base font-semibold text-gray-900">{t("result.saveAlertTitle")}</h3>
+            <p className="mt-2 text-sm text-gray-600">{t("result.saveAlertDesc")}</p>
+            <button
+              type="button"
+              onClick={onSaveAlert}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
+            >
+              {alertSaved ? (
+                <>
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                  {t("result.alertSaved")}
+                </>
+              ) : (
+                t("result.saveAlert")
+              )}
+            </button>
+          </section>
+
+          <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-semibold text-gray-900">{t("result.noListingsShownTitle")}</p>
+            <p className="mt-1 text-sm text-gray-400">{t("result.noListingsShownDesc")}</p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+export default function EstimateResult({ data, onReset, onCompare, onClose, onListingsModeChange }) {
   const {
     estimate,
     range,
@@ -226,6 +541,19 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
   const [favoriteAnimating, setFavoriteAnimating] = useState(false);
   const [showLoginTooltip, setShowLoginTooltip] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [showListingsView, setShowListingsView] = useState(false);
+  const [alertSaved, setAlertSaved] = useState(false);
+  const [listingFilters, setListingFilters] = useState({
+    priceMin: "",
+    priceMax: "",
+    maxPricePerM2: "",
+    floorMin: "",
+    floorMax: "",
+    sellerType: "all",
+    published: "any",
+    activeOnly: true,
+    withPhotos: true,
+  });
   const favoriteChecked = useRef(false);
   const { t, lang } = useTranslation();
   const { session, isAuthenticated, clearAuthError } = useAuth();
@@ -238,6 +566,16 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
   const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
   const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
   const hideSellerBreakdownValues = !isPaid && lockedSections.seller_breakdown_values !== false;
+
+  useEffect(() => () => onListingsModeChange?.(false), [onListingsModeChange]);
+
+  useEffect(() => {
+    if (!showListingsView || typeof window === "undefined") return;
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [showListingsView]);
 
   // Check if this evaluation is already favorited
   useEffect(() => {
@@ -278,6 +616,19 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
     clearAuthError();
     setIsAuthModalOpen(true);
   }, [clearAuthError, isAuthenticated]);
+
+  const setListingsMode = (enabled) => {
+    setShowListingsView(enabled);
+    onListingsModeChange?.(enabled);
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const updateListingFilter = (key, value) => {
+    setAlertSaved(false);
+    setListingFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleToggleFavorite = async () => {
     if (!isAuthenticated) {
@@ -411,6 +762,53 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
   const agRate = data.estimates_by_seller?.agency?.estimate?.market_rate;
   const sellerDelta = (indRate && agRate) ? (agRate - indRate) : null;
   const sellerDeltaPct = (indRate && agRate) ? ((sellerDelta / indRate) * 100) : null;
+  const listingsCount = 1284;
+  const areaValue = Number(input.area_m2) || 65;
+  const baseListingPrice =
+    Number(estimate.market_rate) ||
+    (Number(market_stats?.median_price_per_m2) * areaValue) ||
+    85000;
+  const previewLocation = input.district
+    ? t(`data.district.${input.district}`)
+    : t(`data.city.${input.city}`);
+  const previewTags = [
+    roomsLabel,
+    input.area_m2 ? `${input.area_m2}m²` : null,
+    input.building_type ? t(`data.buildingType.${input.building_type}`) : null,
+    input.renovation ? t(`data.renovationType.${input.renovation}`) : null,
+  ].filter(Boolean);
+  const marketFilterChips = [
+    t(`data.city.${input.city}`),
+    input.district ? t(`data.district.${input.district}`) : null,
+    roomsLabel,
+    input.area_m2 ? `~${input.area_m2}m²` : null,
+    input.building_type ? t(`data.buildingType.${input.building_type}`) : null,
+    input.renovation ? t(`data.renovationType.${input.renovation}`) : null,
+    floorLabel,
+  ].filter(Boolean);
+  const listingPreviewItems = [
+    {
+      title: t("result.listingPreviewTitleA", { location: previewLocation }),
+      meta: t("result.listingPreviewMetaA"),
+      price: Math.round(baseListingPrice * 0.96),
+      pricePerM2: Math.round((baseListingPrice * 0.96) / areaValue),
+      tags: previewTags.slice(0, 3),
+    },
+    {
+      title: t("result.listingPreviewTitleB", { location: previewLocation }),
+      meta: t("result.listingPreviewMetaB"),
+      price: Math.round(baseListingPrice * 1.03),
+      pricePerM2: Math.round((baseListingPrice * 1.03) / areaValue),
+      tags: previewTags.slice(0, 3),
+    },
+    {
+      title: t("result.listingPreviewTitleC", { location: previewLocation }),
+      meta: t("result.listingPreviewMetaC"),
+      price: Math.round(baseListingPrice * 1.12),
+      pricePerM2: Math.round((baseListingPrice * 1.12) / areaValue),
+      tags: previewTags.slice(0, 3),
+    },
+  ];
 
   const authModal =
     isAuthModalOpen && typeof document !== "undefined"
@@ -444,6 +842,24 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
           document.body
         )
       : null;
+
+  if (showListingsView) {
+    return (
+      <div className="animate-fade-in">
+        {authModal}
+        <ListingsFilterView
+          t={t}
+          count={listingsCount}
+          marketFilterChips={marketFilterChips}
+          filters={listingFilters}
+          alertSaved={alertSaved}
+          onBack={() => setListingsMode(false)}
+          onFilterChange={updateListingFilter}
+          onSaveAlert={() => setAlertSaved(true)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in space-y-5">
@@ -1039,6 +1455,13 @@ export default function EstimateResult({ data, onReset, onCompare, onClose }) {
           </div>
         </div>
       </div>
+
+      <RelevantListingsPreview
+        t={t}
+        count={listingsCount}
+        listings={listingPreviewItems}
+        onViewAll={() => setListingsMode(true)}
+      />
 
       {/* Actions */}
       <div className="flex flex-col gap-3">

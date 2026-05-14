@@ -19,6 +19,7 @@ function EvaluareContent() {
   const [loading, setLoading] = useState(true);
 
   const [isComparing, setIsComparing] = useState(false);
+  const [isListingsMode, setIsListingsMode] = useState(false);
   const [result2, setResult2] = useState(null);
   const [error2, setError2] = useState(null);
   const [loading2, setLoading2] = useState(false);
@@ -212,6 +213,7 @@ function EvaluareContent() {
   }, [authLoading, session?.access_token, paramsString, router, lang, t]);
 
   const handleEdit = () => {
+    setIsListingsMode(false);
     const editParams = new URLSearchParams();
     ["city", "district", "rooms", "area", "floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
       const val = searchParams.get(key);
@@ -221,6 +223,7 @@ function EvaluareContent() {
   };
 
   const startCompare = () => {
+    setIsListingsMode(false);
     setIsComparing(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -355,7 +358,7 @@ function EvaluareContent() {
   }
 
   return (
-    <div className={`mx-auto py-10 px-4 transition-all duration-300 ${isComparing ? "max-w-[90rem]" : "max-w-2xl"}`}>
+    <div className={`mx-auto py-10 px-4 transition-all duration-300 ${isComparing ? "max-w-[90rem]" : isListingsMode ? "max-w-5xl" : "max-w-2xl"}`}>
       <div className={`flex flex-col ${isComparing ? "md:flex-row items-start justify-center gap-6" : ""}`}>
         {/* Left Side: Primary */}
         <div className={`w-full ${isComparing ? "md:w-1/2 max-w-2xl" : ""}`}>
@@ -365,6 +368,7 @@ function EvaluareContent() {
               onReset={handleEdit} 
               onCompare={startCompare} 
               onClose={isComparing ? handleCloseLeft : undefined}
+              onListingsModeChange={setIsListingsMode}
             />
           )}
         </div>

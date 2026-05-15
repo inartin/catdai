@@ -54,6 +54,237 @@ function computeFeatureAdjustments(bathroomsCount, balconiesCount) {
   return { items, total_pct: totalPct, multiplier };
 }
 
+function getRenovationFilters(renovation) {
+  if (renovation === "Euroreparație") return ["Euroreparație", "Design individual"];
+  if (renovation === "Reparație cosmetică") return ["Reparație cosmetică"];
+  if (renovation === "Fără reparație") {
+    return [
+      "Fără reparație",
+      "Construcție nefinisată",
+      "Are nevoie de reparație",
+      "Variantă sură",
+      "Dat în exploatare",
+    ];
+  }
+  return renovation ? [renovation] : [];
+}
+
+function build999ListingUrl(externalId, language = "ro") {
+  if (!externalId) return null;
+  const listingLang = language === "ru" ? "ru" : "ro";
+  return `https://999.md/${listingLang}/${encodeURIComponent(String(externalId))}`;
+}
+
+function decodeHtmlAttribute(value) {
+  return String(value || "")
+    .replaceAll("&amp;", "&")
+    .replaceAll("&quot;", "\"")
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">");
+}
+
+function getMetaTagContent(html, key, value) {
+  const metaTags = html.match(/<meta\b[^>]*>/gi) || [];
+  for (const tag of metaTags) {
+    const attrRegex = /([a-zA-Z_:.-]+)\s*=\s*["']([^"']*)["']/g;
+    const attrs = {};
+    let match;
+    while ((match = attrRegex.exec(tag))) {
+      attrs[match[1].toLowerCase()] = decodeHtmlAttribute(match[2]);
+    }
+
+    if (attrs[key] === value && attrs.content) {
+      return attrs.content;
+    }
+  }
+
+  return null;
+}
+
+function isUsefulPreviewImage(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url, "https://999.md");
+    return parsed.protocol === "https:" && !parsed.pathname.includes("logo-1200x650");
+  } catch {
+    return false;
+  }
+}
+
+async function fetchListingPreviewImage(externalId, language) {
+  const url = build999ListingUrl(externalId, language);
+  if (!url) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)",
+        Accept: "text/html,application/xhtml+xml",
+      },
+    });
+
+    const html = await res.text();
+    const imageUrl =
+      getMetaTagContent(html, "property", "og:image") ||
+      getMetaTagContent(html, "name", "twitter:image");
+
+    if (!isUsefulPreviewImage(imageUrl)) return null;
+    return new URL(imageUrl, "https://999.md").toString();
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function enrichRelevantListingsWithPreviewImages(listings, language) {
+  if (!Array.isArray(listings) || listings.length === 0) return [];
+
+  return Promise.all(
+    listings.map(async (listing) => ({
+      ...listing,
+      image_url: await fetchListingPreviewImage(listing.external_id, language),
+    }))
+  );
+}
+
+function applyComparableListingFilters(query, input, filtersUsed) {
+  const area = Number(input?.area_m2);
+  const floor = Number(input?.floor);
+  const totalFloors = Number(input?.total_floors);
+  const areaTolerance = Number(filtersUsed?.area_tolerance) || 0.20;
+
+  query = query
+    .eq("is_active", true)
+    .not("price_per_m2", "is", null)
+    .gt("price_per_m2", 0)
+    .not("price_amount", "is", null)
+    .gt("price_amount", 0)
+    .eq("city", input.city);
+
+  if (filtersUsed?.district && input.district) {
+    query = query.eq("district", input.district);
+  }
+  if (input.rooms_count != null) {
+    query = query.eq("rooms_count", input.rooms_count);
+  }
+  if (filtersUsed?.building_type && input.building_type) {
+    query = query.eq("building_type", input.building_type);
+  }
+  if (filtersUsed?.renovation && input.renovation) {
+    query = query.in("renovation", getRenovationFilters(input.renovation));
+  }
+  if (filtersUsed?.area && Number.isFinite(area) && area > 0) {
+    query = query
+      .gte("area_m2", area * (1 - areaTolerance))
+      .lte("area_m2", area * (1 + areaTolerance));
+  }
+  if (filtersUsed?.floor && Number.isFinite(floor)) {
+    if (floor === 1) {
+      query = query.eq("floor", 1);
+    } else if (Number.isFinite(totalFloors) && floor === totalFloors) {
+      query = query.not("floor", "is", null).not("total_floors", "is", null);
+    } else {
+      const maxFloor = Number.isFinite(totalFloors)
+        ? Math.min(totalFloors - 1, floor + 2)
+        : floor + 2;
+      query = query.gte("floor", Math.max(2, floor - 2)).lte("floor", maxFloor);
+    }
+  }
+
+  return query;
+}
+
+function matchesFinalFloorFilter(listing, input, filtersUsed) {
+  if (!filtersUsed?.floor) return true;
+
+  const floor = Number(input?.floor);
+  const totalFloors = Number(input?.total_floors);
+  if (!Number.isFinite(floor) || !Number.isFinite(totalFloors) || floor !== totalFloors) {
+    return true;
+  }
+
+  return Number(listing.floor) === Number(listing.total_floors);
+}
+
+function pickRandomItems(items, limit) {
+  const shuffled = [...items];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, limit);
+}
+
+async function fetchRelevantListings(payload) {
+  const input = payload?.input;
+  const filtersUsed = payload?.filters_used || {};
+  if (!input?.city) return [];
+
+  const countQuery = applyComparableListingFilters(
+    supabaseAdmin.from("listing").select("external_id", { count: "exact", head: true }),
+    input,
+    filtersUsed
+  );
+  const { count, error: countError } = await countQuery;
+
+  if (countError || !count) {
+    if (countError) console.error("Relevant listings count error:", countError.message);
+    return [];
+  }
+
+  const fields = [
+    "external_id",
+    "title",
+    "price_amount",
+    "price_per_m2",
+    "area_m2",
+    "rooms_count",
+    "floor",
+    "total_floors",
+    "building_type",
+    "renovation",
+    "city",
+    "district",
+    "sector",
+    "images_count",
+  ].join(", ");
+  const batchSize = Math.min(count, 100);
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const offset = count > batchSize
+      ? Math.floor(Math.random() * (count - batchSize + 1))
+      : 0;
+    const query = applyComparableListingFilters(
+      supabaseAdmin.from("listing").select(fields),
+      input,
+      filtersUsed
+    );
+    const { data, error } = await query
+      .order("external_id", { ascending: true })
+      .range(offset, offset + batchSize - 1);
+
+    if (error) {
+      console.error("Relevant listings fetch error:", error.message);
+      return [];
+    }
+
+    const listings = (data || []).filter((listing) =>
+      matchesFinalFloorFilter(listing, input, filtersUsed)
+    );
+    const picked = pickRandomItems(listings, 3);
+    if (picked.length >= 3 || count <= batchSize) return picked;
+  }
+
+  return [];
+}
+
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const TRACKING_SALT = process.env.TRACKING_SALT || "catdai-default-salt";
 
@@ -293,6 +524,14 @@ export async function POST(request) {
       ? { estimate: agencyData.estimate, range: agencyData.range, market_stats: agencyData.market_stats }
       : null,
   };
+
+  if (!Array.isArray(data.relevant_listings) || data.relevant_listings.length === 0) {
+    data.relevant_listings = await fetchRelevantListings(data);
+  }
+  data.relevant_listings = await enrichRelevantListingsWithPreviewImages(
+    data.relevant_listings,
+    body.language
+  );
 
   const access = await resolveAccessTier(request);
   let isPaid = isPaidAccessTier(access.tier);

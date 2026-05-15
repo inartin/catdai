@@ -9,8 +9,61 @@ import CloseIcon from "@/components/icons/CloseIcon";
 import AuthOptions from "@/components/AuthOptions";
 
 function formatPrice(num) {
-  if (num == null) return "—";
-  return "€" + Math.round(num).toLocaleString("ro-MD");
+  const value = Number(num);
+  if (!Number.isFinite(value)) return "—";
+  return "€" + Math.round(value).toLocaleString("ro-MD");
+}
+
+function formatArea(num) {
+  const value = Number(num);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return `${value.toLocaleString("ro-MD", { maximumFractionDigits: 1 })}m²`;
+}
+
+function build999ListingUrl(externalId, lang) {
+  if (!externalId) return null;
+  const listingLang = lang === "ru" ? "ru" : "ro";
+  return `https://999.md/${listingLang}/${encodeURIComponent(String(externalId))}`;
+}
+
+function formatListingMeta(listing, t) {
+  const location = [
+    listing.district ? t(`data.district.${listing.district}`) : null,
+    listing.city ? t(`data.city.${listing.city}`) : null,
+  ].filter(Boolean).join(", ");
+
+  const floor = listing.floor != null
+    ? (listing.total_floors
+      ? t("result.floorOf", { floor: listing.floor, total: listing.total_floors })
+      : t("result.floor", { floor: listing.floor }))
+    : null;
+
+  return [location, floor].filter(Boolean).join(" · ");
+}
+
+function normalizeRelevantListing(listing, t, lang) {
+  const href = build999ListingUrl(listing?.external_id, lang);
+  if (!href) return null;
+
+  const tags = [
+    listing.rooms_count === 1
+      ? t("result.oneRoom")
+      : (listing.rooms_count ? t("result.rooms", { count: listing.rooms_count }) : null),
+    formatArea(listing.area_m2),
+    listing.building_type ? t(`data.buildingType.${listing.building_type}`) : null,
+    listing.renovation ? t(`data.renovationType.${listing.renovation}`) : null,
+  ].filter(Boolean);
+
+  return {
+    externalId: String(listing.external_id),
+    href,
+    title: listing.title || t("result.relevantListings"),
+    meta: formatListingMeta(listing, t),
+    price: listing.price_amount,
+    pricePerM2: listing.price_per_m2,
+    imageUrl: listing.image_url || null,
+    tags,
+  };
 }
 
 function LockedValue({ text = "999999", className = "", onClick }) {
@@ -73,18 +126,18 @@ function LockedValue({ text = "999999", className = "", onClick }) {
       </button>
       {showTooltip && tooltipPos && typeof document !== "undefined"
         ? createPortal(
+          <span
+            className="pointer-events-none fixed z-[70] left-1/2 top-0 -translate-x-1/2 -translate-y-full px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium text-center max-w-[280px] leading-tight shadow-lg animate-fade-in"
+            style={{ left: tooltipPos.left, top: tooltipPos.top }}
+          >
+            {t("result.loginToSeeFullAnalysis")}
             <span
-              className="pointer-events-none fixed z-[70] left-1/2 top-0 -translate-x-1/2 -translate-y-full px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium text-center max-w-[280px] leading-tight shadow-lg animate-fade-in"
-              style={{ left: tooltipPos.left, top: tooltipPos.top }}
-            >
-              {t("result.loginToSeeFullAnalysis")}
-              <span
-                className="absolute top-full -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900"
-                style={{ left: `calc(50% + ${tooltipPos.arrowOffset}px)` }}
-              />
-            </span>,
-            document.body
-          )
+              className="absolute top-full -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900"
+              style={{ left: `calc(50% + ${tooltipPos.arrowOffset}px)` }}
+            />
+          </span>,
+          document.body
+        )
         : null}
     </span>
   );
@@ -218,13 +271,26 @@ function PlainFilterChip({ children }) {
 
 function ListingsPreviewCard({ listing }) {
   return (
-    <article className="flex gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm">
-      <div className="flex aspect-[4/3] w-24 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-300 sm:w-28">
-        <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5Z" />
-          <path d="M9 21v-7h6v7" />
-          <path d="M7 11h2M15 11h2" />
-        </svg>
+    <a
+      href={listing.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5"
+    >
+      <div
+        className={`flex aspect-[4/3] w-24 shrink-0 items-center justify-center rounded-lg bg-gray-100 sm:w-28 ${listing.imageUrl
+          ? "bg-cover bg-center"
+          : "text-gray-300"
+          }`}
+        style={listing.imageUrl ? { backgroundImage: `url(${JSON.stringify(listing.imageUrl)})` } : undefined}
+      >
+        {!listing.imageUrl && (
+          <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5Z" />
+            <path d="M9 21v-7h6v7" />
+            <path d="M7 11h2M15 11h2" />
+          </svg>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
@@ -245,7 +311,7 @@ function ListingsPreviewCard({ listing }) {
           ))}
         </div>
       </div>
-    </article>
+    </a>
   );
 }
 
@@ -255,17 +321,19 @@ function RelevantListingsPreview({ t, count, listings, onViewAll }) {
       <div className="p-6 sm:p-8 border-b border-gray-100">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="text-base font-semibold text-gray-900">{t("result.relevantListings")}</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold text-gray-900">{t("result.relevantListings")}</h3>
+              <span className="shrink-0 rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-bold text-primary">
+                {count.toLocaleString("ro-MD")}
+              </span>
+            </div>
             <p className="mt-1 text-sm text-gray-400">{t("result.relevantListingsDesc")}</p>
           </div>
-          <span className="shrink-0 rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-bold text-primary">
-            {count.toLocaleString("ro-MD")}
-          </span>
         </div>
 
         <div className="mt-5 space-y-3">
           {listings.map((listing) => (
-            <ListingsPreviewCard key={listing.title} listing={listing} />
+            <ListingsPreviewCard key={listing.externalId} listing={listing} />
           ))}
         </div>
       </div>
@@ -762,21 +830,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const agRate = data.estimates_by_seller?.agency?.estimate?.market_rate;
   const sellerDelta = (indRate && agRate) ? (agRate - indRate) : null;
   const sellerDeltaPct = (indRate && agRate) ? ((sellerDelta / indRate) * 100) : null;
-  const listingsCount = 1284;
-  const areaValue = Number(input.area_m2) || 65;
-  const baseListingPrice =
-    Number(estimate.market_rate) ||
-    (Number(market_stats?.median_price_per_m2) * areaValue) ||
-    85000;
-  const previewLocation = input.district
-    ? t(`data.district.${input.district}`)
-    : t(`data.city.${input.city}`);
-  const previewTags = [
-    roomsLabel,
-    input.area_m2 ? `${input.area_m2}m²` : null,
-    input.building_type ? t(`data.buildingType.${input.building_type}`) : null,
-    input.renovation ? t(`data.renovationType.${input.renovation}`) : null,
-  ].filter(Boolean);
+  const listingsCount = Number.isFinite(Number(market_stats?.comparable_count))
+    ? Number(market_stats.comparable_count)
+    : 0;
   const marketFilterChips = [
     t(`data.city.${input.city}`),
     input.district ? t(`data.district.${input.district}`) : null,
@@ -786,61 +842,42 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     input.renovation ? t(`data.renovationType.${input.renovation}`) : null,
     floorLabel,
   ].filter(Boolean);
-  const listingPreviewItems = [
-    {
-      title: t("result.listingPreviewTitleA", { location: previewLocation }),
-      meta: t("result.listingPreviewMetaA"),
-      price: Math.round(baseListingPrice * 0.96),
-      pricePerM2: Math.round((baseListingPrice * 0.96) / areaValue),
-      tags: previewTags.slice(0, 3),
-    },
-    {
-      title: t("result.listingPreviewTitleB", { location: previewLocation }),
-      meta: t("result.listingPreviewMetaB"),
-      price: Math.round(baseListingPrice * 1.03),
-      pricePerM2: Math.round((baseListingPrice * 1.03) / areaValue),
-      tags: previewTags.slice(0, 3),
-    },
-    {
-      title: t("result.listingPreviewTitleC", { location: previewLocation }),
-      meta: t("result.listingPreviewMetaC"),
-      price: Math.round(baseListingPrice * 1.12),
-      pricePerM2: Math.round((baseListingPrice * 1.12) / areaValue),
-      tags: previewTags.slice(0, 3),
-    },
-  ];
+  const listingPreviewItems = (Array.isArray(data.relevant_listings) ? data.relevant_listings : [])
+    .map((listing) => normalizeRelevantListing(listing, t, lang))
+    .filter(Boolean)
+    .slice(0, 3);
 
   const authModal =
     isAuthModalOpen && typeof document !== "undefined"
       ? createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 cursor-zoom-out"
+          onClick={() => setIsAuthModalOpen(false)}
+        >
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 cursor-zoom-out"
-            onClick={() => setIsAuthModalOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            className="relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl bg-white p-6 sm:p-7 cursor-auto"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div
-              role="dialog"
-              aria-modal="true"
-              className="relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl bg-white p-6 sm:p-7 cursor-auto"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              type="button"
+              onClick={() => setIsAuthModalOpen(false)}
+              aria-label="Close"
+              className="absolute top-3 right-3 inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
             >
-              <button
-                type="button"
-                onClick={() => setIsAuthModalOpen(false)}
-                aria-label="Close"
-                className="absolute top-3 right-3 inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-              >
-                <CloseIcon size={18} />
-              </button>
+              <CloseIcon size={18} />
+            </button>
 
-              <p className="text-center text-base font-medium text-gray-800 mb-4 px-8">
-                {t("result.comingSoon")}
-              </p>
+            <p className="text-center text-base font-medium text-gray-800 mb-4 px-8">
+              {t("result.comingSoon")}
+            </p>
 
-              <AuthOptions variant="freeContinue" />
-            </div>
-          </div>,
-          document.body
-        )
+            <AuthOptions />
+          </div>
+        </div>,
+        document.body
+      )
       : null;
 
   if (showListingsView) {

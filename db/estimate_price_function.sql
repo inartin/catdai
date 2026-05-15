@@ -71,6 +71,7 @@ DECLARE
 
   -- District comparison
   district_comparison jsonb;
+  relevant_listings jsonb;
 
 BEGIN
 
@@ -221,7 +222,77 @@ BEGIN
   ) d;
 
   -- ============================================================
-  -- Step 5: Build result
+  -- Step 5: Random relevant listings
+  --         Uses the final widened filters from the estimate.
+  -- ============================================================
+  SELECT COALESCE(jsonb_agg(
+    jsonb_build_object(
+      'external_id', l.external_id,
+      'title', l.title,
+      'price_amount', l.price_amount,
+      'price_per_m2', l.price_per_m2,
+      'area_m2', l.area_m2,
+      'rooms_count', l.rooms_count,
+      'floor', l.floor,
+      'total_floors', l.total_floors,
+      'building_type', l.building_type,
+      'renovation', l.renovation,
+      'city', l.city,
+      'district', l.district,
+      'sector', l.sector,
+      'images_count', l.images_count
+    ) ORDER BY l.random_sort
+  ), '[]'::jsonb)
+  INTO relevant_listings
+  FROM (
+    SELECT
+      external_id,
+      title,
+      price_amount,
+      price_per_m2,
+      area_m2,
+      rooms_count,
+      floor,
+      total_floors,
+      building_type,
+      renovation,
+      city,
+      district,
+      sector,
+      images_count,
+      random() AS random_sort
+    FROM listing
+    WHERE is_active = true
+      AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
+      AND price_amount IS NOT NULL AND price_amount > 0
+      AND city = p_city
+      AND (NOT use_district OR district = p_district)
+      AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
+      AND (NOT use_building_type OR building_type = p_building_type)
+      AND (NOT use_renovation OR renovation = ANY(renovation_filters))
+      AND (NOT use_floor OR (
+        CASE
+          WHEN p_floor = 1 THEN
+            floor = 1
+          WHEN p_total_floors IS NOT NULL AND p_floor = p_total_floors THEN
+            floor = total_floors
+          ELSE
+            floor BETWEEN GREATEST(2, p_floor - 2) AND (
+              CASE WHEN p_total_floors IS NOT NULL
+                THEN LEAST(p_total_floors - 1, p_floor + 2)
+                ELSE p_floor + 2
+              END
+            )
+        END
+      ))
+      AND (NOT use_area OR area_m2 BETWEEN p_area_m2 * (1 - area_tolerance) AND p_area_m2 * (1 + area_tolerance))
+      AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories))
+    ORDER BY random_sort
+    LIMIT 3
+  ) l;
+
+  -- ============================================================
+  -- Step 6: Build result
   -- ============================================================
   result := jsonb_build_object(
     'estimate', jsonb_build_object(
@@ -271,6 +342,7 @@ BEGIN
       ELSE jsonb_build_object('applied', false)
     END,
     'district_comparison', COALESCE(district_comparison, '[]'::jsonb),
+    'relevant_listings', relevant_listings,
     'input', jsonb_build_object(
       'city', p_city,
       'district', p_district,

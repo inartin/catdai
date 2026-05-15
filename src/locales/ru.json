@@ -147,7 +147,7 @@
   "result.marketStats": "Статистика рынка",
   "result.relevantListings": "Подходящие объявления",
   "result.relevantListingsDesc": "Примеры из того же рыночного сегмента до личного уточнения фильтров.",
-  "result.listingsPreviewNote": "Цены показаны ориентировочно для этой UI-макета.",
+  "result.listingsPreviewNote": "Карточки открывают оригинальные объявления на 999.md.",
   "result.viewListings": "Смотреть {count} объявлений",
   "result.listingPreviewTitleA": "Квартира в {location}",
   "result.listingPreviewTitleB": "Сопоставимое объявление в {location}",

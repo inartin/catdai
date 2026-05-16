@@ -81,6 +81,50 @@ function normalizeRelevantListing(listing, t, lang) {
   };
 }
 
+function compactObject(values) {
+  return Object.fromEntries(
+    Object.entries(values).filter(([, value]) => (
+      value !== undefined && value !== null && value !== ""
+    ))
+  );
+}
+
+function parseOptionalNumber(value) {
+  const normalized = String(value ?? "").replace(/\s/g, "").replace(",", ".");
+  if (!normalized) return null;
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : null;
+}
+
+function buildBaseAlertFilters(input, filtersUsed) {
+  return compactObject({
+    city: input?.city,
+    district: input?.district,
+    rooms_count: input?.rooms_count,
+    area_m2: input?.area_m2,
+    floor: input?.floor,
+    total_floors: input?.total_floors,
+    building_type: input?.building_type,
+    renovation: input?.renovation,
+    bathrooms_count: input?.bathrooms_count,
+    balconies_count: input?.balconies_count,
+    filters_used: filtersUsed || undefined,
+  });
+}
+
+function buildNotificationFilters(filters) {
+  return compactObject({
+    price_min: parseOptionalNumber(filters.priceMin),
+    price_max: parseOptionalNumber(filters.priceMax),
+    max_price_per_m2: parseOptionalNumber(filters.maxPricePerM2),
+    floor_min: parseOptionalNumber(filters.floorMin),
+    floor_max: parseOptionalNumber(filters.floorMax),
+    first_floor: filters.firstFloor ? true : null,
+    last_floor: filters.lastFloor ? true : null,
+    seller_type: filters.sellerType === "all" ? null : filters.sellerType,
+  });
+}
+
 function MarketTrendMiniChart({ trend, compact = false }) {
   const { t, lang } = useTranslation();
   const [activeIndex, setActiveIndex] = useState(null);
@@ -567,6 +611,8 @@ function ListingsFilterView({
   marketFilterChips,
   filters,
   alertSaved,
+  alertSaving,
+  alertError,
   onBack,
   onFilterChange,
   onSaveAlert,
@@ -708,7 +754,8 @@ function ListingsFilterView({
             <button
               type="button"
               onClick={onSaveAlert}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-dark"
+              disabled={alertSaving || alertSaved}
+              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:cursor-default disabled:bg-primary/70"
             >
               {alertSaved ? (
                 <>
@@ -717,10 +764,15 @@ function ListingsFilterView({
                   </svg>
                   {t("result.alertSaved")}
                 </>
+              ) : alertSaving ? (
+                t("result.savingAlert")
               ) : (
                 t("result.saveAlert")
               )}
             </button>
+            {alertError && (
+              <p className="mt-3 text-sm text-red-600">{alertError}</p>
+            )}
           </section>
 
         </aside>
@@ -747,8 +799,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const [favoriteAnimating, setFavoriteAnimating] = useState(false);
   const [showLoginTooltip, setShowLoginTooltip] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalCopyKey, setAuthModalCopyKey] = useState("result.comingSoon");
   const [showListingsView, setShowListingsView] = useState(false);
   const [alertSaved, setAlertSaved] = useState(false);
+  const [alertSaving, setAlertSaving] = useState(false);
+  const [alertError, setAlertError] = useState("");
   const [listingFilters, setListingFilters] = useState({
     priceMin: "",
     priceMax: "",
@@ -816,8 +871,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isAuthModalOpen]);
 
-  const openAuthModal = useCallback(() => {
+  const openAuthModal = useCallback((copyKey = "result.comingSoon") => {
     if (isAuthenticated) return;
+    setAuthModalCopyKey(typeof copyKey === "string" ? copyKey : "result.comingSoon");
     clearAuthError();
     setIsAuthModalOpen(true);
   }, [clearAuthError, isAuthenticated]);
@@ -832,7 +888,58 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
   const updateListingFilter = (key, value) => {
     setAlertSaved(false);
+    setAlertError("");
     setListingFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveAlert = async () => {
+    if (alertSaving || alertSaved) return;
+
+    if (!isAuthenticated || !session?.access_token) {
+      setAlertError("");
+      openAuthModal("result.loginToSaveAlert");
+      return;
+    }
+
+    setAlertSaving(true);
+    setAlertError("");
+
+    const roomsLbl = input.rooms_count === 1
+      ? t("result.oneRoom")
+      : t("result.rooms", { count: input.rooms_count });
+    const label = `${t("result.apartment")} ${roomsLbl} · ${input.area_m2}m² · ${input.district ? t(`data.district.${input.district}`) + ", " : ""}${t(`data.city.${input.city}`)}`;
+
+    try {
+      const res = await fetch("/api/listing-alerts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          label,
+          website_enabled: true,
+          telegram_enabled: false,
+          base_filters: buildBaseAlertFilters(input, filters_used),
+          alert_filters: buildNotificationFilters(listingFilters),
+        }),
+      });
+
+      if (res.status === 401) {
+        openAuthModal("result.loginToSaveAlert");
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error("Failed to save alert");
+      }
+
+      setAlertSaved(true);
+    } catch {
+      setAlertError(t("result.saveAlertError"));
+    } finally {
+      setAlertSaving(false);
+    }
   };
 
   const handleToggleFavorite = async () => {
@@ -1028,7 +1135,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             </button>
 
             <p className="text-center text-base font-medium text-gray-800 mb-4 px-8">
-              {t("result.comingSoon")}
+              {t(authModalCopyKey)}
             </p>
 
             <AuthOptions />
@@ -1048,9 +1155,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
           marketFilterChips={marketFilterChips}
           filters={listingFilters}
           alertSaved={alertSaved}
+          alertSaving={alertSaving}
+          alertError={alertError}
           onBack={() => setListingsMode(false)}
           onFilterChange={updateListingFilter}
-          onSaveAlert={() => setAlertSaved(true)}
+          onSaveAlert={handleSaveAlert}
         />
       </div>
     );

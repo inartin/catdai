@@ -1,16 +1,53 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import { useLivePrices } from "@/lib/useLivePrices";
+import { useMarketTrends } from "@/lib/useMarketTrends";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
 
 const TREND_ARROWS = { up: "↑", down: "↓", stable: "→" };
 const TREND_COLORS = { up: "text-emerald-400/40", down: "text-red-400/40", stable: "text-gray-300/40" };
+const MARKET_SERIES = {
+  constructii_noi: {
+    line: "#059669",
+    textClass: "text-emerald-700",
+    unitClass: "text-emerald-700/60",
+    chipClass: "bg-emerald-50 text-emerald-700",
+  },
+  secundar: {
+    line: "#2563eb",
+    textClass: "text-blue-700",
+    unitClass: "text-blue-700/60",
+    chipClass: "bg-blue-50 text-blue-700",
+  },
+};
 
 function formatListings(n) {
   if (!n) return "—";
   if (n >= 1000) return `~${Math.round(n / 1000)}k`;
   return String(n);
+}
+
+function formatPrice(num) {
+  const value = Number(num);
+  if (!Number.isFinite(value)) return "—";
+  return "€" + Math.round(value).toLocaleString("ro-MD");
+}
+
+function formatTrendPercent(num) {
+  const value = Number(num);
+  if (!Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
+}
+
+function formatTrendDate(date, lang) {
+  if (!date) return "";
+  return new Date(`${date}T00:00:00`).toLocaleDateString(
+    lang === "ru" ? "ru-RU" : "ro-RO",
+    { day: "2-digit", month: "short" }
+  );
 }
 
 function timeAgo(isoString, t) {
@@ -101,17 +138,16 @@ function LivePricePanel({ t, priceData }) {
             {t("categories.livePrices")}
           </span>
         </div>
-        <div className="mt-1 text-xs font-medium text-gray-500">
-          Chișinău · {t("categories.today")}
-        </div>
       </div>
 
       <div className="space-y-3">
         <div className="flex items-baseline justify-between gap-4 border-b border-gray-100 pb-3">
-          <span className="text-sm font-medium text-gray-600">{t("categories.newConstruction")}</span>
-          <span className="text-2xl font-bold tabular-nums text-gray-950">
+          <span className={`text-sm font-semibold ${MARKET_SERIES.constructii_noi.textClass}`}>
+            {t("categories.newConstruction")}
+          </span>
+          <span className={`text-2xl font-bold tabular-nums ${MARKET_SERIES.constructii_noi.textClass}`}>
             €{cn ?? "—"}
-            <span className="ml-1 text-xs font-semibold text-gray-500">/m²</span>
+            <span className={`ml-1 text-xs font-semibold ${MARKET_SERIES.constructii_noi.unitClass}`}>/m²</span>
             {trend && (
               <span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} ml-1 text-sm`}>
                 {TREND_ARROWS[trend.direction] || "→"}
@@ -120,10 +156,12 @@ function LivePricePanel({ t, priceData }) {
           </span>
         </div>
         <div className="flex items-baseline justify-between gap-4">
-          <span className="text-sm font-medium text-gray-600">{t("categories.secondary")}</span>
-          <span className="text-2xl font-bold tabular-nums text-gray-950">
+          <span className={`text-sm font-semibold ${MARKET_SERIES.secundar.textClass}`}>
+            {t("categories.secondary")}
+          </span>
+          <span className={`text-2xl font-bold tabular-nums ${MARKET_SERIES.secundar.textClass}`}>
             €{sec ?? "—"}
-            <span className="ml-1 text-xs font-semibold text-gray-500">/m²</span>
+            <span className={`ml-1 text-xs font-semibold ${MARKET_SERIES.secundar.unitClass}`}>/m²</span>
             {trend && (
               <span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} ml-1 text-sm`}>
                 {TREND_ARROWS[trend.direction] || "→"}
@@ -140,9 +178,185 @@ function LivePricePanel({ t, priceData }) {
   );
 }
 
+function normalizeTrendPoints(trend) {
+  return Array.isArray(trend?.points)
+    ? trend.points
+      .map((point) => ({
+        date: point.date,
+        value: Number(point.value),
+      }))
+      .filter((point) => point.date && Number.isFinite(point.value) && point.value > 0)
+    : [];
+}
+
+function buildCombinedChartPoints(points, dateIndex, minValue, maxValue, width, height, padding, rightPadding) {
+  const span = maxValue - minValue;
+
+  return points.map((point) => {
+    const index = dateIndex.get(point.date);
+    const x = padding + (index / Math.max(dateIndex.size - 1, 1)) * (width - padding - rightPadding);
+    const y = span === 0
+      ? height / 2
+      : height - padding - ((point.value - minValue) / span) * (height - padding * 2);
+
+    return { ...point, x, y };
+  });
+}
+
+function LandingTrendCharts({ t, lang, trendData }) {
+  const [activePoint, setActivePoint] = useState(null);
+  const trends = trendData?.trends || {};
+  const series = [
+    {
+      key: "constructii_noi",
+      label: t("categories.newConstruction"),
+      trend: trends.constructii_noi,
+      points: normalizeTrendPoints(trends.constructii_noi),
+      color: MARKET_SERIES.constructii_noi.line,
+      chipClass: MARKET_SERIES.constructii_noi.chipClass,
+    },
+    {
+      key: "secundar",
+      label: t("categories.secondary"),
+      trend: trends.secundar,
+      points: normalizeTrendPoints(trends.secundar),
+      color: MARKET_SERIES.secundar.line,
+      chipClass: MARKET_SERIES.secundar.chipClass,
+    },
+  ];
+  const drawableSeries = series.filter((item) => item.points.length >= 2);
+
+  if (drawableSeries.length === 0) {
+    return (
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-xs text-gray-400">{t("result.trendPeriod", { days: trendData?.period_days || 30 })}</span>
+          <span className="text-xs font-semibold text-gray-400">{t("result.noData")}</span>
+        </div>
+      </div>
+    );
+  }
+
+  const allPoints = drawableSeries.flatMap((item) => item.points);
+  const values = allPoints.map((point) => point.value);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const allDates = [...new Set(allPoints.map((point) => point.date))].sort();
+  const dateIndex = new Map(allDates.map((date, index) => [date, index]));
+  const width = 220;
+  const height = 156;
+  const padding = 6;
+  const rightPadding = 48;
+  const firstDate = allDates[0];
+  const lastDate = allDates[allDates.length - 1];
+  const chartSeries = drawableSeries.map((item) => {
+    const chartPoints = buildCombinedChartPoints(
+      item.points,
+      dateIndex,
+      minValue,
+      maxValue,
+      width,
+      height,
+      padding,
+      rightPadding
+    );
+
+    return {
+      ...item,
+      chartPoints,
+      coords: chartPoints.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" "),
+    };
+  });
+  const constructiiNoi = series.find((item) => item.key === "constructii_noi");
+  const secundar = series.find((item) => item.key === "secundar");
+
+  return (
+    <div className="mt-5">
+      <p className="text-[11px] text-gray-400">
+        {t("result.trendPeriod", { days: trendData?.period_days || 30 })}
+      </p>
+
+      <div className="relative mt-4 h-40 w-full">
+        {constructiiNoi?.points.length >= 2 && (
+          <span className={`absolute right-0 top-0 z-10 rounded-lg px-2 py-1 text-xs font-bold ${constructiiNoi.chipClass}`}>
+            {formatTrendPercent(constructiiNoi.trend?.change_pct)}
+          </span>
+        )}
+        {secundar?.points.length >= 2 && (
+          <span className={`absolute bottom-1 right-0 z-10 rounded-lg px-2 py-1 text-xs font-bold ${secundar.chipClass}`}>
+            {formatTrendPercent(secundar.trend?.change_pct)}
+          </span>
+        )}
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full overflow-visible"
+          role="img"
+          aria-label={t("result.trendPeriod", { days: trendData?.period_days || 30 })}
+        >
+          <line x1="0" y1={height - padding} x2={width - rightPadding} y2={height - padding} stroke="#111827" strokeOpacity="0.08" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          {chartSeries.map((item) => (
+            <polyline
+              key={item.key}
+              points={item.coords}
+              fill="none"
+              stroke={item.color}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
+        {chartSeries.map((item) => (
+          item.chartPoints.map((point) => (
+            <button
+              key={`${item.key}-${point.date}-${point.value}`}
+              type="button"
+              aria-label={`${formatTrendDate(point.date, lang)} ${formatPrice(point.value)}/m²`}
+              className="group absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full outline-none"
+              style={{
+                left: `${(point.x / width) * 100}%`,
+                top: `${(point.y / height) * 100}%`,
+              }}
+              onMouseEnter={() => setActivePoint({ ...point, label: item.label, color: item.color })}
+              onMouseLeave={() => setActivePoint(null)}
+              onFocus={() => setActivePoint({ ...point, label: item.label, color: item.color })}
+              onBlur={() => setActivePoint(null)}
+            >
+              <span
+                className="block h-2.5 w-2.5 translate-x-[5px] translate-y-[5px] rounded-full border-2 bg-white opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100"
+                style={{ borderColor: item.color }}
+              />
+            </button>
+          ))
+        ))}
+        {activePoint && (
+          <div
+            className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 px-2.5 py-1.5 text-center text-[11px] font-medium leading-tight text-white shadow-lg"
+            style={{
+              left: `${(activePoint.x / width) * 100}%`,
+              top: `${(activePoint.y / height) * 100}%`,
+            }}
+          >
+            <span className="block whitespace-nowrap font-semibold">{activePoint.label}</span>
+            <span className="block whitespace-nowrap">{formatTrendDate(activePoint.date, lang)}</span>
+            <span className="block whitespace-nowrap">{formatPrice(activePoint.value)}/m²</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[11px] leading-none text-gray-400">
+        <span>{formatTrendDate(firstDate, lang)}</span>
+        <span>{formatTrendDate(lastDate, lang)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function CategoryCards({ onCategorySelect }) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
   const { data: priceData } = useLivePrices();
+  const { data: trendData } = useMarketTrends();
 
   const trackSubmitLeadForm = () => {
     if (typeof window === "undefined" || typeof window.gtag !== "function") return;
@@ -300,30 +514,25 @@ export default function CategoryCards({ onCategorySelect }) {
                 >
                   <LivePricePanel t={t} priceData={priceData} />
 
-                  <div className="flex items-center justify-center bg-emerald-50/70 px-4 py-6">
+                  <div className="flex flex-col items-center justify-center gap-5 bg-emerald-50/70 px-4 py-6">
                     <div
-                      className="h-52 w-full rounded-xl bg-cover bg-center bg-no-repeat shadow-inner"
+                      className="relative h-52 w-full rounded-xl bg-cover bg-center bg-no-repeat shadow-inner"
                       style={{ backgroundImage: `url(${cat.backgroundImage})` }}
-                    />
-                  </div>
-
-                  <div className="flex h-full flex-col justify-between gap-6 p-6">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${cat.iconBg}`}>
-                          {cat.icon}
-                        </span>
-                        <span className="text-xl font-bold text-gray-950">{cat.name}</span>
-                      </div>
-                      <p className="mt-4 max-w-52 text-sm leading-6 text-gray-600">
-                        {t("howItWorks.independentData")}
-                      </p>
+                    >
+                      <span className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur">
+                        Chișinău · {t("categories.today")}
+                      </span>
                     </div>
-
                     <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors group-hover/card:bg-primary-dark cursor-pointer">
                       {cat.cta}
                       <ArrowRight size={16} className="translate-y-[-1px]" />
                     </span>
+                  </div>
+
+                  <div className="flex h-full flex-col p-6">
+                    <div className="pt-1">
+                      <LandingTrendCharts t={t} lang={lang} trendData={trendData} />
+                    </div>
                   </div>
                 </button>
               )}

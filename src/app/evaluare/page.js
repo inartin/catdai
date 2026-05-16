@@ -358,7 +358,7 @@ function EvaluareContent() {
   }
 
   return (
-    <div className={`mx-auto py-10 px-4 transition-all duration-300 ${isComparing ? "max-w-[90rem]" : isListingsMode ? "max-w-5xl" : "max-w-2xl"}`}>
+    <div className={`mx-auto py-10 px-4 transition-all duration-300 ${isComparing ? "max-w-[90rem]" : isListingsMode ? "max-w-5xl" : "max-w-6xl"}`}>
       <div className={`flex flex-col ${isComparing ? "md:flex-row items-start justify-center gap-6" : ""}`}>
         {/* Left Side: Primary */}
         <div className={`w-full ${isComparing ? "md:w-1/2 max-w-2xl" : ""}`}>
@@ -369,6 +369,7 @@ function EvaluareContent() {
               onCompare={startCompare} 
               onClose={isComparing ? handleCloseLeft : undefined}
               onListingsModeChange={setIsListingsMode}
+              compactLayout={isComparing}
             />
           )}
         </div>
@@ -416,6 +417,7 @@ function EvaluareContent() {
                   router.replace(`/evaluare?${clean.toString()}`);
                 }}
                 onClose={handleCloseRight}
+                compactLayout
               />
             ) : error2 ? (
               <div className="p-6 text-center">

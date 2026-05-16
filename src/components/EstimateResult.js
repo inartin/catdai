@@ -14,6 +14,21 @@ function formatPrice(num) {
   return "€" + Math.round(value).toLocaleString("ro-MD");
 }
 
+function formatTrendPercent(num) {
+  const value = Number(num);
+  if (!Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
+}
+
+function formatTrendDate(date, lang) {
+  if (!date) return "";
+  return new Date(`${date}T00:00:00`).toLocaleDateString(
+    lang === "ru" ? "ru-RU" : "ro-RO",
+    { day: "2-digit", month: "short" }
+  );
+}
+
 function formatArea(num) {
   const value = Number(num);
   if (!Number.isFinite(value) || value <= 0) return null;
@@ -64,6 +79,138 @@ function normalizeRelevantListing(listing, t, lang) {
     imageUrl: listing.image_url || null,
     tags,
   };
+}
+
+function MarketTrendMiniChart({ trend, compact = false }) {
+  const { t, lang } = useTranslation();
+  const [activeIndex, setActiveIndex] = useState(null);
+  const points = Array.isArray(trend?.points)
+    ? trend.points
+      .map((point) => ({
+        date: point.date,
+        value: Number(point.value),
+      }))
+      .filter((point) => point.date && Number.isFinite(point.value) && point.value > 0)
+    : [];
+
+  if (points.length < 2) return null;
+
+  const values = points.map((point) => point.value);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const width = 176;
+  const height = 48;
+  const padding = 4;
+  const span = maxValue - minValue;
+  const chartPoints = points.map((point, index) => {
+    const x = padding + (index / (points.length - 1)) * (width - padding * 2);
+    const y = span === 0
+      ? height / 2
+      : height - padding - ((point.value - minValue) / span) * (height - padding * 2);
+
+    return { ...point, x, y };
+  });
+  const coords = chartPoints.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const activePoint = Number.isInteger(activeIndex) ? chartPoints[activeIndex] : null;
+  const firstPoint = chartPoints[0];
+  const lastPoint = chartPoints[chartPoints.length - 1];
+  const endValue = Number(trend.end_value);
+  const changePct = Number(trend.change_pct);
+  const isUp = changePct > 0;
+  const isDown = changePct < 0;
+  const toneClass = isUp
+    ? "text-emerald-600 bg-emerald-50"
+    : isDown
+      ? "text-red-600 bg-red-50"
+      : "text-gray-500 bg-gray-100";
+  const metricLabel = trend.metric === "average_price_per_m2"
+    ? t("result.trendMetricAverage")
+    : t("result.trendMetricMedian");
+
+  return (
+    <div
+      className={`${compact
+        ? "mt-5 border-t border-gray-100 pt-4"
+        : "mt-5 border-t border-gray-100 pt-4 lg:mt-0 lg:w-full lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
+        }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            {trend.scope === "city" ? t("result.cityTrend") : t("result.districtTrend")}
+          </p>
+          <p className="mt-0.5 text-[11px] text-gray-400">
+            {t("result.trendPeriod", { days: trend.period_days || 30 })}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center gap-2">
+        <p className="text-lg font-bold leading-none text-gray-900">
+            {formatPrice(endValue)}/m²
+        </p>
+        <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${toneClass}`}>
+          {formatTrendPercent(changePct)}
+        </span>
+      </div>
+      <p className="mt-1 text-[11px] text-gray-400">{metricLabel}</p>
+
+      <div className="relative mt-3 h-14 w-full">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full overflow-visible text-primary"
+          role="img"
+          aria-label={t("result.districtTrend")}
+        >
+          <line x1="0" y1={height - padding} x2={width} y2={height - padding} stroke="currentColor" strokeOpacity="0.08" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <polyline
+            points={coords}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+        {chartPoints.map((point, index) => (
+          <button
+            key={`${point.date}-${point.value}`}
+            type="button"
+            aria-label={`${formatTrendDate(point.date, lang)} ${formatPrice(point.value)}/m²`}
+            className="group absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full outline-none"
+            style={{
+              left: `${(point.x / width) * 100}%`,
+              top: `${(point.y / height) * 100}%`,
+            }}
+            onMouseEnter={() => setActiveIndex(index)}
+            onMouseLeave={() => setActiveIndex(null)}
+            onFocus={() => setActiveIndex(index)}
+            onBlur={() => setActiveIndex(null)}
+          >
+            <span className="block h-2.5 w-2.5 translate-x-[5px] translate-y-[5px] rounded-full border-2 border-primary bg-white opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
+          </button>
+        ))}
+        {activePoint && (
+          <div
+            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 px-2.5 py-1.5 text-center text-[11px] font-medium leading-tight text-white shadow-lg"
+            style={{
+              left: `${(activePoint.x / width) * 100}%`,
+              top: `${(activePoint.y / height) * 100}%`,
+            }}
+          >
+            <span className="block whitespace-nowrap">{formatTrendDate(activePoint.date, lang)}</span>
+            <span className="block whitespace-nowrap">{formatPrice(activePoint.value)}/m²</span>
+          </div>
+        )}
+      </div>
+      <div className="mt-1 flex items-center justify-between text-[11px] leading-none text-gray-400">
+        <span>{formatTrendDate(firstPoint.date, lang)}</span>
+        <span>{formatTrendDate(lastPoint.date, lang)}</span>
+      </div>
+    </div>
+  );
 }
 
 function LockedValue({ text = "999999", className = "", onClick }) {
@@ -188,7 +335,7 @@ function FeatureAdjustmentBadge({ item }) {
   );
 }
 
-function DistrictComparison({ districts, currentDistrict, area, blurValues, onLockedClick }) {
+function DistrictComparison({ districts, currentDistrict, area, blurValues, onLockedClick, className = "" }) {
   const { t } = useTranslation();
 
   if (!districts || districts.length < 2) return null;
@@ -199,7 +346,7 @@ function DistrictComparison({ districts, currentDistrict, area, blurValues, onLo
   const maxPpm = numericMedians.length > 0 ? Math.max(...numericMedians) : null;
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
+    <div className={`${className} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
       <h3 className="text-base font-semibold text-gray-900 mb-1">
         {t("result.districtComparison")}
       </h3>
@@ -270,6 +417,8 @@ function PlainFilterChip({ children }) {
 }
 
 function ListingsPreviewCard({ listing }) {
+  const metaParts = listing.meta ? listing.meta.split(" · ").filter(Boolean) : [];
+
   return (
     <a
       href={listing.href}
@@ -277,31 +426,39 @@ function ListingsPreviewCard({ listing }) {
       rel="noopener noreferrer"
       className="flex gap-3 rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5"
     >
-      <div
-        className={`flex aspect-[4/3] w-24 shrink-0 items-center justify-center rounded-lg bg-gray-100 sm:w-28 ${listing.imageUrl
-          ? "bg-cover bg-center"
-          : "text-gray-300"
-          }`}
-        style={listing.imageUrl ? { backgroundImage: `url(${JSON.stringify(listing.imageUrl)})` } : undefined}
-      >
-        {!listing.imageUrl && (
-          <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5Z" />
-            <path d="M9 21v-7h6v7" />
-            <path d="M7 11h2M15 11h2" />
-          </svg>
-        )}
+      <div className="flex w-24 shrink-0 self-stretch flex-col sm:w-28">
+        <div
+          className={`flex aspect-[4/3] w-full items-center justify-center rounded-lg bg-gray-100 ${listing.imageUrl
+            ? "bg-cover bg-center"
+            : "text-gray-300"
+            }`}
+          style={listing.imageUrl ? { backgroundImage: `url(${JSON.stringify(listing.imageUrl)})` } : undefined}
+        >
+          {!listing.imageUrl && (
+            <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5Z" />
+              <path d="M9 21v-7h6v7" />
+              <path d="M7 11h2M15 11h2" />
+            </svg>
+          )}
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center pt-2 text-center leading-tight">
+          <p className="text-base font-bold tracking-tight text-gray-900">{formatPrice(listing.price)}</p>
+          <p className="mt-0.5 text-xs text-gray-400">{formatPrice(listing.pricePerM2)}/m²</p>
+        </div>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h4 className="truncate text-sm font-semibold text-gray-900">{listing.title}</h4>
-            <p className="mt-0.5 text-xs text-gray-400">{listing.meta}</p>
-          </div>
-          <div className="shrink-0 text-right">
-            <p className="text-sm font-bold text-gray-900">{formatPrice(listing.price)}</p>
-            <p className="text-xs text-gray-400">{formatPrice(listing.pricePerM2)}/m²</p>
-          </div>
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-semibold text-gray-900">{listing.title}</h4>
+          {metaParts.length > 0 && (
+            <p className="mt-0.5 text-xs text-gray-400">
+              {metaParts.map((part, index) => (
+                <span key={`${part}-${index}`} className="block">
+                  {part}
+                </span>
+              ))}
+            </p>
+          )}
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {listing.tags.map((tag) => (
@@ -315,7 +472,7 @@ function ListingsPreviewCard({ listing }) {
   );
 }
 
-function RelevantListingsPreview({ t, count, listings, onViewAll }) {
+function RelevantListingsPreview({ t, count, listings, onViewAll, sidebar = false }) {
   return (
     <section className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
       <div className="p-6 sm:p-8 border-b border-gray-100">
@@ -338,7 +495,7 @@ function RelevantListingsPreview({ t, count, listings, onViewAll }) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+      <div className={`flex flex-col gap-3 p-5 sm:p-6 ${sidebar ? "" : "sm:flex-row sm:items-center sm:justify-between"}`}>
         <p className="text-sm text-gray-500">{t("result.listingsPreviewNote")}</p>
         <button
           type="button"
@@ -591,7 +748,7 @@ function ListingsFilterView({
   );
 }
 
-export default function EstimateResult({ data, onReset, onCompare, onClose, onListingsModeChange }) {
+export default function EstimateResult({ data, onReset, onCompare, onClose, onListingsModeChange, compactLayout = false }) {
   const {
     estimate,
     range,
@@ -846,6 +1003,27 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     .map((listing) => normalizeRelevantListing(listing, t, lang))
     .filter(Boolean)
     .slice(0, 3);
+  const resultLayoutClassName = compactLayout
+    ? "animate-fade-in flex flex-col gap-5"
+    : "animate-fade-in flex flex-col gap-5 lg:gap-6";
+  const analysisLayoutClassName = compactLayout
+    ? "flex flex-col gap-5"
+    : "flex flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] lg:items-start lg:gap-6";
+  const analysisColumnClassName = compactLayout
+    ? "flex flex-col gap-5"
+    : "flex flex-col gap-5";
+  const supportColumnClassName = compactLayout
+    ? "flex flex-col gap-5"
+    : "flex flex-col gap-5";
+  const actionGridClassName = compactLayout
+    ? "grid grid-cols-2 gap-3"
+    : "grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-1";
+  const actionButtonClassName = compactLayout
+    ? "py-5 rounded-2xl text-base"
+    : "px-3 py-4 rounded-2xl text-sm min-[360px]:whitespace-nowrap lg:py-4";
+  const actionIconClassName = compactLayout
+    ? "w-5 h-5"
+    : "h-4 w-4 shrink-0";
 
   const authModal =
     isAuthModalOpen && typeof document !== "undefined"
@@ -899,11 +1077,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   }
 
   return (
-    <div className="animate-fade-in space-y-5">
+    <div className={resultLayoutClassName}>
       {authModal}
 
       {/* Property summary header */}
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
+      <div className={`${compactLayout ? "" : "order-1"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
             <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -948,53 +1126,58 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 )}
               </div>
             </div>
-            <h2 className="text-xl font-bold text-gray-900 leading-snug">
-              {t("result.apartment")} {roomsLabel} · {input.area_m2}m²
-            </h2>
-            <p className="text-base text-gray-500 mt-1">
-              {input.district && `${t(`data.district.${input.district}`)}, `}{t(`data.city.${input.city}`)}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {input.building_type && (
-                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                  {t(`data.buildingType.${input.building_type}`)}
-                </span>
-              )}
-              {input.renovation && (
-                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                  {t(`data.renovationType.${input.renovation}`)}
-                </span>
-              )}
-              {floorLabel && (
-                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                  {floorLabel}
-                </span>
-              )}
-              {input.bathrooms_count != null && (
-                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                  {input.bathrooms_count === 0
-                    ? t("result.noBathroom")
-                    : input.bathrooms_count === 1
-                      ? t("result.oneBathroom")
-                      : t("result.bathrooms", { count: input.bathrooms_count })}
-                </span>
-              )}
-              {input.balconies_count != null && (
-                <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                  {input.balconies_count === 0
-                    ? t("result.noBalcony")
-                    : input.balconies_count === 1
-                      ? t("result.oneBalcony")
-                      : t("result.balconies", { count: input.balconies_count })}
-                </span>
-              )}
+            <div className={`mt-4 -ml-16 w-[calc(100%+4rem)] ${compactLayout ? "lg:ml-0 lg:w-auto" : "lg:mt-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-0"}`}>
+              <div className={`min-w-0 ${compactLayout ? "" : "lg:pl-16 lg:pr-6"}`}>
+                <h2 className="text-xl font-bold text-gray-900 leading-snug">
+                  {t("result.apartment")} {roomsLabel} · {input.area_m2}m²
+                </h2>
+                <p className="text-base text-gray-500 mt-1">
+                  {input.district && `${t(`data.district.${input.district}`)}, `}{t(`data.city.${input.city}`)}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {input.building_type && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                      {t(`data.buildingType.${input.building_type}`)}
+                    </span>
+                  )}
+                  {input.renovation && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                      {t(`data.renovationType.${input.renovation}`)}
+                    </span>
+                  )}
+                  {floorLabel && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                      {floorLabel}
+                    </span>
+                  )}
+                  {input.bathrooms_count != null && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                      {input.bathrooms_count === 0
+                        ? t("result.noBathroom")
+                        : input.bathrooms_count === 1
+                          ? t("result.oneBathroom")
+                          : t("result.bathrooms", { count: input.bathrooms_count })}
+                    </span>
+                  )}
+                  {input.balconies_count != null && (
+                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                      {input.balconies_count === 0
+                        ? t("result.noBalcony")
+                        : input.balconies_count === 1
+                          ? t("result.oneBalcony")
+                          : t("result.balconies", { count: input.balconies_count })}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <MarketTrendMiniChart trend={data.market_trend} compact={compactLayout} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Main estimate */}
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+      <div className={`${compactLayout ? "" : "order-2"} rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden`}>
         <div className="p-6 sm:p-8 text-center border-b border-gray-100">
           <p className="text-base text-gray-400 mb-2">{t("result.estimatedPrice")}</p>
           <p className="text-6xl font-bold tracking-tight text-gray-900">
@@ -1050,14 +1233,17 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       </div>
 
       {!isPaid && (
-        <p className="text-sm text-gray-600 px-1">
+        <p className={`${compactLayout ? "" : "order-3"} text-sm text-gray-600 px-1`}>
           {t("result.freeTierUncertaintyLine")}
         </p>
       )}
 
+      <div className={`${analysisLayoutClassName} ${compactLayout ? "" : "order-4"}`}>
+        <div className={analysisColumnClassName}>
+
       {/* Seller category breakdown */}
       {(data.estimates_by_seller?.individual || data.estimates_by_seller?.agency) && (
-        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+        <div className={`${compactLayout ? "" : "order-3"} rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden`}>
           <div className="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
             <div>
               <h3 className="text-sm font-semibold text-gray-900">{t("result.sellerBreakdown")}</h3>
@@ -1128,7 +1314,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       )}
 
       {cadastral && !cadastral.partial && (
-        <div className="rounded-2xl border-2 border-emerald-200 bg-white shadow-md overflow-hidden">
+        <div className={`${compactLayout ? "" : "order-6"} rounded-2xl border-2 border-emerald-200 bg-white shadow-md overflow-hidden`}>
           <div className="bg-emerald-700 px-6 py-4 flex items-center gap-2.5">
             <svg viewBox="0 0 16 16" fill="currentColor" className="w-6 h-6 shrink-0 text-white">
               <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
@@ -1234,7 +1420,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       )}
 
       {cadastral?.partial && (
-        <div className="rounded-2xl border border-sky-200 bg-sky-50 shadow-sm p-6 sm:p-8">
+        <div className={`${compactLayout ? "" : "order-6"} rounded-2xl border border-sky-200 bg-sky-50 shadow-sm p-6 sm:p-8`}>
           <p className="text-sm font-medium text-sky-700 flex items-center gap-1.5 mb-1.5">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4 shrink-0">
               <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
@@ -1249,7 +1435,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       )}
 
       {/* Price position on range */}
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
+      <div className={`${compactLayout ? "" : "order-2"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
         <h3 className="text-base font-semibold text-gray-900 mb-1">
           {t("result.marketPosition")}
         </h3>
@@ -1299,7 +1485,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       </div>
 
       {/* How we calculated */}
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
+      <div className={`${compactLayout ? "" : "order-1"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
         <h3 className="text-base font-semibold text-gray-900 mb-1">
           {t("result.howWeAnalyzed")}
         </h3>
@@ -1448,10 +1634,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         area={input.area_m2}
         blurValues={hideDistrictComparisonValues}
         onLockedClick={openAuthModal}
+        className={compactLayout ? "" : "order-4"}
       />
 
       {/* Market stats */}
-      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8">
+      <div className={`${compactLayout ? "" : "order-5"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
         <h3 className="text-base font-semibold text-gray-900 mb-4">
           {t("result.marketStats")}
         </h3>
@@ -1493,22 +1680,26 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         </div>
       </div>
 
+        </div>
+        <aside className={supportColumnClassName}>
+
       <RelevantListingsPreview
         t={t}
         count={listingsCount}
         listings={listingPreviewItems}
         onViewAll={() => setListingsMode(true)}
+        sidebar={!compactLayout}
       />
 
       {/* Actions */}
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className={actionGridClassName}>
           <button
             type="button"
             onClick={onReset}
-            className="py-5 rounded-2xl text-base font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+            className={`${actionButtonClassName} font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2`}
           >
-            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
@@ -1517,11 +1708,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
           <button
             type="button"
             onClick={handleShare}
-            className="py-5 rounded-2xl text-base font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2"
+            className={`${actionButtonClassName} font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2`}
           >
             {sharing ? (
               <>
-                <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <svg className={`${actionIconClassName} animate-spin`} viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
                   <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                 </svg>
@@ -1529,14 +1720,14 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               </>
             ) : copied ? (
               <>
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
                 {t("result.linkCopied")}
               </>
             ) : (
               <>
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                   <polyline points="16 6 12 2 8 6" />
                   <line x1="12" y1="2" x2="12" y2="15" />
@@ -1549,9 +1740,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         <button
           type="button"
           onClick={onCompare}
-          className="w-full py-5 rounded-2xl text-base font-semibold border border-primary/50 text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2"
+          className={`w-full ${actionButtonClassName} font-semibold border border-primary/50 text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2`}
         >
-          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="18" cy="18" r="3" />
             <circle cx="6" cy="6" r="3" />
             <path d="M13 6h3a2 2 0 0 1 2 2v7" />
@@ -1559,6 +1750,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
           </svg>
           {t("result.compare")}
         </button>
+      </div>
+        </aside>
       </div>
     </div>
   );

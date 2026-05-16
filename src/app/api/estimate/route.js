@@ -287,6 +287,8 @@ async function fetchRelevantListings(payload) {
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const TRACKING_SALT = process.env.TRACKING_SALT || "catdai-default-salt";
+const MARKET_TREND_DAYS = 30;
+const MIN_MARKET_TREND_POINTS = 2;
 
 function hashIp(ip) {
   return crypto.createHash("sha256").update(ip + TRACKING_SALT).digest("hex").slice(0, 16);
@@ -330,6 +332,115 @@ function computeMarketMarkerPct(payload) {
   if (!Number.isFinite(span) || span <= 0) return 50;
 
   return clamp(((marketRate - rangeMin) / span) * 100, 2, 98);
+}
+
+async function fetchDailySnapshotRows({ district, buildingType, since }) {
+  if (!buildingType) return [];
+
+  let query = supabaseAdmin
+    .from("daily_price_snapshot")
+    .select("snapshot_date, district, building_type, median_ppm, listing_count")
+    .eq("building_type", buildingType)
+    .gte("snapshot_date", since)
+    .order("snapshot_date", { ascending: true });
+
+  query = district ? query.eq("district", district) : query.is("district", null);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+function buildMarketTrendPayload(pointsInput, { scope, district, buildingType, metric, listingCount }) {
+  const points = pointsInput
+    .map((point) => {
+      const value = Number(point.value);
+
+      if (!point.date || !Number.isFinite(value) || value <= 0) return null;
+
+      return {
+        date: point.date,
+        value: Math.round(value),
+      };
+    })
+    .filter(Boolean);
+
+  if (points.length < MIN_MARKET_TREND_POINTS) return null;
+
+  const first = points[0];
+  const last = points[points.length - 1];
+  const changePct = ((last.value - first.value) / first.value) * 100;
+
+  return {
+    scope,
+    district,
+    building_type: buildingType,
+    period_days: MARKET_TREND_DAYS,
+    metric,
+    start_date: first.date,
+    end_date: last.date,
+    start_value: first.value,
+    end_value: last.value,
+    change_pct: Math.round(changePct * 10) / 10,
+    listing_count: listingCount,
+    points,
+  };
+}
+
+function buildSnapshotTrend(rows, { scope, district, buildingType }) {
+  const points = rows.map((row) => ({
+    date: row.snapshot_date,
+    value: row.median_ppm,
+  }));
+
+  const lastCount = Number(rows[rows.length - 1]?.listing_count);
+
+  return buildMarketTrendPayload(points, {
+    scope,
+    district,
+    buildingType,
+    metric: "median_price_per_m2",
+    listingCount: Number.isFinite(lastCount) ? lastCount : null,
+  });
+}
+
+async function fetchMarketTrend(input) {
+  if (!input?.building_type) return null;
+
+  const since = new Date(Date.now() - MARKET_TREND_DAYS * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
+  try {
+    if (input.district) {
+      const rows = await fetchDailySnapshotRows({
+        district: input.district,
+        buildingType: input.building_type,
+        since,
+      });
+      const trend = buildSnapshotTrend(rows, {
+        scope: "district",
+        district: input.district,
+        buildingType: input.building_type,
+      });
+      if (trend) return trend;
+    }
+
+    const fallbackRows = await fetchDailySnapshotRows({
+      district: null,
+      buildingType: input.building_type,
+      since,
+    });
+
+    return buildSnapshotTrend(fallbackRows, {
+      scope: "city",
+      district: null,
+      buildingType: input.building_type,
+    });
+  } catch (error) {
+    console.error("Market trend fetch failed:", error.message);
+    return null;
+  }
 }
 
 function buildDistrictComparisonPreview(items) {
@@ -515,6 +626,7 @@ export async function POST(request) {
   data.market_position = {
     marker_pct: computeMarketMarkerPct(data),
   };
+  data.market_trend = await fetchMarketTrend(data.input);
 
   data.estimates_by_seller = {
     individual: individualData

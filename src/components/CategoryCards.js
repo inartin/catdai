@@ -77,6 +77,69 @@ function LivePriceBadge({ t, priceData }) {
   );
 }
 
+function LivePricePanel({ t, priceData }) {
+  const cn = priceData?.constructii_noi?.median_ppm;
+  const sec = priceData?.secundar?.median_ppm;
+  const trend = priceData?.trend;
+  const total = priceData?.total_active;
+
+  return (
+    <div className="flex h-full flex-col justify-between gap-5 p-6">
+      <div>
+        <div className="flex items-center gap-2">
+          <span className="relative inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+            <span
+              className="absolute h-1.5 w-1.5 rounded-full"
+              style={{
+                backgroundColor: "#22c55e",
+                boxShadow: "0 0 6px 2px rgba(34, 197, 94, 0.45), 0 0 12px 4px rgba(34, 197, 94, 0.18)",
+                animation: "live-glow 2s ease-in-out infinite",
+              }}
+            />
+          </span>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">
+            {t("categories.livePrices")}
+          </span>
+        </div>
+        <div className="mt-1 text-xs font-medium text-gray-500">
+          Chișinău · {t("categories.today")}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-baseline justify-between gap-4 border-b border-gray-100 pb-3">
+          <span className="text-sm font-medium text-gray-600">{t("categories.newConstruction")}</span>
+          <span className="text-2xl font-bold tabular-nums text-gray-950">
+            €{cn ?? "—"}
+            <span className="ml-1 text-xs font-semibold text-gray-500">/m²</span>
+            {trend && (
+              <span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} ml-1 text-sm`}>
+                {TREND_ARROWS[trend.direction] || "→"}
+              </span>
+            )}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm font-medium text-gray-600">{t("categories.secondary")}</span>
+          <span className="text-2xl font-bold tabular-nums text-gray-950">
+            €{sec ?? "—"}
+            <span className="ml-1 text-xs font-semibold text-gray-500">/m²</span>
+            {trend && (
+              <span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} ml-1 text-sm`}>
+                {TREND_ARROWS[trend.direction] || "→"}
+              </span>
+            )}
+          </span>
+        </div>
+      </div>
+
+      <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+        {formatListings(total)} {t("categories.listingsAnalyzed")}
+      </div>
+    </div>
+  );
+}
+
 export default function CategoryCards({ onCategorySelect }) {
   const { t } = useTranslation();
   const { data: priceData } = useLivePrices();
@@ -95,6 +158,7 @@ export default function CategoryCards({ onCategorySelect }) {
       backgroundImage: "/images/cd-auto.webp",
       iconBg: "bg-red-500",
       disabled: true,
+      showOnLanding: false,
       icon: (
         <svg
           viewBox="0 0 24 24"
@@ -120,6 +184,7 @@ export default function CategoryCards({ onCategorySelect }) {
       iconBg: "bg-green-600",
       disabled: false,
       highlighted: true,
+      showOnLanding: true,
       icon: (
         <svg
           viewBox="0 0 24 24"
@@ -140,9 +205,10 @@ export default function CategoryCards({ onCategorySelect }) {
       name: t("categories.electronics"),
       cta: t("categories.electronicsAnalysis"),
       gradient: "from-blue-200 to-indigo-300",
-      backgroundImage: "/images/CD-electronics.webp",
+      backgroundImage: "/images/cd-electronics.webp",
       iconBg: "bg-amber-500",
       disabled: true,
+      showOnLanding: false,
       icon: (
         <svg
           viewBox="0 0 24 24"
@@ -160,14 +226,16 @@ export default function CategoryCards({ onCategorySelect }) {
     },
   ];
 
+  const visibleCategories = categories.filter((cat) => cat.showOnLanding !== false);
+
   return (
     <section className="pb-8 px-4">
-      <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
-        {categories.map((cat) => {
+      <div className="max-w-4xl mx-auto grid grid-cols-1 gap-6">
+        {visibleCategories.map((cat) => {
           const isActive = !cat.disabled;
 
           return (
-            <div key={cat.id} className={`group/card w-full h-full min-w-0 ${cat.highlighted ? "z-10 sm:scale-110 -order-1 sm:order-none" : ""}`}>
+            <div key={cat.id} className="group/card w-full min-w-0">
               <button
                 type="button"
                 disabled={cat.disabled}
@@ -177,9 +245,9 @@ export default function CategoryCards({ onCategorySelect }) {
                   onCategorySelect?.(cat.id);
                 }}
                 className={`relative w-full h-full rounded-2xl overflow-hidden bg-white border border-gray-100 text-left transition-all duration-200 ${cat.highlighted
-                  ? "shadow-lg hover:shadow-xl hover:-translate-y-1 cursor-pointer"
+                  ? "shadow-lg hover:shadow-xl hover:-translate-y-1 cursor-default md:hidden"
                   : isActive
-                    ? "shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
+                    ? "shadow-md hover:shadow-lg hover:-translate-y-0.5 cursor-default"
                     : "cursor-default"
                   }`}
               >
@@ -210,7 +278,7 @@ export default function CategoryCards({ onCategorySelect }) {
 
                     <span
                       className={`inline-flex items-center gap-1.5 font-medium text-sm ${isActive
-                        ? "text-primary"
+                        ? "text-primary cursor-pointer"
                         : "text-gray-400"
                         }`}
                     >
@@ -220,6 +288,45 @@ export default function CategoryCards({ onCategorySelect }) {
                   </div>
                 </div>
               </button>
+
+              {cat.id === "imobil" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackSubmitLeadForm();
+                    onCategorySelect?.(cat.id);
+                  }}
+                  className="hidden w-full overflow-hidden rounded-2xl border border-emerald-100 bg-white text-left shadow-lg transition-all duration-200 hover:-translate-y-1 hover:shadow-xl cursor-default md:grid md:min-h-72 md:grid-cols-[minmax(0,1fr)_18rem_minmax(0,1fr)]"
+                >
+                  <LivePricePanel t={t} priceData={priceData} />
+
+                  <div className="flex items-center justify-center bg-emerald-50/70 px-4 py-6">
+                    <div
+                      className="h-52 w-full rounded-xl bg-cover bg-center bg-no-repeat shadow-inner"
+                      style={{ backgroundImage: `url(${cat.backgroundImage})` }}
+                    />
+                  </div>
+
+                  <div className="flex h-full flex-col justify-between gap-6 p-6">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${cat.iconBg}`}>
+                          {cat.icon}
+                        </span>
+                        <span className="text-xl font-bold text-gray-950">{cat.name}</span>
+                      </div>
+                      <p className="mt-4 max-w-52 text-sm leading-6 text-gray-600">
+                        {t("howItWorks.independentData")}
+                      </p>
+                    </div>
+
+                    <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors group-hover/card:bg-primary-dark cursor-pointer">
+                      {cat.cta}
+                      <ArrowRight size={16} className="translate-y-[-1px]" />
+                    </span>
+                  </div>
+                </button>
+              )}
             </div>
           );
         })}

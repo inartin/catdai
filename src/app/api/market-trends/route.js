@@ -5,10 +5,20 @@ export const dynamic = "force-dynamic";
 
 const MARKET_TREND_DAYS = 60;
 const MIN_MARKET_TREND_POINTS = 2;
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=0, s-maxage=43200, stale-while-revalidate=86400",
+};
 const BUILDING_TYPES = [
   { key: "constructii_noi", value: "Construcţii noi" },
   { key: "secundar", value: "Secundar" },
 ];
+
+let cache = null;
+
+function isCacheFresh(cachedAt) {
+  return cachedAt && Date.now() - cachedAt < CACHE_TTL_MS;
+}
 
 function getSinceDate() {
   return new Date(Date.now() - MARKET_TREND_DAYS * 24 * 60 * 60 * 1000)
@@ -53,6 +63,10 @@ function buildTrendPayload(rows, buildingType) {
 }
 
 export async function GET() {
+  if (cache && isCacheFresh(cache.cached_at)) {
+    return NextResponse.json(cache.data, { headers: CACHE_HEADERS });
+  }
+
   try {
     const since = getSinceDate();
     const { data, error } = await supabaseAdmin
@@ -79,17 +93,25 @@ export async function GET() {
       if (!row.snapshot_date) return latest;
       return !latest || row.snapshot_date > latest ? row.snapshot_date : latest;
     }, null);
+    const payload = {
+      period_days: MARKET_TREND_DAYS,
+      updated_at: latestDate ? `${latestDate}T00:00:00.000Z` : new Date().toISOString(),
+      trends,
+    };
 
-    return NextResponse.json(
-      {
-        period_days: MARKET_TREND_DAYS,
-        updated_at: latestDate ? `${latestDate}T00:00:00.000Z` : new Date().toISOString(),
-        trends,
-      },
-      { headers: { "Cache-Control": "no-store, max-age=0" } }
-    );
+    cache = {
+      cached_at: Date.now(),
+      data: payload,
+    };
+
+    return NextResponse.json(payload, { headers: CACHE_HEADERS });
   } catch (error) {
     console.error("Failed to fetch market trends:", error.message);
+
+    if (cache) {
+      return NextResponse.json(cache.data, { headers: CACHE_HEADERS });
+    }
+
     return NextResponse.json(
       { error: "Market trend data unavailable" },
       { status: 502 }

@@ -504,12 +504,7 @@ export default function CategoryCards({ onCategorySelect }) {
               </button>
 
               {cat.id === "imobil" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    trackSubmitLeadForm();
-                    onCategorySelect?.(cat.id);
-                  }}
+                <div
                   className="hidden w-full overflow-hidden rounded-2xl border border-emerald-100 bg-white text-left shadow-lg transition-all duration-200 hover:-translate-y-1 hover:shadow-xl cursor-default md:grid md:min-h-72 md:grid-cols-[minmax(0,1fr)_18rem_minmax(0,1fr)]"
                 >
                   <LivePricePanel t={t} priceData={priceData} />
@@ -523,10 +518,17 @@ export default function CategoryCards({ onCategorySelect }) {
                         Chișinău · {t("categories.today")}
                       </span>
                     </div>
-                    <span className="inline-flex w-fit items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors group-hover/card:bg-primary-dark cursor-pointer">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        trackSubmitLeadForm();
+                        onCategorySelect?.(cat.id);
+                      }}
+                      className="inline-flex w-fit items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-dark cursor-pointer"
+                    >
                       {cat.cta}
                       <ArrowRight size={16} className="translate-y-[-1px]" />
-                    </span>
+                    </button>
                   </div>
 
                   <div className="flex h-full flex-col p-6">
@@ -534,7 +536,7 @@ export default function CategoryCards({ onCategorySelect }) {
                       <LandingTrendCharts t={t} lang={lang} trendData={trendData} />
                     </div>
                   </div>
-                </button>
+                </div>
               )}
             </div>
           );

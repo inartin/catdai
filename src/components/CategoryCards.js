@@ -519,7 +519,7 @@ export default function CategoryCards({ onCategorySelect }) {
                       className="relative h-52 w-full rounded-xl bg-cover bg-center bg-no-repeat shadow-inner"
                       style={{ backgroundImage: `url(${cat.backgroundImage})` }}
                     >
-                      <span className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm backdrop-blur">
+                      <span className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-white/35 bg-black/18 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-[2px] [text-shadow:0_1px_2px_rgba(0,0,0,0.45)]">
                         Chișinău · {t("categories.today")}
                       </span>
                     </div>

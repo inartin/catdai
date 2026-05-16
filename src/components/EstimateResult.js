@@ -147,7 +147,7 @@ function MarketTrendMiniChart({ trend, compact = false }) {
 
       <div className="mt-2 flex items-center gap-2">
         <p className="text-lg font-bold leading-none text-gray-900">
-            {formatPrice(endValue)}/m²
+          {formatPrice(endValue)}/m²
         </p>
         <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${toneClass}`}>
           {formatTrendPercent(changePct)}
@@ -651,21 +651,36 @@ function ListingsFilterView({
                 <FilterInput
                   label={t("result.floorFrom")}
                   value={filters.floorMin}
-                  placeholder="2"
+                  placeholder="1"
                   onChange={(value) => onFilterChange("floorMin", value)}
                 />
                 <FilterInput
                   label={t("result.floorTo")}
                   value={filters.floorMax}
-                  placeholder="8"
+                  placeholder="25"
                   onChange={(value) => onFilterChange("floorMax", value)}
                 />
               </div>
 
+              <div className="grid gap-2 sm:grid-cols-2">
+                <CheckboxOption
+                  checked={filters.firstFloor}
+                  onChange={(value) => onFilterChange("firstFloor", value)}
+                >
+                  {t("result.floorOption.first")}
+                </CheckboxOption>
+                <CheckboxOption
+                  checked={filters.lastFloor}
+                  onChange={(value) => onFilterChange("lastFloor", value)}
+                >
+                  {t("result.floorOption.last")}
+                </CheckboxOption>
+              </div>
+
               <div>
                 <p className="mb-3 text-sm font-semibold text-gray-900">{t("result.sellerTypeFilter")}</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {["all", "owner", "agency"].map((option) => (
+                <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                  {["all", "owner", "agency", "developer"].map((option) => (
                     <SegmentedOption
                       key={option}
                       active={filters.sellerType === option}
@@ -675,36 +690,6 @@ function ListingsFilterView({
                     </SegmentedOption>
                   ))}
                 </div>
-              </div>
-
-              <div>
-                <p className="mb-3 text-sm font-semibold text-gray-900">{t("result.publishedFilter")}</p>
-                <div className="grid gap-2 sm:grid-cols-3">
-                  {["any", "3d", "7d"].map((option) => (
-                    <SegmentedOption
-                      key={option}
-                      active={filters.published === option}
-                      onClick={() => onFilterChange("published", option)}
-                    >
-                      {t(`result.published.${option}`)}
-                    </SegmentedOption>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                <CheckboxOption
-                  checked={filters.activeOnly}
-                  onChange={(value) => onFilterChange("activeOnly", value)}
-                >
-                  {t("result.activeOnly")}
-                </CheckboxOption>
-                <CheckboxOption
-                  checked={filters.withPhotos}
-                  onChange={(value) => onFilterChange("withPhotos", value)}
-                >
-                  {t("result.withPhotos")}
-                </CheckboxOption>
               </div>
             </div>
           </section>
@@ -738,10 +723,6 @@ function ListingsFilterView({
             </button>
           </section>
 
-          <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-gray-900">{t("result.noListingsShownTitle")}</p>
-            <p className="mt-1 text-sm text-gray-400">{t("result.noListingsShownDesc")}</p>
-          </section>
         </aside>
       </div>
     </div>
@@ -774,10 +755,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     maxPricePerM2: "",
     floorMin: "",
     floorMax: "",
+    firstFloor: false,
+    lastFloor: false,
     sellerType: "all",
-    published: "any",
-    activeOnly: true,
-    withPhotos: true,
   });
   const favoriteChecked = useRef(false);
   const { t, lang } = useTranslation();
@@ -1241,516 +1221,516 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       <div className={`${analysisLayoutClassName} ${compactLayout ? "" : "order-4"}`}>
         <div className={analysisColumnClassName}>
 
-      {/* Seller category breakdown */}
-      {(data.estimates_by_seller?.individual || data.estimates_by_seller?.agency) && (
-        <div className={`${compactLayout ? "" : "order-3"} rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden`}>
-          <div className="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900">{t("result.sellerBreakdown")}</h3>
-              <p className="text-xs text-gray-500 mt-0.5">{t("result.sellerBreakdownDesc")}</p>
-            </div>
-            {indRate && agRate && (
-              <div className="flex flex-wrap items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
-                <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{t("result.sellerDifference")}</span>
-                {hideSellerBreakdownValues ? (
-                  <LockedValue onClick={openAuthModal} text="+€99.999 (+9.9%)" className="text-gray-700" />
-                ) : (
-                  <span className={`text-sm font-bold ${sellerDelta > 0 ? "text-amber-600" : sellerDelta < 0 ? "text-emerald-600" : "text-gray-900"}`}>
-                    {sellerDelta > 0 ? "+" : ""}€{Math.abs(sellerDelta).toLocaleString("ro-MD")} ({sellerDelta > 0 ? "+" : ""}{sellerDeltaPct.toFixed(1)}%)
-                  </span>
+          {/* Seller category breakdown */}
+          {(data.estimates_by_seller?.individual || data.estimates_by_seller?.agency) && (
+            <div className={`${compactLayout ? "" : "order-3"} rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden`}>
+              <div className="p-4 sm:p-5 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">{t("result.sellerBreakdown")}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">{t("result.sellerBreakdownDesc")}</p>
+                </div>
+                {indRate && agRate && (
+                  <div className="flex flex-wrap items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
+                    <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{t("result.sellerDifference")}</span>
+                    {hideSellerBreakdownValues ? (
+                      <LockedValue onClick={openAuthModal} text="+€99.999 (+9.9%)" className="text-gray-700" />
+                    ) : (
+                      <span className={`text-sm font-bold ${sellerDelta > 0 ? "text-amber-600" : sellerDelta < 0 ? "text-emerald-600" : "text-gray-900"}`}>
+                        {sellerDelta > 0 ? "+" : ""}€{Math.abs(sellerDelta).toLocaleString("ro-MD")} ({sellerDelta > 0 ? "+" : ""}{sellerDeltaPct.toFixed(1)}%)
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
+              <div className="grid grid-cols-2 divide-x divide-gray-100">
+                <div className="p-4 sm:p-5 text-center">
+                  <p className="text-sm text-gray-500 mb-1 font-medium">{t("result.sellerIndividual")}</p>
+                  {data.estimates_by_seller.individual?.estimate?.market_rate ? (
+                    <>
+                      <p className="text-xl font-bold text-gray-900">
+                        {hideSellerBreakdownValues ? (
+                          <LockedValue onClick={openAuthModal} text="€999.999" className="text-gray-900" />
+                        ) : (
+                          formatPrice(data.estimates_by_seller.individual.estimate.market_rate)
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {hideSellerBreakdownValues ? (
+                          <LockedValue onClick={openAuthModal} text="€9.999/m²" className="text-gray-400" />
+                        ) : (
+                          `${formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²`
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic py-2 mt-1">{t("result.noData")}</p>
+                  )}
+                </div>
+                <div className="p-4 sm:p-5 text-center">
+                  <p className="text-sm text-gray-500 mb-1 font-medium">{t("result.sellerAgency")}</p>
+                  {data.estimates_by_seller.agency?.estimate?.market_rate ? (
+                    <>
+                      <p className="text-xl font-bold text-gray-900">
+                        {hideSellerBreakdownValues ? (
+                          <LockedValue onClick={openAuthModal} text="€999.999" className="text-gray-900" />
+                        ) : (
+                          formatPrice(data.estimates_by_seller.agency.estimate.market_rate)
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {hideSellerBreakdownValues ? (
+                          <LockedValue onClick={openAuthModal} text="€9.999/m²" className="text-gray-400" />
+                        ) : (
+                          `${formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²`
+                        )}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic py-2 mt-1">{t("result.noData")}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {cadastral && !cadastral.partial && (
+            <div className={`${compactLayout ? "" : "order-6"} rounded-2xl border-2 border-emerald-200 bg-white shadow-md overflow-hidden`}>
+              <div className="bg-emerald-700 px-6 py-4 flex items-center gap-2.5">
+                <svg viewBox="0 0 16 16" fill="currentColor" className="w-6 h-6 shrink-0 text-white">
+                  <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
+                </svg>
+                <span className="text-xl font-semibold text-white">{t("result.cadastralDataTitle")}</span>
+              </div>
+
+              <div className="p-6 sm:p-8 space-y-5">
+                {(cadastral.apartment?.address || cadastral.building?.address) && (
+                  <p className="text-base text-gray-600">
+                    {cadastral.apartment?.address || cadastral.building?.address}
+                  </p>
+                )}
+
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700 mb-2.5">{t("form.cadastralApartment")}</p>
+                  <div className="space-y-2.5">
+                    {cadastral.apartment?.area_m2 && (
+                      <div className="flex justify-between text-base">
+                        <span className="text-gray-500">{t("form.cadastralArea")}</span>
+                        <span className="font-medium text-gray-900">{cadastral.apartment.area_m2} m²</span>
+                      </div>
+                    )}
+                    {cadastral.apartment?.floor && (
+                      <div className="flex justify-between text-base">
+                        <span className="text-gray-500">{t("form.cadastralFloor")}</span>
+                        <span className="font-medium text-gray-900">
+                          {cadastral.building?.total_floors
+                            ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
+                            : cadastral.apartment.floor}
+                        </span>
+                      </div>
+                    )}
+                    {hideCadastralDetails ? (
+                      <div className="flex justify-between text-base">
+                        <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
+                        <LockedValue onClick={openAuthModal} text="999999 lei" className="font-medium" />
+                      </div>
+                    ) : (
+                      cadastral.apartment?.estimated_value_lei && (
+                        <div className="flex justify-between text-base">
+                          <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
+                          <span className="font-medium text-gray-900">{cadastral.apartment.estimated_value_lei} lei</span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                <div className="border-t border-emerald-100" />
+
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700 mb-2.5">{t("form.cadastralBuilding")}</p>
+                  <div className="space-y-2.5">
+                    {hideCadastralDetails ? (
+                      <>
+                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><LockedValue onClick={openAuthModal} text="9999" className="font-medium" /></div>
+                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
+                      </>
+                    ) : (
+                      <>
+                        {cadastral.building?.classifier && (
+                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><span className="font-medium text-gray-900">{cadastral.building.classifier}</span></div>
+                        )}
+                        {cadastral.building?.condition && (
+                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><span className="font-medium text-gray-900">{cadastral.building.condition}</span></div>
+                        )}
+                        {cadastral.building?.construction_year && (
+                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><span className="font-medium text-gray-900">{cadastral.building.construction_year}</span></div>
+                        )}
+                        {cadastral.building?.wall_material && (
+                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><span className="font-medium text-gray-900">{cadastral.building.wall_material}</span></div>
+                        )}
+                        {cadastral.building?.water && (
+                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><span className="font-medium text-gray-900">{cadastral.building.water}</span></div>
+                        )}
+                        {cadastral.building?.sewage && (
+                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><span className="font-medium text-gray-900">{cadastral.building.sewage}</span></div>
+                        )}
+                        {cadastral.building?.gas && (
+                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><span className="font-medium text-gray-900">{cadastral.building.gas}</span></div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                    {t("result.cadastralDataSource")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {cadastral?.partial && (
+            <div className={`${compactLayout ? "" : "order-6"} rounded-2xl border border-sky-200 bg-sky-50 shadow-sm p-6 sm:p-8`}>
+              <p className="text-sm font-medium text-sky-700 flex items-center gap-1.5 mb-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4 shrink-0">
+                  <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
+                </svg>
+                {t("result.cadastralDataTitle")}
+              </p>
+              {cadastral.location?.display_name && (
+                <p className="text-sm text-sky-700">{cadastral.location.display_name}</p>
+              )}
+              <p className="text-xs text-sky-600 mt-3">{t("result.cadastralDataSource")}</p>
+            </div>
+          )}
+
+          {/* Price position on range */}
+          <div className={`${compactLayout ? "" : "order-2"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
+            <h3 className="text-base font-semibold text-gray-900 mb-1">
+              {t("result.marketPosition")}
+            </h3>
+            <p className="text-sm text-gray-400 mb-5">
+              {t("result.marketPositionDesc")}
+            </p>
+
+            <div className="relative pt-6 pb-1">
+              <div
+                className="absolute top-2 -translate-x-1/2 flex flex-col items-center"
+                style={{ left: `${markerPct}%` }}
+              >
+                <div className="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[9px] border-t-primary" />
+              </div>
+
+              <div className="h-3 bg-gray-100 rounded-full relative overflow-hidden">
+                <div
+                  className="absolute inset-y-0 bg-linear-to-r from-emerald-200 via-primary/30 to-amber-200 rounded-full"
+                  style={{ left: "10%", right: "10%" }}
+                />
+              </div>
+
+              <div className="flex justify-between mt-3">
+                <span className="text-xs text-gray-400">
+                  {hideMarketPositionNumbers ? (
+                    <LockedValue onClick={openAuthModal} text="€999.999" />
+                  ) : (
+                    formatPrice(range.low)
+                  )}
+                </span>
+                <span className="text-sm text-gray-500 font-medium">
+                  {hideMarketPositionNumbers ? (
+                    <LockedValue onClick={openAuthModal} text={t("result.median", { price: "€999.999" })} />
+                  ) : (
+                    t("result.median", { price: formatPrice(market_stats.median_price_per_m2) })
+                  )}
+                </span>
+                <span className="text-xs text-gray-400">
+                  {hideMarketPositionNumbers ? (
+                    <LockedValue onClick={openAuthModal} text="€999.999" />
+                  ) : (
+                    formatPrice(range.high)
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* How we calculated */}
+          <div className={`${compactLayout ? "" : "order-1"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
+            <h3 className="text-base font-semibold text-gray-900 mb-1">
+              {t("result.howWeAnalyzed")}
+            </h3>
+            <p className="text-sm text-gray-400 mb-4">
+              {t("result.howWeAnalyzedDesc")}
+            </p>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              <FilterBadge label={t(`data.city.${input.city}`)} active={true} />
+              {input.district && (
+                <FilterBadge
+                  label={t(`data.district.${input.district}`)}
+                  active={filters_used?.district !== false}
+                />
+              )}
+              {input.rooms_count && (
+                <FilterBadge
+                  label={
+                    input.rooms_count === 1
+                      ? t("result.oneRoomFilter")
+                      : t("result.roomsFilter", { count: input.rooms_count })
+                  }
+                  active={true}
+                />
+              )}
+              {input.building_type && (
+                <FilterBadge
+                  label={t(`data.buildingType.${input.building_type}`)}
+                  active={filters_used?.building_type !== false}
+                />
+              )}
+              {input.renovation && (
+                <FilterBadge
+                  label={t(`data.renovationType.${input.renovation}`)}
+                  active={filters_used?.renovation !== false}
+                />
+              )}
+              {input.area_m2 && (
+                <FilterBadge
+                  label={
+                    filters_used?.area !== false && filters_used?.area_tolerance
+                      ? `${Math.round(input.area_m2 * (1 - filters_used.area_tolerance))}–${Math.round(input.area_m2 * (1 + filters_used.area_tolerance))}m²`
+                      : `~${input.area_m2}m²`
+                  }
+                  active={filters_used?.area !== false}
+                />
+              )}
+              {input.floor && (
+                <FilterBadge
+                  label={
+                    input.floor === 1
+                      ? t("result.floorGround")
+                      : input.total_floors && input.floor === input.total_floors
+                        ? t("result.floorLast", { floor: input.floor })
+                        : t("result.floorRange", {
+                          from: Math.max(2, input.floor - 2),
+                          to: input.total_floors
+                            ? Math.min(input.total_floors - 1, input.floor + 2)
+                            : input.floor + 2,
+                        })
+                  }
+                  active={filters_used?.floor !== false}
+                />
+              )}
+            </div>
+
+            {feature_adjustments?.items?.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm text-gray-400 mb-2">{t("result.featureAdjustments")}</p>
+                <div className="flex flex-wrap gap-2">
+                  {feature_adjustments.items.map((item) => (
+                    <FeatureAdjustmentBadge key={item.type} item={item} />
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">
+                  {t("result.totalAdjustment")}{" "}
+                  <span className={feature_adjustments.total_pct > 0 ? "text-emerald-600 font-medium" : "text-red-500 font-medium"}>
+                    {feature_adjustments.total_pct > 0 ? "+" : ""}{feature_adjustments.total_pct}%
+                  </span>{" "}
+                  {t("result.vsComparables")}
+                </p>
+              </div>
             )}
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-gray-100">
-            <div className="p-4 sm:p-5 text-center">
-              <p className="text-sm text-gray-500 mb-1 font-medium">{t("result.sellerIndividual")}</p>
-              {data.estimates_by_seller.individual?.estimate?.market_rate ? (
-                <>
-                  <p className="text-xl font-bold text-gray-900">
-                    {hideSellerBreakdownValues ? (
-                      <LockedValue onClick={openAuthModal} text="€999.999" className="text-gray-900" />
-                    ) : (
-                      formatPrice(data.estimates_by_seller.individual.estimate.market_rate)
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {hideSellerBreakdownValues ? (
-                      <LockedValue onClick={openAuthModal} text="€9.999/m²" className="text-gray-400" />
-                    ) : (
-                      `${formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²`
-                    )}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-gray-400 italic py-2 mt-1">{t("result.noData")}</p>
-              )}
-            </div>
-            <div className="p-4 sm:p-5 text-center">
-              <p className="text-sm text-gray-500 mb-1 font-medium">{t("result.sellerAgency")}</p>
-              {data.estimates_by_seller.agency?.estimate?.market_rate ? (
-                <>
-                  <p className="text-xl font-bold text-gray-900">
-                    {hideSellerBreakdownValues ? (
-                      <LockedValue onClick={openAuthModal} text="€999.999" className="text-gray-900" />
-                    ) : (
-                      formatPrice(data.estimates_by_seller.agency.estimate.market_rate)
-                    )}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {hideSellerBreakdownValues ? (
-                      <LockedValue onClick={openAuthModal} text="€9.999/m²" className="text-gray-400" />
-                    ) : (
-                      `${formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²`
-                    )}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-gray-400 italic py-2 mt-1">{t("result.noData")}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {cadastral && !cadastral.partial && (
-        <div className={`${compactLayout ? "" : "order-6"} rounded-2xl border-2 border-emerald-200 bg-white shadow-md overflow-hidden`}>
-          <div className="bg-emerald-700 px-6 py-4 flex items-center gap-2.5">
-            <svg viewBox="0 0 16 16" fill="currentColor" className="w-6 h-6 shrink-0 text-white">
-              <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
-            </svg>
-            <span className="text-xl font-semibold text-white">{t("result.cadastralDataTitle")}</span>
-          </div>
-
-          <div className="p-6 sm:p-8 space-y-5">
-            {(cadastral.apartment?.address || cadastral.building?.address) && (
-              <p className="text-base text-gray-600">
-                {cadastral.apartment?.address || cadastral.building?.address}
+            {anyDropped && (
+              <p className="text-sm text-gray-600 bg-gray-100 rounded-lg px-4 py-2.5 mb-4 border border-gray-200">
+                {t("result.droppedFilters")}
               </p>
             )}
 
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700 mb-2.5">{t("form.cadastralApartment")}</p>
-              <div className="space-y-2.5">
-                {cadastral.apartment?.area_m2 && (
-                  <div className="flex justify-between text-base">
-                    <span className="text-gray-500">{t("form.cadastralArea")}</span>
-                    <span className="font-medium text-gray-900">{cadastral.apartment.area_m2} m²</span>
-                  </div>
-                )}
-                {cadastral.apartment?.floor && (
-                  <div className="flex justify-between text-base">
-                    <span className="text-gray-500">{t("form.cadastralFloor")}</span>
-                    <span className="font-medium text-gray-900">
-                      {cadastral.building?.total_floors
-                        ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
-                        : cadastral.apartment.floor}
-                    </span>
-                  </div>
-                )}
-                {hideCadastralDetails ? (
-                  <div className="flex justify-between text-base">
-                    <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
-                    <LockedValue onClick={openAuthModal} text="999999 lei" className="font-medium" />
-                  </div>
-                ) : (
-                  cadastral.apartment?.estimated_value_lei && (
-                    <div className="flex justify-between text-base">
-                      <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
-                      <span className="font-medium text-gray-900">{cadastral.apartment.estimated_value_lei} lei</span>
+            {district_coefficient?.applied ? (
+              <div className="space-y-2">
+                <div className="p-4 rounded-xl bg-gray-50">
+                  <div className="flex items-center gap-4 justify-center">
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                        {t("result.cityMedian")}
+                      </p>
+                      <p className="text-base font-bold text-gray-600">
+                        {formatPrice(market_stats.median_price_per_m2)}/m²
+                      </p>
                     </div>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div className="border-t border-emerald-100" />
-
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700 mb-2.5">{t("form.cadastralBuilding")}</p>
-              <div className="space-y-2.5">
-                {hideCadastralDetails ? (
-                  <>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><LockedValue onClick={openAuthModal} text="9999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                    <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                  </>
-                ) : (
-                  <>
-                    {cadastral.building?.classifier && (
-                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><span className="font-medium text-gray-900">{cadastral.building.classifier}</span></div>
-                    )}
-                    {cadastral.building?.condition && (
-                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><span className="font-medium text-gray-900">{cadastral.building.condition}</span></div>
-                    )}
-                    {cadastral.building?.construction_year && (
-                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><span className="font-medium text-gray-900">{cadastral.building.construction_year}</span></div>
-                    )}
-                    {cadastral.building?.wall_material && (
-                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><span className="font-medium text-gray-900">{cadastral.building.wall_material}</span></div>
-                    )}
-                    {cadastral.building?.water && (
-                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><span className="font-medium text-gray-900">{cadastral.building.water}</span></div>
-                    )}
-                    {cadastral.building?.sewage && (
-                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><span className="font-medium text-gray-900">{cadastral.building.sewage}</span></div>
-                    )}
-                    {cadastral.building?.gas && (
-                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><span className="font-medium text-gray-900">{cadastral.building.gas}</span></div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 shrink-0">
-                  <path d="M20 6 9 17l-5-5" />
-                </svg>
-                {t("result.cadastralDataSource")}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {cadastral?.partial && (
-        <div className={`${compactLayout ? "" : "order-6"} rounded-2xl border border-sky-200 bg-sky-50 shadow-sm p-6 sm:p-8`}>
-          <p className="text-sm font-medium text-sky-700 flex items-center gap-1.5 mb-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-4 h-4 shrink-0">
-              <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
-            </svg>
-            {t("result.cadastralDataTitle")}
-          </p>
-          {cadastral.location?.display_name && (
-            <p className="text-sm text-sky-700">{cadastral.location.display_name}</p>
-          )}
-          <p className="text-xs text-sky-600 mt-3">{t("result.cadastralDataSource")}</p>
-        </div>
-      )}
-
-      {/* Price position on range */}
-      <div className={`${compactLayout ? "" : "order-2"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
-        <h3 className="text-base font-semibold text-gray-900 mb-1">
-          {t("result.marketPosition")}
-        </h3>
-        <p className="text-sm text-gray-400 mb-5">
-          {t("result.marketPositionDesc")}
-        </p>
-
-        <div className="relative pt-6 pb-1">
-          <div
-            className="absolute top-2 -translate-x-1/2 flex flex-col items-center"
-            style={{ left: `${markerPct}%` }}
-          >
-            <div className="w-0 h-0 border-l-[9px] border-l-transparent border-r-[9px] border-r-transparent border-t-[9px] border-t-primary" />
-          </div>
-
-          <div className="h-3 bg-gray-100 rounded-full relative overflow-hidden">
-            <div
-              className="absolute inset-y-0 bg-linear-to-r from-emerald-200 via-primary/30 to-amber-200 rounded-full"
-              style={{ left: "10%", right: "10%" }}
-            />
-          </div>
-
-          <div className="flex justify-between mt-3">
-            <span className="text-xs text-gray-400">
-              {hideMarketPositionNumbers ? (
-                <LockedValue onClick={openAuthModal} text="€999.999" />
-              ) : (
-                formatPrice(range.low)
-              )}
-            </span>
-            <span className="text-sm text-gray-500 font-medium">
-              {hideMarketPositionNumbers ? (
-                <LockedValue onClick={openAuthModal} text={t("result.median", { price: "€999.999" })} />
-              ) : (
-                t("result.median", { price: formatPrice(market_stats.median_price_per_m2) })
-              )}
-            </span>
-            <span className="text-xs text-gray-400">
-              {hideMarketPositionNumbers ? (
-                <LockedValue onClick={openAuthModal} text="€999.999" />
-              ) : (
-                formatPrice(range.high)
-              )}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* How we calculated */}
-      <div className={`${compactLayout ? "" : "order-1"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
-        <h3 className="text-base font-semibold text-gray-900 mb-1">
-          {t("result.howWeAnalyzed")}
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">
-          {t("result.howWeAnalyzedDesc")}
-        </p>
-
-        <div className="flex flex-wrap gap-2 mb-4">
-          <FilterBadge label={t(`data.city.${input.city}`)} active={true} />
-          {input.district && (
-            <FilterBadge
-              label={t(`data.district.${input.district}`)}
-              active={filters_used?.district !== false}
-            />
-          )}
-          {input.rooms_count && (
-            <FilterBadge
-              label={
-                input.rooms_count === 1
-                  ? t("result.oneRoomFilter")
-                  : t("result.roomsFilter", { count: input.rooms_count })
-              }
-              active={true}
-            />
-          )}
-          {input.building_type && (
-            <FilterBadge
-              label={t(`data.buildingType.${input.building_type}`)}
-              active={filters_used?.building_type !== false}
-            />
-          )}
-          {input.renovation && (
-            <FilterBadge
-              label={t(`data.renovationType.${input.renovation}`)}
-              active={filters_used?.renovation !== false}
-            />
-          )}
-          {input.area_m2 && (
-            <FilterBadge
-              label={
-                filters_used?.area !== false && filters_used?.area_tolerance
-                  ? `${Math.round(input.area_m2 * (1 - filters_used.area_tolerance))}–${Math.round(input.area_m2 * (1 + filters_used.area_tolerance))}m²`
-                  : `~${input.area_m2}m²`
-              }
-              active={filters_used?.area !== false}
-            />
-          )}
-          {input.floor && (
-            <FilterBadge
-              label={
-                input.floor === 1
-                  ? t("result.floorGround")
-                  : input.total_floors && input.floor === input.total_floors
-                    ? t("result.floorLast", { floor: input.floor })
-                    : t("result.floorRange", {
-                      from: Math.max(2, input.floor - 2),
-                      to: input.total_floors
-                        ? Math.min(input.total_floors - 1, input.floor + 2)
-                        : input.floor + 2,
-                    })
-              }
-              active={filters_used?.floor !== false}
-            />
-          )}
-        </div>
-
-        {feature_adjustments?.items?.length > 0 && (
-          <div className="mb-4">
-            <p className="text-sm text-gray-400 mb-2">{t("result.featureAdjustments")}</p>
-            <div className="flex flex-wrap gap-2">
-              {feature_adjustments.items.map((item) => (
-                <FeatureAdjustmentBadge key={item.type} item={item} />
-              ))}
-            </div>
-            <p className="text-xs text-gray-400 mt-2">
-              {t("result.totalAdjustment")}{" "}
-              <span className={feature_adjustments.total_pct > 0 ? "text-emerald-600 font-medium" : "text-red-500 font-medium"}>
-                {feature_adjustments.total_pct > 0 ? "+" : ""}{feature_adjustments.total_pct}%
-              </span>{" "}
-              {t("result.vsComparables")}
-            </p>
-          </div>
-        )}
-
-        {anyDropped && (
-          <p className="text-sm text-gray-600 bg-gray-100 rounded-lg px-4 py-2.5 mb-4 border border-gray-200">
-            {t("result.droppedFilters")}
-          </p>
-        )}
-
-        {district_coefficient?.applied ? (
-          <div className="space-y-2">
-            <div className="p-4 rounded-xl bg-gray-50">
-              <div className="flex items-center gap-4 justify-center">
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                    {t("result.cityMedian")}
-                  </p>
-                  <p className="text-base font-bold text-gray-600">
-                    {formatPrice(market_stats.median_price_per_m2)}/m²
-                  </p>
+                    <span className="text-gray-300 text-lg">×</span>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                        {t("result.districtCoef", { district: t(`data.district.${input.district}`) })}
+                      </p>
+                      <p className="text-base font-bold text-gray-600">
+                        {district_coefficient.value}
+                      </p>
+                    </div>
+                    <span className="text-gray-300 text-lg">=</span>
+                    <div className="text-center">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                        {t("result.adjusted")}
+                      </p>
+                      <p className="text-base font-bold text-primary">
+                        {formatPrice(estimate.price_per_m2)}/m²
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <span className="text-gray-300 text-lg">×</span>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                    {t("result.districtCoef", { district: t(`data.district.${input.district}`) })}
-                  </p>
-                  <p className="text-base font-bold text-gray-600">
-                    {district_coefficient.value}
-                  </p>
-                </div>
-                <span className="text-gray-300 text-lg">=</span>
-                <div className="text-center">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                    {t("result.adjusted")}
-                  </p>
-                  <p className="text-base font-bold text-primary">
-                    {formatPrice(estimate.price_per_m2)}/m²
-                  </p>
-                </div>
+                <p className="text-sm text-gray-400 text-center">
+                  × {input.area_m2}m² = {formatPrice(estimate.market_rate)}
+                </p>
               </div>
-            </div>
-            <p className="text-sm text-gray-400 text-center">
-              × {input.area_m2}m² = {formatPrice(estimate.market_rate)}
-            </p>
+            ) : (
+              <div className="p-4 rounded-xl bg-gray-50 text-center">
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">
+                  {t("result.segmentMedian")}
+                </p>
+                <p className="text-2xl font-bold text-primary">
+                  {formatPrice(market_stats.median_price_per_m2)}/m²
+                </p>
+                <p className="text-sm text-gray-400 mt-1.5">
+                  × {input.area_m2}m² = {formatPrice(estimate.market_rate)}
+                </p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="p-4 rounded-xl bg-gray-50 text-center">
-            <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">
-              {t("result.segmentMedian")}
-            </p>
-            <p className="text-2xl font-bold text-primary">
-              {formatPrice(market_stats.median_price_per_m2)}/m²
-            </p>
-            <p className="text-sm text-gray-400 mt-1.5">
-              × {input.area_m2}m² = {formatPrice(estimate.market_rate)}
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* District comparison */}
-      <DistrictComparison
-        districts={district_comparison}
-        currentDistrict={input.district}
-        area={input.area_m2}
-        blurValues={hideDistrictComparisonValues}
-        onLockedClick={openAuthModal}
-        className={compactLayout ? "" : "order-4"}
-      />
+          {/* District comparison */}
+          <DistrictComparison
+            districts={district_comparison}
+            currentDistrict={input.district}
+            area={input.area_m2}
+            blurValues={hideDistrictComparisonValues}
+            onLockedClick={openAuthModal}
+            className={compactLayout ? "" : "order-4"}
+          />
 
-      {/* Market stats */}
-      <div className={`${compactLayout ? "" : "order-5"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
-        <h3 className="text-base font-semibold text-gray-900 mb-4">
-          {t("result.marketStats")}
-        </h3>
-        <div className="grid grid-cols-2 gap-5">
-          {/* <div>
+          {/* Market stats */}
+          <div className={`${compactLayout ? "" : "order-5"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
+            <h3 className="text-base font-semibold text-gray-900 mb-4">
+              {t("result.marketStats")}
+            </h3>
+            <div className="grid grid-cols-2 gap-5">
+              {/* <div>
             <p className="text-sm text-gray-400 mb-1">{t("result.comparableListings")}</p>
             <p className="text-xl font-bold text-gray-900">{market_stats.comparable_count}</p>
           </div> */}
-          <div>
-            <p className="text-sm text-gray-400 mb-1">{t("result.avgPricePerM2")}</p>
-            <p className="text-xl font-bold text-gray-900">
-              {hideMarketStatsValues ? (
-                <LockedValue onClick={openAuthModal} text="€999.999" />
-              ) : (
-                formatPrice(market_stats.avg_price_per_m2)
-              )}
-            </p>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">{t("result.avgPricePerM2")}</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {hideMarketStatsValues ? (
+                    <LockedValue onClick={openAuthModal} text="€999.999" />
+                  ) : (
+                    formatPrice(market_stats.avg_price_per_m2)
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">{t("result.medianPricePerM2")}</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {hideMarketStatsValues ? (
+                    <LockedValue onClick={openAuthModal} text="€999.999" />
+                  ) : (
+                    formatPrice(market_stats.median_price_per_m2)
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-400 mb-1">{t("result.avgTotalPrice")}</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {hideMarketStatsValues ? (
+                    <LockedValue onClick={openAuthModal} text="€999.999" />
+                  ) : (
+                    formatPrice(market_stats.avg_price)
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-gray-400 mb-1">{t("result.medianPricePerM2")}</p>
-            <p className="text-xl font-bold text-gray-900">
-              {hideMarketStatsValues ? (
-                <LockedValue onClick={openAuthModal} text="€999.999" />
-              ) : (
-                formatPrice(market_stats.median_price_per_m2)
-              )}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-400 mb-1">{t("result.avgTotalPrice")}</p>
-            <p className="text-xl font-bold text-gray-900">
-              {hideMarketStatsValues ? (
-                <LockedValue onClick={openAuthModal} text="€999.999" />
-              ) : (
-                formatPrice(market_stats.avg_price)
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
 
         </div>
         <aside className={supportColumnClassName}>
 
-      <RelevantListingsPreview
-        t={t}
-        count={listingsCount}
-        listings={listingPreviewItems}
-        onViewAll={() => setListingsMode(true)}
-        sidebar={!compactLayout}
-      />
+          <RelevantListingsPreview
+            t={t}
+            count={listingsCount}
+            listings={listingPreviewItems}
+            onViewAll={() => setListingsMode(true)}
+            sidebar={!compactLayout}
+          />
 
-      {/* Actions */}
-      <div className="flex flex-col gap-3">
-        <div className={actionGridClassName}>
-          <button
-            type="button"
-            onClick={onReset}
-            className={`${actionButtonClassName} font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2`}
-          >
-            <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-            {t("result.changeCriteria")}
-          </button>
-          <button
-            type="button"
-            onClick={handleShare}
-            className={`${actionButtonClassName} font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2`}
-          >
-            {sharing ? (
-              <>
-                <svg className={`${actionIconClassName} animate-spin`} viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                  <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-                {t("result.sharing")}
-              </>
-            ) : copied ? (
-              <>
+          {/* Actions */}
+          <div className="flex flex-col gap-3">
+            <div className={actionGridClassName}>
+              <button
+                type="button"
+                onClick={onReset}
+                className={`${actionButtonClassName} font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2`}
+              >
                 <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6L9 17l-5-5" />
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
-                {t("result.linkCopied")}
-              </>
-            ) : (
-              <>
-                <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                  <polyline points="16 6 12 2 8 6" />
-                  <line x1="12" y1="2" x2="12" y2="15" />
-                </svg>
-                {t("result.shareAnalysis")}
-              </>
-            )}
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={onCompare}
-          className={`w-full ${actionButtonClassName} font-semibold border border-primary/50 text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2`}
-        >
-          <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="18" cy="18" r="3" />
-            <circle cx="6" cy="6" r="3" />
-            <path d="M13 6h3a2 2 0 0 1 2 2v7" />
-            <path d="M11 18H8a2 2 0 0 1-2-2V9" />
-          </svg>
-          {t("result.compare")}
-        </button>
-      </div>
+                {t("result.changeCriteria")}
+              </button>
+              <button
+                type="button"
+                onClick={handleShare}
+                className={`${actionButtonClassName} font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2`}
+              >
+                {sharing ? (
+                  <>
+                    <svg className={`${actionIconClassName} animate-spin`} viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                      <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                    </svg>
+                    {t("result.sharing")}
+                  </>
+                ) : copied ? (
+                  <>
+                    <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    {t("result.linkCopied")}
+                  </>
+                ) : (
+                  <>
+                    <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                      <polyline points="16 6 12 2 8 6" />
+                      <line x1="12" y1="2" x2="12" y2="15" />
+                    </svg>
+                    {t("result.shareAnalysis")}
+                  </>
+                )}
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={onCompare}
+              className={`w-full ${actionButtonClassName} font-semibold border border-primary/50 text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2`}
+            >
+              <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="18" cy="18" r="3" />
+                <circle cx="6" cy="6" r="3" />
+                <path d="M13 6h3a2 2 0 0 1 2 2v7" />
+                <path d="M11 18H8a2 2 0 0 1-2-2V9" />
+              </svg>
+              {t("result.compare")}
+            </button>
+          </div>
         </aside>
       </div>
     </div>

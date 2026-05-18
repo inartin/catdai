@@ -55,7 +55,7 @@ function ListingAlertsTeaser() {
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/estimeaza"
+                href="/alerts"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-700/15 transition-colors hover:bg-primary-dark"
               >
                 {t("landing.alertPrimaryCta")}

@@ -34,6 +34,10 @@ function formatAlertFilter(key, value, t) {
       return `${t("result.priceTo")}: €${formatNumber(value)}`;
     case "max_price_per_m2":
       return `${t("result.maxPricePerM2")}: €${formatNumber(value)}`;
+    case "area_min":
+      return `${t("alerts.areaFrom")}: ${formatNumber(value)}m²`;
+    case "area_max":
+      return `${t("alerts.areaTo")}: ${formatNumber(value)}m²`;
     case "floor_min":
       return `${t("result.floorFrom")}: ${formatNumber(value)}`;
     case "floor_max":
@@ -67,6 +71,8 @@ function buildBaseSummary(alert, t) {
         : t("result.rooms", { count: filters.rooms_count }))
       : null,
     filters.area_m2 ? `${formatNumber(filters.area_m2)}m²` : null,
+    filters.building_type ? t(`data.buildingType.${filters.building_type}`) : null,
+    filters.renovation ? t(`data.renovationType.${filters.renovation}`) : null,
   ].filter(Boolean).join(" · ");
 }
 

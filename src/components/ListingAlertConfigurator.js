@@ -35,12 +35,24 @@ function parseOptionalNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 
-function formatRooms(input, t) {
-  if (input?.rooms_count === undefined || input?.rooms_count === null || input?.rooms_count === "") return null;
-  const roomsCount = Number(input?.rooms_count);
+function isEmptyRoomValue(value) {
+  return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
+}
+
+function formatRoomValue(value, t) {
+  const roomsCount = Number(value);
   return roomsCount === 1
     ? t("result.oneRoom")
-    : t("result.rooms", { count: Number.isFinite(roomsCount) ? roomsCount : input?.rooms_count });
+    : t("result.rooms", { count: Number.isFinite(roomsCount) ? roomsCount : value });
+}
+
+function formatRooms(input, t) {
+  if (isEmptyRoomValue(input?.rooms_count)) return null;
+  if (Array.isArray(input.rooms_count)) {
+    return input.rooms_count.map((value) => formatRoomValue(value, t)).join(", ");
+  }
+
+  return formatRoomValue(input.rooms_count, t);
 }
 
 function formatFloor(input, t) {
@@ -81,7 +93,7 @@ export function buildListingAlertMarketFilterChips(input, t) {
   return [
     input.city ? t(`data.city.${input.city}`) : null,
     input.district ? t(`data.district.${input.district}`) : null,
-    input.rooms_count != null ? formatRooms(input, t) : null,
+    !isEmptyRoomValue(input.rooms_count) ? formatRooms(input, t) : null,
     input.area_m2 ? `~${input.area_m2}m²` : null,
     input.building_type ? t(`data.buildingType.${input.building_type}`) : null,
     input.renovation ? t(`data.renovationType.${input.renovation}`) : null,

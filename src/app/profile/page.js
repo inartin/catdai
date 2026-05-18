@@ -24,6 +24,25 @@ function formatNumber(value) {
   return number.toLocaleString("ro-MD");
 }
 
+function isEmptyRoomValue(value) {
+  return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
+}
+
+function formatRoomValue(value, t) {
+  return Number(value) === 1
+    ? t("result.oneRoom")
+    : t("result.rooms", { count: value });
+}
+
+function formatRooms(value, t) {
+  if (isEmptyRoomValue(value)) return null;
+  if (Array.isArray(value)) {
+    return value.map((roomValue) => formatRoomValue(roomValue, t)).join(", ");
+  }
+
+  return formatRoomValue(value, t);
+}
+
 function formatAlertFilter(key, value, t) {
   if (value === null || value === undefined || value === "" || value === false) return null;
 
@@ -65,11 +84,7 @@ function buildBaseSummary(alert, t) {
   return [
     filters.city ? t(`data.city.${filters.city}`) : null,
     filters.district ? t(`data.district.${filters.district}`) : null,
-    filters.rooms_count
-      ? (Number(filters.rooms_count) === 1
-        ? t("result.oneRoom")
-        : t("result.rooms", { count: filters.rooms_count }))
-      : null,
+    formatRooms(filters.rooms_count, t),
     filters.area_m2 ? `${formatNumber(filters.area_m2)}m²` : null,
     filters.building_type ? t(`data.buildingType.${filters.building_type}`) : null,
     filters.renovation ? t(`data.renovationType.${filters.renovation}`) : null,

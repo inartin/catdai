@@ -35,7 +35,18 @@ const renovationTypes = [
 ];
 
 function normalizeRoomCount(value) {
-  return value === "5+" ? 5 : value;
+  if (value === "5+") return 5;
+  const roomsCount = Number(value);
+  return Number.isInteger(roomsCount) ? roomsCount : value;
+}
+
+function normalizeRoomCounts(value) {
+  const values = Array.isArray(value) ? value : [value];
+  const normalized = values
+    .filter((item) => item !== undefined && item !== null && item !== "")
+    .map(normalizeRoomCount);
+
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 function ChevronIcon() {
@@ -82,7 +93,7 @@ function SelectField({ label, required, value, onChange, placeholder, options, l
   );
 }
 
-function PillGroup({ options, value, onChange, columns, labelFn, highlighted }) {
+function PillGroup({ options, value, onChange, columns, labelFn, highlighted, multiple = false }) {
   return (
     <div className={`rounded-xl transition-all duration-300 ${highlighted ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}>
       <div
@@ -90,12 +101,15 @@ function PillGroup({ options, value, onChange, columns, labelFn, highlighted }) 
         style={{ gridTemplateColumns: `repeat(${columns || options.length}, minmax(0, 1fr))` }}
       >
         {options.map((option) => {
-          const active = String(value) === String(option);
+          const active = multiple
+            ? (Array.isArray(value) ? value : []).some((item) => String(item) === String(option))
+            : String(value) === String(option);
           return (
             <button
               key={option}
               type="button"
               onClick={() => onChange(option)}
+              aria-pressed={active}
               className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-all duration-150 ${active
                 ? "border-primary bg-primary text-white shadow-sm"
                 : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
@@ -125,14 +139,13 @@ export default function AlertsPage() {
   const [baseFilters, setBaseFilters] = useState({
     city: "Chișinău",
     district: "",
-    rooms_count: null,
+    rooms_count: [],
     building_type: "",
     renovation: "",
   });
   const [highlightField, setHighlightField] = useState(null);
   const refCity = useRef(null);
   const refDistrict = useRef(null);
-  const refRooms = useRef(null);
   const refBuildingType = useRef(null);
   const refRenovation = useRef(null);
   const districts = districtsByCity[baseFilters.city] || [];
@@ -146,19 +159,32 @@ export default function AlertsPage() {
     });
   };
 
+  const toggleRoomFilter = (value) => {
+    setHighlightField(null);
+    setBaseFilters((prev) => {
+      const current = Array.isArray(prev.rooms_count) ? prev.rooms_count : [];
+      const exists = current.some((item) => String(item) === String(value));
+      const nextRooms = exists
+        ? current.filter((item) => String(item) !== String(value))
+        : roomOptions.filter((option) => (
+          current.some((item) => String(item) === String(option)) || String(option) === String(value)
+        ));
+
+      return { ...prev, rooms_count: nextRooms };
+    });
+  };
+
   const validateBaseFilters = () => {
     const needsDistrict = districts.length > 0;
     const firstMissing = !baseFilters.city
       ? "city"
       : needsDistrict && !baseFilters.district
         ? "district"
-        : baseFilters.rooms_count == null
-          ? "rooms_count"
-          : !baseFilters.building_type
-            ? "building_type"
-            : !baseFilters.renovation
-              ? "renovation"
-              : null;
+        : !baseFilters.building_type
+          ? "building_type"
+          : !baseFilters.renovation
+            ? "renovation"
+            : null;
 
     if (!firstMissing) return true;
 
@@ -166,7 +192,6 @@ export default function AlertsPage() {
     const refMap = {
       city: refCity,
       district: refDistrict,
-      rooms_count: refRooms,
       building_type: refBuildingType,
       renovation: refRenovation,
     };
@@ -176,7 +201,7 @@ export default function AlertsPage() {
 
   const normalizedBaseFilters = {
     ...baseFilters,
-    rooms_count: normalizeRoomCount(baseFilters.rooms_count),
+    rooms_count: normalizeRoomCounts(baseFilters.rooms_count),
   };
 
   const baseContent = (
@@ -212,14 +237,14 @@ export default function AlertsPage() {
         </div>
       )}
 
-      <div ref={refRooms}>
-        <RequiredLabel>{t("form.rooms")}</RequiredLabel>
+      <div>
+        <label className="mb-2 block text-sm text-gray-600">{t("form.rooms")}</label>
         <PillGroup
           options={roomOptions}
           value={baseFilters.rooms_count}
-          onChange={(value) => updateBaseFilter("rooms_count", value)}
+          onChange={toggleRoomFilter}
           columns={5}
-          highlighted={highlightField === "rooms_count"}
+          multiple
         />
       </div>
 

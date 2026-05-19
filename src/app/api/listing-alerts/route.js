@@ -87,13 +87,30 @@ export async function POST(request) {
   }
 
   const telegramEnabled = body.telegram_enabled === true;
-  const telegramChatId = normalizeText(body.telegram_chat_id);
+  let resolvedTelegramChatId = null;
 
-  if (telegramEnabled && !telegramChatId) {
-    return NextResponse.json(
-      { error: "Missing required field: telegram_chat_id" },
-      { status: 400 }
-    );
+  if (telegramEnabled) {
+    const { data: connection, error: connectionError } = await supabaseAdmin
+      .from("user_telegram_connections")
+      .select("telegram_chat_id")
+      .eq("user_id", access.user_id)
+      .maybeSingle();
+
+    if (connectionError) {
+      console.error("[listing-alerts] telegram lookup failed:", connectionError.message);
+      return NextResponse.json(
+        { error: "Failed to resolve Telegram connection." },
+        { status: 500 }
+      );
+    }
+
+    resolvedTelegramChatId = normalizeText(connection?.telegram_chat_id);
+    if (!resolvedTelegramChatId) {
+      return NextResponse.json(
+        { error: "Connect Telegram first." },
+        { status: 400 }
+      );
+    }
   }
 
   const { data, error } = await supabaseAdmin
@@ -103,7 +120,7 @@ export async function POST(request) {
       label: normalizeText(body.label),
       website_enabled: body.website_enabled !== false,
       telegram_enabled: telegramEnabled,
-      telegram_chat_id: telegramEnabled ? telegramChatId : null,
+      telegram_chat_id: telegramEnabled ? resolvedTelegramChatId : null,
       base_filters: baseFilters,
       alert_filters: alertFilters,
     })

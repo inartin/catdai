@@ -14,6 +14,11 @@ function generateToken() {
   return crypto.randomBytes(24).toString("base64url");
 }
 
+function normalizeTelegramLang(value) {
+  const lang = String(value || "").trim().toLowerCase();
+  return lang === "ru" ? "ru" : "ro";
+}
+
 export async function GET(request) {
   const access = await resolveAccessTier(request);
   if (!access.user_id) {
@@ -47,6 +52,15 @@ export async function POST(request) {
     return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const lang = normalizeTelegramLang(body?.lang);
+
   const token = generateToken();
   const tokenHash = hashToken(token);
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS).toISOString();
@@ -74,7 +88,7 @@ export async function POST(request) {
   }
 
   return NextResponse.json({
-    url: buildTelegramAlertsStartUrl(token),
+    url: buildTelegramAlertsStartUrl(token, lang),
     expires_at: expiresAt,
   });
 }

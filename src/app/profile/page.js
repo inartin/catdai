@@ -181,8 +181,10 @@ export default function ProfilePage() {
       const res = await fetch("/api/telegram-link", {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
+        body: JSON.stringify({ lang }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -193,10 +195,45 @@ export default function ProfilePage() {
 
       const url = data.url || TELEGRAM_ALERTS_BOT_URL;
       if (url && typeof window !== "undefined") {
-        window.location.assign(url);
+        window.open(url, "_blank", "noopener,noreferrer");
       }
     } catch (error) {
       setTelegramLinkError(error?.message || "Failed to create Telegram link");
+    } finally {
+      setIsTelegramLinking(false);
+    }
+  };
+
+  const handleDisconnectTelegram = async () => {
+    if (!session?.access_token) return;
+
+    setIsTelegramLinking(true);
+    setTelegramLinkError("");
+
+    try {
+      const res = await fetch("/api/telegram-link/disconnect", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to disconnect Telegram");
+      }
+
+      setTelegramConnection(null);
+      setListingAlerts((prev) =>
+        prev.map((alert) => ({
+          ...alert,
+          telegram_enabled: false,
+          telegram_chat_id: null,
+        }))
+      );
+    } catch (error) {
+      setTelegramLinkError(error?.message || "Failed to disconnect Telegram");
     } finally {
       setIsTelegramLinking(false);
     }
@@ -314,20 +351,31 @@ export default function ProfilePage() {
                       {telegramConnection ? t("profile.telegramConnected") : t("profile.telegramNotConnected")}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleConnectTelegram}
-                    className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                  >
-                    <TelegramIcon size={16} />
-                    <span>
-                      {isTelegramLinking
-                        ? t("profile.telegramLinking")
-                        : telegramConnection
-                          ? t("profile.telegramReconnect")
-                          : t("profile.telegramConnect")}
-                    </span>
-                  </button>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleConnectTelegram}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      <TelegramIcon size={16} />
+                      <span>
+                        {isTelegramLinking
+                          ? t("profile.telegramLinking")
+                          : telegramConnection
+                            ? t("profile.telegramReconnect")
+                            : t("profile.telegramConnect")}
+                      </span>
+                    </button>
+                    {telegramConnection && (
+                      <button
+                        type="button"
+                        onClick={handleDisconnectTelegram}
+                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100"
+                      >
+                        <span>{t("profile.telegramDisconnect")}</span>
+                      </button>
+                    )}
+                  </div>
                   {telegramLinkError && (
                     <p className="mt-2 text-xs text-red-600">{telegramLinkError}</p>
                   )}

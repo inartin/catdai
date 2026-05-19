@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { telegramLinkSecret } from "@/lib/telegram-link-secret";
 
 function normalizeText(value) {
   if (typeof value !== "string") return null;
@@ -23,12 +24,7 @@ function getSecret(request) {
 }
 
 export async function POST(request) {
-  const configuredSecret = process.env.TELEGRAM_ALERTS_SHARED_SECRET;
-  if (!configuredSecret) {
-    return NextResponse.json({ error: "Telegram bot secret is not configured." }, { status: 500 });
-  }
-
-  if (getSecret(request) !== configuredSecret) {
+  if (getSecret(request) !== telegramLinkSecret) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

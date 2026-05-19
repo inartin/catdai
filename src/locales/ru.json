@@ -14,6 +14,7 @@
   "profile.telegramConnected": "Подключено",
   "profile.telegramNotConnected": "Не подключено",
   "profile.telegramLinking": "Открывается...",
+  "profile.telegramDisconnect": "Отключить Telegram",
   "profile.delete": "Удалить профиль",
   "profile.confirmDelete": "Вы уверены, что хотите удалить профиль?",
   "nav.register": "Регистрация",

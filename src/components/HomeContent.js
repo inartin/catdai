@@ -22,6 +22,11 @@ function ListingAlertsTeaser() {
 
   return (
     <section className="px-4 pb-16">
+      <div className="mx-auto mb-6 max-w-5xl text-center">
+        <h2 className="mb-2 text-xl font-bold text-gray-800">
+          {t("landing.alertTitle")}
+        </h2>
+      </div>
       <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
         <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr]">
           <div className="relative bg-gradient-to-br from-emerald-50 via-white to-sky-50 px-5 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-11">
@@ -30,9 +35,6 @@ function ListingAlertsTeaser() {
               {t("landing.alertEyebrow")}
             </div>
 
-            <h2 className="mt-5 max-w-xl text-3xl font-extrabold leading-tight tracking-tight text-gray-950 sm:text-4xl">
-              {t("landing.alertTitle")}
-            </h2>
             <p className="mt-4 max-w-xl text-base leading-7 text-gray-600">
               {t("landing.alertDesc")}
             </p>
@@ -53,7 +55,7 @@ function ListingAlertsTeaser() {
               ))}
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-12 flex flex-col gap-3 sm:mt-14 sm:flex-row">
               <Link
                 href="/alerts"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-700/15 transition-colors hover:bg-primary-dark"

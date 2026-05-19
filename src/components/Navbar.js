@@ -2,8 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 import LoginButton from "@/components/LoginButton";
+import AlertIcon from "@/components/icons/AlertIcon";
+import MenuIcon from "@/components/icons/MenuIcon";
 
 export const GO_HOME_EVENT = "catdai-go-home";
 
@@ -15,6 +19,10 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { lang, setLang, t } = useTranslation();
+  const { isAuthenticated, loading } = useAuth();
+  const mobileMenuRef = useRef(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const showAlertShortcut = !loading && isAuthenticated;
 
   const handleLogoClick = (e) => {
     if (pathname === "/") {
@@ -26,6 +34,7 @@ export default function Navbar() {
 
   const handleLangChange = (nextLang) => {
     setLang(nextLang);
+    setMobileMenuOpen(false);
 
     if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {
       const target = `/${nextLang}/faq`;
@@ -33,8 +42,33 @@ export default function Navbar() {
     }
   };
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const onPointerDown = (event) => {
+      if (mobileMenuRef.current?.contains(event.target)) return;
+      setMobileMenuOpen(false);
+    };
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
   return (
-    <header className="bg-white sticky top-0 z-50 border-b border-gray-100">
+    <header className="relative sticky top-0 z-50 border-b border-gray-100 bg-white">
       <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between h-16">
         <Link
           href="/"
@@ -50,8 +84,17 @@ export default function Navbar() {
           <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="hidden items-center gap-4 md:flex">
           <LoginButton />
+          {showAlertShortcut && (
+            <Link
+              href="/alerts"
+              aria-label={t("nav.alerts")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
+            >
+              <AlertIcon size={18} />
+            </Link>
+          )}
           <div
             className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm font-medium"
             role="group"
@@ -82,6 +125,70 @@ export default function Navbar() {
               RU
             </button>
           </div>
+        </div>
+
+        <div ref={mobileMenuRef} className="flex items-center gap-2 md:hidden">
+          {showAlertShortcut && (
+            <Link
+              href="/alerts"
+              aria-label={t("nav.alerts")}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
+            >
+              <AlertIcon size={18} />
+            </Link>
+          )}
+          <button
+            type="button"
+            aria-label={t("nav.menu")}
+            aria-expanded={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
+          >
+            <MenuIcon size={18} />
+          </button>
+
+          {mobileMenuOpen && (
+            <div className="absolute right-4 top-full z-50 mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
+              <div className="space-y-2">
+                <LoginButton className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900" menuAlign="left" />
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-1">
+                  <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                    {t("nav.langAriaLabel")}
+                  </p>
+                  <div
+                    className="flex rounded-lg bg-white p-0.5 text-sm font-medium"
+                    role="group"
+                    aria-label={t("nav.langAriaLabel")}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleLangChange("ro")}
+                      className={`cursor-pointer flex-1 rounded-md px-3 py-1.5 transition-colors ${
+                        lang === "ro"
+                          ? "bg-gray-50 text-foreground shadow-sm"
+                          : "text-gray-500 hover:text-foreground"
+                      }`}
+                      aria-pressed={lang === "ro"}
+                    >
+                      RO
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleLangChange("ru")}
+                      className={`cursor-pointer flex-1 rounded-md px-3 py-1.5 transition-colors ${
+                        lang === "ru"
+                          ? "bg-gray-50 text-foreground shadow-sm"
+                          : "text-gray-500 hover:text-foreground"
+                      }`}
+                      aria-pressed={lang === "ru"}
+                    >
+                      RU
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

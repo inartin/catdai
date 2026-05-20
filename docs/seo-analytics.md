@@ -20,6 +20,7 @@ Implemented.
 - Google Analytics loads only when `NEXT_PUBLIC_GA_ID` exists.
 - Default consent denies analytics/ad storage.
 - Cookie banner can grant or deny consent.
+- `/estimeaza` sends `conversion_event_page_view_1` once on client mount when GA is available.
 - Estimate logging stores device/session ids, input summary, result price, language, response time, and hashed IP.
 
 ## Related Files

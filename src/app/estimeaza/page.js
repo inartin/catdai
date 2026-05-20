@@ -1,10 +1,24 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PropertyForm from "@/components/PropertyForm";
+
+function EstimeazaAnalytics() {
+  const sentRef = useRef(false);
+
+  useEffect(() => {
+    if (sentRef.current) return;
+    if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+
+    window.gtag("event", "conversion_event_page_view_1");
+    sentRef.current = true;
+  }, []);
+
+  return null;
+}
 
 function EstimeazaContent() {
   const router = useRouter();
@@ -36,6 +50,7 @@ export default function EstimeazaPage() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />
       <main className="flex-1">
+        <EstimeazaAnalytics />
         <Suspense>
           <EstimeazaContent />
         </Suspense>

@@ -5,13 +5,14 @@ Implemented.
 
 ## Public Pages
 - `/` landing page with hero, categories, how it works, examples, and alerts teaser.
+- The landing page how-it-works steps render as a compact two-column grid on mobile and a horizontal arrow flow on larger screens.
 - `/faq`, `/ro/faq`, `/ru/faq`.
 - `/about`.
 - `/terms`.
 - `/privacy`.
 
 ## App Shell
-- Shared navbar with logo, login/profile link, language switcher, and alerts shortcut for logged-in users.
+- Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, login/profile link, language switcher, and alerts shortcut for logged-in users.
 - Shared footer.
 - Cookie banner is global.
 - PWA manifest and app icons are present.

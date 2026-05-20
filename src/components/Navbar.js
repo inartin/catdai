@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import LoginButton from "@/components/LoginButton";
 import AlertIcon from "@/components/icons/AlertIcon";
 import MenuIcon from "@/components/icons/MenuIcon";
+import Tooltip from "@/components/Tooltip";
 
 export const GO_HOME_EVENT = "catdai-go-home";
 
@@ -75,13 +76,18 @@ export default function Navbar() {
           aria-label={t("nav.homeAriaLabel")}
           className="flex items-center gap-3 whitespace-nowrap"
           onClick={handleLogoClick}
-        >
+          >
           <img
             src="/icon0.svg"
             alt=""
             className="h-11 w-auto object-contain"
           />
           <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
+          <Tooltip text={t("nav.betaTooltip")}>
+            <span className="inline-flex h-5 items-center rounded-full border border-gray-200 bg-gray-50 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
+              beta
+            </span>
+          </Tooltip>
         </Link>
 
         <div className="hidden items-center gap-4 md:flex">

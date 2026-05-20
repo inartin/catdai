@@ -7,7 +7,7 @@ function ArrowIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="w-5 h-5 text-gray-300 shrink-0"
+      className="hidden h-5 w-5 shrink-0 text-gray-300 sm:block"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -62,15 +62,15 @@ export default function HowItWorks() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto bg-section-bg rounded-2xl py-10 px-6 mt-10">
-        <div className="flex items-center justify-center gap-4 sm:gap-6">
+      <div className="max-w-2xl mx-auto bg-section-bg rounded-2xl py-6 px-4 mt-10 sm:py-10 sm:px-6">
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-center sm:gap-6">
           {stepKeys.map((key, i) => (
             <div key={key} className="contents">
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-14 h-14 rounded-full bg-primary-light flex items-center justify-center">
+              <div className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-emerald-100 bg-white px-2.5 py-4 shadow-sm sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-light sm:h-14 sm:w-14">
                   {stepIcons[i]}
                 </div>
-                <span className="text-xs sm:text-sm font-medium text-gray-600">
+                <span className="text-center text-xs font-medium leading-tight text-gray-600 sm:text-sm">
                   {t(key)}
                 </span>
               </div>

@@ -5,6 +5,7 @@
   "nav.forAgents": "Для агентов",
   "nav.langAriaLabel": "Выбрать язык",
   "nav.alerts": "Уведомления",
+  "nav.betaTooltip": "Бесплатный доступ в период beta и активная разработка платформы.",
   "nav.login": "Войти",
   "nav.profile": "Профиль",
   "profile.logout": "Выйти",

@@ -7,10 +7,8 @@ import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ConfigIcon from "@/components/icons/ConfigIcon";
-import { ArrowLeft } from "@/components/icons/ArrowsIcons";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
-import TelegramIcon from "@/components/icons/TelegramIcon";
-import { TELEGRAM_ALERTS_BOT_HANDLE, TELEGRAM_ALERTS_BOT_URL } from "../../../db/constants";
+import TelegramConnectionCard from "@/components/TelegramConnectionCard";
 
 function formatDate(value, lang) {
   if (!value) return null;
@@ -97,7 +95,6 @@ export default function ProfilePage() {
   const { t, lang } = useTranslation();
   const { user, session, signOut, isAuthenticated, loading } = useAuth();
   const router = useRouter();
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [alertDeleteTarget, setAlertDeleteTarget] = useState(null);
@@ -107,9 +104,6 @@ export default function ProfilePage() {
   const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [listingAlerts, setListingAlerts] = useState([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
-  const [telegramConnection, setTelegramConnection] = useState(null);
-  const [isTelegramLinking, setIsTelegramLinking] = useState(false);
-  const [telegramLinkError, setTelegramLinkError] = useState("");
 
   const handleDeleteProfile = async () => {
     try {
@@ -151,13 +145,11 @@ export default function ProfilePage() {
     Promise.all([
       fetch("/api/favorites", { headers }).then((res) => res.json()),
       fetch("/api/listing-alerts", { headers }).then((res) => res.json()),
-      fetch("/api/telegram-link", { headers }).then((res) => res.json()),
     ])
-      .then(([favoritesData, alertsData, telegramData]) => {
+      .then(([favoritesData, alertsData]) => {
         if (cancelled) return;
         setFavorites(favoritesData.favorites || []);
         setListingAlerts(alertsData.alerts || []);
-        setTelegramConnection(telegramData.connection || null);
       })
       .catch(() => {})
       .finally(() => {
@@ -170,74 +162,6 @@ export default function ProfilePage() {
       cancelled = true;
     };
   }, [session?.access_token]);
-
-  const handleConnectTelegram = async () => {
-    if (!session?.access_token || isTelegramLinking) return;
-
-    setIsTelegramLinking(true);
-    setTelegramLinkError("");
-
-    try {
-      const res = await fetch("/api/telegram-link", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ lang }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to create Telegram link");
-      }
-
-      const url = data.url || TELEGRAM_ALERTS_BOT_URL;
-      if (url && typeof window !== "undefined") {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
-    } catch (error) {
-      setTelegramLinkError(error?.message || "Failed to create Telegram link");
-    } finally {
-      setIsTelegramLinking(false);
-    }
-  };
-
-  const handleDisconnectTelegram = async () => {
-    if (!session?.access_token) return;
-
-    setIsTelegramLinking(true);
-    setTelegramLinkError("");
-
-    try {
-      const res = await fetch("/api/telegram-link/disconnect", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to disconnect Telegram");
-      }
-
-      setTelegramConnection(null);
-      setListingAlerts((prev) =>
-        prev.map((alert) => ({
-          ...alert,
-          telegram_enabled: false,
-          telegram_chat_id: null,
-        }))
-      );
-    } catch (error) {
-      setTelegramLinkError(error?.message || "Failed to disconnect Telegram");
-    } finally {
-      setIsTelegramLinking(false);
-    }
-  };
 
   const handleRemoveFavorite = async (urlPath) => {
     setFavorites((prev) => prev.filter((f) => f.url_path !== urlPath));
@@ -297,11 +221,8 @@ export default function ProfilePage() {
         <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 min-h-[60vh]">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">{t("nav.profile")}</h1>
           <div className="bg-white shadow rounded-lg p-8 border border-gray-100 relative">
-            <div 
-              className="absolute top-6 right-6 cursor-pointer text-gray-400 hover:text-gray-600 transition-colors"
-              onClick={() => setIsConfigOpen(!isConfigOpen)}
-            >
-              {isConfigOpen ? <ArrowLeft size={24} /> : <ConfigIcon size={24} />}
+            <div className="absolute top-6 right-6 text-gray-400">
+              <ConfigIcon size={24} />
             </div>
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {user?.user_metadata?.avatar_url || user?.user_metadata?.picture ? (
@@ -331,64 +252,17 @@ export default function ProfilePage() {
                 </button>
               </div>
             </div>
-            {isConfigOpen && (
-              <div className="mt-8 pt-8 border-t border-gray-100">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">{t("profile.config")}</h3>
-                <div className="mb-4 rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">{t("profile.telegramConnect")}</p>
-                      <p className="mt-1 truncate text-xs text-gray-500">
-                        {telegramConnection?.telegram_username
-                          ? `@${telegramConnection.telegram_username}`
-                          : `t.me/${TELEGRAM_ALERTS_BOT_HANDLE}`}
-                      </p>
-                    </div>
-                    <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${telegramConnection
-                      ? "bg-emerald-50 text-emerald-600"
-                      : "bg-gray-100 text-gray-500"
-                    }`}>
-                      {telegramConnection ? t("profile.telegramConnected") : t("profile.telegramNotConnected")}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleConnectTelegram}
-                      className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                    >
-                      <TelegramIcon size={16} />
-                      <span>
-                        {isTelegramLinking
-                          ? t("profile.telegramLinking")
-                          : telegramConnection
-                            ? t("profile.telegramReconnect")
-                            : t("profile.telegramConnect")}
-                      </span>
-                    </button>
-                    {telegramConnection && (
-                      <button
-                        type="button"
-                        onClick={handleDisconnectTelegram}
-                        className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-100"
-                      >
-                        <span>{t("profile.telegramDisconnect")}</span>
-                      </button>
-                    )}
-                  </div>
-                  {telegramLinkError && (
-                    <p className="mt-2 text-xs text-red-600">{telegramLinkError}</p>
-                  )}
-                </div>
-                <button 
-                  type="button"
-                  className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-md text-sm font-medium transition-colors border border-red-200"
-                  onClick={() => setIsDeleteModalOpen(true)}
-                >
-                  {t("profile.delete")}
-                </button>
-              </div>
-            )}
+            <div className="mt-8 pt-8 border-t border-gray-100">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">{t("profile.config")}</h3>
+              <TelegramConnectionCard className="mb-4" />
+              <button 
+                type="button"
+                className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-md text-sm font-medium transition-colors border border-red-200"
+                onClick={() => setIsDeleteModalOpen(true)}
+              >
+                {t("profile.delete")}
+              </button>
+            </div>
           </div>
 
           <div className="mt-8">

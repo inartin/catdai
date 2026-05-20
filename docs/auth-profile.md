@@ -15,7 +15,7 @@ Implemented and active.
 - logout
 - favorites
 - listing alerts
-- Telegram connection controls
+- always-visible Telegram connection controls
 - account deletion
 
 ## Activity Tracking

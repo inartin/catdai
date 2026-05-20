@@ -4,8 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import AuthOptions from "@/components/AuthOptions";
 import CloseIcon from "@/components/icons/CloseIcon";
+import AlertIcon from "@/components/icons/AlertIcon";
+import TelegramIcon from "@/components/icons/TelegramIcon";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import TelegramConnectionCard from "@/components/TelegramConnectionCard";
 
 const defaultAlertFilters = {
   priceMin: "",
@@ -168,20 +171,39 @@ function SegmentedOption({ active, children, onClick }) {
   );
 }
 
-function CheckboxOption({ checked, children, onChange }) {
+function CheckboxOption({ checked, children, onChange, className = "", fullWidth = true }) {
   return (
     <button
       type="button"
       onClick={() => onChange(!checked)}
-      className="flex w-full items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
+      className={`flex ${fullWidth ? "w-full items-center justify-between" : "w-fit items-center justify-start gap-4"} rounded-xl border border-gray-200 bg-white px-4 py-3 text-left text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50 ${className}`}
     >
-      <span>{children}</span>
+      <span className="flex items-center gap-2">{children}</span>
       <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${checked ? "border-primary bg-primary text-white" : "border-gray-300 text-transparent"}`}>
         <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="m3.5 8 3 3 6-6" />
         </svg>
       </span>
     </button>
+  );
+}
+
+function NotificationSection({ children, title, description }) {
+  return (
+    <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <AlertIcon size={18} />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          <p className="mt-1 text-sm text-gray-400">{description}</p>
+        </div>
+      </div>
+      <div className="mt-5">
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -264,6 +286,7 @@ export default function ListingAlertConfigurator({
   const [alertSaving, setAlertSaving] = useState(false);
   const [alertError, setAlertError] = useState("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [telegramNotificationsEnabled, setTelegramNotificationsEnabled] = useState(false);
 
   const chips = marketFilterChips?.length
     ? marketFilterChips
@@ -303,6 +326,12 @@ export default function ListingAlertConfigurator({
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateTelegramNotifications = (checked) => {
+    setAlertSaved(false);
+    setAlertError("");
+    setTelegramNotificationsEnabled(checked);
+  };
+
   const handleSaveAlert = async () => {
     if (alertSaving || alertSaved) return;
 
@@ -327,7 +356,7 @@ export default function ListingAlertConfigurator({
         body: JSON.stringify({
           label: buildListingAlertLabel(baseInput, t),
           website_enabled: true,
-          telegram_enabled: false,
+          telegram_enabled: telegramNotificationsEnabled,
           base_filters: buildListingAlertBaseFilters(baseInput, filtersUsed),
           alert_filters: buildNotificationFilters(filters),
         }),
@@ -544,6 +573,28 @@ export default function ListingAlertConfigurator({
               </div>
             </div>
           </section>
+
+          <NotificationSection
+            title={t("result.notificationsTitle")}
+            description={t("result.notificationsDesc")}
+          >
+            <div className="space-y-4">
+              <CheckboxOption
+                checked={telegramNotificationsEnabled}
+                onChange={updateTelegramNotifications}
+                fullWidth={false}
+              >
+                <TelegramIcon size={16} />
+                {t("result.telegramNotifications")}
+              </CheckboxOption>
+
+              {telegramNotificationsEnabled && (
+                <TelegramConnectionCard
+                  onConnectionChange={(connection) => setTelegramNotificationsEnabled(!!connection)}
+                />
+              )}
+            </div>
+          </NotificationSection>
 
           {savePlacement === "after" && (
             <SaveAlertAction

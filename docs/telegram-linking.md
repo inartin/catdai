@@ -9,6 +9,7 @@ Account linking implemented. Alert delivery depends on an external bot/worker.
 - Bot calls `/api/telegram-link/claim` with `x-catdai-telegram-secret`.
 - Server stores one Telegram connection per user.
 - Disconnect removes the connection and disables Telegram on that user's alerts.
+- Profile polls `/api/telegram-link` while a link is pending, so the UI flips to connected without a page refresh.
 
 ## Security
 - Link tokens are hashed in DB.
@@ -20,6 +21,7 @@ Account linking implemented. Alert delivery depends on an external bot/worker.
 - `src/app/api/telegram-link/route.js`
 - `src/app/api/telegram-link/claim/route.js`
 - `src/app/api/telegram-link/disconnect/route.js`
+- `src/app/profile/page.js`
 - `src/lib/telegram-link-secret.js`
 - `db/user_telegram_connections.sql`
 - `db/constants.js`

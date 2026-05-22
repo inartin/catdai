@@ -17,7 +17,7 @@ Implemented.
 - About page includes `AboutPage`.
 
 ## Analytics And Consent
-- Google Analytics loads only when `NEXT_PUBLIC_GA_ID` exists.
+- Google tag loads once and configures `NEXT_PUBLIC_GA_ID` plus Google Ads-provided tag `G-DF2HD9WF05`.
 - Default consent denies analytics/ad storage.
 - Cookie banner can grant or deny consent.
 - `/estimeaza` sends `conversion_event_page_view_1` once on client mount when GA is available.

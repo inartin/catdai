@@ -19,6 +19,9 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
+  const googleAdsTagId = "G-DF2HD9WF05";
+  const googleTagIds = [gaId, googleAdsTagId].filter(Boolean);
+  const googleTagScriptId = googleTagIds[0];
   const siteUrl = getCanonicalSiteUrl();
 
   const organizationJsonLd = {
@@ -55,7 +58,7 @@ export default function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteJsonLd) }}
         />
-        {gaId && (
+        {googleTagScriptId && (
           <>
             <script
               dangerouslySetInnerHTML={{
@@ -71,16 +74,21 @@ export default function RootLayout({ children }) {
                 `,
               }}
             />
-            <script async src={`https://www.googletagmanager.com/gtag/js?id=${gaId}`} />
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${googleTagScriptId}`} />
             <script
               dangerouslySetInnerHTML={{
                 __html: `
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
                   gtag('js', new Date());
-                  gtag('config', '${gaId}', {
+                  ${googleTagIds
+                    .map(
+                      (tagId) => `
+                  gtag('config', '${tagId}', {
                     page_path: window.location.pathname,
-                  });
+                  });`
+                    )
+                    .join("")}
                 `,
               }}
             />

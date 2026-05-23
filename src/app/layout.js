@@ -19,7 +19,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
-  const googleAdsTagId = "G-DF2HD9WF05";
+  const googleAdsTagId = "AW-18184166002";
   const googleTagIds = [gaId, googleAdsTagId].filter(Boolean);
   const googleTagScriptId = googleTagIds[0];
   const siteUrl = getCanonicalSiteUrl();

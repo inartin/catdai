@@ -19,6 +19,7 @@ Implemented.
 ## Analytics And Consent
 - Google tag loads once and configures `NEXT_PUBLIC_GA_ID` plus Google Ads-provided tag `AW-18184166002`.
 - The shared Google tag script loads with the Ads ID first so Ads diagnostics see the expected source ID.
+- CSP allows Google Ads collection endpoints used by remarketing, consent mode, and view-through conversion checks.
 - Default consent uses stored cookie consent when available, otherwise denies analytics/ad storage.
 - Cookie banner can grant or deny consent.
 - Google Ads conversion actions need `NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL`; this is the label after `AW-18184166002/` in the Ads event snippet.

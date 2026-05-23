@@ -20,8 +20,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
   const googleAdsTagId = "AW-18184166002";
-  const googleTagIds = [gaId, googleAdsTagId].filter(Boolean);
-  const googleTagScriptId = googleTagIds[0];
+  const googleAdsConversionLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL;
+  const googleTagIds = [googleAdsTagId, gaId].filter(Boolean);
+  const googleAdsConversionSendTo = googleAdsConversionLabel
+    ? `${googleAdsTagId}/${googleAdsConversionLabel}`
+    : null;
   const siteUrl = getCanonicalSiteUrl();
 
   const organizationJsonLd = {
@@ -58,23 +61,25 @@ export default function RootLayout({ children }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(websiteJsonLd) }}
         />
-        {googleTagScriptId && (
+        {googleTagIds.length > 0 && (
           <>
             <script
               dangerouslySetInnerHTML={{
                 __html: `
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
+                  var cookieConsent = localStorage.getItem('cookie_consent');
+                  var googleConsent = cookieConsent === 'granted' ? 'granted' : 'denied';
                   gtag('consent', 'default', {
-                    'analytics_storage': 'denied',
-                    'ad_storage': 'denied',
-                    'ad_user_data': 'denied',
-                    'ad_personalization': 'denied',
+                    'analytics_storage': googleConsent,
+                    'ad_storage': googleConsent,
+                    'ad_user_data': googleConsent,
+                    'ad_personalization': googleConsent,
                   });
                 `,
               }}
             />
-            <script async src={`https://www.googletagmanager.com/gtag/js?id=${googleTagScriptId}`} />
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${googleAdsTagId}`} />
             <script
               dangerouslySetInnerHTML={{
                 __html: `
@@ -89,6 +94,16 @@ export default function RootLayout({ children }) {
                   });`
                     )
                     .join("")}
+                  ${
+                    googleAdsConversionSendTo
+                      ? `
+                  window.catdaiTrackGoogleAdsConversion = function() {
+                    gtag('event', 'conversion', {
+                      send_to: '${googleAdsConversionSendTo}',
+                    });
+                  };`
+                      : ""
+                  }
                 `,
               }}
             />

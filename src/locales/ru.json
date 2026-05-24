@@ -180,7 +180,6 @@
   "result.baseMarketFiltersDesc": "Эти критерии определяют текущий результат и будут включены в уведомление.",
   "result.listingFilters": "Дополнительные фильтры для уведомления",
   "result.listingFiltersDesc": "Они применяются только к уведомлениям и не меняют анализ рынка.",
-  "result.uiDraft": "UI draft",
   "result.budget": "Бюджет, €",
   "result.notificationsTitle": "Уведомления",
   "result.notificationsDesc": "Настройка получения уведомлений о новых объявлениях.",

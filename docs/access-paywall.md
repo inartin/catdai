@@ -8,17 +8,17 @@ Preview paywall implemented. Real payments not implemented.
 - Any authenticated Supabase user is currently returned as `paid`.
 - `user_entitlements` schema exists, but `resolveAccessTier()` does not read it yet.
 
-## Free Payload
-The backend removes locked values before returning data:
-- fast sale and premium prices
+## Result Payload
+Estimate results return the same valuation numbers for anonymous and authenticated users:
+- fast sale, market, and premium prices
 - numeric range
-- detailed market stats
+- market stats
 - district comparison values
 - market position numbers
 - seller breakdown values
-- cadastral detail fields
 
-UI renders locked placeholders from `locked_sections`.
+UI renders these values directly. There is no blur, tooltip, lock marker, or fake numeric placeholder on estimate result numbers.
+`src/components/BlurWall.js` keeps the reusable blur-wall presentation available for future paywall variants.
 
 ## Paid Payload
 Paid users receive the full estimate and cadastral response.
@@ -31,4 +31,5 @@ If a shared link was created by a paid user, `/api/estimate` allows full result 
 - `src/app/api/estimate/route.js`
 - `src/app/api/cadastral/route.js`
 - `src/components/EstimateResult.js`
+- `src/components/BlurWall.js`
 - `db/user_entitlements.sql`

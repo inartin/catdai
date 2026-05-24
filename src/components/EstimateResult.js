@@ -214,83 +214,6 @@ function MarketTrendMiniChart({ trend, compact = false }) {
   );
 }
 
-function LockedValue({ text = "999999", className = "", onClick }) {
-  const { t } = useTranslation();
-  const [showTooltip, setShowTooltip] = useState(false);
-  const triggerRef = useRef(null);
-  const [tooltipPos, setTooltipPos] = useState(null);
-
-  const updateTooltipPosition = useCallback(() => {
-    if (!triggerRef.current || typeof window === "undefined") return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const baseLeft = rect.left + rect.width / 2;
-    const top = rect.top - 8;
-    const halfTooltip = 140;
-    const clampedLeft = Math.min(
-      Math.max(baseLeft, halfTooltip),
-      window.innerWidth - halfTooltip
-    );
-    setTooltipPos({
-      left: clampedLeft,
-      top,
-      arrowOffset: baseLeft - clampedLeft,
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!showTooltip) return;
-    updateTooltipPosition();
-    const onReposition = () => updateTooltipPosition();
-    window.addEventListener("resize", onReposition);
-    window.addEventListener("scroll", onReposition, true);
-    return () => {
-      window.removeEventListener("resize", onReposition);
-      window.removeEventListener("scroll", onReposition, true);
-    };
-  }, [showTooltip, updateTooltipPosition]);
-
-  return (
-    <span className="relative inline-block">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.();
-        }}
-        onMouseEnter={() => {
-          updateTooltipPosition();
-          setShowTooltip(true);
-        }}
-        onMouseLeave={() => setShowTooltip(false)}
-        onFocus={() => {
-          updateTooltipPosition();
-          setShowTooltip(true);
-        }}
-        onBlur={() => setShowTooltip(false)}
-        className={`inline-block select-none blur-sm cursor-pointer bg-transparent border-0 p-0 ${className}`}
-      >
-        {text}
-      </button>
-      {showTooltip && tooltipPos && typeof document !== "undefined"
-        ? createPortal(
-          <span
-            className="pointer-events-none fixed z-[70] left-1/2 top-0 -translate-x-1/2 -translate-y-full px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium text-center max-w-[280px] leading-tight shadow-lg animate-fade-in"
-            style={{ left: tooltipPos.left, top: tooltipPos.top }}
-          >
-            {t("result.loginToSeeFullAnalysis")}
-            <span
-              className="absolute top-full -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900"
-              style={{ left: `calc(50% + ${tooltipPos.arrowOffset}px)` }}
-            />
-          </span>,
-          document.body
-        )
-        : null}
-    </span>
-  );
-}
-
 function FilterBadge({ label, active }) {
   return (
     <span
@@ -336,7 +259,7 @@ function FeatureAdjustmentBadge({ item }) {
   );
 }
 
-function DistrictComparison({ districts, currentDistrict, area, blurValues, onLockedClick, className = "" }) {
+function DistrictComparison({ districts, currentDistrict, area, className = "" }) {
   const { t } = useTranslation();
 
   if (!districts || districts.length < 2) return null;
@@ -387,12 +310,8 @@ function DistrictComparison({ districts, currentDistrict, area, blurValues, onLo
                     } ${isCurrent ? "font-bold text-primary" : "text-gray-600"}`}
                   style={widthPct > 50 ? {} : { left: `calc(${widthPct}% + 8px)` }}
                 >
-                  {blurValues || totalPrice == null ? (
-                    <LockedValue
-                      text="€99.999"
-                      className={isCurrent ? "text-primary" : "text-gray-500"}
-                      onClick={onLockedClick}
-                    />
+                  {totalPrice == null ? (
+                    "—"
                   ) : (
                     `€${totalPrice.toLocaleString("ro-MD")}`
                   )}
@@ -531,13 +450,6 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const { session, isAuthenticated, clearAuthError } = useAuth();
 
   const isPaid = data.access_tier === "paid";
-  const lockedSections = data.locked_sections || {};
-  const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
-  const hideCadastralDetails = !isPaid && lockedSections.cadastral_details !== false;
-  const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
-  const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
-  const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
-  const hideSellerBreakdownValues = !isPaid && lockedSections.seller_breakdown_values !== false;
 
   useEffect(() => () => onListingsModeChange?.(false), [onListingsModeChange]);
 
@@ -763,7 +675,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     isAuthModalOpen && typeof document !== "undefined"
       ? createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 cursor-zoom-out"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 cursor-zoom-out"
           onClick={() => setIsAuthModalOpen(false)}
         >
           <div
@@ -919,18 +831,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
           <div className="p-5 sm:p-6 text-center">
             <p className="text-sm text-gray-400 mb-1">{t("result.fastSale")}</p>
             <p className="text-xl font-bold text-emerald-600">
-              {hidePriceTiers ? (
-                <LockedValue onClick={openAuthModal} text="€999.999" className="text-emerald-600" />
-              ) : (
-                formatPrice(estimate.fast_sale)
-              )}
+              {formatPrice(estimate.fast_sale)}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
-              {hidePriceTiers ? (
-                <LockedValue onClick={openAuthModal} text="-99%" />
-              ) : (
-                "-10%"
-              )}
+              -10%
             </p>
           </div>
           <div className="p-5 sm:p-6 text-center bg-primary/5">
@@ -942,18 +846,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
           <div className="p-5 sm:p-6 text-center">
             <p className="text-sm text-gray-400 mb-1">{t("result.targetPrice")}</p>
             <p className="text-xl font-bold text-amber-600">
-              {hidePriceTiers ? (
-                <LockedValue onClick={openAuthModal} text="€999.999" className="text-amber-600" />
-              ) : (
-                formatPrice(estimate.premium)
-              )}
+              {formatPrice(estimate.premium)}
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
-              {hidePriceTiers ? (
-                <LockedValue onClick={openAuthModal} text="+99%" />
-              ) : (
-                "+8%"
-              )}
+              +8%
             </p>
           </div>
         </div>
@@ -979,13 +875,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 {indRate && agRate && (
                   <div className="flex flex-wrap items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm">
                     <span className="text-xs font-bold uppercase tracking-wide text-gray-500">{t("result.sellerDifference")}</span>
-                    {hideSellerBreakdownValues ? (
-                      <LockedValue onClick={openAuthModal} text="+€99.999 (+9.9%)" className="text-gray-700" />
-                    ) : (
-                      <span className={`text-sm font-bold ${sellerDelta > 0 ? "text-amber-600" : sellerDelta < 0 ? "text-emerald-600" : "text-gray-900"}`}>
-                        {sellerDelta > 0 ? "+" : ""}€{Math.abs(sellerDelta).toLocaleString("ro-MD")} ({sellerDelta > 0 ? "+" : ""}{sellerDeltaPct.toFixed(1)}%)
-                      </span>
-                    )}
+                    <span className={`text-sm font-bold ${sellerDelta > 0 ? "text-amber-600" : sellerDelta < 0 ? "text-emerald-600" : "text-gray-900"}`}>
+                      {sellerDelta > 0 ? "+" : ""}€{Math.abs(sellerDelta).toLocaleString("ro-MD")} ({sellerDelta > 0 ? "+" : ""}{sellerDeltaPct.toFixed(1)}%)
+                    </span>
                   </div>
                 )}
               </div>
@@ -995,18 +887,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   {data.estimates_by_seller.individual?.estimate?.market_rate ? (
                     <>
                       <p className="text-xl font-bold text-gray-900">
-                        {hideSellerBreakdownValues ? (
-                          <LockedValue onClick={openAuthModal} text="€999.999" className="text-gray-900" />
-                        ) : (
-                          formatPrice(data.estimates_by_seller.individual.estimate.market_rate)
-                        )}
+                        {formatPrice(data.estimates_by_seller.individual.estimate.market_rate)}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {hideSellerBreakdownValues ? (
-                          <LockedValue onClick={openAuthModal} text="€9.999/m²" className="text-gray-400" />
-                        ) : (
-                          `${formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²`
-                        )}
+                        {formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²
                       </p>
                     </>
                   ) : (
@@ -1018,18 +902,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   {data.estimates_by_seller.agency?.estimate?.market_rate ? (
                     <>
                       <p className="text-xl font-bold text-gray-900">
-                        {hideSellerBreakdownValues ? (
-                          <LockedValue onClick={openAuthModal} text="€999.999" className="text-gray-900" />
-                        ) : (
-                          formatPrice(data.estimates_by_seller.agency.estimate.market_rate)
-                        )}
+                        {formatPrice(data.estimates_by_seller.agency.estimate.market_rate)}
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {hideSellerBreakdownValues ? (
-                          <LockedValue onClick={openAuthModal} text="€9.999/m²" className="text-gray-400" />
-                        ) : (
-                          `${formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²`
-                        )}
+                        {formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²
                       </p>
                     </>
                   ) : (
@@ -1075,18 +951,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                         </span>
                       </div>
                     )}
-                    {hideCadastralDetails ? (
+                    {cadastral.apartment?.estimated_value_lei && (
                       <div className="flex justify-between text-base">
                         <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
-                        <LockedValue onClick={openAuthModal} text="999999 lei" className="font-medium" />
+                        <span className="font-medium text-gray-900">{cadastral.apartment.estimated_value_lei} lei</span>
                       </div>
-                    ) : (
-                      cadastral.apartment?.estimated_value_lei && (
-                        <div className="flex justify-between text-base">
-                          <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
-                          <span className="font-medium text-gray-900">{cadastral.apartment.estimated_value_lei} lei</span>
-                        </div>
-                      )
                     )}
                   </div>
                 </div>
@@ -1096,40 +965,26 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700 mb-2.5">{t("form.cadastralBuilding")}</p>
                   <div className="space-y-2.5">
-                    {hideCadastralDetails ? (
-                      <>
-                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><LockedValue onClick={openAuthModal} text="9999" className="font-medium" /></div>
-                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                        <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><LockedValue onClick={openAuthModal} text="999999" className="font-medium" /></div>
-                      </>
-                    ) : (
-                      <>
-                        {cadastral.building?.classifier && (
-                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><span className="font-medium text-gray-900">{cadastral.building.classifier}</span></div>
-                        )}
-                        {cadastral.building?.condition && (
-                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><span className="font-medium text-gray-900">{cadastral.building.condition}</span></div>
-                        )}
-                        {cadastral.building?.construction_year && (
-                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><span className="font-medium text-gray-900">{cadastral.building.construction_year}</span></div>
-                        )}
-                        {cadastral.building?.wall_material && (
-                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><span className="font-medium text-gray-900">{cadastral.building.wall_material}</span></div>
-                        )}
-                        {cadastral.building?.water && (
-                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><span className="font-medium text-gray-900">{cadastral.building.water}</span></div>
-                        )}
-                        {cadastral.building?.sewage && (
-                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><span className="font-medium text-gray-900">{cadastral.building.sewage}</span></div>
-                        )}
-                        {cadastral.building?.gas && (
-                          <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><span className="font-medium text-gray-900">{cadastral.building.gas}</span></div>
-                        )}
-                      </>
+                    {cadastral.building?.classifier && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><span className="font-medium text-gray-900">{cadastral.building.classifier}</span></div>
+                    )}
+                    {cadastral.building?.condition && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><span className="font-medium text-gray-900">{cadastral.building.condition}</span></div>
+                    )}
+                    {cadastral.building?.construction_year && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><span className="font-medium text-gray-900">{cadastral.building.construction_year}</span></div>
+                    )}
+                    {cadastral.building?.wall_material && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><span className="font-medium text-gray-900">{cadastral.building.wall_material}</span></div>
+                    )}
+                    {cadastral.building?.water && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><span className="font-medium text-gray-900">{cadastral.building.water}</span></div>
+                    )}
+                    {cadastral.building?.sewage && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><span className="font-medium text-gray-900">{cadastral.building.sewage}</span></div>
+                    )}
+                    {cadastral.building?.gas && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><span className="font-medium text-gray-900">{cadastral.building.gas}</span></div>
                     )}
                   </div>
                 </div>
@@ -1187,25 +1042,13 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
               <div className="flex justify-between mt-3">
                 <span className="text-xs text-gray-400">
-                  {hideMarketPositionNumbers ? (
-                    <LockedValue onClick={openAuthModal} text="€999.999" />
-                  ) : (
-                    formatPrice(range.low)
-                  )}
+                  {formatPrice(range.low)}
                 </span>
                 <span className="text-sm text-gray-500 font-medium">
-                  {hideMarketPositionNumbers ? (
-                    <LockedValue onClick={openAuthModal} text={t("result.median", { price: "€999.999" })} />
-                  ) : (
-                    t("result.median", { price: formatPrice(market_stats.median_price_per_m2) })
-                  )}
+                  {t("result.median", { price: formatPrice(market_stats.median_price_per_m2) })}
                 </span>
                 <span className="text-xs text-gray-400">
-                  {hideMarketPositionNumbers ? (
-                    <LockedValue onClick={openAuthModal} text="€999.999" />
-                  ) : (
-                    formatPrice(range.high)
-                  )}
+                  {formatPrice(range.high)}
                 </span>
               </div>
             </div>
@@ -1359,8 +1202,6 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             districts={district_comparison}
             currentDistrict={input.district}
             area={input.area_m2}
-            blurValues={hideDistrictComparisonValues}
-            onLockedClick={openAuthModal}
             className={compactLayout ? "" : "order-4"}
           />
 
@@ -1377,31 +1218,19 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               <div>
                 <p className="text-sm text-gray-400 mb-1">{t("result.avgPricePerM2")}</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {hideMarketStatsValues ? (
-                    <LockedValue onClick={openAuthModal} text="€999.999" />
-                  ) : (
-                    formatPrice(market_stats.avg_price_per_m2)
-                  )}
+                  {formatPrice(market_stats.avg_price_per_m2)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-400 mb-1">{t("result.medianPricePerM2")}</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {hideMarketStatsValues ? (
-                    <LockedValue onClick={openAuthModal} text="€999.999" />
-                  ) : (
-                    formatPrice(market_stats.median_price_per_m2)
-                  )}
+                  {formatPrice(market_stats.median_price_per_m2)}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-400 mb-1">{t("result.avgTotalPrice")}</p>
                 <p className="text-xl font-bold text-gray-900">
-                  {hideMarketStatsValues ? (
-                    <LockedValue onClick={openAuthModal} text="€999.999" />
-                  ) : (
-                    formatPrice(market_stats.avg_price)
-                  )}
+                  {formatPrice(market_stats.avg_price)}
                 </p>
               </div>
             </div>

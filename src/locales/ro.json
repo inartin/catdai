@@ -180,7 +180,6 @@
   "result.baseMarketFiltersDesc": "Aceste criterii definesc rezultatul curent și vor fi incluse în alertă.",
   "result.listingFilters": "Filtre suplimentare pentru alertă",
   "result.listingFiltersDesc": "Se aplică doar notificărilor și nu schimbă analiza pieței.",
-  "result.uiDraft": "UI draft",
   "result.budget": "Buget, €",
   "result.notificationsTitle": "Notificări",
   "result.notificationsDesc": "Alegi unde vrei să primești notificările pentru anunțurile noi.",

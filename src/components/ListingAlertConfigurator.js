@@ -275,7 +275,6 @@ export default function ListingAlertConfigurator({
   baseContent,
   onBeforeSave,
   showAreaFilters = false,
-  showDraftBadge = true,
   savePlacement = "aside",
   className = "",
 }) {
@@ -383,7 +382,7 @@ export default function ListingAlertConfigurator({
     isAuthModalOpen && typeof document !== "undefined"
       ? createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 cursor-zoom-out"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 cursor-zoom-out"
           onClick={() => setIsAuthModalOpen(false)}
         >
           <div
@@ -471,11 +470,6 @@ export default function ListingAlertConfigurator({
                 <h3 className="text-base font-semibold text-gray-900">{t("result.listingFilters")}</h3>
                 <p className="mt-1 text-sm text-gray-400">{t("result.listingFiltersDesc")}</p>
               </div>
-              {showDraftBadge && (
-                <span className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-600">
-                  {t("result.uiDraft")}
-                </span>
-              )}
             </div>
 
             <div className="mt-5 space-y-5">

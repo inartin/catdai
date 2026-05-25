@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import { getSharedCache, setSharedCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+const TWENTY_FOUR_HOURS_SECONDS = 24 * 60 * 60;
+const CACHE_KEY = "catdai:prices:latest:v1";
 
 // ── In-memory cache ─────────────────────────────────────────
 let cache = null; // { data, updated_at }
@@ -30,6 +33,14 @@ async function fetchFromParser() {
 }
 
 export async function GET() {
+  const sharedCache = await getSharedCache(CACHE_KEY);
+  if (sharedCache && isCacheFresh(sharedCache.value?.updated_at)) {
+    cache = { data: sharedCache.value, updated_at: sharedCache.value.updated_at };
+    return NextResponse.json(sharedCache.value, {
+      headers: { "Cache-Control": "no-store, max-age=0" },
+    });
+  }
+
   // 1. Return cached data if updated_at is < 24h old
   if (cache && isCacheFresh(cache.updated_at)) {
     return NextResponse.json(cache.data, {
@@ -41,6 +52,7 @@ export async function GET() {
   try {
     const data = await fetchFromParser();
     cache = { data, updated_at: data.updated_at };
+    await setSharedCache(CACHE_KEY, data, TWENTY_FOUR_HOURS_SECONDS);
     return NextResponse.json(data, {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });

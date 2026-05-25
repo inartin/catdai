@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getSharedCache, setSharedCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
 const MARKET_TREND_DAYS = 60;
 const MIN_MARKET_TREND_POINTS = 2;
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const CACHE_TTL_SECONDS = 12 * 60 * 60;
+const CACHE_KEY = "catdai:market-trends:v1";
 const CACHE_HEADERS = {
   "Cache-Control": "public, max-age=0, s-maxage=43200, stale-while-revalidate=86400",
 };
@@ -63,6 +66,15 @@ function buildTrendPayload(rows, buildingType) {
 }
 
 export async function GET() {
+  const sharedCache = await getSharedCache(CACHE_KEY);
+  if (sharedCache) {
+    cache = {
+      cached_at: Date.now(),
+      data: sharedCache.value,
+    };
+    return NextResponse.json(sharedCache.value, { headers: CACHE_HEADERS });
+  }
+
   if (cache && isCacheFresh(cache.cached_at)) {
     return NextResponse.json(cache.data, { headers: CACHE_HEADERS });
   }
@@ -103,6 +115,7 @@ export async function GET() {
       cached_at: Date.now(),
       data: payload,
     };
+    await setSharedCache(CACHE_KEY, payload, CACHE_TTL_SECONDS);
 
     return NextResponse.json(payload, { headers: CACHE_HEADERS });
   } catch (error) {

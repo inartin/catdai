@@ -4,7 +4,7 @@ module.exports = {
       name: "catdai-redis",
       script: "bash",
       args:
-        "-lc \"mkdir -p .redis && exec redis-server --bind 127.0.0.1 --port 6379 --dir .redis --appendonly yes --daemonize no\"",
+        "-c 'mkdir -p .redis && REDIS_BIN=$(command -v redis-server || command -v redis6-server) && exec \"$REDIS_BIN\" --bind 127.0.0.1 --port 6379 --dir .redis --appendonly yes --daemonize no'",
       autorestart: true,
       watch: false,
       max_memory_restart: "256M",

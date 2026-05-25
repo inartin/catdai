@@ -18,7 +18,8 @@ Backend prepared and active when Redis is reachable.
 - For same-host Redis, keep Redis bound to `127.0.0.1` and do not expose port `6379` publicly.
 - Restart the app after adding or changing env vars.
 - PM2 starts Redis through `ecosystem.config.cjs` as `catdai-redis`; it stores append-only data in `.redis`.
-- The host must have the `redis-server` binary installed before running PM2.
+- The host must have `redis-server` or `redis6-server` installed before running PM2.
+- On Amazon Linux with `amazon-linux-extras enable redis6`, the binary is usually `redis6-server`.
 
 ## PM2 Start
 ```bash

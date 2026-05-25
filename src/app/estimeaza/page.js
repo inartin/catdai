@@ -42,7 +42,33 @@ function EstimeazaContent() {
     };
   }, [searchParams]);
 
-  return <PropertyForm onBack={() => router.push("/")} initialValues={prefill} />;
+  const trackCompleteEstimateConversion = (targetUrl) => {
+    if (
+      typeof window === "undefined" ||
+      typeof window.catdaiTrackGoogleAdsConversion !== "function"
+    ) {
+      return true;
+    }
+
+    let shouldNavigate = true;
+    const navigate = () => {
+      if (!shouldNavigate) return;
+      shouldNavigate = false;
+      router.push(targetUrl);
+    };
+
+    window.catdaiTrackGoogleAdsConversion(navigate);
+    window.setTimeout(navigate, 1000);
+    return false;
+  };
+
+  return (
+    <PropertyForm
+      onBack={() => router.push("/")}
+      initialValues={prefill}
+      onValidSubmit={trackCompleteEstimateConversion}
+    />
+  );
 }
 
 export default function EstimeazaPage() {

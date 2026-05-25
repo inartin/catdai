@@ -144,7 +144,7 @@ function PillGroup({ options, value, onChange, columns, labelFn }) {
 }
 
 
-export default function PropertyForm({ onBack, initialValues, onSubmit }) {
+export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit }) {
   const router = useRouter();
   const { t } = useTranslation();
   const [form, setForm] = useState({
@@ -295,11 +295,15 @@ export default function PropertyForm({ onBack, initialValues, onSubmit }) {
     params.set("_new", "1");
 
     if (onSubmit) {
+      onValidSubmit?.();
       onSubmit(params);
       return;
     }
 
-    router.push(`/evaluare?${params.toString()}`);
+    const targetUrl = `/evaluare?${params.toString()}`;
+    if (onValidSubmit?.(targetUrl) === false) return;
+
+    router.push(targetUrl);
   };
 
   const accuracy = useMemo(() => {

@@ -20,7 +20,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
   const googleAdsTagId = "AW-18184166002";
-  const googleAdsConversionLabel = process.env.NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL;
+  const googleAdsConversionLabel = "Afy1CNv4g7McEPK08d5D";
   const googleTagIds = [googleAdsTagId, gaId].filter(Boolean);
   const googleAdsConversionSendTo = googleAdsConversionLabel
     ? `${googleAdsTagId}/${googleAdsConversionLabel}`
@@ -97,9 +97,10 @@ export default function RootLayout({ children }) {
                   ${
                     googleAdsConversionSendTo
                       ? `
-                  window.catdaiTrackGoogleAdsConversion = function() {
+                  window.catdaiTrackGoogleAdsConversion = function(callback) {
                     gtag('event', 'conversion', {
                       send_to: '${googleAdsConversionSendTo}',
+                      event_callback: callback,
                     });
                   };`
                       : ""

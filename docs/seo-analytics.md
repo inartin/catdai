@@ -22,7 +22,7 @@ Implemented.
 - CSP allows Google Ads collection endpoints used by remarketing, consent mode, and view-through conversion checks.
 - Default consent uses stored cookie consent when available, otherwise denies analytics/ad storage.
 - Cookie banner can grant or deny consent.
-- Google Ads conversion actions need `NEXT_PUBLIC_GOOGLE_ADS_CONVERSION_LABEL`; this is the label after `AW-18184166002/` in the Ads event snippet.
+- The `/estimeaza` submit button fires Google Ads conversion `AW-18184166002/Afy1CNv4g7McEPK08d5D` before navigating to `/evaluare`.
 - `/estimeaza` sends `conversion_event_page_view_1` once on client mount when GA is available.
 - Estimate logging stores device/session ids, input summary, result price, language, response time, and hashed IP.
 

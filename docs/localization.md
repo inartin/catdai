@@ -14,7 +14,8 @@ Implemented for Romanian and Russian UI.
 - `document.documentElement.lang` follows selected language.
 - `/estimeaza` sets a localized browser title from `estimeaza.pageTitle`.
 - `/evaluare` sets a localized browser title from `evaluare.pageTitle`.
-- `/estimeaza`, `/evaluare`, and `/profile` also read the `catdai-lang` cookie in route metadata so hard refreshes render the selected language title before hydration.
+- `/alerts` sets a localized browser title from `alerts.pageTitle`.
+- `/estimeaza`, `/evaluare`, `/alerts`, and `/profile` also read the `catdai-lang` cookie in route metadata so hard refreshes render the selected language title before hydration.
 - Localized FAQ routes exist at `/ro/faq` and `/ru/faq`.
 
 ## Current Default

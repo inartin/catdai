@@ -37,12 +37,25 @@ function fmtDate(d) {
 function fmtDateTime(d) {
   if (!d) return "\u2014";
   return new Date(d).toLocaleString("ro-RO", {
-    day: "2-digit",
-    month: "short",
+    day: "numeric",
+    month: "long",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function fmtBool(value) {
+  return value ? "Yes" : "No";
+}
+
+function fmtProperty(row) {
+  return [
+    row.roomsCount ? `${row.roomsCount} rooms` : null,
+    row.areaM2 ? `${fmtNum(row.areaM2)} m\u00B2` : null,
+    row.district,
+    row.city,
+  ].filter(Boolean).join(" · ") || "\u2014";
 }
 
 function StatCard({ label, value, detail, onClick, active = false }) {
@@ -177,6 +190,10 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState(null);
+  const [showEstimationsList, setShowEstimationsList] = useState(false);
+  const [estimations, setEstimations] = useState([]);
+  const [estimationsLoading, setEstimationsLoading] = useState(false);
+  const [estimationsError, setEstimationsError] = useState(null);
 
   useEffect(() => {
     fetch("/api/admin/stats")
@@ -214,6 +231,29 @@ export default function AdminDashboard() {
     setShowUsersList(next);
     if (next && users.length === 0 && !usersLoading) {
       loadUsers();
+    }
+  };
+
+  const loadEstimations = async () => {
+    setEstimationsLoading(true);
+    setEstimationsError(null);
+    try {
+      const res = await fetch("/api/admin/estimations");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setEstimations(Array.isArray(data.estimations) ? data.estimations : []);
+    } catch (err) {
+      setEstimationsError(err.message || "Failed to load estimations");
+    } finally {
+      setEstimationsLoading(false);
+    }
+  };
+
+  const toggleEstimationsList = () => {
+    const next = !showEstimationsList;
+    setShowEstimationsList(next);
+    if (next && estimations.length === 0 && !estimationsLoading) {
+      loadEstimations();
     }
   };
 
@@ -271,7 +311,13 @@ export default function AdminDashboard() {
             onClick={toggleUsersList}
             active={showUsersList}
           />
-          <StatCard label="Total Estimations" value={fmtNum(s.totalEstimations)} />
+          <StatCard
+            label="Total Estimations"
+            value={fmtNum(s.totalEstimations)}
+            detail={showEstimationsList ? "Click to hide list" : "Click to view recent estimations"}
+            onClick={toggleEstimationsList}
+            active={showEstimationsList}
+          />
           <StatCard label="Shared Links" value={fmtNum(s.totalSharedLinks)} />
           <StatCard label="Favorites" value={fmtNum(s.totalFavorites)} />
         </div>
@@ -327,6 +373,74 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600">
                           {fmtNum(u.favorites)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+        {showEstimationsList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Recent Estimations</h3>
+              <button
+                type="button"
+                onClick={loadEstimations}
+                disabled={estimationsLoading}
+                className="text-xs text-primary hover:underline disabled:text-gray-400 disabled:no-underline"
+              >
+                {estimationsLoading ? "Loading..." : "Refresh"}
+              </button>
+            </div>
+
+            {estimationsError ? (
+              <div className="px-5 py-8 text-center">
+                <p className="text-sm text-red-500 font-medium">Failed to load estimations</p>
+                <p className="text-xs text-gray-400 mt-1">{estimationsError}</p>
+              </div>
+            ) : estimationsLoading && estimations.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">Loading estimations...</div>
+            ) : estimations.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No estimations found</div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3">Property</th>
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3 text-right">Estimate</th>
+                      <th className="px-4 py-3 text-right">Shared</th>
+                      <th className="px-4 py-3 text-right">Favorite</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {estimations.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-900 font-medium">
+                          <div>{fmtProperty(row)}</div>
+                          <div className="mt-0.5 text-xs font-normal text-gray-500">
+                            {[row.buildingType, row.renovation].filter(Boolean).join(" · ") || "\u2014"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {row.isAnonymous ? "Anonymous" : row.userName || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {fmtDateTime(row.createdAt)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                          {fmtPrice(row.estimatedPrice)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtBool(row.shared)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtBool(row.favorited)}
                         </td>
                       </tr>
                     ))}

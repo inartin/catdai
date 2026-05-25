@@ -21,12 +21,14 @@ Shows:
 - market direction for 24h, 7d, 30d
 - distributions by district, rooms, renovation, building type
 - recent listings
+- total estimations is clickable and opens a recent estimation row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
 
 ## Data Views
 - Listings list with search, active filter, rooms filter, sorting, pagination.
 - Listing detail with full data, owner link, and price history.
 - Owners list with search and pagination.
 - Owner detail with profile fields and listings.
+- Dashboard registered users and recent estimations are inline expandable tables.
 
 ## Related Files
 - `src/proxy.js`

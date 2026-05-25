@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Footer from "@/components/Footer";
 import ListingAlertConfigurator from "@/components/ListingAlertConfigurator";
@@ -149,6 +149,10 @@ export default function AlertsPage() {
   const refBuildingType = useRef(null);
   const refRenovation = useRef(null);
   const districts = districtsByCity[baseFilters.city] || [];
+
+  useEffect(() => {
+    document.title = `${t("alerts.pageTitle")} | Catdai`;
+  }, [t]);
 
   const updateBaseFilter = (key, value) => {
     setHighlightField(null);

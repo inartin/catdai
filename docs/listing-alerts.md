@@ -9,6 +9,7 @@ UI and storage implemented. Matching/sending worker is not in this repo.
 - Configure base market filters and notification filters.
 - Optionally enable Telegram notifications on `/alerts` and connect from the profile-style Telegram card.
 - View and delete saved alerts in `/profile`.
+- `/alerts` has a localized browser title from `alerts.pageTitle`.
 
 ## Filters
 Base filters:

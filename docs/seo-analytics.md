@@ -10,7 +10,7 @@ Implemented.
 - Static metadata exists for home, about, terms, privacy.
 - Shared result pages at `/imobil/[slug]` generate OG/Twitter metadata and JSON-LD before redirecting.
 - Admin, profile, and API routes are marked `noindex` in `next.config.mjs`.
-- `/ro/estimeaza`, `/ru/estimeaza`, `/ro/evaluare`, and `/ru/evaluare` are indexable localized entry points with alternate metadata.
+- `/ro/estimeaza`, `/ru/estimeaza`, `/ro/evaluare`, `/ru/evaluare`, `/ro/alerts`, and `/ru/alerts` are indexable localized entry points with alternate metadata.
 - Direct `/evaluare` keeps a `noindex` metadata directive to avoid duplicating the localized evaluation URLs.
 
 ## Structured Data

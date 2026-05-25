@@ -7,6 +7,8 @@ const INDEXABLE_STATIC_PATHS = [
   "/ru/estimeaza",
   "/ro/evaluare",
   "/ru/evaluare",
+  "/ro/alerts",
+  "/ru/alerts",
   "/about",
   "/terms",
   "/privacy",

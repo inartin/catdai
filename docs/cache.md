@@ -14,12 +14,28 @@ Backend prepared and active when Redis is reachable.
 - `GET /api/market-trends`: key `catdai:market-trends:v1`, 12h TTL.
 
 ## AWS Setup
-- Install and run Redis on the same host as the app, or point `REDIS_URL` at the host Redis endpoint.
+- Install and run Redis on the same host as the app through the OS service, or point `REDIS_URL` at the host Redis endpoint.
 - For same-host Redis, keep Redis bound to `127.0.0.1` and do not expose port `6379` publicly.
 - Restart the app after adding or changing env vars.
-- PM2 starts Redis through `ecosystem.config.cjs` as `catdai-redis`; it stores append-only data in `.redis`.
 - The host must have `redis-server` or `redis6-server` installed before running PM2.
 - On Amazon Linux with `amazon-linux-extras enable redis6`, the binary is usually `redis6-server`.
+- PM2 only starts the Next.js app; Redis is managed by `systemd`.
+
+## AWS Redis Service
+```bash
+sudo systemctl enable redis6
+sudo systemctl start redis6
+redis6-cli ping
+```
+
+Expected response:
+
+```text
+PONG
+```
+
+On this Amazon Linux Redis 6 host, both the service and CLI are namespaced as `redis6`.
+Only use `redis`/`redis-cli` on hosts where those names actually exist.
 
 ## PM2 Start
 ```bash

@@ -7,6 +7,7 @@ import Hero from "@/components/Hero";
 import CategoryCards from "@/components/CategoryCards";
 import HowItWorks from "@/components/HowItWorks";
 import ExampleResults from "@/components/ExampleResults";
+import LandingFaqPreview from "@/components/LandingFaqPreview";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
 import { useTranslation } from "@/context/LanguageContext";
@@ -164,6 +165,7 @@ export default function HomeContent() {
       <HowItWorks />
       <ExampleResults />
       <ListingAlertsTeaser />
+      <LandingFaqPreview />
     </div>
   );
 }

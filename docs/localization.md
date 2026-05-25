@@ -7,6 +7,7 @@ Implemented for Romanian and Russian UI.
 - Translations live in `src/locales/ro.json` and `src/locales/ru.json`.
 - `LanguageProvider` stores selected language in `localStorage` and the `catdai-lang` cookie.
 - URL prefixes `/ro/...` and `/ru/...` set the language.
+- FAQ copy is centralized in `src/lib/faq-content.js`, with separate localized datasets for the full FAQ pages and the landing-page FAQ preview.
 - Proxy rewrites localized paths to the base route, except localized FAQ pages.
 
 ## UI

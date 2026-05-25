@@ -49,7 +49,7 @@ export default function HowItWorks() {
 
   return (
     <section className="py-16 px-4 text-center">
-      <p className="text-lg max-w-md mx-auto mb-6 text-gray-700">
+      <p className="mx-auto max-w-2xl text-lg text-gray-700">
         {t("howItWorks.intro")}
       </p>
       <div className="max-w-md mx-auto w-full mt-8 flex flex-col gap-3">

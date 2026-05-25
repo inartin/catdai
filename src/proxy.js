@@ -17,7 +17,13 @@ export function proxy(request) {
     if (!rest.startsWith("/api/")) {
       const url = request.nextUrl.clone();
       url.pathname = rest;
-      return NextResponse.rewrite(url);
+      const requestHeaders = new Headers(request.headers);
+      requestHeaders.set("x-catdai-lang", langMatch[1]);
+      return NextResponse.rewrite(url, {
+        request: {
+          headers: requestHeaders,
+        },
+      });
     }
   }
 

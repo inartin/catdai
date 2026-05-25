@@ -105,6 +105,10 @@ export default function ProfilePage() {
   const [listingAlerts, setListingAlerts] = useState([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
 
+  useEffect(() => {
+    document.title = `${t("nav.profile")} | Catdai`;
+  }, [t]);
+
   const handleDeleteProfile = async () => {
     try {
       setIsDeleting(true);

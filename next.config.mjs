@@ -23,10 +23,6 @@ const nextConfig = {
         headers: noIndexHeader,
       },
       {
-        source: "/evaluare/:path*",
-        headers: noIndexHeader,
-      },
-      {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },

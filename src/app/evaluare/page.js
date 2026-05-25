@@ -28,6 +28,10 @@ function EvaluareContent() {
   const { session, loading: authLoading } = useAuth();
   const paramsString = searchParams.toString();
 
+  useEffect(() => {
+    document.title = `${t("evaluare.pageTitle")} | Catdai`;
+  }, [t]);
+
   // Capture share_slug once on first render so it survives URL stripping
   const shareSlugRef = useRef(searchParams.get("share_slug"));
   const loadedPrimaryParamsRef = useRef(null);

@@ -6,32 +6,34 @@ import ru from "@/locales/ru.json";
 
 const translations = { ro, ru };
 const LanguageContext = createContext(null);
+const LANG_COOKIE = "catdai-lang";
+
+function persistLanguage(l) {
+  localStorage.setItem(LANG_COOKIE, l);
+  document.cookie = `${LANG_COOKIE}=${l}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
+function getInitialLanguage() {
+  if (typeof window === "undefined") return "ro";
+
+  const pathLangMatch = window.location.pathname.match(/^\/(ro|ru)(\/|$)/);
+  if (pathLangMatch && translations[pathLangMatch[1]]) return pathLangMatch[1];
+
+  const saved = localStorage.getItem(LANG_COOKIE);
+  return saved && translations[saved] ? saved : "ro";
+}
 
 export function LanguageProvider({ children }) {
-  const [lang, setLangState] = useState("ro");
+  const [lang, setLangState] = useState(getInitialLanguage);
 
   useEffect(() => {
-    // Check URL path for language prefix (e.g. /ru/... or /ro/...)
-    const path = window.location.pathname;
-    const pathLangMatch = path.match(/^\/(ro|ru)(\/|$)/);
-    if (pathLangMatch && translations[pathLangMatch[1]]) {
-      const urlLang = pathLangMatch[1];
-      setLangState(urlLang);
-      localStorage.setItem("catdai-lang", urlLang);
-      return;
-    }
-    // Fall back to saved preference
-    const saved = localStorage.getItem("catdai-lang");
-    if (saved && translations[saved]) setLangState(saved);
-  }, []);
-
-  useEffect(() => {
+    persistLanguage(lang);
     document.documentElement.lang = lang;
   }, [lang]);
 
   const setLang = useCallback((l) => {
     setLangState(l);
-    localStorage.setItem("catdai-lang", l);
+    persistLanguage(l);
   }, []);
 
   const t = useCallback(

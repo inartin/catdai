@@ -17,6 +17,7 @@ Implemented and active.
 - listing alerts
 - always-visible Telegram connection controls
 - account deletion
+- localized browser title from `nav.profile`
 
 ## Activity Tracking
 - Authenticated sessions ping `/api/activity/ping`.

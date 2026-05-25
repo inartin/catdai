@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PropertyForm from "@/components/PropertyForm";
+import { useTranslation } from "@/context/LanguageContext";
 
 function EstimeazaAnalytics() {
   const sentRef = useRef(false);
@@ -72,6 +73,12 @@ function EstimeazaContent() {
 }
 
 export default function EstimeazaPage() {
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    document.title = `${t("estimeaza.pageTitle")} | Catdai`;
+  }, [t]);
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />

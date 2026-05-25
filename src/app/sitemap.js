@@ -1,7 +1,18 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getCanonicalSiteUrl } from "@/lib/seo";
 
-const INDEXABLE_STATIC_PATHS = ["/", "/estimeaza", "/about", "/terms", "/privacy", "/ro/faq", "/ru/faq"];
+const INDEXABLE_STATIC_PATHS = [
+  "/",
+  "/ro/estimeaza",
+  "/ru/estimeaza",
+  "/ro/evaluare",
+  "/ru/evaluare",
+  "/about",
+  "/terms",
+  "/privacy",
+  "/ro/faq",
+  "/ru/faq",
+];
 
 export default async function sitemap() {
   const siteUrl = getCanonicalSiteUrl();

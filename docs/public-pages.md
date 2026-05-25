@@ -5,6 +5,9 @@ Implemented.
 
 ## Public Pages
 - `/` landing page with hero, categories, how it works, examples, and alerts teaser.
+- Landing hero copy positions the core flow as a free, no-account apartment estimate for both buyers and sellers, delivered in about 1 minute.
+- Landing hero has the primary CTA button below the hero text and routes directly to `/estimeaza`.
+- The desktop real estate card is supporting market context only; the primary CTA lives in the hero.
 - The landing page how-it-works steps render as a compact two-column grid on mobile and a horizontal arrow flow on larger screens.
 - `/faq`, `/ro/faq`, `/ru/faq`.
 - `/about`.

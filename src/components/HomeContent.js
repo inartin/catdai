@@ -159,7 +159,7 @@ export default function HomeContent() {
 
   return (
     <div className="animate-fade-in">
-      <Hero />
+      <Hero onPrimaryCta={() => handleCategorySelect("imobil")} />
       <CategoryCards onCategorySelect={handleCategorySelect} />
       <HowItWorks />
       <ExampleResults />

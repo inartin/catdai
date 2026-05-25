@@ -509,26 +509,14 @@ export default function CategoryCards({ onCategorySelect }) {
                 >
                   <LivePricePanel t={t} priceData={priceData} />
 
-                  <div className="flex flex-col items-center justify-center gap-5 bg-emerald-50/70 px-4 py-6">
+                  <div className="flex flex-col items-center justify-center gap-3 bg-emerald-50/70 px-4 py-6">
+                    <span className="rounded-full border border-emerald-200 bg-white px-3 py-1 text-[11px] font-bold text-primary shadow-sm">
+                      Chișinău · {t("categories.today")}
+                    </span>
                     <div
-                      className="relative h-52 w-full rounded-xl bg-cover bg-center bg-no-repeat shadow-inner"
+                      className="h-52 w-full rounded-xl bg-cover bg-center bg-no-repeat shadow-inner"
                       style={{ backgroundImage: `url(${cat.backgroundImage})` }}
-                    >
-                      <span className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-white/35 bg-black/18 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-[2px] [text-shadow:0_1px_2px_rgba(0,0,0,0.45)]">
-                        Chișinău · {t("categories.today")}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        trackSubmitLeadForm();
-                        onCategorySelect?.(cat.id);
-                      }}
-                      className="inline-flex w-fit items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-dark cursor-pointer"
-                    >
-                      {cat.cta}
-                      <ArrowRight size={16} className="translate-y-[-1px]" />
-                    </button>
+                    />
                   </div>
 
                   <div className="flex h-full flex-col p-6">

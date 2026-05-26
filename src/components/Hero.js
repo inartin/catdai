@@ -5,15 +5,30 @@ import { ArrowRight } from "@/components/icons/ArrowsIcons";
 
 export default function Hero({ onPrimaryCta }) {
   const { t } = useTranslation();
+  const scopes = [
+    t("hero.scopeSell"),
+    t("hero.scopeBuy"),
+    t("hero.scopeRent"),
+  ];
 
   return (
-    <section className="pt-16 pb-10 text-center px-4">
+    <section className="px-4 pb-10 pt-16 text-center">
       <h1 className="mx-auto max-w-4xl text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight">
         {t("hero.title")}
       </h1>
-      <p className="mt-4 text-lg text-gray-500">
+      <p className="mx-auto mt-4 max-w-3xl text-lg leading-8 text-gray-500">
         {t("hero.subtitle")}
       </p>
+      <div className="mx-auto mt-5 flex max-w-3xl flex-wrap items-center justify-center gap-2">
+        {scopes.map((scope) => (
+          <span
+            key={scope}
+            className="rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 shadow-sm"
+          >
+            {scope}
+          </span>
+        ))}
+      </div>
       <button
         type="button"
         onClick={onPrimaryCta}

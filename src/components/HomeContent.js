@@ -152,6 +152,73 @@ function ListingAlertsTeaser() {
   );
 }
 
+function MarketScopeCards() {
+  const { t } = useTranslation();
+  const scopes = [
+    {
+      key: "sell",
+      title: t("landing.scopeSellTitle"),
+      desc: t("landing.scopeSellDesc"),
+      accent: "border-emerald-100 bg-emerald-50 text-emerald-700",
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12h18" />
+          <path d="m14 5 7 7-7 7" />
+        </svg>
+      ),
+    },
+    {
+      key: "buy",
+      title: t("landing.scopeBuyTitle"),
+      desc: t("landing.scopeBuyDesc"),
+      accent: "border-sky-100 bg-sky-50 text-sky-700",
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 12V8H6a2 2 0 0 1 0-4h14v4" />
+          <path d="M4 6v12a2 2 0 0 0 2 2h14v-4" />
+          <path d="M18 12h.01" />
+        </svg>
+      ),
+    },
+    {
+      key: "rent",
+      title: t("landing.scopeRentTitle"),
+      desc: t("landing.scopeRentDesc"),
+      accent: "border-amber-100 bg-amber-50 text-amber-700",
+      icon: (
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 11 12 3l9 8" />
+          <path d="M5 10v10h14V10" />
+          <path d="M9 20v-6h6v6" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <section className="px-4 pb-8">
+      <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-3">
+        {scopes.map((scope) => (
+          <div
+            key={scope.key}
+            className="rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm"
+          >
+            <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl border ${scope.accent}`}>
+              {scope.icon}
+            </div>
+            <h2 className="text-base font-extrabold text-gray-950">
+              {scope.title}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-500">
+              {scope.desc}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function HomeContent() {
   const router = useRouter();
 
@@ -165,6 +232,7 @@ export default function HomeContent() {
   return (
     <div className="animate-fade-in">
       <Hero onPrimaryCta={() => handleCategorySelect("imobil")} />
+      <MarketScopeCards />
       <CategoryCards onCategorySelect={handleCategorySelect} />
       <HowItWorks />
       <ExampleResults />

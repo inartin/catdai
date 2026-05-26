@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
-import { supabase } from "@/lib/supabase";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
+import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { rateLimit } from "@/lib/rate-limit";
 import { validateEstimateInput } from "@/lib/validation";
 import { NextResponse } from "next/server";
@@ -289,6 +289,12 @@ const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const TRACKING_SALT = process.env.TRACKING_SALT || "catdai-default-salt";
 const MARKET_TREND_DAYS = 30;
 const MIN_MARKET_TREND_POINTS = 2;
+const ESTIMATE_CACHE_TTL_MS = 30 * 60 * 1000;
+const ESTIMATE_CACHE_TTL_SECONDS = 30 * 60;
+const ESTIMATE_CACHE_MAX_ENTRIES = 250;
+const ESTIMATE_CACHE_PREFIX = "catdai:estimate:v1:";
+
+let estimateCache = new Map();
 
 function hashIp(ip) {
   return crypto.createHash("sha256").update(ip + TRACKING_SALT).digest("hex").slice(0, 16);
@@ -302,6 +308,126 @@ function logEstimate(row) {
     .then(({ error }) => {
       if (error) console.error("estimate_log upsert failed:", error.message);
     });
+}
+
+function normalizeEstimateLanguage(language) {
+  return language === "ru" ? "ru" : "ro";
+}
+
+function makeEstimateCacheKey(params, language) {
+  const payload = {
+    ...params,
+    language: normalizeEstimateLanguage(language),
+  };
+  const hash = crypto
+    .createHash("sha256")
+    .update(JSON.stringify(payload))
+    .digest("hex")
+    .slice(0, 32);
+
+  return `${ESTIMATE_CACHE_PREFIX}${hash}`;
+}
+
+async function getCachedEstimate(key) {
+  const sharedCache = await getSharedCache(key);
+  if (sharedCache?.value) {
+    estimateCache.set(key, {
+      data: sharedCache.value,
+      cached_at: Date.now(),
+    });
+    return sharedCache.value;
+  }
+
+  const local = estimateCache.get(key);
+  if (!local) return null;
+
+  if (Date.now() - local.cached_at > ESTIMATE_CACHE_TTL_MS) {
+    estimateCache.delete(key);
+    return null;
+  }
+
+  return local.data;
+}
+
+async function setCachedEstimate(key, data) {
+  estimateCache.set(key, {
+    data,
+    cached_at: Date.now(),
+  });
+
+  if (estimateCache.size > ESTIMATE_CACHE_MAX_ENTRIES) {
+    const oldestKey = estimateCache.keys().next().value;
+    if (oldestKey) estimateCache.delete(oldestKey);
+  }
+
+  await setSharedCache(key, data, ESTIMATE_CACHE_TTL_SECONDS);
+}
+
+function logRpcError(label, error, params, responseTimeMs) {
+  if (!error) return;
+  console.error("Supabase estimate RPC error:", {
+    label,
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    hint: error.hint,
+    params,
+    responseTimeMs,
+  });
+}
+
+function trackEstimate({
+  body,
+  access,
+  data,
+  ip,
+  params,
+  responseTimeMs,
+  validationData,
+}) {
+  if (!body.device_id) return;
+
+  logEstimate({
+    id: body.log_id || undefined,
+    user_id: access.user_id || null,
+    device_id: body.device_id,
+    session_id: body.session_id || null,
+    evaluation_group_id: body.evaluation_group_id || null,
+    ip_hash: hashIp(ip),
+    city: validationData.city,
+    district: validationData.district,
+    rooms_count: validationData.rooms_count,
+    area_m2: validationData.area_m2,
+    building_type: validationData.building_type || null,
+    renovation: validationData.renovation || null,
+    floor: params.p_floor,
+    total_floors: params.p_total_floors,
+    bathrooms_count: params.p_bathrooms_count,
+    balconies_count: params.p_balconies_count,
+    estimated_price: data.estimate?.market_rate ?? null,
+    price_per_m2: data.estimate?.price_per_m2 ?? null,
+    language: body.language || null,
+    response_time_ms: responseTimeMs,
+  });
+}
+
+async function resolveEstimateAccess(request, body) {
+  const access = await resolveAccessTier(request);
+  let isPaid = isPaidAccessTier(access.tier);
+
+  // If a share_slug is provided, verify server-side if the sharer was paid
+  if (!isPaid && body.share_slug) {
+    const { data: shareData } = await supabaseAdmin
+      .from("shared_links")
+      .select("sharer_is_paid")
+      .eq("slug", String(body.share_slug))
+      .maybeSingle();
+    if (shareData?.sharer_is_paid) {
+      isPaid = true;
+    }
+  }
+
+  return { access, isPaid };
 }
 
 function getClientIp(request) {
@@ -505,16 +631,43 @@ export async function POST(request) {
     p_balconies_count: v.balconies_count ?? null,
   };
 
+  const requestStart = Date.now();
+  const cacheKey = makeEstimateCacheKey(params, body.language);
+  const cachedData = await getCachedEstimate(cacheKey);
+
+  if (cachedData) {
+    const { access, isPaid } = await resolveEstimateAccess(request, body);
+    const responseTimeMs = Date.now() - requestStart;
+    trackEstimate({
+      body,
+      access,
+      data: cachedData,
+      ip,
+      params,
+      responseTimeMs,
+      validationData: v,
+    });
+
+    const res = NextResponse.json({
+      ...cachedData,
+      access_tier: isPaid ? "paid" : "free",
+      locked_sections: {},
+    });
+    res.headers.set("X-RateLimit-Remaining", String(remaining));
+    res.headers.set("X-Estimate-Cache", "HIT");
+    return res;
+  }
+
   const rpcStart = Date.now();
   const [overallRes, individualRes, agencyRes] = await Promise.all([
-    supabase.rpc("estimate_price", params),
-    supabase.rpc("estimate_price", { ...params, p_seller_categories: ["Persoană fizică"] }),
-    supabase.rpc("estimate_price", { ...params, p_seller_categories: ["Agenție", "Dezvoltator imobiliar"] }),
+    supabaseAdmin.rpc("estimate_price", params),
+    supabaseAdmin.rpc("estimate_price", { ...params, p_seller_categories: ["Persoană fizică"] }),
+    supabaseAdmin.rpc("estimate_price", { ...params, p_seller_categories: ["Agenție", "Dezvoltator imobiliar"] }),
   ]);
   const responseTimeMs = Date.now() - rpcStart;
 
   if (overallRes.error) {
-    console.error("Supabase RPC error:", overallRes.error);
+    logRpcError("overall", overallRes.error, params, responseTimeMs);
     return NextResponse.json(
       { error: "Failed to compute estimate" },
       { status: 500 }
@@ -529,6 +682,14 @@ export async function POST(request) {
   }
 
   const data = overallRes.data;
+  logRpcError("seller_individual", individualRes.error, {
+    ...params,
+    p_seller_categories: ["Persoană fizică"],
+  }, responseTimeMs);
+  logRpcError("seller_agency", agencyRes.error, {
+    ...params,
+    p_seller_categories: ["Agenție", "Dezvoltator imobiliar"],
+  }, responseTimeMs);
 
   const featureAdj = computeFeatureAdjustments(
     params.p_bathrooms_count,
@@ -575,20 +736,8 @@ export async function POST(request) {
     body.language
   );
 
-  const access = await resolveAccessTier(request);
-  let isPaid = isPaidAccessTier(access.tier);
-
-  // If a share_slug is provided, verify server-side if the sharer was paid
-  if (!isPaid && body.share_slug) {
-    const { data: shareData } = await supabaseAdmin
-      .from("shared_links")
-      .select("sharer_is_paid")
-      .eq("slug", String(body.share_slug))
-      .maybeSingle();
-    if (shareData?.sharer_is_paid) {
-      isPaid = true;
-    }
-  }
+  await setCachedEstimate(cacheKey, data);
+  const { access, isPaid } = await resolveEstimateAccess(request, body);
 
   const responsePayload = {
     ...data,
@@ -596,32 +745,18 @@ export async function POST(request) {
     locked_sections: {},
   };
 
-  if (body.device_id) {
-    logEstimate({
-      id: body.log_id || undefined,
-      user_id: access.user_id || null,
-      device_id: body.device_id,
-      session_id: body.session_id || null,
-      evaluation_group_id: body.evaluation_group_id || null,
-      ip_hash: hashIp(ip),
-      city: v.city,
-      district: v.district,
-      rooms_count: v.rooms_count,
-      area_m2: v.area_m2,
-      building_type: v.building_type || null,
-      renovation: v.renovation || null,
-      floor: params.p_floor,
-      total_floors: params.p_total_floors,
-      bathrooms_count: params.p_bathrooms_count,
-      balconies_count: params.p_balconies_count,
-      estimated_price: data.estimate?.market_rate ?? null,
-      price_per_m2: data.estimate?.price_per_m2 ?? null,
-      language: body.language || null,
-      response_time_ms: responseTimeMs,
-    });
-  }
+  trackEstimate({
+    body,
+    access,
+    data,
+    ip,
+    params,
+    responseTimeMs,
+    validationData: v,
+  });
 
   const res = NextResponse.json(responsePayload);
   res.headers.set("X-RateLimit-Remaining", String(remaining));
+  res.headers.set("X-Estimate-Cache", "MISS");
   return res;
 }

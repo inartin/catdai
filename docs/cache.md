@@ -12,6 +12,13 @@ Backend prepared and active when Redis is reachable.
 ## Cached Routes
 - `GET /api/prices`: key `catdai:prices:latest:v1`, 24h TTL.
 - `GET /api/market-trends`: key `catdai:market-trends:v1`, 12h TTL.
+- `POST /api/estimate`: key prefix `catdai:estimate:v1:`, 30m TTL for repeated validated estimate inputs.
+
+## Estimate Cache
+- Cache keys include the normalized valuation inputs and UI language.
+- Cached data excludes `access_tier`, `locked_sections`, device/session ids, and share context.
+- `/api/estimate` still resolves access and logs each estimate request on cache hits.
+- Process memory keeps up to 250 recent estimates as a fallback when Redis is unavailable.
 
 ## AWS Setup
 - Install and run Redis on the same host as the app through the OS service, or point `REDIS_URL` at the host Redis endpoint.

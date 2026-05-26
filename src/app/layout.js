@@ -15,7 +15,7 @@ export const metadata = {
   metadataBase: new URL(getCanonicalSiteUrl()),
   title: "Catdai - Înțelege piața imobiliară. Decide corect.",
   description:
-    "Pentru vânzători și cumpărători: vezi prețuri realiste și analiza pieței pe criteriile tale (zonă, m², camere, renovare).",
+    "Pentru vânzători, cumpărători și chirie: vezi prețuri realiste, potențial de chirie lunară și analiza pieței pe criteriile tale.",
 };
 
 export default function RootLayout({ children }) {

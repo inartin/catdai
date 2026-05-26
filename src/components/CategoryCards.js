@@ -499,6 +499,18 @@ export default function CategoryCards({ onCategorySelect }) {
                       {cat.cta}
                       <ArrowRight size={16} className="translate-y-[-2px]" />
                     </span>
+                    {cat.id === "imobil" && (
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                        {[t("categories.scopeSale"), t("categories.scopeBuy"), t("categories.scopeRent")].map((scope) => (
+                          <span
+                            key={scope}
+                            className="rounded-full bg-gray-50 px-2.5 py-1 text-[11px] font-bold text-gray-600"
+                          >
+                            {scope}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </button>
@@ -517,6 +529,16 @@ export default function CategoryCards({ onCategorySelect }) {
                       className="h-52 w-full rounded-xl bg-cover bg-center bg-no-repeat shadow-inner"
                       style={{ backgroundImage: `url(${cat.backgroundImage})` }}
                     />
+                    <div className="grid w-full grid-cols-3 gap-2">
+                      {[t("categories.scopeSale"), t("categories.scopeBuy"), t("categories.scopeRent")].map((scope) => (
+                        <span
+                          key={scope}
+                          className="rounded-lg bg-white px-2 py-2 text-center text-[11px] font-bold leading-tight text-gray-700 shadow-sm"
+                        >
+                          {scope}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="flex h-full flex-col p-6">

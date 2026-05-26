@@ -15,7 +15,8 @@ Implemented and active for apartments.
 - `/api/estimate` calls the RPC with the server-side Supabase admin client so server valuation work does not inherit the anonymous client timeout.
 - Backend also runs seller-category estimates for owner vs agency/developer.
 - Successful estimate payloads are cached for 30 minutes by normalized inputs and language.
-- Cache hits still resolve access and write estimate logs, but skip repeated RPC/listing/image/trend work.
+- Cache hits still resolve access and write estimate logs, but skip repeated RPC/listing/trend work.
+- `999.md` preview images for relevant listings are loaded after the result page renders through `/api/listing-preview-images`.
 - RPC failures are logged with the failing branch, params, error code, and elapsed time.
 
 ## Feature Adjustments
@@ -39,6 +40,7 @@ Applied after RPC in `/api/estimate`.
 - `src/app/estimeaza/page.js`
 - `src/app/evaluare/page.js`
 - `src/app/api/estimate/route.js`
+- `src/app/api/listing-preview-images/route.js`
 - `src/components/PropertyForm.js`
 - `src/components/EstimateResult.js`
 - `db/estimate_price_function.sql`

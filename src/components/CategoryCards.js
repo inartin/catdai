@@ -357,6 +357,11 @@ export default function CategoryCards({ onCategorySelect }) {
   const { t, lang } = useTranslation();
   const { data: priceData } = useLivePrices();
   const { data: trendData } = useMarketTrends();
+  const realEstateScopes = [
+    { label: t("categories.scopeSale") },
+    { label: t("categories.scopeBuy") },
+    { label: t("categories.scopeRent"), badge: t("categories.comingSoon") },
+  ];
 
   const trackSubmitLeadForm = () => {
     if (typeof window === "undefined" || typeof window.gtag !== "function") return;
@@ -501,12 +506,17 @@ export default function CategoryCards({ onCategorySelect }) {
                     </span>
                     {cat.id === "imobil" && (
                       <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-                        {[t("categories.scopeSale"), t("categories.scopeBuy"), t("categories.scopeRent")].map((scope) => (
+                        {realEstateScopes.map((scope) => (
                           <span
-                            key={scope}
-                            className="rounded-full bg-gray-50 px-2.5 py-1 text-[11px] font-bold text-gray-600"
+                            key={scope.label}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-2.5 py-1 text-[11px] font-bold text-gray-600"
                           >
-                            {scope}
+                            {scope.label}
+                            {scope.badge && (
+                              <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-extrabold leading-none text-sky-700 ring-1 ring-sky-100">
+                                {scope.badge}
+                              </span>
+                            )}
                           </span>
                         ))}
                       </div>
@@ -530,12 +540,17 @@ export default function CategoryCards({ onCategorySelect }) {
                       style={{ backgroundImage: `url(${cat.backgroundImage})` }}
                     />
                     <div className="grid w-full grid-cols-3 gap-2">
-                      {[t("categories.scopeSale"), t("categories.scopeBuy"), t("categories.scopeRent")].map((scope) => (
+                      {realEstateScopes.map((scope) => (
                         <span
-                          key={scope}
-                          className="rounded-lg bg-white px-2 py-2 text-center text-[11px] font-bold leading-tight text-gray-700 shadow-sm"
+                          key={scope.label}
+                          className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg bg-white px-2 py-2 text-center text-[11px] font-bold leading-tight text-gray-700 shadow-sm"
                         >
-                          {scope}
+                          {scope.label}
+                          {scope.badge && (
+                            <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-extrabold leading-none text-sky-700 ring-1 ring-sky-100">
+                              {scope.badge}
+                            </span>
+                          )}
                         </span>
                       ))}
                     </div>

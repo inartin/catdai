@@ -6,9 +6,9 @@ import { ArrowRight } from "@/components/icons/ArrowsIcons";
 export default function Hero({ onPrimaryCta }) {
   const { t } = useTranslation();
   const scopes = [
-    t("hero.scopeSell"),
-    t("hero.scopeBuy"),
-    t("hero.scopeRent"),
+    { label: t("hero.scopeSell") },
+    { label: t("hero.scopeBuy") },
+    { label: t("hero.scopeRent"), badge: t("categories.comingSoon") },
   ];
 
   return (
@@ -22,10 +22,15 @@ export default function Hero({ onPrimaryCta }) {
       <div className="mx-auto mt-5 flex max-w-3xl flex-wrap items-center justify-center gap-2">
         {scopes.map((scope) => (
           <span
-            key={scope}
-            className="rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 shadow-sm"
+            key={scope.label}
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-sm font-bold text-gray-700 shadow-sm"
           >
-            {scope}
+            {scope.label}
+            {scope.badge && (
+              <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 ring-1 ring-sky-100">
+                {scope.badge}
+              </span>
+            )}
           </span>
         ))}
       </div>

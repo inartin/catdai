@@ -43,6 +43,7 @@ function EvaluareContent() {
   const shareSlugRef = useRef(searchParams.get("share_slug"));
   const loadedPrimaryParamsRef = useRef(null);
   const loadedCompareParamsRef = useRef(null);
+  const previewImageRequestsRef = useRef(new Set());
 
   useEffect(() => {
     if (authLoading) return;
@@ -239,6 +240,55 @@ function EvaluareContent() {
       cancelled = true;
     };
   }, [authLoading, session?.access_token, paramsString, router, lang, t]);
+
+  useEffect(() => {
+    const hydrateListingImages = async (data, updateResult, slot) => {
+      const listings = Array.isArray(data?.relevant_listings) ? data.relevant_listings : [];
+      const externalIds = listings
+        .filter((listing) => listing?.external_id && !listing.image_url)
+        .map((listing) => String(listing.external_id))
+        .filter((externalId) => !previewImageRequestsRef.current.has(`${slot}:${lang}:${externalId}`));
+      const uniqueIds = [...new Set(externalIds)];
+      if (uniqueIds.length === 0) return;
+
+      uniqueIds.forEach((externalId) => {
+        previewImageRequestsRef.current.add(`${slot}:${lang}:${externalId}`);
+      });
+
+      try {
+        const res = await fetch("/api/listing-preview-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            external_ids: uniqueIds,
+            language: lang,
+          }),
+        });
+        if (!res.ok) return;
+
+        const payload = await res.json();
+        const images = payload?.images || {};
+        if (Object.keys(images).length === 0) return;
+
+        updateResult((current) => {
+          if (!current?.relevant_listings) return current;
+
+          return {
+            ...current,
+            relevant_listings: current.relevant_listings.map((listing) => {
+              const imageUrl = images[String(listing.external_id)];
+              return imageUrl ? { ...listing, image_url: imageUrl } : listing;
+            }),
+          };
+        });
+      } catch {
+        // Listing preview images are optional; the estimate stays usable without them.
+      }
+    };
+
+    if (result) hydrateListingImages(result, setResult, "primary");
+    if (result2) hydrateListingImages(result2, setResult2, "compare");
+  }, [result, result2, lang]);
 
   const handleEdit = () => {
     setIsListingsMode(false);

@@ -9,6 +9,7 @@ Implemented.
 - Landing hero copy positions the product as apartment market analysis for sellers, buyers, and monthly rent context.
 - Landing hero subtitle repeats the main H1 terms in body copy so homepage SEO analyzers see the heading language reflected in visible text.
 - Landing shows compact sell/buy/rent scope cards immediately after the hero so the rent market direction is visible before the detailed market panels.
+- Landing marks visible rent scope labels with a localized `În curând` / `Скоро` badge until rent analysis is active.
 - Landing real estate market card repeats the sale/buy/rent scope on mobile and desktop, while the CTA still routes to the existing `/estimeaza` flow.
 - Landing `How it works` keeps the original short intro above the `Prețul tău` chart, while the more detailed calculation wording lives in the landing FAQ preview.
 - Landing hero has the primary CTA button below the hero text and routes directly to `/estimeaza`.

@@ -184,6 +184,7 @@ function MarketScopeCards() {
       key: "rent",
       title: t("landing.scopeRentTitle"),
       desc: t("landing.scopeRentDesc"),
+      badge: t("categories.comingSoon"),
       accent: "border-amber-100 bg-amber-50 text-amber-700",
       icon: (
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -206,9 +207,16 @@ function MarketScopeCards() {
             <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl border ${scope.accent}`}>
               {scope.icon}
             </div>
-            <h2 className="text-base font-extrabold text-gray-950">
-              {scope.title}
-            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-base font-extrabold text-gray-950">
+                {scope.title}
+              </h2>
+              {scope.badge && (
+                <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 ring-1 ring-sky-100">
+                  {scope.badge}
+                </span>
+              )}
+            </div>
             <p className="mt-2 text-sm leading-6 text-gray-500">
               {scope.desc}
             </p>

@@ -24,11 +24,16 @@ Implemented.
 - Google tag loads once and configures `NEXT_PUBLIC_GA_ID` plus Google Ads-provided tag `AW-18184166002`.
 - The shared Google tag script loads with the Ads ID first so Ads diagnostics see the expected source ID.
 - CSP allows Google Ads collection endpoints used by remarketing, consent mode, and view-through conversion checks.
+- CSP also allows `https://static.cloudflareinsights.com` so Cloudflare Web Analytics can inject its beacon script without violating `script-src` or `script-src-elem`.
 - Default consent uses stored cookie consent when available, otherwise denies analytics/ad storage.
 - Cookie banner can grant or deny consent.
 - The `/estimeaza` submit button fires Google Ads conversion `AW-18184166002/Afy1CNv4g7McEPK08d5D` before navigating to `/evaluare`.
 - `/estimeaza` sends `conversion_event_page_view_1` once on client mount when GA is available.
 - Estimate logging stores device/session ids, input summary, result price, language, response time, and hashed IP.
+- Landing-only ad source tracking supports `/?src=zdg`.
+- When `src=zdg` is seen on `/`, the browser stores the source for the session and posts simple events to `/api/ad-source-events`.
+- `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
+- Authenticated tracking requests store `user_id` so ZDG ad sessions can be tied to registered Supabase users after login.
 
 ## Related Files
 - `src/app/layout.js`
@@ -36,5 +41,8 @@ Implemented.
 - `src/app/robots.js`
 - `src/lib/seo.js`
 - `src/components/CookieBanner.js`
+- `src/components/AdSourceTracker.js`
 - `src/lib/tracking.js`
+- `src/app/api/ad-source-events/route.js`
+- `db/ad_source_events.sql`
 - `next.config.mjs`

@@ -49,6 +49,55 @@ function fmtBool(value) {
   return value ? "Yes" : "No";
 }
 
+const BASE_FILTER_LABELS = {
+  city: "City",
+  district: "District",
+  rooms_count: "Rooms",
+  area_m2: "Area",
+  floor: "Floor",
+  total_floors: "Total floors",
+  building_type: "Building type",
+  renovation: "Renovation",
+  bathrooms_count: "Bathrooms",
+  balconies_count: "Balconies",
+};
+
+const ALERT_FILTER_LABELS = {
+  price_min: "Min price",
+  price_max: "Max price",
+  max_price_per_m2: "Max price/m\u00B2",
+  area_min: "Min area",
+  area_max: "Max area",
+  floor_min: "Min floor",
+  floor_max: "Max floor",
+  first_floor: "First floor",
+  last_floor: "Last floor",
+  seller_type: "Seller type",
+};
+
+function fmtAlertValue(key, value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) return value.join(", ");
+  if (key.includes("price")) return fmtPrice(value);
+  if (key.includes("area")) return `${fmtNum(value)} m\u00B2`;
+  if (typeof value === "object") return null;
+  return String(value);
+}
+
+function fmtFilterSummary(filters, labels) {
+  if (!filters || typeof filters !== "object") return "\u2014";
+
+  const parts = Object.entries(labels)
+    .map(([key, label]) => {
+      const value = fmtAlertValue(key, filters[key]);
+      return value ? `${label}: ${value}` : null;
+    })
+    .filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" \u00B7 ") : "\u2014";
+}
+
 function fmtProperty(row) {
   return [
     row.roomsCount ? `${row.roomsCount} rooms` : null,
@@ -194,6 +243,7 @@ export default function AdminDashboard() {
   const [estimations, setEstimations] = useState([]);
   const [estimationsLoading, setEstimationsLoading] = useState(false);
   const [estimationsError, setEstimationsError] = useState(null);
+  const [showTelegramAlertsList, setShowTelegramAlertsList] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/stats")
@@ -303,7 +353,7 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}
@@ -320,6 +370,13 @@ export default function AdminDashboard() {
           />
           <StatCard label="Shared Links" value={fmtNum(s.totalSharedLinks)} />
           <StatCard label="Favorites" value={fmtNum(s.totalFavorites)} />
+          <StatCard
+            label="Telegram Alerts"
+            value={fmtNum(s.totalTelegramAlerts)}
+            detail={showTelegramAlertsList ? "Click to hide list" : "Click to view alerts"}
+            onClick={() => setShowTelegramAlertsList((value) => !value)}
+            active={showTelegramAlertsList}
+          />
         </div>
         {showUsersList && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -441,6 +498,70 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600">
                           {fmtBool(row.favorited)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+        {showTelegramAlertsList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Telegram Alerts</h3>
+            </div>
+
+            {!Array.isArray(s.telegramAlerts) || s.telegramAlerts.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No Telegram alerts found</div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3">Alert</th>
+                      <th className="px-4 py-3">Chat ID</th>
+                      <th className="px-4 py-3">Base Filters</th>
+                      <th className="px-4 py-3">Notification Filters</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Created</th>
+                      <th className="px-4 py-3">Last Notified</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {s.telegramAlerts.map((alert) => (
+                      <tr key={alert.id} className="hover:bg-gray-50 align-top">
+                        <td className="px-4 py-3 text-gray-900 font-medium min-w-48">
+                          <div>{alert.label || "\u2014"}</div>
+                          <div className="mt-0.5 text-xs font-normal text-gray-400">
+                            {alert.user_id || "\u2014"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {alert.telegram_chat_id || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 min-w-64">
+                          {fmtFilterSummary(alert.base_filters, BASE_FILTER_LABELS)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 min-w-64">
+                          {fmtFilterSummary(alert.alert_filters, ALERT_FILTER_LABELS)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${alert.is_active
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-500"
+                              }`}
+                          >
+                            {alert.is_active ? "Active" : "Inactive"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                          {fmtDateTime(alert.created_at)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                          {fmtDateTime(alert.last_notified_at)}
                         </td>
                       </tr>
                     ))}

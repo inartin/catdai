@@ -57,7 +57,7 @@ function buildListingSeo(params = {}, slug = "") {
     ? `Apartament ${titleParts.join(" · ")} — ${[district, city].filter(Boolean).join(", ")} | Catdai`
     : "Evaluare apartament | Catdai";
   const details = [buildingType, renovation, floor, balconies].filter(Boolean);
-  const description = `Analiza Pieții: ${roomsLabel}${area ? `, ${area}m²` : ""} în ${[district, city].filter(Boolean).join(", ")}.${details.length ? ` ${details.join(" · ")}.` : ""} Preț estimat, comparație pe sectoare și statistici de piață.`;
+  const description = `Analiza Pieței: ${roomsLabel}${area ? `, ${area}m²` : ""} în ${[district, city].filter(Boolean).join(", ")}.${details.length ? ` ${details.join(" · ")}.` : ""} Preț estimat, comparație pe sectoare și statistici de piață.`;
   const canonicalPath = `/imobil/${slug}`;
   const canonicalUrl = toAbsoluteUrl(canonicalPath);
 

@@ -11,6 +11,7 @@ import LandingFaqPreview from "@/components/LandingFaqPreview";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
 import { useTranslation } from "@/context/LanguageContext";
+import { trackAdSourceEvent } from "@/lib/tracking";
 
 function ListingAlertsTeaser() {
   const { t } = useTranslation();
@@ -155,7 +156,10 @@ export default function HomeContent() {
   const router = useRouter();
 
   const handleCategorySelect = useCallback((category) => {
-    if (category === "imobil") router.push("/estimeaza");
+    if (category === "imobil") {
+      trackAdSourceEvent("landing_estimate_cta");
+      router.push("/estimeaza");
+    }
   }, [router]);
 
   return (

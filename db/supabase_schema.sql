@@ -164,6 +164,35 @@ create index idx_estimate_log_created on estimate_log (created_at);
 create index idx_estimate_log_city    on estimate_log (city, district);
 
 -- ============================================================
+-- ad_source_events — first-party source tracking events
+-- ============================================================
+create table ad_source_events (
+  id          bigserial primary key,
+  source      text not null,
+  event_name  text not null,
+  user_id     uuid references auth.users(id) on delete set null,
+  device_id   text,
+  session_id  text,
+  path        text,
+  referrer    text,
+  ip_hash     text,
+  metadata    jsonb not null default '{}'::jsonb,
+  created_at  timestamptz not null default now()
+);
+
+create index idx_ad_source_events_source_created
+  on ad_source_events (source, created_at desc);
+
+create index idx_ad_source_events_session
+  on ad_source_events (session_id);
+
+create index idx_ad_source_events_event_created
+  on ad_source_events (event_name, created_at desc);
+
+create index idx_ad_source_events_user_created
+  on ad_source_events (user_id, created_at desc);
+
+-- ============================================================
 -- user_activity — last authenticated user visit timestamp
 -- ============================================================
 create table user_activity (

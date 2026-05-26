@@ -2,6 +2,7 @@ import { Geist } from "next/font/google";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import CookieBanner from "@/components/CookieBanner";
+import AdSourceTracker from "@/components/AdSourceTracker";
 import { getCanonicalSiteUrl, serializeJsonLd } from "@/lib/seo";
 import "./globals.css";
 
@@ -113,7 +114,10 @@ export default function RootLayout({ children }) {
       </head>
       <body className={`${geistSans.variable} antialiased`}>
         <LanguageProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <AdSourceTracker />
+            {children}
+          </AuthProvider>
         </LanguageProvider>
         <CookieBanner />
       </body>

@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
 
 const AuthContext = createContext(null);
 const ACTIVITY_PING_INTERVAL_MS = 5 * 60 * 1000;
@@ -89,6 +90,11 @@ function pingUserActivity(accessToken) {
   });
 }
 
+function trackAdSourceLogin(accessToken) {
+  if (!accessToken || !getActiveAdSource()) return;
+  trackAdSourceEvent("signed_in", { accessToken });
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
@@ -161,6 +167,7 @@ export function AuthProvider({ children }) {
     if (!accessToken) return;
 
     pingUserActivity(accessToken);
+    trackAdSourceLogin(accessToken);
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === "visible") {

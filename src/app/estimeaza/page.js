@@ -6,12 +6,14 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import PropertyForm from "@/components/PropertyForm";
 import { useTranslation } from "@/context/LanguageContext";
+import { trackAdSourceEvent } from "@/lib/tracking";
 
 function EstimeazaAnalytics() {
   const sentRef = useRef(false);
 
   useEffect(() => {
     if (sentRef.current) return;
+    trackAdSourceEvent("estimate_form_view");
     if (typeof window === "undefined" || typeof window.gtag !== "function") return;
 
     window.gtag("event", "conversion_event_page_view_1");
@@ -44,6 +46,8 @@ function EstimeazaContent() {
   }, [searchParams]);
 
   const trackCompleteEstimateConversion = (targetUrl) => {
+    trackAdSourceEvent("estimate_submit", { target_url: targetUrl });
+
     if (
       typeof window === "undefined" ||
       typeof window.catdaiTrackGoogleAdsConversion !== "function"

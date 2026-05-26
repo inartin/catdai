@@ -1,5 +1,7 @@
 const DEVICE_KEY = "catdai-device-id";
 const SESSION_KEY = "catdai-session-id";
+const AD_SOURCE_KEY = "catdai-ad-source";
+const TRACKED_AD_SOURCES = new Set(["zdg"]);
 
 export function getDeviceId() {
   try {
@@ -25,6 +27,74 @@ export function getSessionId() {
   } catch {
     return null;
   }
+}
+
+export function captureAdSource(source, details = {}) {
+  if (!TRACKED_AD_SOURCES.has(source)) return null;
+
+  try {
+    const payload = {
+      source,
+      captured_at: new Date().toISOString(),
+      ...details,
+    };
+    sessionStorage.setItem(AD_SOURCE_KEY, JSON.stringify(payload));
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+export function getActiveAdSource() {
+  try {
+    const raw = sessionStorage.getItem(AD_SOURCE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!TRACKED_AD_SOURCES.has(parsed?.source)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function trackAdSourceEvent(eventName, metadata = {}) {
+  const attribution = getActiveAdSource();
+  if (!attribution || typeof window === "undefined") return;
+
+  const { accessToken, ...eventMetadata } = metadata || {};
+  const body = JSON.stringify({
+    source: attribution.source,
+    event_name: eventName,
+    device_id: getDeviceId(),
+    session_id: getSessionId(),
+    path: window.location.pathname + window.location.search,
+    referrer: document.referrer || null,
+    metadata: {
+      captured_at: attribution.captured_at,
+      landing_path: attribution.landing_path || null,
+      ...eventMetadata,
+    },
+  });
+
+  const headers = { "Content-Type": "application/json" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  try {
+    if (!accessToken && navigator.sendBeacon) {
+      const blob = new Blob([body], { type: "application/json" });
+      navigator.sendBeacon("/api/ad-source-events", blob);
+      return;
+    }
+  } catch {}
+
+  try {
+    fetch("/api/ad-source-events", {
+      method: "POST",
+      headers,
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
 }
 
 function djb2(str) {

@@ -165,7 +165,7 @@
   "result.estimatedForArea": "Расчётная цена за {area}м² · (кол-во объявлений)",
   "result.marketStats": "Статистика рынка",
   "result.relevantListings": "Подходящие объявления",
-  "result.relevantListingsDesc": "Примеры из того же рыночного сегмента до личного уточнения фильтров.",
+  "result.relevantListingsDesc": "Примеры из того же рыночного сегмента",
   "result.listingsPreviewNote": "Карточки открывают оригинальные объявления на 999.md.",
   "result.viewListings": "Создать уведомление",
   "result.listingPreviewTitleA": "Квартира в {location}",

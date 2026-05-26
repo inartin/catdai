@@ -74,8 +74,153 @@ async function countAllUsers() {
   return total;
 }
 
-export async function GET() {
-  if (cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
+async function fetchTelegramAlerts() {
+  return fetchAllRows(() =>
+    supabaseAdmin
+      .from("user_listing_alerts")
+      .select(
+        "id, user_id, label, is_active, website_enabled, telegram_chat_id, base_filters, alert_filters, created_at, last_notified_at"
+      )
+      .eq("telegram_enabled", true)
+      .order("created_at", { ascending: false })
+  );
+}
+
+function userDisplayName(user) {
+  const meta = user?.user_metadata || {};
+  const composed = [meta.first_name, meta.last_name].filter(Boolean).join(" ").trim();
+
+  return (
+    meta.full_name ||
+    meta.name ||
+    meta.display_name ||
+    composed ||
+    user?.email ||
+    user?.phone ||
+    user?.id ||
+    "Unknown"
+  );
+}
+
+async function fetchUsersById(userIds) {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return new Map();
+
+  const users = new Map();
+  let page = 1;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) {
+      console.error("Failed to list users for ad tracking:", error.message);
+      return users;
+    }
+
+    const chunk = data?.users || [];
+    for (const user of chunk) {
+      if (uniqueIds.includes(user.id)) {
+        users.set(user.id, {
+          id: user.id,
+          name: userDisplayName(user),
+          email: user.email || null,
+        });
+      }
+    }
+
+    if (users.size >= uniqueIds.length || chunk.length < 1000) break;
+    page += 1;
+  }
+
+  return users;
+}
+
+function groupAdJourneys(events, usersById) {
+  const groups = new Map();
+
+  for (const event of events) {
+    const key = event.session_id || event.device_id || `event:${event.created_at}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        sessionId: event.session_id || null,
+        deviceId: event.device_id || null,
+        userId: null,
+        user: null,
+        firstSeenAt: event.created_at,
+        lastSeenAt: event.created_at,
+        eventCount: 0,
+        events: [],
+      });
+    }
+
+    const group = groups.get(key);
+    group.eventCount += 1;
+    group.events.push(event);
+
+    if (event.user_id && !group.userId) {
+      group.userId = event.user_id;
+      group.user = usersById.get(event.user_id) || { id: event.user_id, name: event.user_id, email: null };
+    }
+
+    if (Date.parse(event.created_at) < Date.parse(group.firstSeenAt)) {
+      group.firstSeenAt = event.created_at;
+    }
+    if (Date.parse(event.created_at) > Date.parse(group.lastSeenAt)) {
+      group.lastSeenAt = event.created_at;
+    }
+  }
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      events: group.events.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
+    }))
+    .sort((a, b) => Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt));
+}
+
+async function fetchZdgAdStats() {
+  const { data, error } = await supabaseAdmin
+    .from("ad_source_events")
+    .select("event_name, user_id, device_id, session_id, path, referrer, metadata, created_at")
+    .eq("source", "zdg")
+    .order("created_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    if (error.code === "42P01") {
+      return { available: false, error: "ad_source_events table is missing.", events: [] };
+    }
+    console.error("Failed to load ZDG ad events:", error.message);
+    return { available: false, error: "Failed to load ZDG ad events.", events: [] };
+  }
+
+  const events = Array.isArray(data) ? data : [];
+  const usersById = await fetchUsersById(events.map((event) => event.user_id));
+  const uniqueSessions = new Set(events.map((event) => event.session_id).filter(Boolean));
+  const uniqueDevices = new Set(events.map((event) => event.device_id).filter(Boolean));
+  const identifiedUsers = new Set(events.map((event) => event.user_id).filter(Boolean));
+  const countsByEvent = events.reduce((acc, event) => {
+    acc[event.event_name] = (acc[event.event_name] || 0) + 1;
+    return acc;
+  }, {});
+
+  return {
+    available: true,
+    source: "zdg",
+    totalEvents: events.length,
+    uniqueSessions: uniqueSessions.size,
+    uniqueDevices: uniqueDevices.size,
+    identifiedUsers: identifiedUsers.size,
+    countsByEvent,
+    recentEvents: events,
+    journeys: groupAdJourneys(events, usersById),
+  };
+}
+
+export async function GET(request) {
+  const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
+
+  if (!bypassCache && cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
     return NextResponse.json(cache.data);
   }
 
@@ -121,6 +266,8 @@ export async function GET() {
       supabaseAdmin.from("estimate_log").select("*", { count: "exact", head: true }),
       supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
       supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
+      fetchTelegramAlerts(),
+      fetchZdgAdStats(),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -146,6 +293,8 @@ export async function GET() {
     countEstimations,
     countSharedLinks,
     countFavorites,
+    telegramAlerts,
+    zdgAd,
   ] = dataResults;
 
   const priced = listings.filter((l) => l.price_amount != null);
@@ -160,6 +309,9 @@ export async function GET() {
     totalEstimations: countEstimations.count || 0,
     totalSharedLinks: countSharedLinks.count || 0,
     totalFavorites: countFavorites.count || 0,
+    totalTelegramAlerts: telegramAlerts.length,
+    telegramAlerts,
+    zdgAd,
     totalListings: countAll.count || 0,
     activeListings: countActive.count || 0,
     totalOwners: countOwners.count || 0,
@@ -190,6 +342,8 @@ export async function GET() {
     recentListings: recentRes.data || [],
   };
 
-  cache = { data: result, ts: Date.now() };
+  if (!bypassCache) {
+    cache = { data: result, ts: Date.now() };
+  }
   return NextResponse.json(result);
 }

@@ -15,6 +15,7 @@ Shows:
 - total estimations
 - shared links
 - favorites
+- Telegram alert count with an expandable list of configured Telegram alerts
 - listing counts and active listings
 - owner count
 - average price and price per m2
@@ -29,6 +30,7 @@ Shows:
 - Owners list with search and pagination.
 - Owner detail with profile fields and listings.
 - Dashboard registered users and recent estimations are inline expandable tables.
+- `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows fresh `/?src=zdg` tracking grouped by visitor session, with closed-by-default action timelines, repeated actions collapsed into counters, readable event names, source session/device counts, funnel counts, and registered user identity when a tracked visitor logs in.
 
 ## Related Files
 - `src/proxy.js`

@@ -8,7 +8,14 @@ import EstimateResult from "@/components/EstimateResult";
 import PropertyForm from "@/components/PropertyForm";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
-import { getDeviceId, getSessionId, computeEvaluationGroupId, getOrCreateLogId } from "@/lib/tracking";
+import {
+  computeEvaluationGroupId,
+  getActiveAdSource,
+  getDeviceId,
+  getOrCreateLogId,
+  getSessionId,
+  trackAdSourceEvent,
+} from "@/lib/tracking";
 import { validateEstimateInput, validateCadastralNumber } from "@/lib/validation";
 
 function EvaluareContent() {
@@ -137,7 +144,15 @@ function EvaluareContent() {
           const evalGroupId = computeEvaluationGroupId({
             city: v.city, district: v.district, rooms_count: v.rooms_count, building_type: v.building_type || null,
           });
-          return { log_id: getOrCreateLogId(evalGroupId), device_id: getDeviceId(), session_id: getSessionId(), evaluation_group_id: evalGroupId, language: lang };
+          const attribution = getActiveAdSource();
+          return {
+            log_id: getOrCreateLogId(evalGroupId),
+            device_id: getDeviceId(),
+            session_id: getSessionId(),
+            evaluation_group_id: evalGroupId,
+            language: lang,
+            ad_source: attribution?.source || null,
+          };
         })() : {};
 
         const estReq = fetchJson("/api/estimate", {
@@ -160,6 +175,15 @@ function EvaluareContent() {
         const [estRes, cadRes] = await Promise.all([estReq, cadReq]);
         if (!estRes.ok) return { error: { code: estRes.data.error || "unknown", status: estRes.status } };
         const data = cadRes && cadRes.ok ? { ...estRes.data, cadastral: cadRes.data } : estRes.data;
+        if (isPrimary && isFreshEvaluation) {
+          trackAdSourceEvent("estimate_result_view", {
+            accessToken: session?.access_token || null,
+            log_id: trackingData.log_id || null,
+            city: v.city,
+            district: v.district,
+            rooms_count: v.rooms_count,
+          });
+        }
         return { data };
       };
 

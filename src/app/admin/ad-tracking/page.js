@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const JOURNEY_PAGE_SIZE = 50;
 
 function fmtNum(n) {
   if (n == null) return "\u2014";
@@ -108,25 +110,76 @@ function groupJourneyEvents(events = []) {
 
 export default function AdTrackingPage() {
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [openJourneys, setOpenJourneys] = useState({});
+  const loadMoreRef = useRef(null);
 
-  useEffect(() => {
-    fetch("/api/admin/stats?fresh=1")
+  const loadAdTracking = useCallback((offset = 0) => {
+    if (offset === 0) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+    setError(null);
+
+    fetch(`/api/admin/ad-tracking?limit=${JOURNEY_PAGE_SIZE}&offset=${offset}`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then((data) => {
-        setStats(data);
+        const nextZdgAd = data.zdgAd || {};
+        setStats((current) => {
+          if (offset === 0) return { zdgAd: nextZdgAd };
+
+          const currentJourneys = current?.zdgAd?.journeys || [];
+          const nextJourneys = nextZdgAd.journeys || [];
+          const currentKeys = new Set(currentJourneys.map((journey) => journey.key));
+
+          return {
+            zdgAd: {
+              ...nextZdgAd,
+              journeys: [
+                ...currentJourneys,
+                ...nextJourneys.filter((journey) => !currentKeys.has(journey.key)),
+              ],
+            },
+          };
+        });
         setLoading(false);
       })
       .catch((err) => {
         setError(err.message || "Failed to load ad tracking");
         setLoading(false);
+      })
+      .finally(() => {
+        setLoadingMore(false);
       });
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => loadAdTracking(0), 0);
+    return () => window.clearTimeout(timer);
+  }, [loadAdTracking]);
+
+  const zdgAd = stats?.zdgAd || {};
+  const loadedJourneyCount = Array.isArray(zdgAd.journeys) ? zdgAd.journeys.length : 0;
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || loading || loadingMore || !zdgAd.hasMoreJourneys) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        loadAdTracking(loadedJourneyCount);
+      }
+    }, { rootMargin: "240px" });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadAdTracking, loadedJourneyCount, loading, loadingMore, zdgAd.hasMoreJourneys]);
 
   if (loading) {
     return (
@@ -147,7 +200,6 @@ export default function AdTrackingPage() {
     );
   }
 
-  const zdgAd = stats.zdgAd || {};
   const zdgCounts = zdgAd.countsByEvent || {};
 
   const toggleJourney = (key) => {
@@ -189,80 +241,89 @@ export default function AdTrackingPage() {
             {!Array.isArray(zdgAd.journeys) || zdgAd.journeys.length === 0 ? (
               <div className="px-5 py-8 text-center text-gray-400">No ZDG activity found</div>
             ) : (
-              <div className="divide-y divide-gray-100">
-                {zdgAd.journeys.map((journey) => (
-                  <div key={journey.key} className="p-5">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-semibold text-gray-900">{fmtUser(journey)}</h3>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${journey.userId
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-500"
-                            }`}
-                          >
-                            {journey.userId ? "Registered" : "Anonymous"}
-                          </span>
+              <div>
+                <div className="divide-y divide-gray-100">
+                  {zdgAd.journeys.map((journey) => (
+                    <div key={journey.key} className="p-5">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="font-semibold text-gray-900">{fmtUser(journey)}</h3>
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${journey.userId
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-500"
+                              }`}
+                            >
+                              {journey.userId ? "Registered" : "Anonymous"}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm text-gray-600">{fmtJourneySummary(journey)}</p>
+                          <p className="mt-1 text-xs text-gray-400">
+                            First seen {fmtDateTime(journey.firstSeenAt)} · Last seen {fmtDateTime(journey.lastSeenAt)}
+                          </p>
                         </div>
-                        <p className="mt-1 text-sm text-gray-600">{fmtJourneySummary(journey)}</p>
-                        <p className="mt-1 text-xs text-gray-400">
-                          First seen {fmtDateTime(journey.firstSeenAt)} · Last seen {fmtDateTime(journey.lastSeenAt)}
-                        </p>
+                        <div className="text-xs text-gray-400 lg:text-right">
+                          <div className="font-mono">{journey.sessionId || "\u2014"}</div>
+                          {journey.userId && <div className="mt-1 font-mono">{journey.userId}</div>}
+                        </div>
                       </div>
-                      <div className="text-xs text-gray-400 lg:text-right">
-                        <div className="font-mono">{journey.sessionId || "\u2014"}</div>
-                        {journey.userId && <div className="mt-1 font-mono">{journey.userId}</div>}
-                      </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => toggleJourney(journey.key)}
-                      className="mt-4 inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-primary/40 hover:text-primary"
-                    >
-                      {openJourneys[journey.key] ? "Hide actions" : `Show actions (${fmtNum(journey.eventCount)})`}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleJourney(journey.key)}
+                        className="mt-4 inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-primary/40 hover:text-primary"
+                      >
+                        {openJourneys[journey.key] ? "Hide actions" : `Show actions (${fmtNum(journey.eventCount)})`}
+                      </button>
 
-                    {openJourneys[journey.key] && (
-                    <div className="mt-3 overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-xs font-medium text-gray-500 uppercase">
-                            <th className="py-2 pr-4">Action</th>
-                            <th className="py-2 pr-4 text-right">Count</th>
-                            <th className="py-2 pr-4">Details</th>
-                            <th className="py-2 pr-4">Page</th>
-                            <th className="py-2 pr-4">Time</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {groupJourneyEvents(journey.events || []).map((event, index) => (
-                            <tr key={`${event.event_name}-${event.firstAt}-${index}`} className="align-top">
-                              <td className="py-2 pr-4 font-medium text-gray-900 min-w-56">
-                                {fmtAdEventName(event.event_name)}
-                              </td>
-                              <td className="py-2 pr-4 text-right text-gray-700 tabular-nums">
-                                {fmtNum(event.count)}
-                              </td>
-                              <td className="py-2 pr-4 text-gray-600 min-w-56">
-                                {fmtAdEventDetail(event)}
-                              </td>
-                              <td className="py-2 pr-4 text-gray-600 min-w-64">
-                                {event.path || "\u2014"}
-                              </td>
-                              <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">
-                                {event.count > 1
-                                  ? `${fmtDateTime(event.firstAt)} - ${fmtDateTime(event.lastAt)}`
-                                  : fmtDateTime(event.firstAt)}
-                              </td>
+                      {openJourneys[journey.key] && (
+                      <div className="mt-3 overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-xs font-medium text-gray-500 uppercase">
+                              <th className="py-2 pr-4">Action</th>
+                              <th className="py-2 pr-4 text-right">Count</th>
+                              <th className="py-2 pr-4">Details</th>
+                              <th className="py-2 pr-4">Page</th>
+                              <th className="py-2 pr-4">Time</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {groupJourneyEvents(journey.events || []).map((event, index) => (
+                              <tr key={`${event.event_name}-${event.firstAt}-${index}`} className="align-top">
+                                <td className="py-2 pr-4 font-medium text-gray-900 min-w-56">
+                                  {fmtAdEventName(event.event_name)}
+                                </td>
+                                <td className="py-2 pr-4 text-right text-gray-700 tabular-nums">
+                                  {fmtNum(event.count)}
+                                </td>
+                                <td className="py-2 pr-4 text-gray-600 min-w-56">
+                                  {fmtAdEventDetail(event)}
+                                </td>
+                                <td className="py-2 pr-4 text-gray-600 min-w-64">
+                                  {event.path || "\u2014"}
+                                </td>
+                                <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">
+                                  {event.count > 1
+                                    ? `${fmtDateTime(event.firstAt)} - ${fmtDateTime(event.lastAt)}`
+                                    : fmtDateTime(event.firstAt)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      )}
                     </div>
-                    )}
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div ref={loadMoreRef} className="px-5 py-4 text-center text-sm text-gray-400">
+                  {loadingMore
+                    ? "Loading more..."
+                    : zdgAd.hasMoreJourneys
+                      ? `Showing ${fmtNum(loadedJourneyCount)} of ${fmtNum(zdgAd.totalJourneys)} visitors`
+                      : `Showing all ${fmtNum(zdgAd.totalJourneys)} visitors`}
+                </div>
               </div>
             )}
           </div>

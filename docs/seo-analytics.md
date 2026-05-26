@@ -34,6 +34,7 @@ Implemented.
 - When `src=zdg` is seen on `/`, the browser stores the source for the session and posts simple events to `/api/ad-source-events`.
 - `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
 - Authenticated tracking requests store `user_id` so ZDG ad sessions can be tied to registered Supabase users after login.
+- Admin ZDG top-card totals are computed from all stored ZDG events; the visitor journey list is paged separately.
 
 ## Related Files
 - `src/app/layout.js`
@@ -43,6 +44,8 @@ Implemented.
 - `src/components/CookieBanner.js`
 - `src/components/AdSourceTracker.js`
 - `src/lib/tracking.js`
+- `src/lib/admin-ad-tracking.js`
 - `src/app/api/ad-source-events/route.js`
+- `src/app/api/admin/ad-tracking/route.js`
 - `db/ad_source_events.sql`
 - `next.config.mjs`

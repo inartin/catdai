@@ -409,7 +409,7 @@ function RelevantListingsPreview({ t, count, listings, onViewAll, sidebar = fals
         </div>
       </div>
 
-      <div className={`flex flex-col gap-3 p-5 sm:p-6 ${sidebar ? "" : "sm:flex-row sm:items-center sm:justify-between"}`}>
+      {/* <div className={`flex flex-col gap-3 p-5 sm:p-6 ${sidebar ? "" : "sm:flex-row sm:items-center sm:justify-between"}`}>
         <p className="text-sm text-gray-500">{t("result.listingsPreviewNote")}</p>
         <button
           type="button"
@@ -422,7 +422,7 @@ function RelevantListingsPreview({ t, count, listings, onViewAll, sidebar = fals
             <path d="m13 6 6 6-6 6" />
           </svg>
         </button>
-      </div>
+      </div> */}
     </section>
   );
 }

@@ -185,7 +185,13 @@ function EvaluareContent() {
 
         const [estRes, cadRes] = await Promise.all([estReq, cadReq]);
         if (!estRes.ok) return { error: { code: estRes.data.error || "unknown", status: estRes.status } };
-        const data = cadRes && cadRes.ok ? { ...estRes.data, cadastral: cadRes.data } : estRes.data;
+        const data = {
+          ...estRes.data,
+          ...(cadRes && cadRes.ok ? { cadastral: cadRes.data } : {}),
+          tracking: {
+            estimate_log_id: trackingData.log_id || null,
+          },
+        };
         if (isPrimary && isFreshEvaluation) {
           trackAdSourceEvent("estimate_result_view", {
             accessToken: session?.access_token || null,

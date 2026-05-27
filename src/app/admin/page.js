@@ -244,6 +244,7 @@ export default function AdminDashboard() {
   const [estimationsLoading, setEstimationsLoading] = useState(false);
   const [estimationsError, setEstimationsError] = useState(null);
   const [showTelegramAlertsList, setShowTelegramAlertsList] = useState(false);
+  const [showPdfGenerationList, setShowPdfGenerationList] = useState(false);
 
   useEffect(() => {
     fetch("/api/admin/stats")
@@ -353,7 +354,7 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}
@@ -370,6 +371,13 @@ export default function AdminDashboard() {
           />
           <StatCard label="Shared Links" value={fmtNum(s.totalSharedLinks)} />
           <StatCard label="Favorites" value={fmtNum(s.totalFavorites)} />
+          <StatCard
+            label="PDF Reports"
+            value={fmtNum(s.pdfGeneration?.total)}
+            detail={showPdfGenerationList ? "Click to hide list" : `${fmtNum(s.pdfGeneration?.registered)} registered / ${fmtNum(s.pdfGeneration?.anonymous)} anonymous`}
+            onClick={() => setShowPdfGenerationList((value) => !value)}
+            active={showPdfGenerationList}
+          />
           <StatCard
             label="Telegram Alerts"
             value={fmtNum(s.totalTelegramAlerts)}
@@ -498,6 +506,55 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600">
                           {fmtBool(row.favorited)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+        {showPdfGenerationList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">PDF Reports</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                {fmtNum(s.pdfGeneration?.periods?.["24h"])} in 24h · {fmtNum(s.pdfGeneration?.periods?.["7d"])} in 7 days · {fmtNum(s.pdfGeneration?.withCadastral)} with cadastral
+              </p>
+            </div>
+
+            {!Array.isArray(s.pdfGeneration?.recent) || s.pdfGeneration.recent.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No PDF reports generated</div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3">Cadastral</th>
+                      <th className="px-4 py-3">Session</th>
+                      <th className="px-4 py-3">Estimate Log</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {s.pdfGeneration.recent.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {fmtDateTime(row.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 font-medium break-all">
+                          {row.user_id || "Anonymous"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {fmtBool(row.included_cadastral)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 break-all">
+                          {row.session_id || row.device_id || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-500 break-all">
+                          {row.estimate_log_id || "\u2014"}
                         </td>
                       </tr>
                     ))}

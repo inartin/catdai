@@ -6,6 +6,7 @@ import QRCode from "qrcode";
 import CloseIcon from "@/components/icons/CloseIcon";
 import { useTranslation } from "@/context/LanguageContext";
 import { validateCadastralNumber } from "@/lib/validation";
+import { getDeviceId, getSessionId } from "@/lib/tracking";
 import {
   createPdfPageCanvas,
   downloadCanvasesAsPdf,
@@ -224,6 +225,27 @@ function buildQrUrl(cadastralNumber = "") {
     url.searchParams.set("cadastral_number", cadastralNumber);
   }
   return url.toString();
+}
+
+async function trackPdfGeneration({ accessToken, estimateLogId, includedCadastral }) {
+  const headers = { "Content-Type": "application/json" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  try {
+    await fetch("/api/pdf-generation-events", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        device_id: getDeviceId(),
+        session_id: getSessionId(),
+        estimate_log_id: estimateLogId || null,
+        included_cadastral: includedCadastral,
+      }),
+      keepalive: true,
+    });
+  } catch {
+    // PDF analytics should never block a user download.
+  }
 }
 
 async function buildReportCanvases({ data, options, t, lang, qrUrl }) {
@@ -771,6 +793,11 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onC
         qrUrl: buildQrUrl(addedCadastralNumber),
       });
       downloadCanvasesAsPdf({ canvases, fileName });
+      trackPdfGeneration({
+        accessToken,
+        estimateLogId: data?.tracking?.estimate_log_id || null,
+        includedCadastral: Boolean(options.cadastral && available.cadastral),
+      });
       onClose();
     } catch (err) {
       console.error("Valuation PDF generation failed", err);

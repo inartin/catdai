@@ -87,6 +87,23 @@ async function fetchTelegramAlerts() {
   );
 }
 
+function buildPdfStats(rows, cutoffs) {
+  const recent = rows.slice(0, 50);
+  return {
+    total: rows.length,
+    registered: rows.filter((row) => row.user_id).length,
+    anonymous: rows.filter((row) => !row.user_id).length,
+    withCadastral: rows.filter((row) => row.included_cadastral).length,
+    periods: Object.fromEntries(
+      Object.entries(cutoffs).map(([period, cutoff]) => [
+        period,
+        rows.filter((row) => row.created_at && row.created_at >= cutoff).length,
+      ])
+    ),
+    recent,
+  };
+}
+
 export async function GET(request) {
   const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
   const journeyLimit = request.nextUrl.searchParams.get("zdgJourneyLimit");
@@ -139,6 +156,12 @@ export async function GET(request) {
       supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
       supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
       fetchTelegramAlerts(),
+      fetchAllRows(() =>
+        supabaseAdmin
+          .from("pdf_generation_events")
+          .select("id, user_id, device_id, session_id, estimate_log_id, included_cadastral, created_at")
+          .order("created_at", { ascending: false })
+      ),
       fetchZdgAdStats({ journeyLimit, journeyOffset }),
     ]);
   } catch (err) {
@@ -166,6 +189,7 @@ export async function GET(request) {
     countSharedLinks,
     countFavorites,
     telegramAlerts,
+    pdfEvents,
     zdgAd,
   ] = dataResults;
 
@@ -183,6 +207,7 @@ export async function GET(request) {
     totalFavorites: countFavorites.count || 0,
     totalTelegramAlerts: telegramAlerts.length,
     telegramAlerts,
+    pdfGeneration: buildPdfStats(pdfEvents, cutoffs),
     zdgAd,
     totalListings: countAll.count || 0,
     activeListings: countActive.count || 0,

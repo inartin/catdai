@@ -13,6 +13,7 @@ Implemented as read-only admin dashboard.
 Shows:
 - registered users
 - total estimations
+- PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - shared links
 - favorites
 - Telegram alert count with an expandable list of configured Telegram alerts
@@ -37,3 +38,4 @@ Shows:
 - `src/app/admin/*`
 - `src/app/api/admin/*`
 - `src/lib/admin-ad-tracking.js`
+- `db/pdf_generation_events.sql`

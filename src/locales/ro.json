@@ -230,6 +230,7 @@
   "result.pdfButton": "Generează raport PDF",
   "result.pdfDialogTitle": "Generează raport PDF",
   "result.pdfDialogDesc": "Alege secțiunile incluse în raport.",
+  "result.pdfDemoLink": "Vezi exemplu de raport PDF",
   "result.pdfOptionPrices": "Preț estimat",
   "result.pdfOptionQr": "Cod QR către această pagină",
   "result.pdfOptionQrDetail": "Include un cod QR care deschide această pagină de evaluare.",

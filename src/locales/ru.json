@@ -230,6 +230,7 @@
   "result.pdfButton": "Создать PDF-отчет",
   "result.pdfDialogTitle": "Создать PDF-отчет",
   "result.pdfDialogDesc": "Выбери разделы для отчета.",
+  "result.pdfDemoLink": "Посмотреть пример PDF-отчета",
   "result.pdfOptionPrices": "Оценочная цена",
   "result.pdfOptionQr": "QR-код на эту страницу",
   "result.pdfOptionQrDetail": "Добавляет QR-код, который открывает эту страницу оценки.",

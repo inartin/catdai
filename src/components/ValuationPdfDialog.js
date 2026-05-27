@@ -17,6 +17,7 @@ const PAGE_MARGIN_X = 46;
 const PAGE_MARGIN_TOP = 42;
 const PAGE_MARGIN_BOTTOM = 42;
 const CONTENT_WIDTH = PDF_CANVAS_WIDTH - PAGE_MARGIN_X * 2;
+const DEMO_PDF_URL = "/samples/demo-evaluare-catdai.md.pdf";
 const COLORS = {
   text: "#111827",
   muted: "#6b7280",
@@ -799,6 +800,14 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onC
             <p className="mt-1 text-sm text-gray-500">
               {t("result.pdfDialogDesc")}
             </p>
+            <a
+              href={DEMO_PDF_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex text-sm font-semibold text-primary hover:text-primary/80"
+            >
+              {t("result.pdfDemoLink")}
+            </a>
           </div>
           <button
             type="button"

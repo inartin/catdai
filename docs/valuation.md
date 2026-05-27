@@ -28,6 +28,7 @@ Implemented and active for apartments.
 - `999.md` preview images for relevant listings are loaded after the result page renders through `/api/listing-preview-images`.
 - RPC failures are logged with the failing branch, params, error code, and elapsed time.
 - Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again.
+- The PDF dialog links to the static demo report at `/samples/demo-evaluare-catdai.md.pdf`.
 - PDF report layout uses explicit canvas coordinates for pills, seller cards, notes, and text blocks instead of HTML rasterization.
 - PDF report header reuses the product logo and displays `catdai.md` as the report brand.
 - PDF report can optionally include a QR code pointing back to the estimation page with `src=qr` in the query string.

@@ -576,8 +576,18 @@ export async function POST(request) {
   const rpcStart = Date.now();
   const [overallRes, individualRes, agencyRes] = await Promise.all([
     supabaseAdmin.rpc("estimate_price", params),
-    supabaseAdmin.rpc("estimate_price", { ...params, p_seller_categories: ["Persoană fizică"] }),
-    supabaseAdmin.rpc("estimate_price", { ...params, p_seller_categories: ["Agenție", "Dezvoltator imobiliar"] }),
+    supabaseAdmin.rpc("estimate_price", {
+      ...params,
+      p_seller_categories: ["Persoană fizică"],
+      p_include_district_comparison: false,
+      p_include_relevant_listings: false,
+    }),
+    supabaseAdmin.rpc("estimate_price", {
+      ...params,
+      p_seller_categories: ["Agenție", "Dezvoltator imobiliar"],
+      p_include_district_comparison: false,
+      p_include_relevant_listings: false,
+    }),
   ]);
   const responseTimeMs = Date.now() - rpcStart;
 
@@ -600,10 +610,14 @@ export async function POST(request) {
   logRpcError("seller_individual", individualRes.error, {
     ...params,
     p_seller_categories: ["Persoană fizică"],
+    p_include_district_comparison: false,
+    p_include_relevant_listings: false,
   }, responseTimeMs);
   logRpcError("seller_agency", agencyRes.error, {
     ...params,
     p_seller_categories: ["Agenție", "Dezvoltator imobiliar"],
+    p_include_district_comparison: false,
+    p_include_relevant_listings: false,
   }, responseTimeMs);
 
   const featureAdj = computeFeatureAdjustments(

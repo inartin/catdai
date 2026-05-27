@@ -4,12 +4,13 @@
 Implemented and active for apartments.
 
 ## User Flow
-- `/estimeaza` collects city, district, rooms, building type, renovation, optional area, optional floor, bathrooms, balconies, cadastral number.
+- `/estimeaza` collects city, district, rooms, building type, renovation, optional area, optional floor, optional first-floor/last-floor filters, bathrooms, balconies, cadastral number.
 - `/evaluare` reads URL params and calls `/api/estimate`.
 - Result supports edit, compare, share, favorite, relevant listings, and alert setup.
 
 ## Estimate Logic
 - API validates input with `src/lib/validation.js`.
+- First-floor and last-floor options are optional alternatives to a specific floor; selecting either clears the exact floor field and filters comparables by floor edge.
 - Supabase RPC `estimate_price` does comparable filtering with progressive widening.
 - Area is used as a comparable filter only when provided.
 - If area is missing, total prices and range come from matching listings' `price_amount` values instead of `price_per_m2 * area`.

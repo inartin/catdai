@@ -45,6 +45,8 @@ const PARAM_KEYS = [
   "rooms",
   "area",
   "floor",
+  "first_floor",
+  "last_floor",
   "total_floors",
   "building_type",
   "renovation",

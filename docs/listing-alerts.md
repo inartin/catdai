@@ -14,6 +14,7 @@ UI and storage implemented. Matching/sending worker is not in this repo.
 ## Filters
 Base filters:
 - city, district, rooms, area, floor, total floors
+- first floor / last floor when an alert is created from an evaluation using those options
 - building type, renovation, bathrooms, balconies
 
 Alert filters:
@@ -23,6 +24,8 @@ Alert filters:
 - floor min/max
 - first floor / last floor
 - seller type
+
+Selecting first floor or last floor clears the numeric floor filter fields because these options are alternatives to a specific floor range.
 
 ## Delivery Fields
 Alerts store `website_enabled`, `telegram_enabled`, and `telegram_chat_id`.

@@ -59,6 +59,13 @@ function formatRooms(input, t) {
 }
 
 function formatFloor(input, t) {
+  if (input?.first_floor || input?.last_floor) {
+    return [
+      input.first_floor ? t("result.floorOption.first") : null,
+      input.last_floor ? t("result.floorOption.last") : null,
+    ].filter(Boolean).join(", ");
+  }
+
   if (input?.floor === undefined || input?.floor === null || input?.floor === "") return null;
   const floor = Number(input?.floor);
   if (!Number.isFinite(floor)) return null;
@@ -81,6 +88,8 @@ export function buildListingAlertBaseFilters(input, filtersUsed) {
     rooms_count: input?.rooms_count,
     area_m2: input?.area_m2,
     floor: input?.floor,
+    first_floor: input?.first_floor ? true : undefined,
+    last_floor: input?.last_floor ? true : undefined,
     total_floors: input?.total_floors,
     building_type: input?.building_type,
     renovation: input?.renovation,
@@ -140,7 +149,7 @@ function PlainFilterChip({ children }) {
   );
 }
 
-function FilterInput({ label, value, placeholder, onChange }) {
+function FilterInput({ label, value, placeholder, onChange, disabled = false }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm text-gray-600">{label}</span>
@@ -150,7 +159,8 @@ function FilterInput({ label, value, placeholder, onChange }) {
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+        disabled={disabled}
+        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:bg-gray-50 disabled:text-gray-400"
       />
     </label>
   );
@@ -322,7 +332,18 @@ export default function ListingAlertConfigurator({
   const updateFilter = (key, value) => {
     setAlertSaved(false);
     setAlertError("");
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    setFilters((prev) => {
+      const next = { ...prev, [key]: value };
+      if ((key === "firstFloor" || key === "lastFloor") && value) {
+        next.floorMin = "";
+        next.floorMax = "";
+      }
+      if ((key === "floorMin" || key === "floorMax") && value !== "") {
+        next.firstFloor = false;
+        next.lastFloor = false;
+      }
+      return next;
+    });
   };
 
   const updateTelegramNotifications = (checked) => {
@@ -526,12 +547,14 @@ export default function ListingAlertConfigurator({
                     value={filters.floorMin}
                     placeholder="1"
                     onChange={(value) => updateFilter("floorMin", value)}
+                    disabled={filters.firstFloor || filters.lastFloor}
                   />
                   <FilterInput
                     label={t("result.floorTo")}
                     value={filters.floorMax}
                     placeholder="25"
                     onChange={(value) => updateFilter("floorMax", value)}
+                    disabled={filters.firstFloor || filters.lastFloor}
                   />
                 </div>
               </div>

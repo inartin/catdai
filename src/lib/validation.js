@@ -147,6 +147,12 @@ export function validateEstimateInput(raw) {
     data.floor = floor;
   }
 
+  data.first_floor = raw.first_floor === true || raw.first_floor === "true" || raw.first_floor === "1";
+  data.last_floor = raw.last_floor === true || raw.last_floor === "true" || raw.last_floor === "1";
+  if ((data.first_floor || data.last_floor) && data.floor != null) {
+    delete data.floor;
+  }
+
   if (raw.total_floors != null && raw.total_floors !== "") {
     const tf = parseInt(raw.total_floors, 10);
     if (!isFiniteInRange(tf, 1, 100)) {

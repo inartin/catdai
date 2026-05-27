@@ -73,6 +73,8 @@ function applyComparableListingFilters(query, input, filtersUsed) {
   const area = Number(input?.area_m2);
   const floor = Number(input?.floor);
   const totalFloors = Number(input?.total_floors);
+  const firstFloor = input?.first_floor === true;
+  const lastFloor = input?.last_floor === true;
   const areaTolerance = Number(filtersUsed?.area_tolerance) || 0.20;
 
   query = query
@@ -100,8 +102,14 @@ function applyComparableListingFilters(query, input, filtersUsed) {
       .gte("area_m2", area * (1 - areaTolerance))
       .lte("area_m2", area * (1 + areaTolerance));
   }
-  if (filtersUsed?.floor && Number.isFinite(floor)) {
-    if (floor === 1) {
+  if (filtersUsed?.floor && (firstFloor || lastFloor || Number.isFinite(floor))) {
+    if (firstFloor && !lastFloor) {
+      query = query.eq("floor", 1);
+    } else if (lastFloor && !firstFloor) {
+      query = query.not("floor", "is", null).not("total_floors", "is", null);
+    } else if (firstFloor && lastFloor) {
+      query = query.not("floor", "is", null);
+    } else if (floor === 1) {
       query = query.eq("floor", 1);
     } else if (Number.isFinite(totalFloors) && floor === totalFloors) {
       query = query.not("floor", "is", null).not("total_floors", "is", null);
@@ -118,6 +126,16 @@ function applyComparableListingFilters(query, input, filtersUsed) {
 
 function matchesFinalFloorFilter(listing, input, filtersUsed) {
   if (!filtersUsed?.floor) return true;
+
+  const firstFloor = input?.first_floor === true;
+  const lastFloor = input?.last_floor === true;
+  if (firstFloor || lastFloor) {
+    const listingFloor = Number(listing.floor);
+    const listingTotalFloors = Number(listing.total_floors);
+    const matchesFirst = firstFloor && listingFloor === 1;
+    const matchesLast = lastFloor && Number.isFinite(listingFloor) && Number.isFinite(listingTotalFloors) && listingFloor === listingTotalFloors;
+    return matchesFirst || matchesLast;
+  }
 
   const floor = Number(input?.floor);
   const totalFloors = Number(input?.total_floors);
@@ -517,6 +535,8 @@ export async function POST(request) {
     rooms_count: body.rooms_count,
     area_m2: body.area_m2,
     floor: body.floor,
+    first_floor: body.first_floor,
+    last_floor: body.last_floor,
     total_floors: body.total_floors,
     building_type: body.building_type,
     renovation: body.renovation,
@@ -539,6 +559,8 @@ export async function POST(request) {
     p_rooms_count: v.rooms_count,
     p_area_m2: v.area_m2 ?? null,
     p_floor: v.floor ?? null,
+    ...(v.first_floor ? { p_first_floor: true } : {}),
+    ...(v.last_floor ? { p_last_floor: true } : {}),
     p_total_floors: v.total_floors ?? null,
     p_building_type: v.building_type ?? null,
     p_renovation: v.renovation ?? null,

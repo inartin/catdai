@@ -37,6 +37,8 @@ function EstimeazaContent() {
       rooms_count: searchParams.get("rooms") || null,
       area_m2: searchParams.get("area") || "",
       floor: searchParams.get("floor") || "",
+      first_floor: searchParams.get("first_floor") || "",
+      last_floor: searchParams.get("last_floor") || "",
       total_floors: searchParams.get("total_floors") || "",
       building_type: searchParams.get("building_type") || "",
       renovation: searchParams.get("renovation") || "",

@@ -143,16 +143,37 @@ function PillGroup({ options, value, onChange, columns, labelFn }) {
   );
 }
 
+function CheckboxOption({ checked, onChange, children }) {
+  return (
+    <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/20"
+      />
+      <span>{children}</span>
+    </label>
+  );
+}
+
+function isTrueValue(value) {
+  return value === true || value === "true" || value === "1";
+}
 
 export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit }) {
   const router = useRouter();
   const { t } = useTranslation();
+  const initialFirstFloor = isTrueValue(initialValues?.first_floor);
+  const initialLastFloor = isTrueValue(initialValues?.last_floor);
   const [form, setForm] = useState({
     city: initialValues?.city ?? "Chișinău",
     district: initialValues?.district ?? "",
     rooms_count: initialValues?.rooms_count ?? null,
     area_m2: initialValues?.area_m2 ?? "",
-    floor: initialValues?.floor ?? "",
+    floor: initialFirstFloor || initialLastFloor ? "" : initialValues?.floor ?? "",
+    first_floor: initialFirstFloor,
+    last_floor: initialLastFloor,
     total_floors: initialValues?.total_floors ?? "",
     building_type: initialValues?.building_type ?? "",
     renovation: normalizeRenovationSelection(initialValues?.renovation ?? ""),
@@ -160,7 +181,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     balconies_count: initialValues?.balconies_count ?? null,
   });
   const [showOptional, setShowOptional] = useState(
-    !!(initialValues?.floor || initialValues?.total_floors || initialValues?.bathrooms_count || initialValues?.balconies_count)
+    !!((!initialFirstFloor && !initialLastFloor && initialValues?.floor) || initialFirstFloor || initialLastFloor || initialValues?.total_floors || initialValues?.bathrooms_count || initialValues?.balconies_count)
   );
   const [cadastralInput, setCadastralInput] = useState("");
   const [cadastralLoading, setCadastralLoading] = useState(false);
@@ -179,6 +200,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     setForm((prev) => {
       const next = { ...prev, [key]: value };
       if (key === "city" && value !== prev.city) next.district = "";
+      if ((key === "first_floor" || key === "last_floor") && value) next.floor = "";
+      if (key === "floor" && value !== "") {
+        next.first_floor = false;
+        next.last_floor = false;
+      }
       return next;
     });
   };
@@ -230,7 +256,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         ...(f.city && { city: f.city }),
         ...(f.district && { district: f.district }),
         ...(f.area_m2 && { area_m2: f.area_m2 }),
-        ...(f.floor && { floor: f.floor }),
+        ...(f.floor && !prev.first_floor && !prev.last_floor && { floor: f.floor }),
         ...(f.total_floors && { total_floors: f.total_floors }),
         ...(f.building_type && { building_type: f.building_type }),
         ...(f.bathrooms_count != null && { bathrooms_count: f.bathrooms_count }),
@@ -278,6 +304,8 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     params.set("rooms", String(form.rooms_count));
     if (form.area_m2) params.set("area", String(form.area_m2));
     if (form.floor) params.set("floor", String(form.floor));
+    if (form.first_floor) params.set("first_floor", "1");
+    if (form.last_floor) params.set("last_floor", "1");
     if (form.total_floors) params.set("total_floors", String(form.total_floors));
     if (form.building_type) params.set("building_type", form.building_type);
     if (form.renovation) params.set("renovation", form.renovation);
@@ -309,7 +337,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     if (form.district) s += 15;
     if (form.rooms_count != null) s += 20;
     if (form.area_m2) s += 20;
-    if (form.floor) s += 5;
+    if (form.floor || form.first_floor || form.last_floor) s += 5;
     if (form.total_floors) s += 3;
     if (form.building_type) s += 7;
     if (form.renovation) s += 6;
@@ -320,7 +348,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
 
   const optionalGain = useMemo(() => {
     let s = 0;
-    if (!form.floor) s += 5;
+    if (!form.floor && !form.first_floor && !form.last_floor) s += 5;
     if (!form.total_floors) s += 3;
     if (form.bathrooms_count == null) s += 2;
     if (form.balconies_count == null) s += 2;
@@ -690,7 +718,8 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                       placeholder={t("form.floorPlaceholder")}
                       value={form.floor}
                       onChange={(e) => update("floor", e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                      disabled={form.first_floor || form.last_floor}
+                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors disabled:bg-gray-50 disabled:text-gray-400"
                     />
                   </div>
                   <div>
@@ -708,6 +737,20 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                       className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                     />
                   </div>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <CheckboxOption
+                    checked={form.first_floor}
+                    onChange={(value) => update("first_floor", value)}
+                  >
+                    {t("result.floorOption.first")}
+                  </CheckboxOption>
+                  <CheckboxOption
+                    checked={form.last_floor}
+                    onChange={(value) => update("last_floor", value)}
+                  >
+                    {t("result.floorOption.last")}
+                  </CheckboxOption>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

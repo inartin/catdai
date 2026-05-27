@@ -32,6 +32,15 @@ function floorLabel(floor, totalFloors) {
   return t ? `Etaj ${f}/${t}` : `Etaj ${f}`;
 }
 
+function floorOptionLabel(params = {}) {
+  const labels = [
+    params.first_floor ? "Doar parter" : null,
+    params.last_floor ? "Doar ultimul etaj" : null,
+  ].filter(Boolean);
+  if (labels.length > 0) return labels.join(", ");
+  return floorLabel(params.floor, params.total_floors);
+}
+
 function buildListingSeo(params = {}, slug = "") {
   const city = params.city || "Chișinău";
   const district = params.district || "";
@@ -40,7 +49,7 @@ function buildListingSeo(params = {}, slug = "") {
   const buildingType =
     BUILDING_TYPE[params.building_type] || params.building_type || "";
   const renovation = RENOVATION[params.renovation] || params.renovation || "";
-  const floor = floorLabel(params.floor, params.total_floors);
+  const floor = floorOptionLabel(params);
   const balconies = (() => {
     const b = params.balconies;
     if (b == null || b === "") return null;

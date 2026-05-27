@@ -576,7 +576,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     input.district && filters_used.district === false,
     input.building_type && filters_used.building_type === false,
     input.renovation && filters_used.renovation === false,
-    input.floor && filters_used.floor === false,
+    (input.floor || input.first_floor || input.last_floor) && filters_used.floor === false,
     input.area_m2 && filters_used.area === false,
   ].some(Boolean);
 
@@ -598,7 +598,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     try {
       const shareParams = {};
       const sp = new URLSearchParams(window.location.search);
-      ["city", "district", "rooms", "area", "floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
+      ["city", "district", "rooms", "area", "floor", "first_floor", "last_floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
         const val = sp.get(key);
         if (val) shareParams[key] = val;
       });
@@ -640,6 +640,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   ].filter(Boolean);
 
   const floorLabel = (() => {
+    if (input.first_floor || input.last_floor) {
+      return [
+        input.first_floor ? t("result.floorOption.first") : null,
+        input.last_floor ? t("result.floorOption.last") : null,
+      ].filter(Boolean).join(", ");
+    }
     if (!input.floor) return null;
     if (input.floor === 1) return t("result.groundFloor");
     if (input.total_floors && input.floor === input.total_floors)
@@ -1126,10 +1132,15 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   active={filters_used?.area !== false}
                 />
               )}
-              {input.floor && (
+              {(input.floor || input.first_floor || input.last_floor) && (
                 <FilterBadge
                   label={
-                    input.floor === 1
+                    input.first_floor || input.last_floor
+                      ? [
+                        input.first_floor ? t("result.floorOption.first") : null,
+                        input.last_floor ? t("result.floorOption.last") : null,
+                      ].filter(Boolean).join(", ")
+                      : input.floor === 1
                       ? t("result.floorGround")
                       : input.total_floors && input.floor === input.total_floors
                         ? t("result.floorLast", { floor: input.floor })

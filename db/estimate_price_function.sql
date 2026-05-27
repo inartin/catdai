@@ -25,12 +25,48 @@ DROP FUNCTION IF EXISTS estimate_price(
   text[]
 );
 
+DROP FUNCTION IF EXISTS estimate_price(
+  text,
+  text,
+  int,
+  numeric,
+  int,
+  int,
+  text,
+  text,
+  int,
+  int,
+  text[],
+  boolean,
+  boolean
+);
+
+DROP FUNCTION IF EXISTS estimate_price(
+  text,
+  text,
+  int,
+  numeric,
+  int,
+  boolean,
+  boolean,
+  int,
+  text,
+  text,
+  int,
+  int,
+  text[],
+  boolean,
+  boolean
+);
+
 CREATE OR REPLACE FUNCTION estimate_price(
   p_city text,
   p_district text,
   p_rooms_count int,
   p_area_m2 numeric,
   p_floor int DEFAULT NULL,
+  p_first_floor boolean DEFAULT false,
+  p_last_floor boolean DEFAULT false,
   p_total_floors int DEFAULT NULL,
   p_building_type text DEFAULT NULL,
   p_renovation text DEFAULT NULL,
@@ -53,7 +89,9 @@ DECLARE
 
   -- Track which filters are active (order = widening priority)
   -- Balconies & bathrooms: NOT used as filters (sparse data, shown in impact only)
-  use_floor boolean := (p_floor IS NOT NULL);
+  wants_first_floor boolean := COALESCE(p_first_floor, false);
+  wants_last_floor boolean := COALESCE(p_last_floor, false);
+  use_floor boolean := (p_floor IS NOT NULL OR wants_first_floor OR wants_last_floor);
   has_input_area boolean := (p_area_m2 IS NOT NULL AND p_area_m2 > 0);
   use_area boolean := has_input_area;
   area_tolerance numeric := 0.20;  -- ±20%, widens to ±35%, then drops
@@ -124,6 +162,11 @@ BEGIN
       AND (NOT use_renovation OR renovation = ANY(renovation_filters))
       AND (NOT use_floor OR (
         CASE
+          WHEN wants_first_floor OR wants_last_floor THEN
+            (
+              (wants_first_floor AND floor = 1)
+              OR (wants_last_floor AND floor IS NOT NULL AND total_floors IS NOT NULL AND floor = total_floors)
+            )
           WHEN p_floor = 1 THEN
             floor = 1
           WHEN p_total_floors IS NOT NULL AND p_floor = p_total_floors THEN
@@ -304,6 +347,11 @@ BEGIN
         AND (NOT use_renovation OR renovation = ANY(renovation_filters))
         AND (NOT use_floor OR (
           CASE
+            WHEN wants_first_floor OR wants_last_floor THEN
+              (
+                (wants_first_floor AND floor = 1)
+                OR (wants_last_floor AND floor IS NOT NULL AND total_floors IS NOT NULL AND floor = total_floors)
+              )
             WHEN p_floor = 1 THEN
               floor = 1
             WHEN p_total_floors IS NOT NULL AND p_floor = p_total_floors THEN
@@ -372,6 +420,8 @@ BEGIN
       'building_type', use_building_type,
       'renovation', use_renovation,
       'floor', use_floor,
+      'first_floor', wants_first_floor,
+      'last_floor', wants_last_floor,
       'area', use_area,
       'area_tolerance', CASE WHEN use_area THEN area_tolerance ELSE null END
     ),
@@ -392,6 +442,8 @@ BEGIN
       'rooms_count', p_rooms_count,
       'area_m2', p_area_m2,
       'floor', p_floor,
+      'first_floor', wants_first_floor,
+      'last_floor', wants_last_floor,
       'total_floors', p_total_floors,
       'building_type', p_building_type,
       'renovation', p_renovation,

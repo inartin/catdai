@@ -18,6 +18,10 @@ import {
 } from "@/lib/tracking";
 import { validateEstimateInput, validateCadastralNumber } from "@/lib/validation";
 
+function isTrueParam(value) {
+  return value === "1" || value === "true";
+}
+
 function EvaluareContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -117,10 +121,14 @@ function EvaluareContent() {
         const balRaw = pRaw.get(pFx + "balconies");
         const bVal = bRaw === "3+" ? 3 : bRaw ? parseInt(bRaw, 10) : null;
         const balVal = balRaw === "3+" ? 3 : balRaw != null ? parseInt(balRaw, 10) : null;
+        const firstFloor = isTrueParam(pRaw.get(pFx + "first_floor"));
+        const lastFloor = isTrueParam(pRaw.get(pFx + "last_floor"));
 
         const validation = validateEstimateInput({
           city, district, rooms_count: roomsVal, area_m2: area,
           floor: pRaw.get(pFx + "floor") || null,
+          first_floor: firstFloor,
+          last_floor: lastFloor,
           total_floors: pRaw.get(pFx + "total_floors") || null,
           building_type: pRaw.get(pFx + "building_type") || null,
           renovation: pRaw.get(pFx + "renovation") || null,
@@ -161,6 +169,8 @@ function EvaluareContent() {
           body: JSON.stringify({
             city: v.city, district: v.district, rooms_count: v.rooms_count, area_m2: v.area_m2,
             floor: v.floor ?? null,
+            first_floor: v.first_floor ?? false,
+            last_floor: v.last_floor ?? false,
             total_floors: v.total_floors ?? null,
             building_type: v.building_type ?? null,
             renovation: v.renovation ?? null,
@@ -293,7 +303,7 @@ function EvaluareContent() {
   const handleEdit = () => {
     setIsListingsMode(false);
     const editParams = new URLSearchParams();
-    ["city", "district", "rooms", "area", "floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
+    ["city", "district", "rooms", "area", "floor", "first_floor", "last_floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
       const val = searchParams.get(key);
       if (val) editParams.set(key, val);
     });

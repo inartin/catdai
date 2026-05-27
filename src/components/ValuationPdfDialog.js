@@ -301,14 +301,19 @@ async function buildReportCanvases({ data, options, t, lang, qrUrl }) {
             : cadastral.apartment.floor)
           : null,
       },
+      { label: t("form.cadastralToilet"), value: cadastral.apartment?.toilet },
+      { label: t("form.cadastralBathroom"), value: cadastral.apartment?.bathroom },
+      { label: t("form.cadastralLastFloor"), value: cadastral.apartment?.is_last_floor },
       { label: t("form.cadastralEstimatedValue"), value: cadastral.apartment?.estimated_value_lei ? `${cadastral.apartment.estimated_value_lei} lei` : null },
       { label: t("form.cadastralClassifier"), value: cadastral.building?.classifier },
+      { label: t("form.cadastralTotalFloors"), value: cadastral.building?.total_floors },
       { label: t("form.cadastralCondition"), value: cadastral.building?.condition },
       { label: t("form.cadastralYear"), value: cadastral.building?.construction_year },
       { label: t("form.cadastralWallMaterial"), value: cadastral.building?.wall_material },
       { label: t("form.cadastralWater"), value: cadastral.building?.water },
       { label: t("form.cadastralSewage"), value: cadastral.building?.sewage },
       { label: t("form.cadastralGas"), value: cadastral.building?.gas },
+      { label: t("form.cadastralElectricity"), value: cadastral.building?.electricity },
     ])
     : [];
   const [logo, qrImage] = await Promise.all([

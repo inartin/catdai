@@ -987,6 +987,24 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                         </span>
                       </div>
                     )}
+                    {cadastral.apartment?.toilet && (
+                      <div className="flex justify-between text-base">
+                        <span className="text-gray-500">{t("form.cadastralToilet")}</span>
+                        <span className="font-medium text-gray-900">{cadastral.apartment.toilet}</span>
+                      </div>
+                    )}
+                    {cadastral.apartment?.bathroom && (
+                      <div className="flex justify-between text-base">
+                        <span className="text-gray-500">{t("form.cadastralBathroom")}</span>
+                        <span className="font-medium text-gray-900">{cadastral.apartment.bathroom}</span>
+                      </div>
+                    )}
+                    {cadastral.apartment?.is_last_floor && (
+                      <div className="flex justify-between text-base">
+                        <span className="text-gray-500">{t("form.cadastralLastFloor")}</span>
+                        <span className="font-medium text-gray-900">{cadastral.apartment.is_last_floor}</span>
+                      </div>
+                    )}
                     {cadastral.apartment?.estimated_value_lei && (
                       <div className="flex justify-between text-base">
                         <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
@@ -1003,6 +1021,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   <div className="space-y-2.5">
                     {cadastral.building?.classifier && (
                       <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><span className="font-medium text-gray-900">{cadastral.building.classifier}</span></div>
+                    )}
+                    {cadastral.building?.total_floors && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralTotalFloors")}</span><span className="font-medium text-gray-900">{cadastral.building.total_floors}</span></div>
                     )}
                     {cadastral.building?.condition && (
                       <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><span className="font-medium text-gray-900">{cadastral.building.condition}</span></div>
@@ -1021,6 +1042,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     )}
                     {cadastral.building?.gas && (
                       <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><span className="font-medium text-gray-900">{cadastral.building.gas}</span></div>
+                    )}
+                    {cadastral.building?.electricity && (
+                      <div className="flex justify-between text-base"><span className="text-gray-500">{t("form.cadastralElectricity")}</span><span className="font-medium text-gray-900">{cadastral.building.electricity}</span></div>
                     )}
                   </div>
                 </div>

@@ -21,7 +21,8 @@ UI renders these values directly. There is no blur, tooltip, lock marker, or fak
 `src/components/BlurWall.js` keeps the reusable blur-wall presentation available for future paywall variants.
 
 ## Paid Payload
-Paid users receive the full estimate and cadastral response.
+Paid users receive the full estimate response.
+Cadastral responses are not paywalled and return full extracted apartment/building details for all users.
 
 ## Share Exception
 If a shared link was created by a paid user, `/api/estimate` allows full result access through `share_slug`.

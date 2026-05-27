@@ -56,11 +56,14 @@ const propertyRows = [
 ];
 
 const cadastralRows = [
-  [["Suprafață", "41.9 m²"], ["Anul construcţiei", "1965"]],
-  [["Etaj", "Etaj 4/5"], ["Materialul pereților", "piatra de calcar (cotelet)"]],
-  [["Valoare estimată (Cadastru)", "580 025 lei"], ["Apă", "Centrala functioneaza"]],
-  [["Clasificator", "Bloc cu apartamente"], ["Canalizare", "Centrala functioneaza"]],
-  [["Starea blocului", "Satisfacatoare"], ["Gaz", "Da"]],
+  [["Suprafață", "41.9 m²"], ["Etaj", "Etaj 4/5"]],
+  [["Veceu", "Da"], ["Baie", "Da"]],
+  [["Ultimul etaj", "Nu"], ["Valoare estimată (Cadastru)", "580 025 lei"]],
+  [["Anul construcţiei", "1965"], ["Numărul de etaje", "5"]],
+  [["Clasificator", "Bloc cu apartamente"], ["Starea blocului", "Satisfacatoare"]],
+  [["Materialul pereților", "piatra de calcar (cotelet)"], ["Apă", "Centrala functioneaza"]],
+  [["Canalizare", "Centrala functioneaza"], ["Gaz", "Da"]],
+  [["Complet electrificată", "Da"]],
 ];
 
 function esc(value) {

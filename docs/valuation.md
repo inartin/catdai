@@ -35,6 +35,7 @@ Implemented and active for apartments.
 - PDF report can optionally include a QR code pointing back to the estimation page with `src=qr` in the query string.
 - When official cadastral data is missing, the PDF dialog recommends adding it and can fetch cadastral details by number before generating the report.
 - Official cadastral data, when included, is grouped with its IPCBI source inside one highlighted report panel.
+- Cadastral result/PDF panels include apartment-level and building-level IPCBI details when available: veceu, baie, last-floor flag, official estimated value, construction year, total floors, condition, utilities, and wall material.
 - The cadastral estimated-value label stays on one line in the PDF data panel.
 - `pnpm run pdf:demo` generates `demo-valuation-report.pdf` with non-real example data, all report sections, a cadastral number, and a QR code pointing to `https://catdai.md/`.
 

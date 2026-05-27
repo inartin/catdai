@@ -539,21 +539,6 @@ export default function CategoryCards({ onCategorySelect }) {
                       className="h-52 w-full rounded-xl bg-cover bg-center bg-no-repeat shadow-inner"
                       style={{ backgroundImage: `url(${cat.backgroundImage})` }}
                     />
-                    <div className="grid w-full grid-cols-3 gap-2">
-                      {realEstateScopes.map((scope) => (
-                        <span
-                          key={scope.label}
-                          className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg bg-white px-2 py-2 text-center text-[11px] font-bold leading-tight text-gray-700 shadow-sm"
-                        >
-                          {scope.label}
-                          {scope.badge && (
-                            <span className="rounded-full bg-sky-50 px-1.5 py-0.5 text-[9px] font-extrabold leading-none text-sky-700 ring-1 ring-sky-100">
-                              {scope.badge}
-                            </span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
                   </div>
 
                   <div className="flex h-full flex-col p-6">

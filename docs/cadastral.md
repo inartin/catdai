@@ -5,6 +5,8 @@ Implemented and active, with partial fallback.
 
 ## What It Does
 - User enters a cadastral number in the valuation form.
+- User can also add a cadastral number from the PDF export dialog when the current evaluation lacks official cadastral data.
+- PDF-dialog cadastral lookup sends the same authenticated bearer token as the result page, so authenticated users receive full cadastral details there too.
 - `/api/cadastral` fetches public geodata and extracts building/apartment details.
 - It autofills city, district, area, floor, total floors, building type, and bathroom count when available.
 

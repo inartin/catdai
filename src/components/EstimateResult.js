@@ -8,6 +8,7 @@ import BookmarkIcon from "@/components/icons/BookmarkIcon";
 import CloseIcon from "@/components/icons/CloseIcon";
 import AuthOptions from "@/components/AuthOptions";
 import ListingAlertConfigurator from "@/components/ListingAlertConfigurator";
+import ValuationPdfDialog from "@/components/ValuationPdfDialog";
 
 function formatPrice(num) {
   const value = Number(num);
@@ -447,6 +448,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("result.comingSoon");
   const [showListingsView, setShowListingsView] = useState(false);
+  const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false);
   const favoriteChecked = useRef(false);
   const { t, lang } = useTranslation();
   const { session, isAuthenticated, clearAuthError } = useAuth();
@@ -737,6 +739,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   return (
     <div className={resultLayoutClassName}>
       {authModal}
+      <ValuationPdfDialog
+        open={isPdfDialogOpen}
+        data={data}
+        accessToken={session?.access_token || null}
+        onClose={() => setIsPdfDialogOpen(false)}
+      />
 
       {/* Property summary header */}
       <div className={`${compactLayout ? "" : "order-1"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
@@ -1327,6 +1335,19 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     {t("result.shareAnalysis")}
                   </>
                 )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPdfDialogOpen(true)}
+                className={`${actionButtonClassName} font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2`}
+              >
+                <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <path d="M14 2v6h6" />
+                  <path d="M9 13h6" />
+                  <path d="M9 17h6" />
+                </svg>
+                {t("result.pdfButton")}
               </button>
             </div>
             <button

@@ -254,20 +254,17 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         ? "district"
         : form.rooms_count == null
           ? "rooms_count"
-          : !form.area_m2
-            ? "area_m2"
-            : !form.building_type
-              ? "building_type"
-              : !form.renovation
-                ? "renovation"
-                : null;
+          : !form.building_type
+            ? "building_type"
+            : !form.renovation
+              ? "renovation"
+              : null;
     if (firstMissing) {
       setHighlightField(firstMissing);
       const refMap = {
         city: refCity,
         district: refDistrict,
         rooms_count: refRooms,
-        area_m2: refArea,
         building_type: refBuildingType,
         renovation: refRenovation,
       };
@@ -279,7 +276,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     params.set("city", form.city);
     if (form.district) params.set("district", form.district);
     params.set("rooms", String(form.rooms_count));
-    params.set("area", String(form.area_m2));
+    if (form.area_m2) params.set("area", String(form.area_m2));
     if (form.floor) params.set("floor", String(form.floor));
     if (form.total_floors) params.set("total_floors", String(form.total_floors));
     if (form.building_type) params.set("building_type", form.building_type);
@@ -331,7 +328,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   }, [form]);
 
   const isValid =
-    form.city && ((districtsByCity[form.city] || []).length === 0 || form.district) && form.rooms_count != null && form.area_m2 && form.building_type && form.renovation;
+    form.city && ((districtsByCity[form.city] || []).length === 0 || form.district) && form.rooms_count != null && form.building_type && form.renovation;
 
   const districts = districtsByCity[form.city] || [];
 
@@ -398,7 +395,6 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
               </p>
             </div>
           </div>
-          <LoginButton className="pt-1" />
         </div>
 
         {/* ── Accuracy meter ── */}
@@ -605,7 +601,6 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                 >
                   <label className="text-sm text-gray-600 mb-1.5 block">
                     {t("form.area")}
-                    <span className="text-red-400 ml-0.5">*</span>
                   </label>
                   <input
                     type="number"

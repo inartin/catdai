@@ -264,6 +264,8 @@ function DistrictComparison({ districts, currentDistrict, area, className = "" }
 
   if (!districts || districts.length < 2) return null;
 
+  const areaValue = Number(area);
+  const hasArea = Number.isFinite(areaValue) && areaValue > 0;
   const numericMedians = districts
     .map((d) => Number(d?.median_ppm))
     .filter((value) => Number.isFinite(value) && value > 0);
@@ -289,7 +291,7 @@ function DistrictComparison({ districts, currentDistrict, area, className = "" }
                 ? Math.max(8, (medianPpm / maxPpm) * 100)
                 : 8);
           const totalPrice =
-            Number.isFinite(medianPpm) ? Math.round(medianPpm * area) : null;
+            hasArea && Number.isFinite(medianPpm) ? Math.round(medianPpm * areaValue) : null;
 
           return (
             <div key={d.district} className="flex items-center gap-3">
@@ -310,20 +312,20 @@ function DistrictComparison({ districts, currentDistrict, area, className = "" }
                     } ${isCurrent ? "font-bold text-primary" : "text-gray-600"}`}
                   style={widthPct > 50 ? {} : { left: `calc(${widthPct}% + 8px)` }}
                 >
-                  {totalPrice == null ? (
-                    "—"
-                  ) : (
-                    `€${totalPrice.toLocaleString("ro-MD")}`
-                  )}
+                  {totalPrice == null
+                    ? (Number.isFinite(medianPpm) ? `${formatPrice(medianPpm)}/m²` : "—")
+                    : `€${totalPrice.toLocaleString("ro-MD")}`}
                 </span>
               </div>
             </div>
           );
         })}
       </div>
-      <p className="text-xs text-gray-400 mt-4">
-        {t("result.estimatedForArea", { area })}
-      </p>
+      {hasArea && (
+        <p className="text-xs text-gray-400 mt-4">
+          {t("result.estimatedForArea", { area })}
+        </p>
+      )}
     </div>
   );
 }
@@ -521,7 +523,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     const roomsLbl = input.rooms_count === 1
       ? t("result.oneRoom")
       : t("result.rooms", { count: input.rooms_count });
-    const label = `${t("result.apartment")} ${roomsLbl} · ${input.area_m2}m² · ${input.district ? t(`data.district.${input.district}`) + ", " : ""}${t(`data.city.${input.city}`)}`;
+    const labelParts = [
+      `${t("result.apartment")} ${roomsLbl}`,
+      input.area_m2 ? `${input.area_m2}m²` : null,
+      `${input.district ? t(`data.district.${input.district}`) + ", " : ""}${t(`data.city.${input.city}`)}`,
+    ].filter(Boolean);
+    const label = labelParts.join(" · ");
 
     // Optimistic update
     const next = !favorited;
@@ -627,6 +634,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const roomsLabel = input.rooms_count === 1
     ? t("result.oneRoom")
     : t("result.rooms", { count: input.rooms_count });
+  const titleParts = [
+    `${t("result.apartment")} ${roomsLabel}`,
+    input.area_m2 ? `${input.area_m2}m²` : null,
+  ].filter(Boolean);
 
   const floorLabel = (() => {
     if (!input.floor) return null;
@@ -640,6 +651,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
   const indRate = data.estimates_by_seller?.individual?.estimate?.market_rate;
   const agRate = data.estimates_by_seller?.agency?.estimate?.market_rate;
+  const individualComparableCount = Number(data.estimates_by_seller?.individual?.market_stats?.comparable_count);
+  const agencyComparableCount = Number(data.estimates_by_seller?.agency?.market_stats?.comparable_count);
   const sellerDelta = (indRate && agRate) ? (agRate - indRate) : null;
   const sellerDeltaPct = (indRate && agRate) ? ((sellerDelta / indRate) * 100) : null;
   const listingsCount = Number.isFinite(Number(market_stats?.comparable_count))
@@ -768,7 +781,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             <div className={`mt-4 -ml-16 w-[calc(100%+4rem)] ${compactLayout ? "lg:ml-0 lg:w-auto" : "lg:mt-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-0"}`}>
               <div className={`min-w-0 ${compactLayout ? "" : "lg:pl-16 lg:pr-6"}`}>
                 <h2 className="text-xl font-bold text-gray-900 leading-snug">
-                  {t("result.apartment")} {roomsLabel} · {input.area_m2}m²
+                  {titleParts.join(" · ")}
                 </h2>
                 <p className="text-base text-gray-500 mt-1">
                   {input.district && `${t(`data.district.${input.district}`)}, `}{t(`data.city.${input.city}`)}
@@ -892,6 +905,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                       <p className="text-xs text-gray-400 mt-1">
                         {formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²
                       </p>
+                      {Number.isFinite(individualComparableCount) && individualComparableCount > 0 && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {t("result.trendListings", { count: individualComparableCount })}
+                        </p>
+                      )}
                     </>
                   ) : (
                     <p className="text-sm text-gray-400 italic py-2 mt-1">{t("result.noData")}</p>
@@ -907,6 +925,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                       <p className="text-xs text-gray-400 mt-1">
                         {formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²
                       </p>
+                      {Number.isFinite(agencyComparableCount) && agencyComparableCount > 0 && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          {t("result.trendListings", { count: agencyComparableCount })}
+                        </p>
+                      )}
                     </>
                   ) : (
                     <p className="text-sm text-gray-400 italic py-2 mt-1">{t("result.noData")}</p>
@@ -1179,7 +1202,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   </div>
                 </div>
                 <p className="text-sm text-gray-400 text-center">
-                  × {input.area_m2}m² = {formatPrice(estimate.market_rate)}
+                  {input.area_m2 ? `× ${input.area_m2}m² = ${formatPrice(estimate.market_rate)}` : formatPrice(estimate.market_rate)}
                 </p>
               </div>
             ) : (
@@ -1190,9 +1213,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 <p className="text-2xl font-bold text-primary">
                   {formatPrice(market_stats.median_price_per_m2)}/m²
                 </p>
-                <p className="text-sm text-gray-400 mt-1.5">
-                  × {input.area_m2}m² = {formatPrice(estimate.market_rate)}
-                </p>
+                {input.area_m2 && (
+                  <p className="text-sm text-gray-400 mt-1.5">
+                    × {input.area_m2}m² = {formatPrice(estimate.market_rate)}
+                  </p>
+                )}
               </div>
             )}
           </div>

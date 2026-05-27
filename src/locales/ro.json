@@ -76,7 +76,7 @@
   "form.selectDistrict": "Selectează sectorul",
   "form.propertySection": "Proprietate",
   "form.rooms": "Număr camere",
-  "form.area": "Suprafață (m²)",
+  "form.area": "Suprafață (m²) (Optional)",
   "form.areaPlaceholder": "ex. 65",
   "form.buildingType": "Tip construcție",
   "form.renovation": "Starea reparației",

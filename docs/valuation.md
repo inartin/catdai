@@ -4,17 +4,20 @@
 Implemented and active for apartments.
 
 ## User Flow
-- `/estimeaza` collects city, district, rooms, area, building type, renovation, and optional floor, bathrooms, balconies, cadastral number.
+- `/estimeaza` collects city, district, rooms, building type, renovation, optional area, optional floor, bathrooms, balconies, cadastral number.
 - `/evaluare` reads URL params and calls `/api/estimate`.
 - Result supports edit, compare, share, favorite, relevant listings, and alert setup.
 
 ## Estimate Logic
 - API validates input with `src/lib/validation.js`.
 - Supabase RPC `estimate_price` does comparable filtering with progressive widening.
+- Area is used as a comparable filter only when provided.
+- If area is missing, total prices and range come from matching listings' `price_amount` values instead of `price_per_m2 * area`.
 - It computes fast sale, market rate, premium, price per m2, range, confidence, district comparison, relevant listings.
 - `/api/estimate` calls the RPC with the server-side Supabase admin client so server valuation work does not inherit the anonymous client timeout.
 - Backend also runs seller-category estimates for owner vs agency/developer.
 - Seller-category estimates use the same property filters and seller filters, but skip district comparison and relevant listings because the UI only renders their price/range/stats.
+- Seller breakdown shows the comparable listing count for each seller type under the price per m2.
 - Successful estimate payloads are cached for 30 minutes by normalized inputs and language.
 - Cache hits still resolve access and write estimate logs, but skip repeated RPC/listing/trend work.
 - `999.md` preview images for relevant listings are loaded after the result page renders through `/api/listing-preview-images`.

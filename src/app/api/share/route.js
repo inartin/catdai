@@ -77,9 +77,9 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  if (!body.city || !body.district || !body.rooms || !body.area) {
+  if (!body.city || !body.district || !body.rooms) {
     return NextResponse.json(
-      { error: "Missing required params: city, district, rooms, area" },
+      { error: "Missing required params: city, district, rooms" },
       { status: 400 }
     );
   }

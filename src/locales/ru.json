@@ -76,7 +76,7 @@
   "form.selectDistrict": "Выбери район",
   "form.propertySection": "Недвижимость",
   "form.rooms": "Количество комнат",
-  "form.area": "Площадь (м²)",
+  "form.area": "Площадь (м²) (Опционально)",
   "form.areaPlaceholder": "напр. 65",
   "form.buildingType": "Тип строения",
   "form.renovation": "Состояние ремонта",

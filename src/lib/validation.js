@@ -129,12 +129,15 @@ export function validateEstimateInput(raw) {
     return { valid: false, field: "rooms_count", reason: "invalid_rooms" };
   }
 
-  const area = parseFloat(raw.area_m2);
-  if (!Number.isFinite(area) || area <= 0 || area > 1000) {
-    return { valid: false, field: "area_m2", reason: "invalid_area" };
-  }
+  const data = { city, district: district || null, rooms_count: roomsCount };
 
-  const data = { city, district: district || null, rooms_count: roomsCount, area_m2: area };
+  if (raw.area_m2 != null && raw.area_m2 !== "") {
+    const area = parseFloat(raw.area_m2);
+    if (!Number.isFinite(area) || area <= 0 || area > 1000) {
+      return { valid: false, field: "area_m2", reason: "invalid_area" };
+    }
+    data.area_m2 = area;
+  }
 
   if (raw.floor != null && raw.floor !== "") {
     const floor = parseInt(raw.floor, 10);

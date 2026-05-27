@@ -54,7 +54,8 @@ DECLARE
   -- Track which filters are active (order = widening priority)
   -- Balconies & bathrooms: NOT used as filters (sparse data, shown in impact only)
   use_floor boolean := (p_floor IS NOT NULL);
-  use_area boolean := (p_area_m2 IS NOT NULL AND p_area_m2 > 0);
+  has_input_area boolean := (p_area_m2 IS NOT NULL AND p_area_m2 > 0);
+  use_area boolean := has_input_area;
   area_tolerance numeric := 0.20;  -- ±20%, widens to ±35%, then drops
   use_renovation boolean := (p_renovation IS NOT NULL);
   renovation_filters text[] := CASE
@@ -104,6 +105,9 @@ BEGIN
       avg(price_amount)                                               AS avg_price,
       min(price_amount)                                               AS min_price,
       max(price_amount)                                               AS max_price,
+      percentile_cont(0.5) WITHIN GROUP (ORDER BY price_amount)       AS median_price,
+      percentile_cont(0.25) WITHIN GROUP (ORDER BY price_amount)      AS p25_price,
+      percentile_cont(0.75) WITHIN GROUP (ORDER BY price_amount)      AS p75_price,
       percentile_cont(0.10) WITHIN GROUP (ORDER BY price_per_m2)     AS p10_ppm,
       percentile_cont(0.25) WITHIN GROUP (ORDER BY price_per_m2)     AS p25_ppm,
       percentile_cont(0.75) WITHIN GROUP (ORDER BY price_per_m2)     AS p75_ppm,
@@ -202,9 +206,16 @@ BEGIN
   -- ============================================================
   -- Step 3: Compute price tiers
   -- ============================================================
-  fast_sale   := round(((estimated_ppm * 0.90) * p_area_m2)::numeric, -2);
-  market_rate := round((estimated_ppm * p_area_m2)::numeric, -2);
-  premium     := round(((estimated_ppm * 1.08) * p_area_m2)::numeric, -2);
+  IF has_input_area THEN
+    fast_sale   := round(((estimated_ppm * 0.90) * p_area_m2)::numeric, -2);
+    market_rate := round((estimated_ppm * p_area_m2)::numeric, -2);
+    premium     := round(((estimated_ppm * 1.08) * p_area_m2)::numeric, -2);
+  ELSE
+    market_rate := round((base_stats.median_price *
+      CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2);
+    fast_sale   := round((market_rate * 0.90)::numeric, -2);
+    premium     := round((market_rate * 1.08)::numeric, -2);
+  END IF;
 
   -- ============================================================
   -- Step 4: District comparison
@@ -331,10 +342,18 @@ BEGIN
       END
     ),
     'range', jsonb_build_object(
-      'low', round((base_stats.p25_ppm * p_area_m2 *
-        CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2),
-      'high', round((base_stats.p75_ppm * p_area_m2 *
-        CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+      'low', CASE
+        WHEN has_input_area THEN round((base_stats.p25_ppm * p_area_m2 *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+        ELSE round((base_stats.p25_price *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+      END,
+      'high', CASE
+        WHEN has_input_area THEN round((base_stats.p75_ppm * p_area_m2 *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+        ELSE round((base_stats.p75_price *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+      END
     ),
     'market_stats', jsonb_build_object(
       'comparable_count', comparable_count,

@@ -682,12 +682,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const supportColumnClassName = compactLayout
     ? "flex flex-col gap-5"
     : "flex flex-col gap-5";
-  const actionGridClassName = compactLayout
-    ? "grid grid-cols-2 gap-3"
-    : "grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 lg:grid-cols-1";
   const actionButtonClassName = compactLayout
     ? "py-5 rounded-2xl text-base"
     : "px-3 py-4 rounded-2xl text-sm min-[360px]:whitespace-nowrap lg:py-4";
+  const primaryActionButtonClassName = `${actionButtonClassName} w-full cursor-pointer font-semibold bg-primary text-white shadow-lg shadow-primary/20 hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 transition-all flex items-center justify-center gap-2`;
+  const secondaryActionButtonClassName = `${actionButtonClassName} w-full cursor-pointer font-semibold border border-gray-200 text-gray-700 hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-sm transition-all flex items-center justify-center gap-2`;
   const actionIconClassName = compactLayout
     ? "w-5 h-5"
     : "h-4 w-4 shrink-0";
@@ -1293,67 +1292,54 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
           {/* Actions */}
           <div className="flex flex-col gap-3">
-            <div className={actionGridClassName}>
-              <button
-                type="button"
-                onClick={onReset}
-                className={`${actionButtonClassName} font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2`}
-              >
-                <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-                {t("result.changeCriteria")}
-              </button>
-              <button
-                type="button"
-                onClick={handleShare}
-                className={`${actionButtonClassName} font-semibold border border-primary/30 text-primary bg-primary/5 hover:bg-primary/10 transition-colors flex items-center justify-center gap-2`}
-              >
-                {sharing ? (
-                  <>
-                    <svg className={`${actionIconClassName} animate-spin`} viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                      <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                    </svg>
-                    {t("result.sharing")}
-                  </>
-                ) : copied ? (
-                  <>
-                    <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                    {t("result.linkCopied")}
-                  </>
-                ) : (
-                  <>
-                    <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                      <polyline points="16 6 12 2 8 6" />
-                      <line x1="12" y1="2" x2="12" y2="15" />
-                    </svg>
-                    {t("result.shareAnalysis")}
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPdfDialogOpen(true)}
-                className={`${actionButtonClassName} font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2`}
-              >
-                <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <path d="M14 2v6h6" />
-                  <path d="M9 13h6" />
-                  <path d="M9 17h6" />
-                </svg>
-                {t("result.pdfButton")}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsPdfDialogOpen(true)}
+              className={primaryActionButtonClassName}
+            >
+              <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M9 13h6" />
+                <path d="M9 17h6" />
+              </svg>
+              {t("result.pdfButton")}
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              className={secondaryActionButtonClassName}
+            >
+              {sharing ? (
+                <>
+                  <svg className={`${actionIconClassName} animate-spin`} viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                    <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                  {t("result.sharing")}
+                </>
+              ) : copied ? (
+                <>
+                  <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                  {t("result.linkCopied")}
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                    <polyline points="16 6 12 2 8 6" />
+                    <line x1="12" y1="2" x2="12" y2="15" />
+                  </svg>
+                  {t("result.shareAnalysis")}
+                </>
+              )}
+            </button>
             <button
               type="button"
               onClick={onCompare}
-              className={`w-full ${actionButtonClassName} font-semibold border border-primary/50 text-primary hover:bg-primary/5 transition-colors flex items-center justify-center gap-2`}
+              className={secondaryActionButtonClassName}
             >
               <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="18" cy="18" r="3" />
@@ -1362,6 +1348,17 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 <path d="M11 18H8a2 2 0 0 1-2-2V9" />
               </svg>
               {t("result.compare")}
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              className={secondaryActionButtonClassName}
+            >
+              <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+              {t("result.changeCriteria")}
             </button>
           </div>
         </aside>

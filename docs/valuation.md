@@ -7,6 +7,7 @@ Implemented and active for apartments.
 - `/estimeaza` collects city, district, rooms, building type, renovation, optional area, optional floor, optional first-floor/last-floor filters, bathrooms, balconies, cadastral number.
 - `/evaluare` reads URL params and calls `/api/estimate`.
 - Result supports edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
+- Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
 - PDF export opens a section picker and downloads a concise seller-facing market evaluation report from the already-loaded result data.
 - PDF reports always include the estimated market price, segment median price per m2, property summary, disclaimer footer, and `catdai.md` source label; optional sections include seller-type comparison and official cadastral data when available.
 - PDF reports intentionally exclude market statistics, relevant listing cards/links, and sector/city trend charts.

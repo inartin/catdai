@@ -248,6 +248,7 @@
   "result.pdfGenerate": "Скачать PDF",
   "result.pdfGenerating": "Генерация...",
   "result.pdfError": "Не удалось создать PDF. Попробуй снова.",
+  "result.loginToGeneratePdf": "Войдите, чтобы скачать PDF-отчет",
   "result.pdfReportTitle": "Отчет о рыночной оценке",
   "result.pdfReportDate": "Дата отчета",
   "result.pdfPricesTitle": "Оценочная цена",

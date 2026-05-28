@@ -10,6 +10,38 @@ import AuthOptions from "@/components/AuthOptions";
 import ListingAlertConfigurator from "@/components/ListingAlertConfigurator";
 import ValuationPdfDialog from "@/components/ValuationPdfDialog";
 
+const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
+
+function rememberPdfLoginReturn() {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.setItem(PDF_LOGIN_RETURN_KEY, "1");
+  } catch {
+    // Best effort: login still works, only PDF dialog restore is skipped.
+  }
+}
+
+function forgetPdfLoginReturn() {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.removeItem(PDF_LOGIN_RETURN_KEY);
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
+function hasPdfLoginReturn() {
+  if (typeof window === "undefined") return false;
+
+  try {
+    return localStorage.getItem(PDF_LOGIN_RETURN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function formatPrice(num) {
   const value = Number(num);
   if (!Number.isFinite(value)) return "—";
@@ -492,6 +524,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     if (!isAuthModalOpen) return;
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
+        forgetPdfLoginReturn();
         setIsAuthModalOpen(false);
       }
     };
@@ -505,6 +538,24 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     clearAuthError();
     setIsAuthModalOpen(true);
   }, [clearAuthError, isAuthenticated]);
+
+  const handlePdfAuthRequired = useCallback(() => {
+    rememberPdfLoginReturn();
+    openAuthModal("result.loginToGeneratePdf");
+  }, [openAuthModal]);
+
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === "undefined") return;
+    if (!hasPdfLoginReturn()) return;
+
+    const timeoutId = window.setTimeout(() => {
+      forgetPdfLoginReturn();
+      setIsAuthModalOpen(false);
+      setIsPdfDialogOpen(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isAuthenticated]);
 
   const setListingsMode = (enabled) => {
     setShowListingsView(enabled);
@@ -695,8 +746,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     isAuthModalOpen && typeof document !== "undefined"
       ? createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 cursor-zoom-out"
-          onClick={() => setIsAuthModalOpen(false)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 cursor-zoom-out"
+          onClick={() => {
+            forgetPdfLoginReturn();
+            setIsAuthModalOpen(false);
+          }}
         >
           <div
             role="dialog"
@@ -706,7 +760,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
           >
             <button
               type="button"
-              onClick={() => setIsAuthModalOpen(false)}
+              onClick={() => {
+                forgetPdfLoginReturn();
+                setIsAuthModalOpen(false);
+              }}
               aria-label="Close"
               className="absolute top-3 right-3 inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
             >
@@ -742,6 +799,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         open={isPdfDialogOpen}
         data={data}
         accessToken={session?.access_token || null}
+        onAuthRequired={handlePdfAuthRequired}
         onClose={() => setIsPdfDialogOpen(false)}
       />
 

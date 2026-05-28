@@ -23,6 +23,7 @@ UI renders these values directly. There is no blur, tooltip, lock marker, or fak
 ## Paid Payload
 Paid users receive the full estimate response.
 Cadastral responses are not paywalled and return full extracted apartment/building details for all users.
+PDF export dialogs are visible to anonymous users, but downloading a PDF requires a valid authenticated Supabase bearer token checked by `/api/pdf-generation-authorizations`.
 
 ## Share Exception
 If a shared link was created by a paid user, `/api/estimate` allows full result access through `share_slug`.

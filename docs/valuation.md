@@ -8,7 +8,7 @@ Implemented and active for apartments.
 - `/evaluare` reads URL params and calls `/api/estimate`.
 - Result supports edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
-- PDF export opens a section picker and downloads a concise seller-facing market evaluation report from the already-loaded result data.
+- PDF export opens a section picker for everyone, but PDF download is login-gated and requires a valid Supabase session immediately before generation. If login starts from the PDF dialog, the login prompt overlays the PDF dialog; after OAuth redirect, a localStorage flag restores the PDF dialog.
 - PDF reports always include the estimated market price, segment median price per m2, property summary, disclaimer footer, and `catdai.md` source label; optional sections include seller-type comparison and official cadastral data when available.
 - PDF reports intentionally exclude market statistics, relevant listing cards/links, and sector/city trend charts.
 
@@ -27,8 +27,8 @@ Implemented and active for apartments.
 - Cache hits still resolve access and write estimate logs, but skip repeated RPC/listing/trend work.
 - `999.md` preview images for relevant listings are loaded after the result page renders through `/api/listing-preview-images`.
 - RPC failures are logged with the failing branch, params, error code, and elapsed time.
-- Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again.
-- Successful PDF generation events are logged to `pdf_generation_events` with optional user id, device/session ids, optional estimate log id, and whether cadastral data was included.
+- Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again, after `/api/pdf-generation-authorizations` validates the bearer token.
+- Successful authenticated PDF generation events are logged to `pdf_generation_events` with user id, device/session ids, optional estimate log id, and whether cadastral data was included.
 - The PDF dialog links to the static demo report at `/samples/demo-evaluare-catdai.md.pdf`.
 - PDF report layout uses explicit canvas coordinates for pills, seller cards, notes, and text blocks instead of HTML rasterization.
 - PDF report header reuses the product logo and displays `catdai.md` as the report brand.
@@ -64,6 +64,7 @@ Applied after RPC in `/api/estimate`.
 - `src/components/PropertyForm.js`
 - `src/components/EstimateResult.js`
 - `src/components/ValuationPdfDialog.js`
+- `src/app/api/pdf-generation-authorizations/route.js`
 - `src/app/api/pdf-generation-events/route.js`
 - `src/lib/browser-pdf.js`
 - `scripts/generate-demo-valuation-pdf.mjs`

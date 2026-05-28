@@ -248,6 +248,7 @@
   "result.pdfGenerate": "Descarcă PDF",
   "result.pdfGenerating": "Se generează...",
   "result.pdfError": "Nu am putut genera PDF-ul. Încearcă din nou.",
+  "result.loginToGeneratePdf": "Autentifică-te ca să descarci raportul PDF",
   "result.pdfReportTitle": "Raport de evaluare de piață",
   "result.pdfReportDate": "Data raportului",
   "result.pdfPricesTitle": "Preț estimat",

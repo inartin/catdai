@@ -228,8 +228,10 @@ function buildQrUrl(cadastralNumber = "") {
 }
 
 async function trackPdfGeneration({ accessToken, estimateLogId, includedCadastral }) {
+  if (!accessToken) return;
+
   const headers = { "Content-Type": "application/json" };
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  headers.Authorization = `Bearer ${accessToken}`;
 
   try {
     await fetch("/api/pdf-generation-events", {
@@ -246,6 +248,22 @@ async function trackPdfGeneration({ accessToken, estimateLogId, includedCadastra
   } catch {
     // PDF analytics should never block a user download.
   }
+}
+
+async function authorizePdfGeneration(accessToken) {
+  if (!accessToken) return false;
+
+  const res = await fetch("/api/pdf-generation-authorizations", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (res.status === 401) return false;
+  if (!res.ok) {
+    throw new Error(`PDF authorization failed with ${res.status}`);
+  }
+
+  return true;
 }
 
 async function buildReportCanvases({ data, options, t, lang, qrUrl }) {
@@ -672,7 +690,7 @@ function CadastralPrompt({
   );
 }
 
-export default function ValuationPdfDialog({ open, data, accessToken = null, onClose }) {
+export default function ValuationPdfDialog({ open, data, accessToken = null, onAuthRequired = null, onClose }) {
   const { t, lang } = useTranslation();
   const [options, setOptions] = useState(() => createInitialOptions(data));
   const [isGenerating, setIsGenerating] = useState(false);
@@ -790,6 +808,13 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onC
     setError("");
 
     try {
+      const authorized = await authorizePdfGeneration(accessToken);
+      if (!authorized) {
+        setError(t("result.loginToGeneratePdf"));
+        onAuthRequired?.();
+        return;
+      }
+
       const canvases = await buildReportCanvases({
         data: reportData,
         options,

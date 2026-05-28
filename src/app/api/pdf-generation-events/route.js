@@ -36,8 +36,12 @@ export async function POST(request) {
   }
 
   const access = await resolveAccessTier(request);
+  if (!access.user_id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const row = {
-    user_id: access.user_id || null,
+    user_id: access.user_id,
     device_id: cleanText(body.device_id, 80),
     session_id: cleanText(body.session_id, 80),
     estimate_log_id: cleanText(body.estimate_log_id, 80),

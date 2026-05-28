@@ -1,7 +1,11 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 
 export async function GET(request, { params }) {
+  const unauthorized = requireAdminApiAuth(request);
+  if (unauthorized) return unauthorized;
+
   const { id } = await params;
 
   const [ownerRes, listingsRes] = await Promise.all([

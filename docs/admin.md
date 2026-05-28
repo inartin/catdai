@@ -6,8 +6,11 @@ Implemented as read-only admin dashboard.
 ## Access
 - `/admin/login?key=...` requires `ADMIN_LOGIN_KEY`.
 - Password is checked against `ADMIN_PASSWORD`.
-- Successful login sets an httpOnly `admin_token` cookie.
-- All `/admin` and `/api/admin` routes require `ADMIN_TOKEN`.
+- `/api/admin/auth` blocks an IP after 5 failed login attempts for 15 minutes and returns `Retry-After`.
+- Successful login sets an httpOnly signed `admin_token` session cookie that expires after 12 hours.
+- `ADMIN_TOKEN` is used as the server-side HMAC signing secret and is not stored directly in the cookie.
+- All `/admin` and `/api/admin` routes require a valid signed `admin_token` session in `src/proxy.js`.
+- Protected `/api/admin/*` data routes also verify the `admin_token` cookie inside each route before returning cached data or using `SUPABASE_SERVICE_KEY`.
 
 ## Dashboard
 Shows:
@@ -35,6 +38,7 @@ Shows:
 
 ## Related Files
 - `src/proxy.js`
+- `src/lib/admin-auth.js`
 - `src/app/admin/*`
 - `src/app/api/admin/*`
 - `src/lib/admin-ad-tracking.js`

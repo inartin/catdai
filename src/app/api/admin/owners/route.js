@@ -1,9 +1,13 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 
 const PAGE_SIZE = 25;
 
 export async function GET(request) {
+  const unauthorized = requireAdminApiAuth(request);
+  if (unauthorized) return unauthorized;
+
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search") || "";
   const page = parseInt(searchParams.get("page") || "0", 10);
@@ -26,7 +30,8 @@ export async function GET(request) {
     .range(from, to);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Failed to load admin owners:", error);
+    return NextResponse.json({ error: "Failed to load owners" }, { status: 500 });
   }
 
   return NextResponse.json({ data: data || [], total: count || 0 });

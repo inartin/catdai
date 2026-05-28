@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 
 const PAGE = 1000;
@@ -140,7 +141,10 @@ function buildFavoriteSet(rows) {
   return set;
 }
 
-export async function GET() {
+export async function GET(request) {
+  const unauthorized = requireAdminApiAuth(request);
+  if (unauthorized) return unauthorized;
+
   if (cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
     return NextResponse.json(cache.data);
   }

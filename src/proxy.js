@@ -1,6 +1,54 @@
 import { NextResponse } from "next/server";
 
-export function proxy(request) {
+const ADMIN_SESSION_VERSION = "v1";
+
+function base64UrlToBytes(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return bytes;
+}
+
+function base64UrlToText(value) {
+  return new TextDecoder().decode(base64UrlToBytes(value));
+}
+
+async function verifyAdminSessionToken(token) {
+  if (!token || !process.env.ADMIN_TOKEN) return false;
+
+  const [version, payload, signature] = token.split(".");
+  if (version !== ADMIN_SESSION_VERSION || !payload || !signature) return false;
+
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(process.env.ADMIN_TOKEN),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const validSignature = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlToBytes(signature),
+      new TextEncoder().encode(`${ADMIN_SESSION_VERSION}.${payload}`)
+    );
+    if (!validSignature) return false;
+
+    const session = JSON.parse(base64UrlToText(payload));
+    return Number.isFinite(session.exp) && session.exp > Math.floor(Date.now() / 1000);
+  } catch {
+    return false;
+  }
+}
+
+export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
   // Language prefix rewrite: /ru/... or /ro/... → serve the actual route
@@ -41,7 +89,7 @@ export function proxy(request) {
     } else {
       // All other admin routes require a valid session cookie
       const token = request.cookies.get("admin_token")?.value;
-      if (token !== process.env.ADMIN_TOKEN) {
+      if (!(await verifyAdminSessionToken(token))) {
         if (pathname.startsWith("/api/")) {
           return new NextResponse("Unauthorized", { status: 401 });
         }

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { fetchZdgAdStats } from "@/lib/admin-ad-tracking";
+import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 
 const PAGE = 1000;
@@ -105,6 +106,9 @@ function buildPdfStats(rows, cutoffs) {
 }
 
 export async function GET(request) {
+  const unauthorized = requireAdminApiAuth(request);
+  if (unauthorized) return unauthorized;
+
   const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
   const journeyLimit = request.nextUrl.searchParams.get("zdgJourneyLimit");
   const journeyOffset = request.nextUrl.searchParams.get("zdgJourneyOffset");

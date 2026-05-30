@@ -52,7 +52,7 @@ const RENOVATION_TYPES = [
   "Are nevoie de reparație", "Dat în exploatare", "Variantă sură",
 ];
 
-const CADASTRAL_RE = /^(?:\d{5,7}\.\d{1,4}\.\d{2}\.\d{3}|\d{7,12}\.\d{2}\.\d{3})$/;
+const CADASTRAL_RE = /^(?:\d{5,7}\.\d{1,4}\.\d{2}\.\d{3,4}|\d{7,12}\.\d{2}\.\d{3,4})$/;
 
 function matchCity(raw) {
   if (!raw || typeof raw !== "string") return null;

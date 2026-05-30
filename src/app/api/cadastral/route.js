@@ -3,6 +3,47 @@ import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
+const GEODATA_TIMEOUT_MS = 10_000;
+const NOMINATIM_TIMEOUT_MS = 5_000;
+
+async function fetchWithTimeout(url, { label, timeoutMs = GEODATA_TIMEOUT_MS, headers } = {}) {
+  const started = Date.now();
+  try {
+    const res = await fetch(url, {
+      ...(headers ? { headers } : {}),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res;
+  } catch (err) {
+    err.stage = label || "unknown";
+    err.elapsedMs = Date.now() - started;
+    throw err;
+  }
+}
+
+async function fetchJsonWithTimeout(url, { label, timeoutMs = GEODATA_TIMEOUT_MS, headers } = {}) {
+  const started = Date.now();
+  const res = await fetchWithTimeout(url, { label, timeoutMs, headers });
+  if (!res.ok) {
+    const err = new Error(`Upstream ${label || "request"} returned ${res.status}`);
+    err.stage = label || "unknown";
+    err.status = res.status;
+    err.elapsedMs = Date.now() - started;
+    throw err;
+  }
+  return res.json();
+}
+
+function logCadastralFetchError(err) {
+  const cause = err?.cause;
+  console.error("[cadastral] Fetch error:", {
+    stage: err?.stage || "unknown",
+    status: err?.status || null,
+    code: err?.code || cause?.code || err?.name || null,
+    message: err?.message || String(err),
+    elapsed_ms: err?.elapsedMs || null,
+  });
+}
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -124,7 +165,9 @@ function resolveCityFromNominatim(addr) {
 
 async function fallbackNominatim(lat, lon) {
   const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&bounded=0&polygon_geojson=1&priority=5`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
+    label: "nominatim_reverse",
+    timeoutMs: NOMINATIM_TIMEOUT_MS,
     headers: { "User-Agent": "CatDai/1.0" },
   });
   if (!res.ok) return null;
@@ -214,7 +257,7 @@ export async function POST(request) {
 
   try {
     const step1Url = `https://geodata.gov.md/geoserver/w_cbi/wfs?service=WFS&version=1.1.0&request=GetFeature&outputFormat=application%2Fjson&maxFeatures=5&typeName=cad_terenuri&cql_filter=(codcadastral+LIKE+%27%25${code}%25%27)&sortBy=codcadastral&srsName=EPSG:4326`;
-    const step1 = await fetch(step1Url).then((r) => r.json());
+    const step1 = await fetchJsonWithTimeout(step1Url, { label: "geodata_wfs" });
 
     if (!step1.features || step1.features.length === 0) {
       return NextResponse.json(
@@ -231,7 +274,7 @@ export async function POST(request) {
     const bbox = `${x - offset},${y - offset},${x + offset},${y + offset}`;
 
     const step3Url = `https://geodata.gov.md/geoserver/contestare/wms?service=WMS&version=1.1.1&request=GetFeatureInfo&layers=S1&query_layers=S1&x=51&y=51&height=101&width=101&srs=EPSG:3857&bbox=${bbox}&feature_count=10&info_format=application%2Fjson&ENV=mapstore_language:en`;
-    const step3 = await fetch(step3Url).then((r) => r.json());
+    const step3 = await fetchJsonWithTimeout(step3Url, { label: "geodata_wms" });
 
     if (!step3.features || step3.features.length === 0) {
 
@@ -291,10 +334,10 @@ export async function POST(request) {
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     return res;
   } catch (err) {
-    console.error("[cadastral] Fetch error:", err);
+    logCadastralFetchError(err);
     return NextResponse.json(
       { error: "Failed to fetch cadastral data" },
-      { status: 502 }
+      { status: err?.name === "TimeoutError" || err?.cause?.code === "UND_ERR_CONNECT_TIMEOUT" ? 504 : 502 }
     );
   }
 }

@@ -4,6 +4,7 @@ import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
 import LoginButton from "@/components/LoginButton";
+import { validateCadastralNumber } from "@/lib/validation";
 
 const cities = [
   "Chișinău",
@@ -276,11 +277,8 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   };
 
   const handleCadastralSearch = async () => {
-    const trimmed = cadastralInput.trim();
-    if (!trimmed) return;
-
-    const cadastralRe = /^(?:\d{5,7}\.\d{1,4}\.\d{2}\.\d{3}|\d{7,12}\.\d{2}\.\d{3})$/;
-    if (!cadastralRe.test(trimmed)) {
+    const validation = validateCadastralNumber(cadastralInput);
+    if (!validation.valid) {
       setCadastralError("cadastralInvalid");
       return;
     }
@@ -292,7 +290,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
       const res = await fetch("/api/cadastral", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cadastral_number: trimmed }),
+        body: JSON.stringify({ cadastral_number: validation.value }),
       });
 
       const data = await res.json();

@@ -115,6 +115,52 @@ function SelectField({ label, required, value, onChange, placeholder, options, l
   );
 }
 
+function MultiSelectField({ label, required, values, onChange, placeholder, options, labelFn }) {
+  const selected = Array.isArray(values) ? values : [];
+
+  const toggle = (option) => {
+    onChange(
+      selected.includes(option)
+        ? selected.filter((item) => item !== option)
+        : [...selected, option]
+    );
+  };
+
+  return (
+    <div>
+      {label && (
+        <label className="text-sm text-gray-600 mb-1.5 block">
+          {label}
+          {required && <span className="text-red-400 ml-0.5">*</span>}
+        </label>
+      )}
+      <div className="rounded-xl border border-gray-200 bg-white p-2">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {options.map((option) => {
+            const active = selected.includes(option);
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => toggle(option)}
+                className={`min-h-10 rounded-lg border px-3 py-2 text-left text-sm font-medium transition-colors ${active
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-gray-100 bg-gray-50 text-gray-600 hover:border-gray-200 hover:bg-white"
+                  }`}
+              >
+                {labelFn ? labelFn(option) : option}
+              </button>
+            );
+          })}
+        </div>
+        {selected.length === 0 && (
+          <p className="px-1 pt-2 text-xs text-gray-400">{placeholder}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PillGroup({ options, value, onChange, columns, labelFn }) {
   const gridClass = columns
     ? `grid gap-2`
@@ -164,8 +210,14 @@ function isTrueValue(value) {
 export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit }) {
   const router = useRouter();
   const { t } = useTranslation();
+  const estimateModes = [
+    { key: "sale", label: t("form.estimateModeSale") },
+    { key: "rent", label: t("form.estimateModeRent") },
+  ];
   const initialFirstFloor = isTrueValue(initialValues?.first_floor);
   const initialLastFloor = isTrueValue(initialValues?.last_floor);
+  const [estimateMode, setEstimateMode] = useState(initialValues?.type === "rent" || initialValues?.mode === "rent" ? "rent" : "sale");
+  const isRentMode = estimateMode === "rent";
   const [form, setForm] = useState({
     city: initialValues?.city ?? "Chișinău",
     district: initialValues?.district ?? "",
@@ -184,6 +236,16 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     !!((!initialFirstFloor && !initialLastFloor && initialValues?.floor) || initialFirstFloor || initialLastFloor || initialValues?.total_floors || initialValues?.bathrooms_count || initialValues?.balconies_count)
   );
   const [cadastralInput, setCadastralInput] = useState("");
+  const [rentDistricts, setRentDistricts] = useState(
+    Array.isArray(initialValues?.districts) && initialValues.districts.length > 0
+      ? initialValues.districts
+      : initialValues?.district ? [initialValues.district] : []
+  );
+  const [rentBuildingTypes, setRentBuildingTypes] = useState(
+    Array.isArray(initialValues?.building_types) && initialValues.building_types.length > 0
+      ? initialValues.building_types
+      : initialValues?.building_type ? [initialValues.building_type] : []
+  );
   const [cadastralLoading, setCadastralLoading] = useState(false);
   const [cadastralError, setCadastralError] = useState(null);
   const [cadastralData, setCadastralData] = useState(null);
@@ -199,7 +261,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     setHighlightField(null);
     setForm((prev) => {
       const next = { ...prev, [key]: value };
-      if (key === "city" && value !== prev.city) next.district = "";
+      if (key === "city" && value !== prev.city) {
+        next.district = "";
+        setRentDistricts([]);
+        setRentBuildingTypes([]);
+      }
       if ((key === "first_floor" || key === "last_floor") && value) next.floor = "";
       if (key === "floor" && value !== "") {
         next.first_floor = false;
@@ -274,13 +340,14 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
 
   const handleSubmit = () => {
     const needsDistrict = (districtsByCity[form.city] || []).length > 0;
+    const hasDistrict = isRentMode ? rentDistricts.length > 0 : !!form.district;
     const firstMissing = !form.city
       ? "city"
-      : needsDistrict && !form.district
+      : needsDistrict && !hasDistrict
         ? "district"
         : form.rooms_count == null
           ? "rooms_count"
-          : !form.building_type
+          : !isRentMode && !form.building_type
             ? "building_type"
             : !form.renovation
               ? "renovation"
@@ -300,14 +367,20 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
 
     const params = new URLSearchParams();
     params.set("city", form.city);
-    if (form.district) params.set("district", form.district);
+    if (isRentMode) {
+      params.set("type", "rent");
+      rentDistricts.forEach((district) => params.append("district", district));
+      rentBuildingTypes.forEach((buildingType) => params.append("building_type", buildingType));
+    } else if (form.district) {
+      params.set("district", form.district);
+    }
     params.set("rooms", String(form.rooms_count));
     if (form.area_m2) params.set("area", String(form.area_m2));
     if (form.floor) params.set("floor", String(form.floor));
     if (form.first_floor) params.set("first_floor", "1");
     if (form.last_floor) params.set("last_floor", "1");
     if (form.total_floors) params.set("total_floors", String(form.total_floors));
-    if (form.building_type) params.set("building_type", form.building_type);
+    if (!isRentMode && form.building_type) params.set("building_type", form.building_type);
     if (form.renovation) params.set("renovation", form.renovation);
     if (form.bathrooms_count != null) params.set("bathrooms", String(form.bathrooms_count));
     if (form.balconies_count != null) params.set("balconies", String(form.balconies_count));
@@ -334,17 +407,17 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   const accuracy = useMemo(() => {
     let s = 0;
     if (form.city) s += 20;
-    if (form.district) s += 15;
+    if (isRentMode ? rentDistricts.length > 0 : form.district) s += 15;
     if (form.rooms_count != null) s += 20;
     if (form.area_m2) s += 20;
     if (form.floor || form.first_floor || form.last_floor) s += 5;
-    if (form.total_floors) s += 3;
-    if (form.building_type) s += 7;
+    if (!isRentMode && form.total_floors) s += 3;
+    if (isRentMode ? rentBuildingTypes.length > 0 : form.building_type) s += 7;
     if (form.renovation) s += 6;
     if (form.bathrooms_count != null) s += 2;
-    if (form.balconies_count != null) s += 2;
+    if (!isRentMode && form.balconies_count != null) s += 2;
     return s;
-  }, [form]);
+  }, [form, isRentMode, rentBuildingTypes, rentDistricts]);
 
   const optionalGain = useMemo(() => {
     let s = 0;
@@ -356,7 +429,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   }, [form]);
 
   const isValid =
-    form.city && ((districtsByCity[form.city] || []).length === 0 || form.district) && form.rooms_count != null && form.building_type && form.renovation;
+    form.city
+    && ((districtsByCity[form.city] || []).length === 0 || (isRentMode ? rentDistricts.length > 0 : form.district))
+    && form.rooms_count != null
+    && (isRentMode || form.building_type)
+    && form.renovation;
 
   const districts = districtsByCity[form.city] || [];
 
@@ -397,6 +474,27 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
           <span className="text-sm font-medium">{t("form.back")}</span>
         </button>
 
+        <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
+          <div className="grid grid-cols-2 gap-1">
+            {estimateModes.map((mode) => {
+              const active = estimateMode === mode.key;
+              return (
+                <button
+                  key={mode.key}
+                  type="button"
+                  onClick={() => setEstimateMode(mode.key)}
+                  className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-150 ${active
+                    ? "bg-primary text-white shadow-sm"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    }`}
+                >
+                  {mode.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -416,10 +514,10 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
             </span>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">
-                {t("form.title")}
+                {isRentMode ? t("form.rentTitle") : t("form.title")}
               </h1>
               <p className="text-sm text-gray-400">
-                {t("form.subtitle")}
+                {isRentMode ? t("form.rentSubtitle") : t("form.subtitle")}
               </p>
             </div>
           </div>
@@ -446,6 +544,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         {/* ── Form card ── */}
         <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
           {/* — Cadastral shortcut — */}
+          {!isRentMode && (
           <div className="p-5 sm:p-6">
             <div className="flex items-center gap-2 mb-4">
               <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 text-xs font-bold flex items-center justify-center">
@@ -541,6 +640,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
               )}
             </div>
           </div>
+          )}
 
           {/* — Section 1: Location — */}
           <div className="p-5 sm:p-6">
@@ -580,22 +680,34 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                   ref={refDistrict}
                   className={`animate-fade-in rounded-xl transition-all duration-300 ${highlightField === "district" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
                 >
-                  <SelectField
-                    label={t("form.district")}
-                    required
-                    value={form.district}
-                    onChange={(v) => update("district", v)}
-                    placeholder={t("form.selectDistrict")}
-                    options={districts}
-                    labelFn={(v) => t(`data.district.${v}`)}
-                  />
+                  {isRentMode ? (
+                    <MultiSelectField
+                      label={t("form.district")}
+                      required
+                      values={rentDistricts}
+                      onChange={setRentDistricts}
+                      placeholder={t("form.selectDistricts")}
+                      options={districts}
+                      labelFn={(v) => t(`data.district.${v}`)}
+                    />
+                  ) : (
+                    <SelectField
+                      label={t("form.district")}
+                      required
+                      value={form.district}
+                      onChange={(v) => update("district", v)}
+                      placeholder={t("form.selectDistrict")}
+                      options={districts}
+                      labelFn={(v) => t(`data.district.${v}`)}
+                    />
+                  )}
                 </div>
               )}
             </div>
           </div>
 
           {/* — Section 2: Property basics — */}
-          {form.city && ((districtsByCity[form.city] || []).length === 0 || form.district) && (
+          {form.city && ((districtsByCity[form.city] || []).length === 0 || (isRentMode ? rentDistricts.length > 0 : form.district)) && (
             <div className="p-5 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
@@ -648,14 +760,24 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                 >
                   <label className="text-sm text-gray-600 mb-2 block">
                     {t("form.buildingType")}
-                    <span className="text-red-400 ml-0.5">*</span>
+                    {!isRentMode && <span className="text-red-400 ml-0.5">*</span>}
                   </label>
-                  <PillGroup
-                    options={buildingTypes}
-                    value={form.building_type}
-                    onChange={(v) => update("building_type", v)}
-                    labelFn={(v) => t(`data.buildingType.${v}`)}
-                  />
+                  {isRentMode ? (
+                    <MultiSelectField
+                      values={rentBuildingTypes}
+                      onChange={setRentBuildingTypes}
+                      placeholder={t("form.selectBuildingTypes")}
+                      options={buildingTypes}
+                      labelFn={(v) => t(`data.buildingType.${v}`)}
+                    />
+                  ) : (
+                    <PillGroup
+                      options={buildingTypes}
+                      value={form.building_type}
+                      onChange={(v) => update("building_type", v)}
+                      labelFn={(v) => t(`data.buildingType.${v}`)}
+                    />
+                  )}
                 </div>
 
                 <div
@@ -705,7 +827,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
 
             {showOptional && (
               <div className="mt-5 space-y-4 animate-fade-in">
-                <div className="grid grid-cols-2 gap-3">
+                <div className={`${isRentMode ? "" : "grid grid-cols-2 gap-3"}`}>
                   <div>
                     <label className="text-sm text-gray-600 mb-1.5 block">
                       {t("form.floor")}
@@ -722,6 +844,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                       className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors disabled:bg-gray-50 disabled:text-gray-400"
                     />
                   </div>
+                  {!isRentMode && (
                   <div>
                     <label className="text-sm text-gray-600 mb-1.5 block">
                       {t("form.totalFloors")}
@@ -737,7 +860,9 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                       className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                     />
                   </div>
+                  )}
                 </div>
+                {!isRentMode && (
                 <div className="grid gap-2 sm:grid-cols-2">
                   <CheckboxOption
                     checked={form.first_floor}
@@ -752,8 +877,9 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                     {t("result.floorOption.last")}
                   </CheckboxOption>
                 </div>
+                )}
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className={`${isRentMode ? "" : "grid grid-cols-2 gap-3"}`}>
                   <div>
                     <label className="text-sm text-gray-600 mb-2 block">
                       {t("form.bathrooms")}
@@ -765,6 +891,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                       columns={3}
                     />
                   </div>
+                  {!isRentMode && (
                   <div>
                     <label className="text-sm text-gray-600 mb-2 block">
                       {t("form.balconies")}
@@ -776,6 +903,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                       columns={4}
                     />
                   </div>
+                  )}
                 </div>
               </div>
             )}

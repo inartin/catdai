@@ -90,6 +90,16 @@ function formatListingMeta(listing, t) {
   return [location, floor].filter(Boolean).join(" · ");
 }
 
+function formatListingAreaFloor(listing, t) {
+  const floor = listing?.floor != null
+    ? (listing.total_floors
+      ? t("result.floorOf", { floor: listing.floor, total: listing.total_floors })
+      : t("result.floor", { floor: listing.floor }))
+    : null;
+
+  return [formatArea(listing?.area_m2), floor].filter(Boolean).join(" · ");
+}
+
 function normalizeRelevantListing(listing, t, lang) {
   const href = build999ListingUrl(listing?.external_id, lang);
   if (!href) return null;
@@ -111,6 +121,7 @@ function normalizeRelevantListing(listing, t, lang) {
     price: listing.price_amount,
     pricePerM2: listing.price_per_m2,
     imageUrl: listing.image_url || null,
+    areaFloor: formatListingAreaFloor(listing, t),
     tags,
   };
 }
@@ -419,6 +430,39 @@ function ListingsPreviewCard({ listing }) {
   );
 }
 
+function RentLevelListingCard({ label, listing, fallbackValue, tone = "emerald", ctaLabel, className = "" }) {
+  const toneClass = tone === "amber" ? "text-amber-600" : "text-emerald-600";
+
+  if (!listing) {
+    return (
+      <div className={`flex min-h-36 flex-col items-center justify-center p-5 text-center sm:min-h-56 sm:p-6 ${className}`}>
+        <p className="mb-1 text-sm text-gray-400">{label}</p>
+        <p className={`text-xl font-bold ${toneClass}`}>{formatPrice(fallbackValue)}</p>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={listing.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`group flex min-h-36 flex-col items-center justify-center p-5 text-center transition-colors hover:bg-primary/5 sm:min-h-56 sm:p-6 ${className}`}
+    >
+      <p className="mb-1 text-sm text-gray-400">{label}</p>
+      <p className={`text-xl font-bold ${toneClass}`}>{formatPrice(listing.price)}</p>
+      {listing.areaFloor && (
+        <p className="mt-1 truncate text-sm font-medium text-gray-500 group-hover:text-primary">
+          {listing.areaFloor}
+        </p>
+      )}
+      <p className="mt-2 text-xs font-semibold text-primary">
+        {ctaLabel}
+      </p>
+    </a>
+  );
+}
+
 function RelevantListingsPreview({ t, count, listings, onViewAll, sidebar = false }) {
   return (
     <section className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden">
@@ -460,6 +504,174 @@ function RelevantListingsPreview({ t, count, listings, onViewAll, sidebar = fals
   );
 }
 
+function RentEstimateResult({ data, onReset, compactLayout = false }) {
+  const { t, lang } = useTranslation();
+  const estimate = data.estimate || {};
+  const range = data.range || {};
+  const stats = data.market_stats || {};
+  const input = data.input || {};
+  const filtersUsed = data.filters_used || {};
+  const districts = Array.isArray(input.districts)
+    ? input.districts
+    : input.district ? [input.district] : [];
+  const buildingTypes = Array.isArray(input.building_types)
+    ? input.building_types
+    : input.building_type ? [input.building_type] : [];
+  const listings = (Array.isArray(data.relevant_listings) ? data.relevant_listings : [])
+    .map((listing) => normalizeRelevantListing(listing, t, lang))
+    .filter(Boolean)
+    .slice(0, 3);
+  const rentLevelListings = data.rent_level_listings || {};
+  const lowListing = normalizeRelevantListing(rentLevelListings.low, t, lang);
+  const highListing = normalizeRelevantListing(rentLevelListings.high, t, lang);
+  const roomsLabel = input.rooms_count === 1
+    ? t("result.oneRoom")
+    : t("result.rooms", { count: input.rooms_count });
+  const selectedDistrictLabel = districts.length > 0
+    ? districts.map((district) => t(`data.district.${district}`)).join(", ")
+    : t(`data.city.${input.city}`);
+  const comparableCount = Number(stats.comparable_count) || 0;
+  return (
+    <div className={compactLayout ? "animate-fade-in flex flex-col gap-5" : "animate-fade-in flex flex-col gap-6"}>
+      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+        <p className="text-sm font-medium uppercase tracking-wide text-gray-400">{t("result.rentProfileAnalyzed")}</p>
+        <h2 className="mt-2 text-2xl font-bold text-gray-900">
+          {t("result.apartment")} {roomsLabel}
+          {input.area_m2 ? ` · ${input.area_m2}m²` : ""}
+        </h2>
+        <p className="mt-1 text-base text-gray-500">
+          {selectedDistrictLabel}{input.city ? `, ${t(`data.city.${input.city}`)}` : ""}
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {input.renovation && (
+            <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+              {t(`data.renovationType.${input.renovation}`)}
+            </span>
+          )}
+          {buildingTypes.map((buildingType) => (
+            <span key={buildingType} className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+              {t(`data.buildingType.${buildingType}`)}
+            </span>
+          ))}
+          {input.floor && (
+            <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+              {t("result.floor", { floor: input.floor })}
+            </span>
+          )}
+          {input.bathrooms_count != null && (
+            <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+              {input.bathrooms_count === 1 ? t("result.oneBathroom") : t("result.bathrooms", { count: input.bathrooms_count })}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:grid-cols-3">
+        <RentLevelListingCard
+          label={t("result.rentLower")}
+          listing={lowListing}
+          fallbackValue={estimate.low}
+          tone="emerald"
+          ctaLabel={t("result.viewListingCta")}
+          className="order-2 border-r border-gray-100 sm:order-1"
+        />
+
+        <div className="order-1 col-span-2 flex min-h-56 flex-col items-center justify-center border-b border-gray-100 p-6 text-center sm:order-2 sm:col-span-1 sm:border-b-0 sm:border-r sm:p-8">
+          <p className="mb-2 text-base text-gray-400 sm:text-sm">{t("result.rentEstimatedMonthly")}</p>
+          <p className="text-6xl font-bold tracking-tight text-gray-900">
+            {formatPrice(estimate.market_rate)}
+          </p>
+          <p className="mt-2 text-base text-gray-500">
+            {t("result.rentPerMonth")}
+          </p>
+        </div>
+
+        <RentLevelListingCard
+          label={t("result.rentUpper")}
+          listing={highListing}
+          fallbackValue={estimate.high}
+          tone="amber"
+          ctaLabel={t("result.viewListingCta")}
+          className="order-3 sm:order-3"
+        />
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+        <div className="flex flex-col gap-5">
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+            <h3 className="mb-1 text-base font-semibold text-gray-900">{t("result.howWeAnalyzed")}</h3>
+            <p className="mb-4 text-sm text-gray-400">{t("result.rentHowWeAnalyzedDesc")}</p>
+            <div className="flex flex-wrap gap-2">
+              <FilterBadge label={t(`data.city.${input.city}`)} active />
+              {districts.map((district) => (
+                <FilterBadge key={district} label={t(`data.district.${district}`)} active={filtersUsed.district !== false} />
+              ))}
+              <FilterBadge label={input.rooms_count === 1 ? t("result.oneRoomFilter") : t("result.roomsFilter", { count: input.rooms_count })} active />
+              {buildingTypes.map((buildingType) => (
+                <FilterBadge key={buildingType} label={t(`data.buildingType.${buildingType}`)} active={filtersUsed.building_type !== false} />
+              ))}
+              {input.renovation && <FilterBadge label={t(`data.renovationType.${input.renovation}`)} active={filtersUsed.renovation !== false} />}
+              {input.area_m2 && <FilterBadge label={`~${input.area_m2}m²`} active={filtersUsed.area !== false} />}
+            </div>
+            <p className="mt-4 text-sm font-medium text-gray-500">
+              {t("result.filtersComparableCount", { count: comparableCount })}
+            </p>
+          </div>
+
+          <DistrictComparison
+            districts={data.district_comparison}
+            currentDistrict={districts[0]}
+            area={input.area_m2}
+          />
+
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+            <h3 className="mb-4 text-base font-semibold text-gray-900">{t("result.marketStats")}</h3>
+            <div className="grid grid-cols-2 gap-5">
+              <div>
+                <p className="mb-1 text-sm text-gray-400">{t("result.comparableListings")}</p>
+                <p className="text-xl font-bold text-gray-900">{comparableCount}</p>
+              </div>
+              <div>
+                <p className="mb-1 text-sm text-gray-400">{t("result.avgPricePerM2")}</p>
+                <p className="text-xl font-bold text-gray-900">{formatPrice(stats.avg_price_per_m2)}</p>
+              </div>
+              <div>
+                <p className="mb-1 text-sm text-gray-400">{t("result.medianPricePerM2")}</p>
+                <p className="text-xl font-bold text-gray-900">{formatPrice(stats.median_price_per_m2)}</p>
+              </div>
+              <div>
+                <p className="mb-1 text-sm text-gray-400">{t("result.avgMonthlyRent")}</p>
+                <p className="text-xl font-bold text-gray-900">{formatPrice(stats.avg_price)}</p>
+              </div>
+            </div>
+            <p className="mt-4 text-sm text-gray-400">
+              {t("result.rentRange", { low: formatPrice(range.low), high: formatPrice(range.high) })}
+            </p>
+          </div>
+        </div>
+
+        <aside className="flex flex-col gap-5">
+          {listings.length > 0 && (
+            <RelevantListingsPreview
+              t={t}
+              count={Number(stats.comparable_count) || listings.length}
+              listings={listings}
+              sidebar
+            />
+          )}
+          <button
+            type="button"
+            onClick={onReset}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 px-3 py-4 text-sm font-semibold text-gray-700 transition-all hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-sm"
+          >
+            {t("result.changeCriteria")}
+          </button>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 export default function EstimateResult({ data, onReset, onCompare, onClose, onListingsModeChange, compactLayout = false }) {
   const {
     estimate,
@@ -484,6 +696,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const favoriteChecked = useRef(false);
   const { t, lang } = useTranslation();
   const { session, isAuthenticated, clearAuthError } = useAuth();
+  const isRentEstimate = data.estimate_type === "rent";
 
   const isPaid = data.access_tier === "paid";
 
@@ -781,6 +994,16 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       )
       : null;
 
+  if (isRentEstimate) {
+    return (
+      <RentEstimateResult
+        data={data}
+        onReset={onReset}
+        compactLayout={compactLayout}
+      />
+    );
+  }
+
   if (showListingsView) {
     return (
       <ListingAlertConfigurator
@@ -911,7 +1134,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
           </p>
         </div>
 
-        <div className="grid grid-cols-3 divide-x divide-gray-100">
+        <div className="grid grid-cols-2 divide-x divide-gray-100 sm:grid-cols-3">
           <div className="p-5 sm:p-6 text-center">
             <p className="text-sm text-gray-400 mb-1">{t("result.fastSale")}</p>
             <p className="text-xl font-bold text-emerald-600">
@@ -921,7 +1144,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               -10%
             </p>
           </div>
-          <div className="p-5 sm:p-6 text-center bg-primary/5">
+          <div className="hidden p-5 text-center bg-primary/5 sm:block sm:p-6">
             <p className="text-sm text-gray-400 mb-1">{t("result.marketPrice")}</p>
             <p className="text-xl font-bold text-primary">
               {formatPrice(estimate.market_rate)}

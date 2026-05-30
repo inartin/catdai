@@ -28,12 +28,15 @@ function EstimeazaContent() {
   const searchParams = useSearchParams();
 
   const prefill = useMemo(() => {
+    const estimateType = searchParams.get("type") || searchParams.get("mode");
     const city = searchParams.get("city");
-    if (!city) return null;
+    if (!city && estimateType !== "rent") return null;
 
     return {
-      city,
+      type: estimateType === "rent" ? "rent" : "sale",
+      city: city || undefined,
       district: searchParams.get("district") || "",
+      districts: searchParams.getAll("district").filter(Boolean),
       rooms_count: searchParams.get("rooms") || null,
       area_m2: searchParams.get("area") || "",
       floor: searchParams.get("floor") || "",
@@ -41,6 +44,7 @@ function EstimeazaContent() {
       last_floor: searchParams.get("last_floor") || "",
       total_floors: searchParams.get("total_floors") || "",
       building_type: searchParams.get("building_type") || "",
+      building_types: searchParams.getAll("building_type").filter(Boolean),
       renovation: searchParams.get("renovation") || "",
       bathrooms_count: searchParams.get("bathrooms") || null,
       balconies_count: searchParams.get("balconies") || null,

@@ -8,6 +8,7 @@ Implemented and active.
 - UI currently exposes Google and Facebook login.
 - Redirect returns to the current page.
 - OAuth params are stripped from the URL after session sync.
+- The auth cleanup only strips `type` when other OAuth callback params are present, so app URLs such as `/evaluare?type=rent` keep their valuation mode on refresh.
 
 ## Profile
 `/profile` shows:

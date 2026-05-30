@@ -4,6 +4,11 @@
 - Reuse the current fetch/map/persist pipeline with a rent-specific preset and checkpoint.
 - Keep sale rows in `listing`; write rent rows to `listing_rent`.
 - Rent price history and change events use `listing_rent_price_history` and `listing_rent_change_events`.
+- Rent valuation reads monthly rent comparables from `listing_rent` through the `estimate_rent` RPC in `db/estimate_rent_function.sql`; it accepts multiple selected sectors/zones through a `text[]` district parameter and never relaxes those selected sectors during fallback.
+- Rent valuation accepts optional multiple construction types through a `text[]` building-type parameter, so old, new, both, or no construction-type filter can be selected in one rent estimate.
+- Rent valuation computes price per m2 from `price_amount / area_m2` when `listing_rent.price_per_m2` is missing.
+- Rent valuation treats missing `renovation` as compatible with a selected renovation because many rental ads do not include that attribute.
+- Rent result low/high levels use the cheapest and most expensive matched rent listings, exposed as direct 999.md links in the result page, instead of sale-style percentage offsets.
 - Owners remain shared in `owner`.
 - The 999 source deal type is `feature(id: 1)`, not `price.value.mode`.
 - Live fetch check: sale returned `776` / `Vând`; monthly rent returned `912` / `De închiriat lunar`.
@@ -27,8 +32,10 @@
 - Verify sale rows persist with `deal_type = 'Vând'`.
 - Verify rent rows persist into `listing_rent` with `deal_type = 'De închiriat lunar'`.
 - Confirm stale marking is scoped to `listing_rent` for the rent sync.
+- After applying `db/estimate_rent_function.sql` in Supabase, call `POST /api/estimate-rent` with city, `districts`, rooms, and optional area to confirm monthly rent output.
 
 ## Assumptions
 - The active rent ingestion target is monthly rent, not daily rent or renter requests.
 - Rent uses the same retry/delay defaults as sale listings.
 - No rent-specific Telegram or snapshot flow is added yet.
+- Rent estimation is wired from `/estimeaza` to `/api/estimate-rent` through `/evaluare?type=rent`.

@@ -16,11 +16,28 @@ const OAUTH_URL_KEYS = [
   "provider_refresh_token",
   "code",
   "state",
-  "type",
   "error",
   "error_code",
   "error_description",
 ];
+
+const OAUTH_TYPE_COMPANION_KEYS = [
+  "access_token",
+  "refresh_token",
+  "expires_in",
+  "expires_at",
+  "token_type",
+  "provider_token",
+  "provider_refresh_token",
+  "code",
+  "error",
+  "error_code",
+  "error_description",
+];
+
+function hasOAuthTypeCompanionParam(params) {
+  return OAUTH_TYPE_COMPANION_KEYS.some((key) => params.has(key));
+}
 
 function buildRedirectTo() {
   if (typeof window === "undefined") return undefined;
@@ -46,6 +63,7 @@ function stripOAuthParamsFromUrl() {
 
   const url = new URL(window.location.href);
   let changed = false;
+  const shouldStripSearchType = hasOAuthTypeCompanionParam(url.searchParams);
 
   for (const key of OAUTH_URL_KEYS) {
     if (url.searchParams.has(key)) {
@@ -54,16 +72,27 @@ function stripOAuthParamsFromUrl() {
     }
   }
 
+  if (shouldStripSearchType && url.searchParams.has("type")) {
+    url.searchParams.delete("type");
+    changed = true;
+  }
+
   const hash = url.hash.startsWith("#") ? url.hash.slice(1) : "";
   if (hash) {
     const hashParams = new URLSearchParams(hash);
     let hashChanged = false;
+    const shouldStripHashType = hasOAuthTypeCompanionParam(hashParams);
 
     for (const key of OAUTH_URL_KEYS) {
       if (hashParams.has(key)) {
         hashParams.delete(key);
         hashChanged = true;
       }
+    }
+
+    if (shouldStripHashType && hashParams.has("type")) {
+      hashParams.delete("type");
+      hashChanged = true;
     }
 
     if (hashChanged) {

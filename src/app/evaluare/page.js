@@ -22,6 +22,19 @@ function isTrueParam(value) {
   return value === "1" || value === "true";
 }
 
+function ensurePrimaryEstimateType(params) {
+  if (!params.has("type") && params.get("mode") === "rent") {
+    params.set("type", "rent");
+  }
+  return params;
+}
+
+function replaceEvaluationUrl(router, params, options) {
+  ensurePrimaryEstimateType(params);
+  const query = params.toString();
+  router.replace(query ? `/evaluare?${query}` : "/evaluare", options);
+}
+
 function EvaluareContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -63,7 +76,9 @@ function EvaluareContent() {
         const clean = new URLSearchParams(paramsString);
         clean.delete("_new");
         clean.delete("share_slug");
-        window.history.replaceState(null, "", `/evaluare?${clean.toString()}`);
+        ensurePrimaryEstimateType(clean);
+        const query = clean.toString();
+        window.history.replaceState(null, "", query ? `/evaluare?${query}` : "/evaluare");
       }
 
       const p1Params = new URLSearchParams();
@@ -110,8 +125,13 @@ function EvaluareContent() {
       };
 
       const fetchProperty = async (pFx, isPrimary) => {
+        const estimateType = pRaw.get(pFx + "type") || pRaw.get(pFx + "mode");
+        const isRentMode = estimateType === "rent";
         const city = pRaw.get(pFx + "city");
-        const district = pRaw.get(pFx + "district");
+        const districts = pRaw.getAll(pFx + "district").filter(Boolean);
+        const district = districts[0] || pRaw.get(pFx + "district");
+        const buildingTypes = pRaw.getAll(pFx + "building_type").filter(Boolean);
+        const buildingType = buildingTypes[0] || pRaw.get(pFx + "building_type");
         const rooms = pRaw.get(pFx + "rooms");
         const area = pRaw.get(pFx + "area");
         if (!city || !rooms) return null;
@@ -130,7 +150,7 @@ function EvaluareContent() {
           first_floor: firstFloor,
           last_floor: lastFloor,
           total_floors: pRaw.get(pFx + "total_floors") || null,
-          building_type: pRaw.get(pFx + "building_type") || null,
+          building_type: buildingType || null,
           renovation: pRaw.get(pFx + "renovation") || null,
           bathrooms_count: bVal, balconies_count: balVal,
         });
@@ -164,9 +184,19 @@ function EvaluareContent() {
           };
         })() : {};
 
-        const estReq = fetchJson("/api/estimate", {
-          method: "POST", headers,
-          body: JSON.stringify({
+        const estimateUrl = isRentMode ? "/api/estimate-rent" : "/api/estimate";
+        const estimateBody = isRentMode
+          ? {
+            city: v.city,
+            districts: districts.length > 0 ? districts : [v.district].filter(Boolean),
+            rooms_count: v.rooms_count,
+            area_m2: v.area_m2,
+            floor: v.floor ?? null,
+            building_types: buildingTypes,
+            renovation: v.renovation ?? null,
+            bathrooms_count: v.bathrooms_count ?? null,
+          }
+          : {
             city: v.city, district: v.district, rooms_count: v.rooms_count, area_m2: v.area_m2,
             floor: v.floor ?? null,
             first_floor: v.first_floor ?? false,
@@ -178,15 +208,20 @@ function EvaluareContent() {
             balconies_count: v.balconies_count ?? null,
             ...(isPrimary && shareSlug ? { share_slug: shareSlug } : {}),
             ...trackingData,
-          }),
+          };
+
+        const estReq = fetchJson(estimateUrl, {
+          method: "POST", headers,
+          body: JSON.stringify(estimateBody),
         });
 
-        const cadReq = cNum ? fetchJson("/api/cadastral", { method: "POST", headers, body: JSON.stringify({ cadastral_number: cNum }) }) : Promise.resolve(null);
+        const cadReq = !isRentMode && cNum ? fetchJson("/api/cadastral", { method: "POST", headers, body: JSON.stringify({ cadastral_number: cNum }) }) : Promise.resolve(null);
 
         const [estRes, cadRes] = await Promise.all([estReq, cadReq]);
         if (!estRes.ok) return { error: { code: estRes.data.error || "unknown", status: estRes.status } };
         const data = {
           ...estRes.data,
+          ...(isRentMode ? { estimate_type: "rent" } : {}),
           ...(cadRes && cadRes.ok ? { cadastral: cadRes.data } : {}),
           tracking: {
             estimate_log_id: trackingData.log_id || null,
@@ -259,6 +294,7 @@ function EvaluareContent() {
 
   useEffect(() => {
     const hydrateListingImages = async (data, updateResult, slot) => {
+      if (data?.estimate_type === "rent") return;
       const listings = Array.isArray(data?.relevant_listings) ? data.relevant_listings : [];
       const externalIds = listings
         .filter((listing) => listing?.external_id && !listing.image_url)
@@ -309,10 +345,15 @@ function EvaluareContent() {
   const handleEdit = () => {
     setIsListingsMode(false);
     const editParams = new URLSearchParams();
-    ["city", "district", "rooms", "area", "floor", "first_floor", "last_floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
-      const val = searchParams.get(key);
-      if (val) editParams.set(key, val);
+    ["type", "city", "district", "rooms", "area", "floor", "first_floor", "last_floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
+      const vals = searchParams.getAll(key);
+      vals.forEach((val) => {
+        if (val) editParams.append(key, val);
+      });
     });
+    if (!editParams.has("type") && searchParams.get("mode") === "rent") {
+      editParams.set("type", "rent");
+    }
     router.push(`/estimeaza?${editParams.toString()}`);
   };
 
@@ -328,7 +369,7 @@ function EvaluareContent() {
     newParams.forEach((value, key) => {
       if (key !== "_new") merged.set(`c_${key}`, value);
     });
-    router.replace(`/evaluare?${merged.toString()}`);
+    replaceEvaluationUrl(router, merged);
   };
 
   const handleCloseRight = () => {
@@ -339,7 +380,7 @@ function EvaluareContent() {
     Array.from(clean.keys()).forEach(k => {
       if (k.startsWith("c_")) clean.delete(k);
     });
-    router.replace(`/evaluare?${clean.toString()}`, { scroll: false });
+    replaceEvaluationUrl(router, clean, { scroll: false });
   };
 
   const handleCloseLeft = () => {
@@ -366,7 +407,7 @@ function EvaluareContent() {
     loadedPrimaryParamsRef.current = newParams.toString();
     loadedCompareParamsRef.current = null;
 
-    router.replace(`/evaluare?${newParams.toString()}`, { scroll: false });
+    replaceEvaluationUrl(router, newParams, { scroll: false });
   };
 
   if (loading) {
@@ -508,7 +549,7 @@ function EvaluareContent() {
                   Array.from(clean.keys()).forEach(k => {
                     if (k.startsWith("c_")) clean.delete(k);
                   });
-                  router.replace(`/evaluare?${clean.toString()}`);
+                  replaceEvaluationUrl(router, clean);
                 }}
                 onClose={handleCloseRight}
                 compactLayout

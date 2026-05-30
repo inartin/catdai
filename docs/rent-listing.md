@@ -8,6 +8,8 @@
 - Rent valuation accepts optional multiple construction types through a `text[]` building-type parameter, so old, new, both, or no construction-type filter can be selected in one rent estimate.
 - Rent valuation computes price per m2 from `price_amount / area_m2` when `listing_rent.price_per_m2` is missing.
 - Rent valuation treats missing `renovation` as compatible with a selected renovation because many rental ads do not include that attribute.
+- Rent district comparison groups all city sectors with the same room, construction-type, and renovation filters, and compares median monthly rent instead of price per m2; selected sectors are highlighted together when the user chose more than one.
+- Rent comparison rows are clickable and open `/evaluare?type=rent` for that sector with the same city, room, construction-type, and renovation filters used by the comparison median.
 - Rent result low/high levels use the cheapest and most expensive matched rent listings, exposed as direct 999.md links in the result page, instead of sale-style percentage offsets.
 - Owners remain shared in `owner`.
 - The 999 source deal type is `feature(id: 1)`, not `price.value.mode`.

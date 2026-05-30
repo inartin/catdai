@@ -126,6 +126,15 @@ function normalizeRelevantListing(listing, t, lang) {
   };
 }
 
+function appendDefinedParam(params, key, value) {
+  if (value === null || value === undefined || value === "") return;
+  params.append(key, String(value));
+}
+
+function buildEvaluationUrl(params) {
+  return `/evaluare?${params.toString()}`;
+}
+
 function MarketTrendMiniChart({ trend, compact = false }) {
   const { t, lang } = useTranslation();
   const [activeIndex, setActiveIndex] = useState(null);
@@ -303,17 +312,21 @@ function FeatureAdjustmentBadge({ item }) {
   );
 }
 
-function DistrictComparison({ districts, currentDistrict, area, className = "" }) {
+function DistrictComparison({ districts, currentDistrict, currentDistricts, area, valueKey = "median_ppm", buildHref, className = "" }) {
   const { t } = useTranslation();
 
   if (!districts || districts.length < 2) return null;
 
+  const selectedDistricts = Array.isArray(currentDistricts) && currentDistricts.length > 0
+    ? currentDistricts
+    : [currentDistrict].filter(Boolean);
   const areaValue = Number(area);
-  const hasArea = Number.isFinite(areaValue) && areaValue > 0;
-  const numericMedians = districts
-    .map((d) => Number(d?.median_ppm))
+  const showPricePerM2 = valueKey === "median_ppm";
+  const hasArea = showPricePerM2 && Number.isFinite(areaValue) && areaValue > 0;
+  const numericValues = districts
+    .map((d) => Number(d?.[valueKey]))
     .filter((value) => Number.isFinite(value) && value > 0);
-  const maxPpm = numericMedians.length > 0 ? Math.max(...numericMedians) : null;
+  const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : null;
 
   return (
     <div className={`${className} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
@@ -325,42 +338,56 @@ function DistrictComparison({ districts, currentDistrict, area, className = "" }
       </p>
       <div className="space-y-3">
         {districts.map((d) => {
-          const isCurrent = d.district === currentDistrict;
-          const medianPpm = Number(d?.median_ppm);
+          const isCurrent = selectedDistricts.includes(d.district);
+          const href = buildHref?.(d);
+          const medianValue = Number(d?.[valueKey]);
           const relativeWidthFromPayload = Number(d?.relative_width_pct);
           const widthPct =
             Number.isFinite(relativeWidthFromPayload)
               ? relativeWidthFromPayload
-              : (Number.isFinite(medianPpm) && maxPpm
-                ? Math.max(8, (medianPpm / maxPpm) * 100)
+              : (Number.isFinite(medianValue) && maxValue
+                ? Math.max(8, (medianValue / maxValue) * 100)
                 : 8);
           const totalPrice =
-            hasArea && Number.isFinite(medianPpm) ? Math.round(medianPpm * areaValue) : null;
+            hasArea && Number.isFinite(medianValue) ? Math.round(medianValue * areaValue) : null;
 
-          return (
-            <div key={d.district} className="flex items-center gap-3">
+          const rowClassName = `group flex items-center gap-3 rounded-lg -m-1 p-1 transition-colors ${href ? "cursor-pointer hover:bg-primary/5" : ""}`;
+          const rowContent = (
+            <>
               <span
-                className={`text-sm w-24 shrink-0 truncate text-right ${isCurrent ? "font-bold text-primary" : "text-gray-500"
+                className={`text-sm w-24 shrink-0 truncate text-right transition-colors ${isCurrent ? "font-bold text-primary" : "text-gray-500"
+                  } ${href ? "group-hover:text-primary" : ""
                   }`}
               >
                 {t(`data.district.${d.district}`)}
               </span>
-              <div className="flex-1 h-8 bg-gray-50 rounded relative overflow-hidden">
+              <div className={`flex-1 h-8 bg-gray-50 rounded relative overflow-hidden transition-colors ${href ? "group-hover:bg-primary/10" : ""}`}>
                 <div
                   className={`h-full rounded transition-all ${isCurrent ? "bg-primary/20" : "bg-gray-200"
+                    } ${href ? "group-hover:bg-primary/30" : ""
                     }`}
                   style={{ width: `${widthPct}%` }}
                 />
                 <span
-                  className={`absolute inset-y-0 flex items-center text-sm tabular-nums ${widthPct > 50 ? "right-2" : "left-2"
-                    } ${isCurrent ? "font-bold text-primary" : "text-gray-600"}`}
+                  className={`absolute inset-y-0 flex items-center text-sm tabular-nums transition-colors ${widthPct > 50 ? "right-2" : "left-2"
+                    } ${isCurrent ? "font-bold text-primary" : "text-gray-600"} ${href ? "group-hover:text-primary" : ""}`}
                   style={widthPct > 50 ? {} : { left: `calc(${widthPct}% + 8px)` }}
                 >
                   {totalPrice == null
-                    ? (Number.isFinite(medianPpm) ? `${formatPrice(medianPpm)}/m²` : "—")
+                    ? (Number.isFinite(medianValue) ? `${formatPrice(medianValue)}${showPricePerM2 ? "/m²" : ""}` : "—")
                     : `€${totalPrice.toLocaleString("ro-MD")}`}
                 </span>
               </div>
+            </>
+          );
+
+          return href ? (
+            <a key={d.district} href={href} className={rowClassName}>
+              {rowContent}
+            </a>
+          ) : (
+            <div key={d.district} className={rowClassName}>
+              {rowContent}
             </div>
           );
         })}
@@ -531,6 +558,19 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
     ? districts.map((district) => t(`data.district.${district}`)).join(", ")
     : t(`data.city.${input.city}`);
   const comparableCount = Number(stats.comparable_count) || 0;
+  const buildRentDistrictHref = (district) => {
+    if (!input.city || !input.rooms_count || !district?.district) return null;
+
+    const params = new URLSearchParams();
+    params.set("type", "rent");
+    params.set("city", input.city);
+    params.append("district", district.district);
+    params.set("rooms", String(input.rooms_count));
+    buildingTypes.forEach((buildingType) => appendDefinedParam(params, "building_type", buildingType));
+    appendDefinedParam(params, "renovation", input.renovation);
+    return buildEvaluationUrl(params);
+  };
+
   return (
     <div className={compactLayout ? "animate-fade-in flex flex-col gap-5" : "animate-fade-in flex flex-col gap-6"}>
       <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
@@ -620,8 +660,9 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
 
           <DistrictComparison
             districts={data.district_comparison}
-            currentDistrict={districts[0]}
-            area={input.area_m2}
+            currentDistricts={districts}
+            valueKey="median_price"
+            buildHref={buildRentDistrictHref}
           />
 
           <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">

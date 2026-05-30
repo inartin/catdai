@@ -413,17 +413,15 @@ BEGIN
     SELECT jsonb_agg(
       jsonb_build_object(
         'district', d.district,
-        'median_ppm', round(d.median_ppm::numeric, 2),
+        'median_price', round(d.median_price::numeric, 2),
         'count', d.cnt
-      ) ORDER BY d.median_ppm DESC
+      ) ORDER BY d.median_price DESC
     )
     INTO district_comparison
     FROM (
       SELECT
         l.district,
-        percentile_cont(0.5) WITHIN GROUP (
-          ORDER BY COALESCE(l.price_per_m2, l.price_amount / NULLIF(l.area_m2, 0))
-        ) AS median_ppm,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY l.price_amount) AS median_price,
         count(*) AS cnt
       FROM listing_rent l
       WHERE l.is_active = true
@@ -431,7 +429,6 @@ BEGIN
         AND COALESCE(l.price_per_m2, l.price_amount / NULLIF(l.area_m2, 0)) > 0
         AND l.city = p_city
         AND l.district IS NOT NULL
-        AND (array_length(selected_districts, 1) IS NULL OR l.district = ANY(selected_districts))
         AND (p_rooms_count IS NULL OR l.rooms_count = p_rooms_count)
         AND (array_length(selected_building_types, 1) IS NULL OR l.building_type = ANY(selected_building_types))
         AND (p_renovation IS NULL OR l.renovation = ANY(renovation_filters) OR l.renovation IS NULL OR trim(l.renovation) = '')

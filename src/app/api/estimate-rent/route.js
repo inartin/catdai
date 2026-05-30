@@ -6,7 +6,7 @@ import { DISTRICTS_BY_CITY, matchBuildingType, matchCity, matchDistrict, validat
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
-const ESTIMATE_RENT_CACHE_PREFIX = "catdai:estimate-rent:v5:";
+const ESTIMATE_RENT_CACHE_PREFIX = "catdai:estimate-rent:v7:";
 const ESTIMATE_RENT_CACHE_TTL_MS = 30 * 60 * 1000;
 const ESTIMATE_RENT_CACHE_TTL_SECONDS = 30 * 60;
 const ESTIMATE_RENT_CACHE_MAX_ENTRIES = 250;

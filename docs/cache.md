@@ -13,7 +13,7 @@ Backend prepared and active when Redis is reachable.
 - `GET /api/prices`: key `catdai:prices:latest:v1`, 24h TTL.
 - `GET /api/market-trends`: key `catdai:market-trends:v1`, 12h TTL.
 - `POST /api/estimate`: key prefix `catdai:estimate:v1:`, 30m TTL for repeated validated estimate inputs.
-- `POST /api/estimate-rent`: key prefix `catdai:estimate-rent:v3:`, 30m TTL for repeated validated rent estimate inputs.
+- `POST /api/estimate-rent`: key prefix `catdai:estimate-rent:v7:`, 30m TTL for repeated validated rent estimate inputs.
 - `POST /api/listing-preview-images`: key prefix `catdai:listing-preview-image:v1:`, 24h TTL per listing/language.
 
 ## Estimate Cache

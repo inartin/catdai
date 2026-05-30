@@ -294,7 +294,6 @@ function EvaluareContent() {
 
   useEffect(() => {
     const hydrateListingImages = async (data, updateResult, slot) => {
-      if (data?.estimate_type === "rent") return;
       const listings = Array.isArray(data?.relevant_listings) ? data.relevant_listings : [];
       const externalIds = listings
         .filter((listing) => listing?.external_id && !listing.image_url)

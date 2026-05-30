@@ -34,7 +34,7 @@ Implemented and active for apartments.
 - Seller breakdown shows the comparable listing count for each seller type under the price per m2.
 - Successful estimate payloads are cached for 30 minutes by normalized inputs and language.
 - Cache hits still resolve access and write estimate logs, but skip repeated RPC/listing/trend work.
-- `999.md` preview images for relevant listings are loaded after the result page renders through `/api/listing-preview-images`.
+- `999.md` preview images for sale and rent relevant listings are loaded after the result page renders through `/api/listing-preview-images`.
 - RPC failures are logged with the failing branch, params, error code, and elapsed time.
 - Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again, after `/api/pdf-generation-authorizations` validates the bearer token.
 - Successful authenticated PDF generation events are logged to `pdf_generation_events` with user id, device/session ids, optional estimate log id, and whether cadastral data was included.

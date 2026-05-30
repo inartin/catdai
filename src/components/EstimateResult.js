@@ -63,6 +63,13 @@ function formatTrendDate(date, lang) {
   );
 }
 
+function formatResultDate(lang) {
+  return new Date().toLocaleDateString(
+    lang === "ru" ? "ru-RU" : "ro-RO",
+    { day: "numeric", month: "long", year: "numeric" }
+  );
+}
+
 function formatArea(num) {
   const value = Number(num);
   if (!Number.isFinite(value) || value <= 0) return null;
@@ -312,6 +319,18 @@ function FeatureAdjustmentBadge({ item }) {
   );
 }
 
+function ResultDateBadge({ lang }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/8 text-xs font-medium text-primary">
+      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M16 2v4M8 2v4M3 10h18" />
+      </svg>
+      {formatResultDate(lang)}
+    </span>
+  );
+}
+
 function DistrictComparison({ districts, currentDistrict, currentDistricts, area, valueKey = "median_ppm", buildHref, className = "" }) {
   const { t } = useTranslation();
 
@@ -329,39 +348,40 @@ function DistrictComparison({ districts, currentDistrict, currentDistricts, area
   const maxValue = numericValues.length > 0 ? Math.max(...numericValues) : null;
 
   return (
-    <div className={`${className} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
+    <div className={`${className} w-full min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-8`}>
       <h3 className="text-base font-semibold text-gray-900 mb-1">
         {t("result.districtComparison")}
       </h3>
       <p className="text-sm text-gray-400 mb-5">
         {t("result.districtComparisonDesc")}
       </p>
-      <div className="space-y-3">
+      <div className="min-w-0 space-y-3 overflow-hidden">
         {districts.map((d) => {
           const isCurrent = selectedDistricts.includes(d.district);
           const href = buildHref?.(d);
           const medianValue = Number(d?.[valueKey]);
           const relativeWidthFromPayload = Number(d?.relative_width_pct);
-          const widthPct =
+          const rawWidthPct =
             Number.isFinite(relativeWidthFromPayload)
               ? relativeWidthFromPayload
               : (Number.isFinite(medianValue) && maxValue
                 ? Math.max(8, (medianValue / maxValue) * 100)
                 : 8);
+          const widthPct = Math.max(8, Math.min(100, rawWidthPct));
           const totalPrice =
             hasArea && Number.isFinite(medianValue) ? Math.round(medianValue * areaValue) : null;
 
-          const rowClassName = `group flex items-center gap-3 rounded-lg -m-1 p-1 transition-colors ${href ? "cursor-pointer hover:bg-primary/5" : ""}`;
+          const rowClassName = `group grid w-full max-w-full min-w-0 grid-cols-[minmax(0,1fr)] gap-1.5 rounded-lg transition-colors sm:-m-1 sm:flex sm:items-center sm:gap-3 sm:p-1 ${href ? "cursor-pointer hover:bg-primary/5" : ""}`;
           const rowContent = (
             <>
               <span
-                className={`text-sm w-24 shrink-0 truncate text-right transition-colors ${isCurrent ? "font-bold text-primary" : "text-gray-500"
+                className={`min-w-0 truncate text-sm transition-colors sm:w-24 sm:shrink-0 sm:text-right ${isCurrent ? "font-bold text-primary" : "text-gray-500"
                   } ${href ? "group-hover:text-primary" : ""
                   }`}
               >
                 {t(`data.district.${d.district}`)}
               </span>
-              <div className={`flex-1 h-8 bg-gray-50 rounded relative overflow-hidden transition-colors ${href ? "group-hover:bg-primary/10" : ""}`}>
+              <div className={`relative h-8 w-full min-w-0 max-w-full overflow-hidden rounded bg-gray-50 transition-colors sm:flex-1 ${href ? "group-hover:bg-primary/10" : ""}`}>
                 <div
                   className={`h-full rounded transition-all ${isCurrent ? "bg-primary/20" : "bg-gray-200"
                     } ${href ? "group-hover:bg-primary/30" : ""
@@ -369,9 +389,7 @@ function DistrictComparison({ districts, currentDistrict, currentDistricts, area
                   style={{ width: `${widthPct}%` }}
                 />
                 <span
-                  className={`absolute inset-y-0 flex items-center text-sm tabular-nums transition-colors ${widthPct > 50 ? "right-2" : "left-2"
-                    } ${isCurrent ? "font-bold text-primary" : "text-gray-600"} ${href ? "group-hover:text-primary" : ""}`}
-                  style={widthPct > 50 ? {} : { left: `calc(${widthPct}% + 8px)` }}
+                  className={`absolute inset-y-0 right-2 flex max-w-[calc(100%-1rem)] items-center justify-end truncate text-right text-sm tabular-nums transition-colors ${isCurrent ? "font-bold text-primary" : "text-gray-600"} ${href ? "group-hover:text-primary" : ""}`}
                 >
                   {totalPrice == null
                     ? (Number.isFinite(medianValue) ? `${formatPrice(medianValue)}${showPricePerM2 ? "/m²" : ""}` : "—")
@@ -398,6 +416,40 @@ function DistrictComparison({ districts, currentDistrict, currentDistricts, area
         </p>
       )}
     </div>
+  );
+}
+
+function getActionButtonClassName(compactLayout = false) {
+  return compactLayout
+    ? "py-5 rounded-2xl text-base"
+    : "px-3 py-4 rounded-2xl text-sm min-[360px]:whitespace-nowrap lg:py-4";
+}
+
+function getSecondaryActionButtonClassName(compactLayout = false) {
+  return `${getActionButtonClassName(compactLayout)} w-full cursor-pointer font-semibold border border-gray-200 text-gray-700 hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-sm transition-all flex items-center justify-center gap-2`;
+}
+
+function getActionIconClassName(compactLayout = false) {
+  return compactLayout
+    ? "w-5 h-5"
+    : "h-4 w-4 shrink-0";
+}
+
+function EditCriteriaButton({ onClick, compactLayout = false }) {
+  const { t } = useTranslation();
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={getSecondaryActionButtonClassName(compactLayout)}
+    >
+      <svg viewBox="0 0 24 24" className={getActionIconClassName(compactLayout)} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+      </svg>
+      {t("result.changeCriteria")}
+    </button>
   );
 }
 
@@ -572,9 +624,12 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   };
 
   return (
-    <div className={compactLayout ? "animate-fade-in flex flex-col gap-5" : "animate-fade-in flex flex-col gap-6"}>
-      <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
-        <p className="text-sm font-medium uppercase tracking-wide text-gray-400">{t("result.rentProfileAnalyzed")}</p>
+    <div className={compactLayout ? "animate-fade-in flex w-full min-w-0 flex-col gap-5" : "animate-fade-in flex w-full min-w-0 flex-col gap-6"}>
+      <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <p className="text-sm font-medium uppercase tracking-wide text-gray-400">{t("result.rentProfileAnalyzed")}</p>
+          <ResultDateBadge lang={lang} />
+        </div>
         <h2 className="mt-2 text-2xl font-bold text-gray-900">
           {t("result.apartment")} {roomsLabel}
           {input.area_m2 ? ` · ${input.area_m2}m²` : ""}
@@ -606,7 +661,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:grid-cols-3">
+      <div className="grid w-full min-w-0 grid-cols-2 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:grid-cols-3">
         <RentLevelListingCard
           label={t("result.rentLower")}
           listing={lowListing}
@@ -636,9 +691,9 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
-        <div className="flex flex-col gap-5">
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+      <div className="flex w-full min-w-0 flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+        <div className="flex min-w-0 flex-col gap-5">
+          <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
             <h3 className="mb-1 text-base font-semibold text-gray-900">{t("result.howWeAnalyzed")}</h3>
             <p className="mb-4 text-sm text-gray-400">{t("result.rentHowWeAnalyzedDesc")}</p>
             <div className="flex flex-wrap gap-2">
@@ -665,9 +720,9 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             buildHref={buildRentDistrictHref}
           />
 
-          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
+          <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
             <h3 className="mb-4 text-base font-semibold text-gray-900">{t("result.marketStats")}</h3>
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid min-w-0 grid-cols-2 gap-5">
               <div>
                 <p className="mb-1 text-sm text-gray-400">{t("result.comparableListings")}</p>
                 <p className="text-xl font-bold text-gray-900">{comparableCount}</p>
@@ -691,7 +746,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
           </div>
         </div>
 
-        <aside className="flex flex-col gap-5">
+        <aside className="flex min-w-0 flex-col gap-5">
           {listings.length > 0 && (
             <RelevantListingsPreview
               t={t}
@@ -700,13 +755,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
               sidebar
             />
           )}
-          <button
-            type="button"
-            onClick={onReset}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-gray-200 px-3 py-4 text-sm font-semibold text-gray-700 transition-all hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-sm"
-          >
-            {t("result.changeCriteria")}
-          </button>
+          <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
         </aside>
       </div>
     </div>
@@ -863,11 +912,6 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     }
   };
 
-  const todayFormatted = new Date().toLocaleDateString(
-    lang === "ru" ? "ru-RU" : "ro-RO",
-    { day: "numeric", month: "long", year: "numeric" }
-  );
-
   const confidenceLabel = {
     high: t("result.confidenceHigh"),
     medium: t("result.confidenceMedium"),
@@ -987,14 +1031,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const supportColumnClassName = compactLayout
     ? "flex flex-col gap-5"
     : "flex flex-col gap-5";
-  const actionButtonClassName = compactLayout
-    ? "py-5 rounded-2xl text-base"
-    : "px-3 py-4 rounded-2xl text-sm min-[360px]:whitespace-nowrap lg:py-4";
+  const actionButtonClassName = getActionButtonClassName(compactLayout);
   const primaryActionButtonClassName = `${actionButtonClassName} w-full cursor-pointer font-semibold bg-primary text-white shadow-lg shadow-primary/20 hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 transition-all flex items-center justify-center gap-2`;
-  const secondaryActionButtonClassName = `${actionButtonClassName} w-full cursor-pointer font-semibold border border-gray-200 text-gray-700 hover:-translate-y-0.5 hover:bg-gray-50 hover:shadow-sm transition-all flex items-center justify-center gap-2`;
-  const actionIconClassName = compactLayout
-    ? "w-5 h-5"
-    : "h-4 w-4 shrink-0";
+  const secondaryActionButtonClassName = getSecondaryActionButtonClassName(compactLayout);
+  const actionIconClassName = getActionIconClassName(compactLayout);
 
   const authModal =
     isAuthModalOpen && typeof document !== "undefined"
@@ -1080,13 +1120,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             <div className="flex items-center justify-between mb-1">
               <p className="text-sm text-gray-400 uppercase tracking-wide font-medium">{t("result.profileAnalyzed")}</p>
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/8 text-xs font-medium text-primary">
-                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <path d="M16 2v4M8 2v4M3 10h18" />
-                  </svg>
-                  {todayFormatted}
-                </span>
+                <ResultDateBadge lang={lang} />
                 <button
                   type="button"
                   onClick={handleToggleFavorite}
@@ -1695,17 +1729,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               </svg>
               {t("result.compare")}
             </button>
-            <button
-              type="button"
-              onClick={onReset}
-              className={secondaryActionButtonClassName}
-            >
-              <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              {t("result.changeCriteria")}
-            </button>
+            <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
           </div>
         </aside>
       </div>

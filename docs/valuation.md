@@ -12,6 +12,7 @@ Implemented and active for apartments.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
 - Result supports edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
+- Sale and rent result pages share the same criteria-edit action button, including the edit icon and secondary button styling.
 - PDF export opens a section picker for everyone, but PDF download is login-gated and requires a valid Supabase session immediately before generation. If login starts from the PDF dialog, the login prompt overlays the PDF dialog; after OAuth redirect, a localStorage flag restores the PDF dialog.
 - PDF reports always include the estimated market price, segment median price per m2, property summary, disclaimer footer, and `catdai.md` source label; optional sections include seller-type comparison and official cadastral data when available.
 - PDF reports intentionally exclude market statistics, relevant listing cards/links, and sector/city trend charts.
@@ -22,8 +23,9 @@ Implemented and active for apartments.
 - Supabase RPC `estimate_price` does comparable filtering with progressive widening.
 - Supabase RPC `estimate_rent` mirrors the same comparable filtering and progressive widening against `listing_rent`, but selected rent districts remain mandatory and are not relaxed during fallback. Rent price-per-m2 calculations use stored `price_per_m2` when present, otherwise `price_amount / area_m2`; selected rent renovation also includes listings with missing renovation because that field is often absent in rental ads.
 - Rent district comparison is calculated per district across the city with the same non-district segment filters and uses median monthly rent, not median price per m2. Multiple selected sectors are highlighted in the chart while every row remains that district's own median. Rent comparison rows are clickable and open `/evaluare?type=rent` with the clicked sector plus the same city, room, construction-type, and renovation filters that produced the median.
+- Rent result analysis sections use a flex column on mobile and switch to the two-column grid only on desktop, so cards and sector bars stay constrained to the viewport.
 - `POST /api/estimate-rent` validates the regular property fields plus `districts` / `regions` as an array of one or more sectors and `building_types` as an optional array, calls `estimate_rent`, and returns monthly rent tiers.
-- `/evaluare?type=rent` calls `/api/estimate-rent` and renders a rent-specific result view with monthly rent levels, filters, market stats, district comparison, and relevant rent listings. Sale-only result actions such as seller breakdown and PDF export remain on the sale/buy result.
+- `/evaluare?type=rent` calls `/api/estimate-rent` and renders a rent-specific result view with the same date badge as the sale result header, monthly rent levels, filters, market stats, district comparison, and relevant rent listings. Sale-only result actions such as seller breakdown and PDF export remain on the sale/buy result.
 - Area is used as a comparable filter only when provided.
 - If area is missing, total prices and range come from matching listings' `price_amount` values instead of `price_per_m2 * area`.
 - It computes fast sale, market rate, premium, price per m2, range, confidence, district comparison, relevant listings.

@@ -131,6 +131,7 @@ create index listing_price_history_source_updated_at_idx
 -- ============================================================
 create table estimate_log (
   id                    text primary key default gen_random_uuid()::text,
+  estimate_type         text not null default 'sale' check (estimate_type in ('sale', 'rent')),
   user_id               uuid references auth.users(id) on delete set null,
   device_id             text,
   session_id            text,
@@ -162,6 +163,7 @@ create index idx_estimate_log_session on estimate_log (session_id);
 create index idx_estimate_log_group   on estimate_log (evaluation_group_id);
 create index idx_estimate_log_created on estimate_log (created_at);
 create index idx_estimate_log_city    on estimate_log (city, district);
+create index idx_estimate_log_type_created on estimate_log (estimate_type, created_at desc);
 
 -- ============================================================
 -- pdf_generation_events — tracks valuation PDF generation

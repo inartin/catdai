@@ -239,6 +239,16 @@ function logEstimate(row) {
     .from("estimate_log")
     .upsert(row, { onConflict: "id" })
     .then(({ error }) => {
+      if (error?.code === "PGRST204" && row.estimate_type) {
+        const { estimate_type, ...fallbackRow } = row;
+        supabaseAdmin
+          .from("estimate_log")
+          .upsert(fallbackRow, { onConflict: "id" })
+          .then(({ error: fallbackError }) => {
+            if (fallbackError) console.error("estimate_log upsert failed:", fallbackError.message);
+          });
+        return;
+      }
       if (error) console.error("estimate_log upsert failed:", error.message);
     });
 }
@@ -322,6 +332,7 @@ function trackEstimate({
 
   logEstimate({
     id: body.log_id || undefined,
+    estimate_type: "sale",
     user_id: access.user_id || null,
     device_id: body.device_id,
     session_id: body.session_id || null,

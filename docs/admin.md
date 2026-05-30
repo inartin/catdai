@@ -15,25 +15,22 @@ Implemented as read-only admin dashboard.
 ## Dashboard
 Shows:
 - registered users
-- total estimations
+- sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - shared links
 - favorites
 - Telegram alert count with an expandable list of configured Telegram alerts
-- listing counts and active listings
-- owner count
-- average price and price per m2
-- market direction for 24h, 7d, 30d
-- distributions by district, rooms, renovation, building type
-- recent listings
-- total estimations is clickable and opens a recent estimation row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
+- sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
+- Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
+- Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
 
 ## Data Views
 - Listings list with search, active filter, rooms filter, sorting, pagination.
+- Listings page loads `/api/admin/listings/stats` for total listings, active/inactive listings, owner count, average price, average price per m2, market direction for 24h/7d/30d, distributions by district/rooms/renovation/building type, and recent listings.
 - Listing detail with full data, owner link, and price history.
 - Owners list with search and pagination.
 - Owner detail with profile fields and listings.
-- Dashboard registered users and recent estimations are inline expandable tables.
+- Dashboard registered users and recent sale/rent estimations are inline expandable tables.
 - `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows `/?src=zdg` tracking grouped by visitor session, with closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, exact all-time source session/device/funnel totals in the top cards, and paged visitor journeys that load more while scrolling.
 
 ## Related Files

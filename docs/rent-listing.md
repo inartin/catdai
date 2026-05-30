@@ -11,6 +11,8 @@
 - Rent district comparison groups all city sectors with the same room, construction-type, and renovation filters, and compares median monthly rent instead of price per m2; selected sectors are highlighted together when the user chose more than one.
 - Rent comparison rows are clickable and open `/evaluare?type=rent` for that sector with the same city, room, construction-type, and renovation filters used by the comparison median.
 - Rent result low/high levels use the cheapest and most expensive matched rent listings, exposed as direct 999.md links in the result page, instead of sale-style percentage offsets.
+- Successful rent valuation payloads are cached through the shared Redis cache for 12 hours by normalized rent filters, with the same in-memory fallback when Redis is unavailable.
+- Successful rent valuation requests are logged in `estimate_log` with `estimate_type = 'rent'`, so admin statistics show rent estimations separately from sale estimations. Requests without a client log or device id are not logged because they can be duplicate untracked result fetches.
 - Owners remain shared in `owner`.
 - The 999 source deal type is `feature(id: 1)`, not `price.value.mode`.
 - Live fetch check: sale returned `776` / `Vând`; monthly rent returned `912` / `De închiriat lunar`.

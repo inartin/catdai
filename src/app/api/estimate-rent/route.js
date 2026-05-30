@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { rateLimit } from "@/lib/rate-limit";
 import { DISTRICTS_BY_CITY, matchBuildingType, matchCity, matchDistrict, validateEstimateInput } from "@/lib/validation";
@@ -7,11 +8,71 @@ import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const ESTIMATE_RENT_CACHE_PREFIX = "catdai:estimate-rent:v7:";
-const ESTIMATE_RENT_CACHE_TTL_MS = 30 * 60 * 1000;
-const ESTIMATE_RENT_CACHE_TTL_SECONDS = 30 * 60;
+const ESTIMATE_RENT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const ESTIMATE_RENT_CACHE_TTL_SECONDS = 12 * 60 * 60;
 const ESTIMATE_RENT_CACHE_MAX_ENTRIES = 250;
+const TRACKING_SALT = process.env.TRACKING_SALT || "catdai-default-salt";
 
 let estimateRentCache = new Map();
+
+function hashIp(ip) {
+  return crypto.createHash("sha256").update(ip + TRACKING_SALT).digest("hex").slice(0, 16);
+}
+
+function logEstimate(row) {
+  supabaseAdmin
+    .from("estimate_log")
+    .upsert(row, { onConflict: "id" })
+    .then(({ error }) => {
+      if (error?.code === "PGRST204" && row.estimate_type) {
+        const { estimate_type, ...fallbackRow } = row;
+        supabaseAdmin
+          .from("estimate_log")
+          .upsert(fallbackRow, { onConflict: "id" })
+          .then(({ error: fallbackError }) => {
+            if (fallbackError) console.error("rent estimate_log upsert failed:", fallbackError.message);
+          });
+        return;
+      }
+      if (error) console.error("rent estimate_log upsert failed:", error.message);
+    });
+}
+
+function trackRentEstimate({
+  body,
+  access,
+  data,
+  ip,
+  params,
+  responseTimeMs,
+  validationData,
+}) {
+  if (!body.log_id && !body.device_id) return;
+
+  logEstimate({
+    id: body.log_id || undefined,
+    estimate_type: "rent",
+    user_id: access.user_id || null,
+    device_id: body.device_id,
+    session_id: body.session_id || null,
+    evaluation_group_id: body.evaluation_group_id || null,
+    ip_hash: hashIp(ip),
+    city: validationData.city,
+    district: Array.isArray(params.p_districts) ? params.p_districts.join(", ") : null,
+    rooms_count: validationData.rooms_count,
+    area_m2: validationData.area_m2 ?? null,
+    building_type: Array.isArray(params.p_building_types) ? params.p_building_types.join(", ") : null,
+    renovation: validationData.renovation || null,
+    floor: params.p_floor,
+    total_floors: params.p_total_floors,
+    bathrooms_count: params.p_bathrooms_count,
+    balconies_count: params.p_balconies_count,
+    estimated_price: data.estimate?.market_rate ?? null,
+    price_per_m2: data.estimate?.price_per_m2 ?? null,
+    language: body.language || null,
+    response_time_ms: responseTimeMs,
+  });
+}
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -373,9 +434,21 @@ export async function POST(request) {
     p_balconies_count: v.balconies_count ?? null,
   };
 
+  const requestStart = Date.now();
   const cacheKey = makeEstimateRentCacheKey(params);
   const cachedData = await getCachedEstimateRent(cacheKey);
   if (cachedData) {
+    const access = await resolveAccessTier(request);
+    trackRentEstimate({
+      body,
+      access,
+      data: cachedData,
+      ip,
+      params,
+      responseTimeMs: Date.now() - requestStart,
+      validationData: v,
+    });
+
     const res = NextResponse.json(cachedData);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     res.headers.set("X-Estimate-Cache", "HIT");
@@ -404,6 +477,16 @@ export async function POST(request) {
   const enrichedData = await enrichRentEstimate(params, data);
 
   await setCachedEstimateRent(cacheKey, enrichedData);
+  const access = await resolveAccessTier(request);
+  trackRentEstimate({
+    body,
+    access,
+    data: enrichedData,
+    ip,
+    params,
+    responseTimeMs,
+    validationData: v,
+  });
 
   const res = NextResponse.json(enrichedData);
   res.headers.set("X-RateLimit-Remaining", String(remaining));

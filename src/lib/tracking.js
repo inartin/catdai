@@ -105,8 +105,8 @@ function djb2(str) {
   return hash.toString(36);
 }
 
-export function computeEvaluationGroupId({ city, district, rooms_count, building_type }) {
-  const raw = [city, district, rooms_count, building_type]
+export function computeEvaluationGroupId({ city, district, rooms_count, building_type, estimate_type }) {
+  const raw = [city, district, rooms_count, building_type, estimate_type]
     .map((v) => String(v ?? ""))
     .join("|");
   return djb2(raw);

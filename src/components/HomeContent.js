@@ -184,7 +184,6 @@ function MarketScopeCards() {
       key: "rent",
       title: t("landing.scopeRentTitle"),
       desc: t("landing.scopeRentDesc"),
-      badge: t("categories.comingSoon"),
       accent: "border-amber-100 bg-amber-50 text-amber-700",
       icon: (
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

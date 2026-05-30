@@ -172,6 +172,7 @@ function EvaluareContent() {
         const trackingData = (isPrimary && isFreshEvaluation) ? (() => {
           const evalGroupId = computeEvaluationGroupId({
             city: v.city, district: v.district, rooms_count: v.rooms_count, building_type: v.building_type || null,
+            estimate_type: isRentMode ? "rent" : null,
           });
           const attribution = getActiveAdSource();
           return {
@@ -195,6 +196,7 @@ function EvaluareContent() {
             building_types: buildingTypes,
             renovation: v.renovation ?? null,
             bathrooms_count: v.bathrooms_count ?? null,
+            ...trackingData,
           }
           : {
             city: v.city, district: v.district, rooms_count: v.rooms_count, area_m2: v.area_m2,

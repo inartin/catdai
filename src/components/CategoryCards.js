@@ -470,11 +470,7 @@ export default function CategoryCards({ onCategorySelect }) {
                     : "cursor-default"
                   }`}
               >
-                {cat.disabled && (
-                  <span className="absolute top-3 right-3 z-20 bg-white border border-gray-200 text-xs font-semibold text-gray-700 px-3 py-1.5 rounded-full shadow-md">
-                    {t("categories.comingSoon")}
-                  </span>
-                )}
+            
 
                 <div className={cat.disabled ? "opacity-60" : ""}>
                   <div className="relative">

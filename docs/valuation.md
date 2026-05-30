@@ -35,12 +35,14 @@ Implemented and active for apartments.
 - Backend also runs seller-category estimates for owner vs agency/developer.
 - Seller-category estimates use the same property filters and seller filters, but skip district comparison and relevant listings because the UI only renders their price/range/stats.
 - Seller breakdown shows the comparable listing count for each seller type under the price per m2.
-- Successful estimate payloads are cached for 30 minutes by normalized inputs and language.
+- Successful sale estimate payloads are cached for 30 minutes by normalized inputs and language.
+- Successful rent estimate payloads are cached for 12 hours by normalized rent filters.
 - Cache hits still resolve access and write estimate logs, but skip repeated RPC/listing/trend work.
 - `999.md` preview images for sale and rent relevant listings are loaded after the result page renders through `/api/listing-preview-images`.
 - RPC failures are logged with the failing branch, params, error code, and elapsed time.
 - Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again, after `/api/pdf-generation-authorizations` validates the bearer token.
 - Successful authenticated PDF generation events are logged to `pdf_generation_events` with user id, device/session ids, optional estimate log id, and whether cadastral data was included.
+- Successful sale and rent estimation requests are logged to `estimate_log` with `estimate_type = 'sale'` or `estimate_type = 'rent'` for separate admin statistics. Rent requests require a client log or device id so duplicate untracked fetches do not create extra rows.
 - The PDF dialog links to the static demo report at `/samples/demo-evaluare-catdai.md.pdf`.
 - PDF report layout uses explicit canvas coordinates for pills, seller cards, notes, and text blocks instead of HTML rasterization.
 - PDF report header reuses the product logo and displays `catdai.md` as the report brand.
@@ -82,5 +84,6 @@ Applied after RPC in `/api/estimate`.
 - `src/lib/browser-pdf.js`
 - `scripts/generate-demo-valuation-pdf.mjs`
 - `db/pdf_generation_events.sql`
+- `db/estimate_log_estimate_type.sql`
 - `db/estimate_price_function.sql`
 - `db/estimate_rent_function.sql`

@@ -5,15 +5,24 @@ import { NextResponse } from "next/server";
 const PAGE = 1000;
 const LIST_LIMIT = 200;
 const CACHE_TTL_MS = 60 * 1000;
-let cache = { data: null, ts: 0 };
+const ESTIMATE_COLUMNS = "id, user_id, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at";
+const ESTIMATE_COLUMNS_WITH_TYPE = `${ESTIMATE_COLUMNS}, estimate_type`;
+let cache = new Map();
 
 function isMissingSchemaError(error) {
   const code = String(error?.code || "");
   return code === "42703" || code === "42P01";
 }
 
+function isMissingEstimateTypeError(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || "");
+  return (code === "PGRST204" || code === "42703") && message.includes("estimate_type");
+}
+
 function estimateParams(row) {
   const params = {
+    ...(row.estimate_type === "rent" ? { type: "rent" } : {}),
     city: row.city,
     district: row.district,
     rooms: row.rooms_count,
@@ -31,6 +40,12 @@ function estimateParams(row) {
       .filter(([, value]) => value != null && value !== "")
       .map(([key, value]) => [key, normalizeParamValue(value)])
   );
+}
+
+function applyEstimateTypeFilter(query, type) {
+  if (type === "rent") return query.eq("estimate_type", "rent");
+  if (type === "sale") return query.neq("estimate_type", "rent");
+  return query;
 }
 
 function normalizedSearch(params) {
@@ -141,23 +156,48 @@ function buildFavoriteSet(rows) {
   return set;
 }
 
+async function fetchEstimateRows(type) {
+  const typedQuery = applyEstimateTypeFilter(
+    supabaseAdmin
+      .from("estimate_log")
+      .select(ESTIMATE_COLUMNS_WITH_TYPE)
+      .order("created_at", { ascending: false })
+      .limit(LIST_LIMIT),
+    type
+  );
+  const typedRes = await typedQuery;
+
+  if (!typedRes.error) return typedRes;
+
+  if (!isMissingEstimateTypeError(typedRes.error)) {
+    return typedRes;
+  }
+
+  if (type === "rent") {
+    return { data: [], error: null };
+  }
+
+  return supabaseAdmin
+    .from("estimate_log")
+    .select(ESTIMATE_COLUMNS)
+    .order("created_at", { ascending: false })
+    .limit(LIST_LIMIT);
+}
+
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
 
-  if (cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
-    return NextResponse.json(cache.data);
+  const requestedType = request.nextUrl.searchParams.get("type");
+  const type = requestedType === "rent" ? "rent" : requestedType === "all" ? "all" : "sale";
+  const cached = cache.get(type);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return NextResponse.json(cached.data);
   }
 
   try {
     const [estimateRes, users, sharedRows, favoriteRows] = await Promise.all([
-      supabaseAdmin
-        .from("estimate_log")
-        .select(
-          "id, user_id, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at"
-        )
-        .order("created_at", { ascending: false })
-        .limit(LIST_LIMIT),
+      fetchEstimateRows(type),
       listAllUsers(),
       fetchSharedLinks(),
       fetchFavorites(),
@@ -192,14 +232,15 @@ export async function GET(request) {
         balconiesCount: row.balconies_count,
         estimatedPrice: row.estimated_price,
         pricePerM2: row.price_per_m2,
+        estimateType: row.estimate_type === "rent" ? "rent" : "sale",
         createdAt: row.created_at,
         shared: sharedSet.has(`${actorKey}|${search}`),
         favorited: row.user_id ? favoriteSet.has(`${row.user_id}|${search}`) : false,
       };
     });
 
-    const data = { estimations };
-    cache = { data, ts: Date.now() };
+    const data = { estimations, type };
+    cache.set(type, { data, ts: Date.now() });
     return NextResponse.json(data);
   } catch (err) {
     console.error("Failed to load admin estimations:", err);

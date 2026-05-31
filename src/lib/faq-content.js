@@ -15,6 +15,23 @@ export const faqItemsByLang = {
       ],
     },
     {
+      question: "Unde pot vedea un exemplu de analiză?",
+      answers: [
+        "Poți vedea exemple pentru un apartament cu 2 camere, 50 m², euroreparație, în Botanica.",
+        "Am pregătit separat varianta într-un bloc vechi și varianta într-un bloc nou, ca să fie mai ușor de comparat diferența de preț.",
+      ],
+      links: [
+        {
+          href: "/ro/preturi-apartamente/chisinau/botanica",
+          label: "Exemplu bloc vechi",
+        },
+        {
+          href: "/ro/preturi-apartamente/chisinau/botanica-constructii-noi",
+          label: "Exemplu bloc nou",
+        },
+      ],
+    },
+    {
       question: "Este CatDai afiliat cu 999.md, Makler.md sau alte platforme?",
       answers: [
         "Nu. CatDai nu este afiliat, sponsorizat sau partener oficial al acestor platforme, decât dacă este indicat explicit în scris.",
@@ -67,6 +84,23 @@ export const faqItemsByLang = {
       answers: [
         "Анализ использует публичные объявления, данные, введенные пользователем, и рыночные сигналы, доступные на момент запроса.",
         "Внешние источники могут меняться со временем, поэтому доступность и точность данных могут отличаться.",
+      ],
+    },
+    {
+      question: "Где можно посмотреть пример анализа?",
+      answers: [
+        "Можно посмотреть примеры для 2-комнатной квартиры 50 м² с евроремонтом в Ботанике.",
+        "Есть отдельный пример для старого дома и отдельный пример для новостроя, чтобы было проще сравнить разницу в цене.",
+      ],
+      links: [
+        {
+          href: "/ru/ceny-kvartir/kishinev/botanika",
+          label: "Пример в старом доме",
+        },
+        {
+          href: "/ru/ceny-kvartir/kishinev/botanika-novostroy",
+          label: "Пример в новострое",
+        },
       ],
     },
     {

@@ -14,6 +14,10 @@ const INDEXABLE_STATIC_PATHS = [
   "/privacy",
   "/ro/faq",
   "/ru/faq",
+  "/ro/preturi-apartamente/chisinau/botanica",
+  "/ru/ceny-kvartir/kishinev/botanika",
+  "/ro/preturi-apartamente/chisinau/botanica-constructii-noi",
+  "/ru/ceny-kvartir/kishinev/botanika-novostroy",
 ];
 
 export default async function sitemap() {

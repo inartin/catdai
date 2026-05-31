@@ -54,6 +54,15 @@ export async function proxy(request) {
   // Language prefix rewrite: /ru/... or /ro/... → serve the actual route
   const langMatch = pathname.match(/^\/(ro|ru)(\/.*)?$/);
   if (langMatch) {
+    if (
+      /^\/ro\/preturi-apartamente\/chisinau\/botanica\/?$/.test(pathname) ||
+      /^\/ru\/ceny-kvartir\/kishinev\/botanika\/?$/.test(pathname) ||
+      /^\/ro\/preturi-apartamente\/chisinau\/botanica-constructii-noi\/?$/.test(pathname) ||
+      /^\/ru\/ceny-kvartir\/kishinev\/botanika-novostroy\/?$/.test(pathname)
+    ) {
+      return NextResponse.next();
+    }
+
     // Keep explicit localized FAQ routes as-is (no rewrite), so they can be
     // indexed separately and avoid rewrite/redirect loops with /faq.
     if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {

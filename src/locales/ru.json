@@ -306,6 +306,7 @@
   "evaluare.suggestionFilters": "Убрать необязательные фильтры (тип строения, ремонт, этаж)",
   "evaluare.suggestionArea": "Скорректировать площадь ближе к средней по сегменту",
   "evaluare.editCriteria": "Изменить критерии",
+  "evaluare.newEstimate": "Новая оценка",
   "evaluare.tryAgain": "Попробовать снова",
   "about.title": "О CatDai",
   "about.intro": "CatDai помогает лучше понять рынок недвижимости и увидеть реалистичный уровень цены для похожих объектов.",

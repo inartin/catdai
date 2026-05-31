@@ -14,10 +14,12 @@ Implemented.
 - Admin, profile, and API routes are marked `noindex` in `next.config.mjs`.
 - `/ro/estimeaza`, `/ru/estimeaza`, `/ro/evaluare`, `/ru/evaluare`, `/ro/alerts`, and `/ru/alerts` are indexable localized entry points with alternate metadata.
 - Direct `/evaluare` keeps a `noindex` metadata directive to avoid duplicating the localized evaluation URLs.
+- Static market-analysis pages can use saved local valuation snapshots without API queries; the first Botanica pairs cover the same 2-room, 50 m², eurorepaired apartment profile in old-building and new-building variants, with reciprocal comparison links.
 
 ## Structured Data
 - Global `Organization` and `WebSite`.
 - Shared result pages include `BreadcrumbList` and `WebPage`.
+- Static market-analysis pages include `BreadcrumbList` and `WebPage`.
 - About page includes `AboutPage`.
 
 ## Analytics And Consent

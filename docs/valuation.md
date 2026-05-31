@@ -11,6 +11,7 @@ Implemented and active for apartments.
 - `/evaluare` reads URL params and calls `/api/estimate`.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
 - Result supports edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
+- Result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
 - Sale and rent result pages share the same criteria-edit action button, including the edit icon and secondary button styling.
 - PDF export opens a section picker for everyone, but PDF download is login-gated and requires a valid Supabase session immediately before generation. If login starts from the PDF dialog, the login prompt overlays the PDF dialog; after OAuth redirect, a localStorage flag restores the PDF dialog.

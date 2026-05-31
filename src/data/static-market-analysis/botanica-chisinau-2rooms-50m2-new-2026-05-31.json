@@ -1,0 +1,159 @@
+{
+  "snapshot_date": "2026-05-31",
+  "source_query": "/evaluare?city=Chișinău&district=Botanica&rooms=2&area=50&building_type=Construcţii+noi&renovation=Euroreparație",
+  "relevant_listings_removed": true,
+  "input": {
+    "city": "Chișinău",
+    "floor": null,
+    "area_m2": 50,
+    "district": "Botanica",
+    "last_floor": false,
+    "renovation": "Euroreparație",
+    "first_floor": false,
+    "rooms_count": 2,
+    "total_floors": null,
+    "building_type": "Construcţii noi",
+    "balconies_count": null,
+    "bathrooms_count": null
+  },
+  "range": {
+    "low": 103400,
+    "high": 132100
+  },
+  "estimate": {
+    "premium": 125000,
+    "fast_sale": 104100,
+    "confidence": "high",
+    "market_rate": 115700,
+    "price_per_m2": 2314
+  },
+  "filters_used": {
+    "area": true,
+    "city": true,
+    "floor": false,
+    "district": true,
+    "last_floor": false,
+    "renovation": true,
+    "first_floor": false,
+    "rooms_count": true,
+    "building_type": true,
+    "area_tolerance": 0.2
+  },
+  "market_stats": {
+    "avg_price": 128022.93,
+    "avg_price_per_m2": 2304.2,
+    "comparable_count": 122,
+    "max_price_per_m2": 2983,
+    "min_price_per_m2": 1388,
+    "p10_price_per_m2": 1801.6,
+    "p90_price_per_m2": 2715,
+    "median_price_per_m2": 2314
+  },
+  "district_comparison": [
+    { "count": 33, "district": "Sculeni", "median_ppm": 2900 },
+    { "count": 332, "district": "Râșcani", "median_ppm": 2690 },
+    { "count": 963, "district": "Buiucani", "median_ppm": 2645 },
+    { "count": 385, "district": "Ciocana", "median_ppm": 2286 },
+    { "count": 917, "district": "Centru", "median_ppm": 2229 },
+    { "count": 62, "district": "Poșta Veche", "median_ppm": 2168 },
+    { "count": 448, "district": "Botanica", "median_ppm": 2163 },
+    { "count": 257, "district": "Telecentru", "median_ppm": 2072 },
+    { "count": 3, "district": "Aeroport", "median_ppm": 2067 },
+    { "count": 32, "district": "Periferie", "median_ppm": 2024 }
+  ],
+  "district_coefficient": {
+    "applied": false
+  },
+  "feature_adjustments": {
+    "items": [],
+    "total_pct": 0,
+    "multiplier": 1
+  },
+  "market_position": {
+    "marker_pct": 58.0564263322884
+  },
+  "market_trend": {
+    "scope": "district",
+    "district": "Botanica",
+    "building_type": "Construcţii noi",
+    "period_days": 30,
+    "metric": "median_price_per_m2",
+    "start_date": "2026-05-01",
+    "end_date": "2026-05-29",
+    "start_value": 1828,
+    "end_value": 1853,
+    "change_pct": 1.4,
+    "listing_count": 2147,
+    "points": [
+      { "date": "2026-05-01", "value": 1828 },
+      { "date": "2026-05-04", "value": 1827 },
+      { "date": "2026-05-05", "value": 1827 },
+      { "date": "2026-05-06", "value": 1833 },
+      { "date": "2026-05-07", "value": 1829 },
+      { "date": "2026-05-08", "value": 1830 },
+      { "date": "2026-05-11", "value": 1836 },
+      { "date": "2026-05-12", "value": 1830 },
+      { "date": "2026-05-13", "value": 1834 },
+      { "date": "2026-05-14", "value": 1837 },
+      { "date": "2026-05-15", "value": 1838 },
+      { "date": "2026-05-18", "value": 1850 },
+      { "date": "2026-05-19", "value": 1850 },
+      { "date": "2026-05-20", "value": 1850 },
+      { "date": "2026-05-21", "value": 1850 },
+      { "date": "2026-05-22", "value": 1850 },
+      { "date": "2026-05-25", "value": 1860 },
+      { "date": "2026-05-26", "value": 1859 },
+      { "date": "2026-05-27", "value": 1858 },
+      { "date": "2026-05-28", "value": 1851 },
+      { "date": "2026-05-29", "value": 1853 }
+    ]
+  },
+  "estimates_by_seller": {
+    "individual": {
+      "estimate": {
+        "premium": 107900,
+        "fast_sale": 90000,
+        "confidence": "low",
+        "market_rate": 100000,
+        "price_per_m2": 1999
+      },
+      "range": {
+        "low": 92000,
+        "high": 116700
+      },
+      "market_stats": {
+        "avg_price": 120899.8,
+        "avg_price_per_m2": 2124.2,
+        "comparable_count": 5,
+        "max_price_per_m2": 2650,
+        "min_price_per_m2": 1800,
+        "p10_price_per_m2": 1815.6,
+        "p90_price_per_m2": 2523.2,
+        "median_price_per_m2": 1999
+      }
+    },
+    "agency": {
+      "estimate": {
+        "premium": 125000,
+        "fast_sale": 104100,
+        "confidence": "high",
+        "market_rate": 115700,
+        "price_per_m2": 2314
+      },
+      "range": {
+        "low": 103400,
+        "high": 133200
+      },
+      "market_stats": {
+        "avg_price": 128327.33,
+        "avg_price_per_m2": 2311.9,
+        "comparable_count": 117,
+        "max_price_per_m2": 2983,
+        "min_price_per_m2": 1388,
+        "p10_price_per_m2": 1809.6,
+        "p90_price_per_m2": 2715,
+        "median_price_per_m2": 2314
+      }
+    }
+  }
+}

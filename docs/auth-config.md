@@ -33,6 +33,7 @@ Google:
 
 Facebook:
 - Add equivalent production/local app domains in Meta developer settings.
+- Production domain verification uses the global `<meta name="facebook-domain-verification" content="5q4tw3otwv1kyuh0x17nz22eetdvzy" />` tag in `src/app/layout.js`.
 - Supabase callback URI is still `https://<project-ref>.supabase.co/auth/v1/callback`.
 - Enable Facebook in Supabase Auth providers.
 

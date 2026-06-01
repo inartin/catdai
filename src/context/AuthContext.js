@@ -284,10 +284,6 @@ export function AuthProvider({ children }) {
     return signInWithProviders("google", ["google"]);
   }, [signInWithProviders]);
 
-  const signInWithFacebook = useCallback(async () => {
-    return signInWithProviders("facebook", ["facebook"]);
-  }, [signInWithProviders]);
-
   const signInWithTelegram = useCallback(async () => {
     const clientId = getTelegramClientId();
 
@@ -375,7 +371,6 @@ export function AuthProvider({ children }) {
       activeProvider,
       isAuthenticated: !!session,
       signInWithGoogle,
-      signInWithFacebook,
       signInWithTelegram,
       signOut,
       clearAuthError: () => setError(null),
@@ -387,7 +382,6 @@ export function AuthProvider({ children }) {
       error,
       activeProvider,
       signInWithGoogle,
-      signInWithFacebook,
       signInWithTelegram,
       signOut,
     ]

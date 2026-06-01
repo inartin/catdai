@@ -5,7 +5,7 @@ Implemented and active.
 
 ## Login
 - Supabase OAuth is used.
-- UI currently exposes Google, Facebook, and Telegram login.
+- UI currently exposes Google and Telegram login.
 - Telegram login uses Telegram's current OAuth popup ID token through `/api/auth/telegram`, then signs the browser into Supabase with an app-managed Telegram account.
 - Telegram does not use Supabase's hosted OIDC callback because Telegram lacks a UserInfo endpoint and that callback can fail with `Error getting user profile from external provider`.
 - Telegram direct OIDC popup ID tokens are not passed to `signInWithIdToken` because those can fail with `Bad ID token`.

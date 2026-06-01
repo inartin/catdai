@@ -55,7 +55,6 @@ export default function RootLayout({ children }) {
   return (
     <html lang="ro">
       <head>
-        <meta name="facebook-domain-verification" content="5q4tw3otwv1kyuh0x17nz22eetdvzy" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationJsonLd) }}

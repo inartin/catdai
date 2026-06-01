@@ -25,6 +25,7 @@ Shows:
 - Cadastru search rows show only date, search type, derived district when available, and anonymous/user id. Exact addresses and cadastral numbers are not stored for this dashboard.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
+- `/admin/feedback` is linked from the left menu as `Feedback` and shows the latest registered-user feedback rows with message, user id, date, status, and optional uploaded image preview that opens in an in-page modal.
 
 ## Data Views
 - Listings list with search, active filter, rooms filter, sorting, pagination.
@@ -34,6 +35,7 @@ Shows:
 - Owner detail with profile fields and listings.
 - Dashboard registered users and recent sale/rent estimations are inline expandable tables.
 - `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows `/?src=zdg` tracking grouped by visitor session, with closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, exact all-time source session/device/funnel totals in the top cards, and paged visitor journeys that load more while scrolling.
+- `/api/admin/feedback` returns the 100 latest `user_feedback` rows after route-level admin cookie verification.
 
 ## Related Files
 - `src/proxy.js`

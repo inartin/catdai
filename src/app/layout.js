@@ -3,6 +3,7 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import CookieBanner from "@/components/CookieBanner";
 import AdSourceTracker from "@/components/AdSourceTracker";
+import FeedbackWidget from "@/components/FeedbackWidget";
 import { getCanonicalSiteUrl, serializeJsonLd } from "@/lib/seo";
 import "./globals.css";
 
@@ -118,6 +119,7 @@ export default function RootLayout({ children }) {
           <AuthProvider>
             <AdSourceTracker />
             {children}
+            <FeedbackWidget />
           </AuthProvider>
         </LanguageProvider>
         <CookieBanner />

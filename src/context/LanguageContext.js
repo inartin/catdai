@@ -13,23 +13,35 @@ function persistLanguage(l) {
   document.cookie = `${LANG_COOKIE}=${l}; path=/; max-age=31536000; SameSite=Lax`;
 }
 
-function getInitialLanguage() {
-  if (typeof window === "undefined") return "ro";
+function normalizeLanguage(value) {
+  return translations[value] ? value : "ro";
+}
+
+function getInitialLanguage(initialLang) {
+  const hasInitialLang = !!translations[initialLang];
+  const normalizedInitialLang = hasInitialLang ? initialLang : "ro";
+  if (typeof window === "undefined") return normalizedInitialLang;
 
   const pathLangMatch = window.location.pathname.match(/^\/(ro|ru)(\/|$)/);
   if (pathLangMatch && translations[pathLangMatch[1]]) return pathLangMatch[1];
+
+  if (hasInitialLang) return normalizedInitialLang;
 
   const saved = localStorage.getItem(LANG_COOKIE);
   return saved && translations[saved] ? saved : "ro";
 }
 
-export function LanguageProvider({ children }) {
-  const [lang, setLangState] = useState(getInitialLanguage);
+export function LanguageProvider({ children, initialLang }) {
+  const [lang, setLangState] = useState(() => getInitialLanguage(initialLang));
 
   useEffect(() => {
-    persistLanguage(lang);
-    document.documentElement.lang = lang;
-  }, [lang]);
+    const pathLangMatch = !initialLang ? window.location.pathname.match(/^\/(ro|ru)(\/|$)/) : null;
+    const pathLang = pathLangMatch?.[1];
+    const documentLang = pathLang && translations[pathLang] ? pathLang : lang;
+
+    persistLanguage(documentLang);
+    document.documentElement.lang = documentLang;
+  }, [initialLang, lang]);
 
   const setLang = useCallback((l) => {
     setLangState(l);

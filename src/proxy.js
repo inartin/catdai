@@ -54,19 +54,30 @@ export async function proxy(request) {
   // Language prefix rewrite: /ru/... or /ro/... → serve the actual route
   const langMatch = pathname.match(/^\/(ro|ru)(\/.*)?$/);
   if (langMatch) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-catdai-lang", langMatch[1]);
+
     if (
       /^\/ro\/preturi-apartamente\/chisinau\/botanica\/?$/.test(pathname) ||
       /^\/ru\/ceny-kvartir\/kishinev\/botanika\/?$/.test(pathname) ||
       /^\/ro\/preturi-apartamente\/chisinau\/botanica-constructii-noi\/?$/.test(pathname) ||
       /^\/ru\/ceny-kvartir\/kishinev\/botanika-novostroy\/?$/.test(pathname)
     ) {
-      return NextResponse.next();
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      });
     }
 
     // Keep explicit localized FAQ routes as-is (no rewrite), so they can be
     // indexed separately and avoid rewrite/redirect loops with /faq.
     if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {
-      return NextResponse.next();
+      return NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      });
     }
 
     const rest = langMatch[2] || "/";
@@ -74,8 +85,6 @@ export async function proxy(request) {
     if (!rest.startsWith("/api/")) {
       const url = request.nextUrl.clone();
       url.pathname = rest;
-      const requestHeaders = new Headers(request.headers);
-      requestHeaders.set("x-catdai-lang", langMatch[1]);
       return NextResponse.rewrite(url, {
         request: {
           headers: requestHeaders,

@@ -183,6 +183,22 @@ create index idx_pdf_generation_events_user    on pdf_generation_events (user_id
 create index idx_pdf_generation_events_session on pdf_generation_events (session_id);
 
 -- ============================================================
+-- cadastru_search_events — tracks /cadastru lookup usage
+-- ============================================================
+create table cadastru_search_events (
+  id          bigserial primary key,
+  search_type text not null check (search_type in ('address', 'number')),
+  user_id     uuid references auth.users(id) on delete set null,
+  district    text,
+  created_at  timestamptz not null default now()
+);
+
+create index idx_cadastru_search_events_created      on cadastru_search_events (created_at desc);
+create index idx_cadastru_search_events_type_created on cadastru_search_events (search_type, created_at desc);
+create index idx_cadastru_search_events_user_created on cadastru_search_events (user_id, created_at desc);
+create index idx_cadastru_search_events_district_created on cadastru_search_events (district, created_at desc);
+
+-- ============================================================
 -- ad_source_events — first-party source tracking events
 -- ============================================================
 create table ad_source_events (

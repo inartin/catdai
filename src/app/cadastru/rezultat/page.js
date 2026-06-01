@@ -11,17 +11,13 @@ import { useTranslation } from "@/context/LanguageContext";
 function CadastruResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
   const [state, setState] = useState({
     loading: true,
     error: "",
     data: null,
   });
-
-  useEffect(() => {
-    document.title = `${t("cadastru.resultPageTitle")} | Catdai`;
-  }, [t]);
 
   useEffect(() => {
     if (!cadastralNumber) {
@@ -64,7 +60,7 @@ function CadastruResultContent() {
       <Navbar />
       <main className="flex-1">
         <section className="mx-auto w-full max-w-5xl px-6 pb-12 pt-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12">
-          <BackButton onClick={() => router.push("/cadastru")} className="mb-6">
+          <BackButton onClick={() => router.push(`/${lang}/cadastru`)} className="mb-6">
             {t("cadastru.backToSearch")}
           </BackButton>
 

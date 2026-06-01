@@ -27,6 +27,20 @@ function fmtBool(value) {
   return value ? "Yes" : "No";
 }
 
+function fmtCadastruSearchType(type) {
+  if (type === "address") return "Address";
+  if (type === "number") return "Cadastral number";
+  return type || "\u2014";
+}
+
+function fmtTopDistricts(byDistrict) {
+  const entries = Object.entries(byDistrict || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
+  if (!entries.length) return "No district data yet";
+  return entries.map(([district, count]) => `${district}: ${fmtNum(count)}`).join(" · ");
+}
+
 const BASE_FILTER_LABELS = {
   city: "City",
   district: "District",
@@ -133,6 +147,7 @@ export default function AdminDashboard() {
   const [estimationsError, setEstimationsError] = useState(null);
   const [showTelegramAlertsList, setShowTelegramAlertsList] = useState(false);
   const [showPdfGenerationList, setShowPdfGenerationList] = useState(false);
+  const [showCadastruSearchesList, setShowCadastruSearchesList] = useState(false);
 
   const loadStats = useCallback(async ({ fresh = false } = {}) => {
     if (fresh) setStatsRefreshing(true);
@@ -258,7 +273,7 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}
@@ -288,6 +303,13 @@ export default function AdminDashboard() {
             detail={showPdfGenerationList ? "Click to hide list" : `${fmtNum(s.pdfGeneration?.registered)} registered / ${fmtNum(s.pdfGeneration?.anonymous)} anonymous`}
             onClick={() => setShowPdfGenerationList((value) => !value)}
             active={showPdfGenerationList}
+          />
+          <StatCard
+            label="Cadastru Searches"
+            value={fmtNum(s.cadastruSearches?.total)}
+            detail={showCadastruSearchesList ? "Click to hide list" : `${fmtNum(s.cadastruSearches?.address)} address / ${fmtNum(s.cadastruSearches?.number)} number`}
+            onClick={() => setShowCadastruSearchesList((value) => !value)}
+            active={showCadastruSearchesList}
           />
           <StatCard
             label="Telegram Alerts"
@@ -468,6 +490,54 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-gray-500 break-all">
                           {row.estimate_log_id || "\u2014"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+        {showCadastruSearchesList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Cadastru Searches</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                {fmtNum(s.cadastruSearches?.periods?.["24h"])} in 24h · {fmtNum(s.cadastruSearches?.periods?.["7d"])} in 7 days · {fmtNum(s.cadastruSearches?.registered)} registered / {fmtNum(s.cadastruSearches?.anonymous)} anonymous
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {fmtTopDistricts(s.cadastruSearches?.byDistrict)}
+              </p>
+            </div>
+
+            {!Array.isArray(s.cadastruSearches?.recent) || s.cadastruSearches.recent.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No cadastru searches found</div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">District</th>
+                      <th className="px-4 py-3">User</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {s.cadastruSearches.recent.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {fmtDateTime(row.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 font-medium">
+                          {fmtCadastruSearchType(row.search_type)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {row.district || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 break-all">
+                          {row.user_id || "Anonymous"}
                         </td>
                       </tr>
                     ))}

@@ -111,6 +111,65 @@ function buildPdfStats(rows, cutoffs) {
   };
 }
 
+function isMissingDistrictError(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || "");
+  return (code === "PGRST204" || code === "42703") && message.includes("district");
+}
+
+async function fetchCadastruSearchEvents() {
+  const buildTypedQuery = (columns) => () =>
+    supabaseAdmin
+      .from("cadastru_search_events")
+      .select(columns)
+      .order("created_at", { ascending: false });
+
+  const firstPage = await buildTypedQuery("id, search_type, user_id, district, created_at")().range(0, PAGE - 1);
+  if (!firstPage.error) {
+    if (!firstPage.data || firstPage.data.length < PAGE) return firstPage.data || [];
+    const rest = await fetchAllRows(buildTypedQuery("id, search_type, user_id, district, created_at"));
+    return rest;
+  }
+
+  if (!isMissingDistrictError(firstPage.error)) return [];
+
+  const rows = await fetchAllRows(buildTypedQuery("id, search_type, user_id, created_at"));
+  return rows.map((row) => ({ ...row, district: null }));
+}
+
+function countByValue(rows, key) {
+  return rows.reduce((acc, row) => {
+    const value = row[key];
+    if (!value) return acc;
+    acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
+}
+
+function buildCadastruSearchStats(rows, cutoffs) {
+  const byType = {
+    address: rows.filter((row) => row.search_type === "address").length,
+    number: rows.filter((row) => row.search_type === "number").length,
+  };
+
+  return {
+    total: rows.length,
+    registered: rows.filter((row) => row.user_id).length,
+    anonymous: rows.filter((row) => !row.user_id).length,
+    address: byType.address,
+    number: byType.number,
+    byType,
+    byDistrict: countByValue(rows, "district"),
+    periods: Object.fromEntries(
+      Object.entries(cutoffs).map(([period, cutoff]) => [
+        period,
+        rows.filter((row) => row.created_at && row.created_at >= cutoff).length,
+      ])
+    ),
+    recent: rows.slice(0, 50),
+  };
+}
+
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
@@ -140,6 +199,7 @@ export async function GET(request) {
           .select("id, user_id, device_id, session_id, estimate_log_id, included_cadastral, created_at")
           .order("created_at", { ascending: false })
       ),
+      fetchCadastruSearchEvents(),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -153,6 +213,7 @@ export async function GET(request) {
     countFavorites,
     telegramAlerts,
     pdfEvents,
+    cadastruSearchEvents,
   ] = dataResults;
 
   const result = {
@@ -167,6 +228,7 @@ export async function GET(request) {
     totalTelegramAlerts: telegramAlerts.length,
     telegramAlerts,
     pdfGeneration: buildPdfStats(pdfEvents, cutoffs),
+    cadastruSearches: buildCadastruSearchStats(cadastruSearchEvents, cutoffs),
   };
 
   if (!bypassCache) {

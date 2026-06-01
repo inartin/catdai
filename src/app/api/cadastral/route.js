@@ -1,5 +1,6 @@
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
+import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
@@ -289,6 +290,10 @@ export async function POST(request) {
       { error: "invalid_format", message: "Invalid cadastral number format" },
       { status: 400 }
     );
+  }
+
+  if (body.search_context === "cadastru") {
+    await logCadastruSearchEvent(request, "number");
   }
 
   const { code, buildingId, apartmentId } = parseCadastralParts(trimmed);

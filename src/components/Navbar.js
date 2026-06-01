@@ -25,6 +25,8 @@ export default function Navbar() {
   const [mobileMenuPath, setMobileMenuPath] = useState(null);
   const mobileMenuOpen = mobileMenuPath === pathname;
   const showAlertShortcut = !loading && isAuthenticated;
+  const cadastruHref = `/${lang}/cadastru`;
+  const isCadastruPath = pathname === "/cadastru" || /^\/(ro|ru)\/cadastru\/?$/.test(pathname);
 
   const handleLogoClick = (e) => {
     if (pathname === "/") {
@@ -40,6 +42,9 @@ export default function Navbar() {
 
     if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {
       const target = `/${nextLang}/faq`;
+      if (pathname !== target) router.replace(target);
+    } else if (isCadastruPath) {
+      const target = `/${nextLang}/cadastru`;
       if (pathname !== target) router.replace(target);
     }
   };
@@ -99,9 +104,9 @@ export default function Navbar() {
             {t("nav.estimate")}
           </Link>
           <Link
-            href="/cadastru"
+            href={cadastruHref}
             className={`inline-flex h-9 items-center rounded-lg px-2.5 text-sm font-medium leading-none transition-colors ${
-              pathname === "/cadastru"
+              isCadastruPath
                 ? "bg-gray-50 text-gray-900"
                 : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
             }`}
@@ -185,10 +190,10 @@ export default function Navbar() {
                   {t("nav.estimate")}
                 </Link>
                 <Link
-                  href="/cadastru"
+                  href={cadastruHref}
                   onClick={() => setMobileMenuPath(null)}
                   className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium ${
-                    pathname === "/cadastru"
+                    isCadastruPath
                       ? "bg-gray-50 text-gray-900"
                       : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   }`}

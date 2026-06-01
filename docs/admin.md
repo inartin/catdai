@@ -17,10 +17,12 @@ Shows:
 - registered users
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
+- cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows
 - shared links
 - favorites
 - Telegram alert count with an expandable list of configured Telegram alerts
 - sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
+- Cadastru search rows show only date, search type, derived district when available, and anonymous/user id. Exact addresses and cadastral numbers are not stored for this dashboard.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
 
@@ -40,3 +42,4 @@ Shows:
 - `src/app/api/admin/*`
 - `src/lib/admin-ad-tracking.js`
 - `db/pdf_generation_events.sql`
+- `db/cadastru_search_events.sql`

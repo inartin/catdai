@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CadastruSourceNote from "@/components/CadastruSourceNote";
 import { useTranslation } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet" },
@@ -13,7 +14,8 @@ const roadTypes = [
 ];
 
 export default function CadastruPage() {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
+  const { session } = useAuth();
   const router = useRouter();
   const [addressForm, setAddressForm] = useState({
     roadType: "strada",
@@ -27,10 +29,6 @@ export default function CadastruPage() {
     method: null,
     error: "",
   });
-
-  useEffect(() => {
-    document.title = `${t("cadastru.pageTitle")} | Catdai`;
-  }, [t]);
 
   const setAddressField = (field, value) => {
     setAddressForm((current) => ({ ...current, [field]: value }));
@@ -49,13 +47,18 @@ export default function CadastruPage() {
     }
   };
 
+  const requestHeaders = () => ({
+    "Content-Type": "application/json",
+    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+  });
+
   const submitAddressSearch = async () => {
     setLookupState({ loading: true, method: "address", error: "" });
 
     try {
       const response = await fetch("/api/cadastru/address", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: requestHeaders(),
         body: JSON.stringify({
           city: "Chișinău",
           road_type: addressForm.roadType,
@@ -76,7 +79,7 @@ export default function CadastruPage() {
 
       const data = await response.json();
       if (data?.cadastral_number) {
-        router.push(`/cadastru/rezultat?cadastral_number=${encodeURIComponent(data.cadastral_number)}`);
+        router.push(`/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(data.cadastral_number)}`);
         return;
       }
 
@@ -96,8 +99,8 @@ export default function CadastruPage() {
     try {
       const response = await fetch("/api/cadastral", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cadastral_number: cadastralNumber }),
+        headers: requestHeaders(),
+        body: JSON.stringify({ cadastral_number: cadastralNumber, search_context: "cadastru" }),
       });
 
       if (!response.ok) {
@@ -110,7 +113,7 @@ export default function CadastruPage() {
       }
 
       const data = await response.json();
-      router.push(`/cadastru/rezultat?cadastral_number=${encodeURIComponent(data?.cadastral_number || cadastralNumber.trim())}`);
+      router.push(`/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(data?.cadastral_number || cadastralNumber.trim())}`);
     } catch {
       setLookupState({
         loading: false,

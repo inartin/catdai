@@ -91,6 +91,25 @@ function buildBaseSummary(alert, t) {
   ].filter(Boolean).join(" · ");
 }
 
+function isManagedTelegramEmail(email) {
+  return /^telegram-\d+@auth\.catdai\.md$/i.test(String(email || ""));
+}
+
+function getProfileName(user) {
+  return user?.user_metadata?.full_name || user?.user_metadata?.name || user?.name || "User";
+}
+
+function getProfileSubtitle(user) {
+  const username = user?.user_metadata?.user_name || user?.user_metadata?.preferred_username;
+  if (username) return `@${username}`;
+  return isManagedTelegramEmail(user?.email) ? null : user?.email;
+}
+
+function getProfileInitial(user) {
+  const label = getProfileName(user) || getProfileSubtitle(user) || user?.email || "U";
+  return label.charAt(0).toUpperCase();
+}
+
 export default function ProfilePage() {
   const { t, lang } = useTranslation();
   const { user, session, signOut, isAuthenticated, loading } = useAuth();
@@ -104,6 +123,8 @@ export default function ProfilePage() {
   const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [listingAlerts, setListingAlerts] = useState([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
+  const profileName = getProfileName(user);
+  const profileSubtitle = getProfileSubtitle(user);
 
   useEffect(() => {
     document.title = `${t("nav.profile")} | Catdai`;
@@ -238,12 +259,12 @@ export default function ProfilePage() {
                 />
               ) : (
                 <div className="h-20 w-20 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-2xl shadow-sm">
-                  {user?.user_metadata?.full_name?.charAt(0).toUpperCase() || user?.user_metadata?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || "U"}
+                  {getProfileInitial(user)}
                 </div>
               )}
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">{user?.user_metadata?.full_name || user?.user_metadata?.name || user?.name || "User"}</h2>
-                <p className="text-gray-600 mb-4">{user?.email}</p>
+                <h2 className="text-xl font-semibold text-gray-900">{profileName}</h2>
+                {profileSubtitle && <p className="text-gray-600 mb-4">{profileSubtitle}</p>}
                 <button
                   type="button"
                   onClick={async () => {

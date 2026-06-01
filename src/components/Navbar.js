@@ -7,6 +7,7 @@ import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import LoginButton from "@/components/LoginButton";
 import AlertIcon from "@/components/icons/AlertIcon";
+import CloseIcon from "@/components/icons/CloseIcon";
 import MenuIcon from "@/components/icons/MenuIcon";
 import Tooltip from "@/components/Tooltip";
 
@@ -16,6 +17,129 @@ export function emitGoHome() {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(GO_HOME_EVENT));
 }
 
+function NotificationButton({ open, unreadCount, onClick, t }) {
+  return (
+    <button
+      type="button"
+      aria-controls="notification-sidebar"
+      aria-expanded={open}
+      aria-label={t("notifications.open")}
+      onClick={onClick}
+      className={`relative inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
+        open
+          ? "border-primary bg-primary-light text-primary-dark"
+          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
+      }`}
+    >
+      <AlertIcon size={18} />
+      {unreadCount > 0 && (
+        <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-primary">
+          <span className="sr-only">{t("notifications.unreadCount", { count: unreadCount })}</span>
+        </span>
+      )}
+    </button>
+  );
+}
+
+function NotificationSidebar({ open, notifications, onClear, onClose, t }) {
+  const unreadCount = notifications.filter((notification) => notification.unread).length;
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60]">
+      <button
+        type="button"
+        aria-label={t("notifications.close")}
+        className="absolute inset-0 h-full w-full cursor-default bg-gray-950/20"
+        onClick={onClose}
+      />
+      <aside
+        id="notification-sidebar"
+        aria-label={t("notifications.title")}
+        className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col border-l border-gray-200 bg-white shadow-2xl sm:w-[420px]"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-5">
+          <div>
+            <p className="text-lg font-semibold text-gray-950">{t("notifications.title")}</p>
+            <p className="mt-1 text-sm text-gray-500">
+              {unreadCount > 0
+                ? t("notifications.unreadSummary", { count: unreadCount })
+                : t("notifications.noUnread")}
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label={t("notifications.close")}
+            onClick={onClose}
+            className="inline-flex h-9 w-9 flex-none items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
+          >
+            <CloseIcon size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          {notifications.length > 0 ? (
+            <div className="space-y-3">
+              {notifications.map((notification) => (
+                <article
+                  key={notification.id}
+                  className={`rounded-lg border p-4 ${
+                    notification.unread
+                      ? "border-primary/30 bg-primary-light"
+                      : "border-gray-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${
+                        notification.unread ? "bg-primary" : "bg-gray-300"
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <h2 className="text-sm font-semibold text-gray-950">{t(notification.titleKey)}</h2>
+                        <span
+                          className={`rounded-full px-2 py-1 text-[11px] font-semibold leading-none ${
+                            notification.unread
+                              ? "bg-white text-primary-dark"
+                              : "bg-gray-100 text-gray-500"
+                          }`}
+                        >
+                          {notification.unread ? t("notifications.unread") : t("notifications.read")}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm leading-5 text-gray-600">{t(notification.bodyKey)}</p>
+                      <time className="mt-3 block text-xs font-medium text-gray-400">{t(notification.timeKey)}</time>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-full min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 px-6 text-center">
+              <p className="text-sm font-semibold text-gray-950">{t("notifications.emptyTitle")}</p>
+              <p className="mt-2 text-sm leading-5 text-gray-500">{t("notifications.emptyBody")}</p>
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-gray-100 px-5 py-4">
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={notifications.length === 0}
+            className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-gray-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
+          >
+            {t("notifications.clear")}
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -23,8 +147,11 @@ export default function Navbar() {
   const { isAuthenticated, loading } = useAuth();
   const mobileMenuRef = useRef(null);
   const [mobileMenuPath, setMobileMenuPath] = useState(null);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
   const mobileMenuOpen = mobileMenuPath === pathname;
   const showAlertShortcut = !loading && isAuthenticated;
+  const unreadNotificationCount = notifications.filter((notification) => notification.unread).length;
   const cadastruHref = `/${lang}/cadastru`;
   const isCadastruPath = pathname === "/cadastru" || /^\/(ro|ru)\/cadastru\/?$/.test(pathname);
 
@@ -70,7 +197,40 @@ export default function Navbar() {
     };
   }, [mobileMenuOpen]);
 
+  useEffect(() => {
+    if (!notificationOpen) return;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setNotificationOpen(false);
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [notificationOpen]);
+
+  const handleNotificationToggle = () => {
+    setMobileMenuPath(null);
+    if (!notificationOpen) {
+      setNotifications((current) =>
+        current.map((notification) => ({ ...notification, unread: false }))
+      );
+    }
+    setNotificationOpen((prev) => !prev);
+  };
+
+  const handleNotificationClear = () => {
+    setNotifications([]);
+  };
+
+  const handleNotificationClose = () => {
+    setNotificationOpen(false);
+  };
+
   return (
+    <>
     <header className="relative sticky top-0 z-50 border-b border-gray-100 bg-white">
       <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between h-16">
         <Link
@@ -115,13 +275,12 @@ export default function Navbar() {
           </Link>
           <LoginButton className="inline-flex h-9 items-center rounded-lg px-2.5 leading-none text-gray-600 hover:bg-gray-50 hover:text-gray-900" />
           {showAlertShortcut && (
-            <Link
-              href="/alerts"
-              aria-label={t("nav.alerts")}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
-            >
-              <AlertIcon size={18} />
-            </Link>
+            <NotificationButton
+              open={notificationOpen}
+              unreadCount={unreadNotificationCount}
+              onClick={handleNotificationToggle}
+              t={t}
+            />
           )}
           <div
             className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm font-medium"
@@ -155,15 +314,14 @@ export default function Navbar() {
           </div>
         </div>
 
-        <div ref={mobileMenuRef} className="flex items-center gap-2 md:hidden">
+      <div ref={mobileMenuRef} className="flex items-center gap-2 md:hidden">
           {showAlertShortcut && (
-            <Link
-              href="/alerts"
-              aria-label={t("nav.alerts")}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
-            >
-              <AlertIcon size={18} />
-            </Link>
+            <NotificationButton
+              open={notificationOpen}
+              unreadCount={unreadNotificationCount}
+              onClick={handleNotificationToggle}
+              t={t}
+            />
           )}
           <button
             type="button"
@@ -242,5 +400,15 @@ export default function Navbar() {
         </div>
       </div>
     </header>
+    {showAlertShortcut && (
+      <NotificationSidebar
+        open={notificationOpen}
+        notifications={notifications}
+        onClear={handleNotificationClear}
+        onClose={handleNotificationClose}
+        t={t}
+      />
+    )}
+    </>
   );
 }

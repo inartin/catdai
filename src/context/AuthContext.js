@@ -6,6 +6,7 @@ import { getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
 
 const AuthContext = createContext(null);
 const ACTIVITY_PING_INTERVAL_MS = 5 * 60 * 1000;
+const TELEGRAM_LOGIN_SCRIPT_SRC = "https://oauth.telegram.org/js/telegram-login.js?5";
 const OAUTH_URL_KEYS = [
   "access_token",
   "refresh_token",
@@ -44,18 +45,41 @@ function buildRedirectTo() {
   return `${window.location.origin}${window.location.pathname}${window.location.search}`;
 }
 
-function normalizeProviders(items) {
-  const providers = [];
-  const seen = new Set();
+function getTelegramClientId() {
+  return String(process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_CLIENT_ID || "").trim();
+}
 
-  for (const item of items) {
-    const provider = String(item || "").trim();
-    if (!provider || seen.has(provider)) continue;
-    seen.add(provider);
-    providers.push(provider);
+function loadTelegramLoginScript() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("Telegram login is only available in the browser."));
   }
 
-  return providers;
+  if (window.Telegram?.Login && !window.Telegram.Login.widgetsOrigin) return Promise.resolve(window.Telegram.Login);
+
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(`script[src="${TELEGRAM_LOGIN_SCRIPT_SRC}"]`);
+
+    const onLoad = () => {
+      if (window.Telegram?.Login && !window.Telegram.Login.widgetsOrigin) {
+        resolve(window.Telegram.Login);
+      } else {
+        reject(new Error("Telegram login did not initialize."));
+      }
+    };
+
+    if (existingScript) {
+      existingScript.addEventListener("load", onLoad, { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Failed to load Telegram login.")), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = TELEGRAM_LOGIN_SCRIPT_SRC;
+    script.onload = onLoad;
+    script.onerror = () => reject(new Error("Failed to load Telegram login."));
+    document.head.appendChild(script);
+  });
 }
 
 function stripOAuthParamsFromUrl() {
@@ -265,10 +289,72 @@ export function AuthProvider({ children }) {
   }, [signInWithProviders]);
 
   const signInWithTelegram = useCallback(async () => {
-    const configured = process.env.NEXT_PUBLIC_SUPABASE_TELEGRAM_PROVIDER;
-    const providers = normalizeProviders([configured, "telegram", "custom:telegram"]);
-    return signInWithProviders("telegram", providers);
-  }, [signInWithProviders]);
+    const clientId = getTelegramClientId();
+
+    if (!clientId) {
+      const telegramError = new Error("Telegram login is not configured.");
+      setError(telegramError.message);
+      return { error: telegramError };
+    }
+
+    setActiveProvider("telegram");
+    setError(null);
+
+    try {
+      const telegramLogin = await loadTelegramLoginScript();
+      return await new Promise((resolve) => {
+        telegramLogin.auth(
+          {
+            client_id: clientId,
+          },
+          async (authData) => {
+            if (!authData || authData.error || !authData.id_token) {
+              const telegramError = new Error(authData?.error || "Telegram authentication failed.");
+              setError(telegramError.message);
+              setActiveProvider(null);
+              resolve({ error: telegramError });
+              return;
+            }
+
+            const response = await fetch("/api/auth/telegram", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ id_token: authData.id_token }),
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok || !payload?.session?.access_token || !payload?.session?.refresh_token) {
+              const telegramError = new Error(payload?.error || "Telegram authentication failed.");
+              setError(telegramError.message);
+              setActiveProvider(null);
+              resolve({ error: telegramError });
+              return;
+            }
+
+            const { error: setSessionError } = await supabase.auth.setSession({
+              access_token: payload.session.access_token,
+              refresh_token: payload.session.refresh_token,
+            });
+
+            if (setSessionError) {
+              setError(setSessionError.message || "Telegram authentication failed.");
+              setActiveProvider(null);
+              resolve({ error: setSessionError });
+              return;
+            }
+
+            setActiveProvider(null);
+            resolve({ error: null });
+          }
+        );
+      });
+    } catch (telegramError) {
+      const message = telegramError?.message || "Telegram authentication failed.";
+      setError(message);
+      setActiveProvider(null);
+      return { error: telegramError };
+    }
+  }, []);
 
   const signOut = useCallback(async () => {
     setError(null);

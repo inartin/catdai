@@ -5,7 +5,10 @@ Implemented and active.
 
 ## Login
 - Supabase OAuth is used.
-- UI currently exposes Google and Facebook login.
+- UI currently exposes Google, Facebook, and Telegram login.
+- Telegram login uses Telegram's current OAuth popup ID token through `/api/auth/telegram`, then signs the browser into Supabase with an app-managed Telegram account.
+- Telegram does not use Supabase's hosted OIDC callback because Telegram lacks a UserInfo endpoint and that callback can fail with `Error getting user profile from external provider`.
+- Telegram direct OIDC popup ID tokens are not passed to `signInWithIdToken` because those can fail with `Bad ID token`.
 - Redirect returns to the current page.
 - OAuth params are stripped from the URL after session sync.
 - The auth cleanup only strips `type` when other OAuth callback params are present, so app URLs such as `/evaluare?type=rent` keep their valuation mode on refresh.
@@ -13,6 +16,7 @@ Implemented and active.
 ## Profile
 `/profile` shows:
 - user avatar/name/email
+- Telegram app-managed placeholder emails like `telegram-<id>@auth.catdai.md` are hidden; Telegram username is shown when available.
 - logout
 - favorites
 - listing alerts
@@ -33,6 +37,8 @@ Implemented and active.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_KEY`
+- `NEXT_PUBLIC_TELEGRAM_LOGIN_CLIENT_ID`
+- `TELEGRAM_LOGIN_SECRET`
 
 ## Related Files
 - `src/context/AuthContext.js`
@@ -41,3 +47,4 @@ Implemented and active.
 - `src/app/profile/page.js`
 - `src/app/api/activity/ping/route.js`
 - `src/app/api/profile/delete/route.js`
+- `src/app/api/auth/telegram/route.js`

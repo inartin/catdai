@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import GoogleIcon from "@/components/icons/GoogleIcon";
 import FacebookIcon from "@/components/icons/FacebookIcon";
+import TelegramIcon from "@/components/icons/TelegramIcon";
 
 export default function AuthOptions({ className = "", variant = "default" }) {
   const { t } = useTranslation();
@@ -13,6 +14,7 @@ export default function AuthOptions({ className = "", variant = "default" }) {
     activeProvider,
     signInWithGoogle,
     signInWithFacebook,
+    signInWithTelegram,
     clearAuthError,
   } = useAuth();
 
@@ -25,6 +27,10 @@ export default function AuthOptions({ className = "", variant = "default" }) {
     variant === "freeContinue"
       ? t("auth.continueFreeWithFacebook")
       : t("auth.loginWithFacebook");
+  const telegramLabel =
+    variant === "freeContinue"
+      ? t("auth.continueFreeWithTelegram")
+      : t("auth.loginWithTelegram");
 
   const signIn = async (providerFn) => {
     clearAuthError();
@@ -58,6 +64,20 @@ export default function AuthOptions({ className = "", variant = "default" }) {
         <span className="flex items-center justify-center gap-2.5 whitespace-nowrap">
           <FacebookIcon size={16} className="text-[#1877F2]" />
           <span>{activeProvider === "facebook" ? t("auth.loading") : facebookLabel}</span>
+        </span>
+      </button>
+
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => signIn(signInWithTelegram)}
+        aria-label={telegramLabel}
+        aria-busy={activeProvider === "telegram"}
+        className="mt-2 w-full rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <span className="flex items-center justify-center gap-2.5 whitespace-nowrap">
+          <TelegramIcon size={16} />
+          <span>{activeProvider === "telegram" ? t("auth.loading") : telegramLabel}</span>
         </span>
       </button>
 

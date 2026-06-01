@@ -3,8 +3,9 @@
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 import BackButton from "@/components/BackButton";
-import LoginButton from "@/components/LoginButton";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { validateCadastralNumber } from "@/lib/validation";
 
 const cities = [
@@ -212,6 +213,7 @@ function isTrueValue(value) {
 export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit }) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { session, isAuthenticated, clearAuthError } = useAuth();
   const estimateModes = [
     { key: "sale", label: t("form.estimateModeSale") },
     { key: "rent", label: t("form.estimateModeRent") },
@@ -251,6 +253,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   const [cadastralLoading, setCadastralLoading] = useState(false);
   const [cadastralError, setCadastralError] = useState(null);
   const [cadastralData, setCadastralData] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [highlightField, setHighlightField] = useState(null);
   const refCity = useRef(null);
   const refDistrict = useRef(null);
@@ -278,6 +281,12 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   };
 
   const handleCadastralSearch = async () => {
+    if (!isAuthenticated) {
+      clearAuthError();
+      setIsAuthModalOpen(true);
+      return;
+    }
+
     const validation = validateCadastralNumber(cadastralInput);
     if (!validation.valid) {
       setCadastralError("cadastralInvalid");
@@ -290,14 +299,20 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     try {
       const res = await fetch("/api/cadastral", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ cadastral_number: validation.value }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        if (data.error === "not_found") {
+        if (res.status === 401 || data.error === "unauthorized") {
+          clearAuthError();
+          setIsAuthModalOpen(true);
+        } else if (data.error === "not_found") {
           setCadastralError("cadastralNotFound");
         } else if (data.error === "invalid_format") {
           setCadastralError("cadastralInvalid");
@@ -452,6 +467,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
 
   return (
     <section className="py-8 px-4">
+      <AuthRequiredModal
+        open={isAuthModalOpen}
+        copyKey="cadastru.loginToUse"
+        onClose={() => setIsAuthModalOpen(false)}
+      />
       <div className="max-w-2xl mx-auto">
         <BackButton onClick={onBack} className="mb-6">
           {t("form.back")}

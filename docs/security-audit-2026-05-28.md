@@ -14,7 +14,7 @@
 - **Medium - Production CORS header is malformed.** Live `/api/prices` returns `Access-Control-Allow-Origin: https://catdai.md,3.126.51.101`, which is not a valid single origin. This is more likely to break CORS than open it, but it is still a security-header config bug.
 - **Medium - Default tracking salt fallback.** `TRACKING_SALT` is not listed in the local `.env` names inspected, while code falls back to `catdai-default-salt`. IP hashes are weaker if production also lacks a secret salt.
 - **Medium - Rate limits are in-memory and trust forwarded IP headers.** Public routes use local process maps and trust `cf-connecting-ip` / `x-forwarded-for`. This is bypassable if the origin is directly reachable or if there are multiple app instances.
-- **Medium - Public cadastral endpoint exposes detailed property data.** `/api/cadastral` intentionally returns building/apartment/location data to anonymous users. This is documented behavior, but it is a privacy/data-minimization risk.
+- **Medium - Public cadastral endpoint exposes detailed property data.** Fixed by requiring a valid Supabase bearer token on `/api/cadastral` and `/api/cadastru/address`; anonymous UI paths now show the shared auth popup before lookup. ✅
 - **Low - Admin query inputs are not allowlisted.** Admin listings accepts arbitrary `sortBy`; admin owners interpolates `search` into a Supabase `.or()` filter. Admin auth limits exposure, but malformed input can cause errors or unexpected filters.
 - **Low - Admin APIs can return raw DB error messages.** Fixed for admin listings and owners list routes by logging detailed DB errors server-side and returning generic API errors. ✅
 - **Low - `X-Powered-By: Next.js` is exposed in production.** Fixed by disabling Next.js `poweredByHeader`. ✅

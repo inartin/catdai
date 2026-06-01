@@ -14,6 +14,7 @@ Implemented and active for apartments.
 - Result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
 - Sale and rent result pages share the same criteria-edit action button, including the edit icon and secondary button styling.
+- The sale valuation form's cadastral shortcut is login-gated and uses the shared auth popup before calling `/api/cadastral`.
 - PDF export opens a section picker for everyone, but PDF download is login-gated and requires a valid Supabase session immediately before generation. If login starts from the PDF dialog, the login prompt overlays the PDF dialog; after OAuth redirect, a localStorage flag restores the PDF dialog.
 - PDF reports always include the estimated market price, segment median price per m2, property summary, disclaimer footer, and `catdai.md` source label; optional sections include seller-type comparison and official cadastral data when available.
 - PDF reports intentionally exclude market statistics, relevant listing cards/links, and sector/city trend charts.
@@ -48,7 +49,7 @@ Implemented and active for apartments.
 - PDF report layout uses explicit canvas coordinates for pills, seller cards, notes, and text blocks instead of HTML rasterization.
 - PDF report header reuses the product logo and displays `catdai.md` as the report brand.
 - PDF report can optionally include a QR code pointing back to the estimation page with `src=qr` in the query string.
-- When official cadastral data is missing, the PDF dialog recommends adding it and can fetch cadastral details by number before generating the report.
+- When official cadastral data is missing, the PDF dialog recommends adding it and can fetch cadastral details by number before generating the report after the same authenticated bearer-token check.
 - Official cadastral data, when included, is grouped with its IPCBI source inside one highlighted report panel.
 - Cadastral result/PDF panels include apartment-level and building-level IPCBI details when available: veceu, baie, last-floor flag, official estimated value, construction year, total floors, condition, utilities, and wall material.
 - The cadastral estimated-value label stays on one line in the PDF data panel.

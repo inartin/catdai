@@ -6,23 +6,31 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BackButton from "@/components/BackButton";
 import CadastralDataCard from "@/components/CadastralDataCard";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { useTranslation } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 
 function CadastruResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { lang, t } = useTranslation();
+  const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
+  const [authModalDismissed, setAuthModalDismissed] = useState(false);
   const [state, setState] = useState({
     loading: true,
     error: "",
     data: null,
   });
+  const authRequired = !authLoading && Boolean(cadastralNumber) && !isAuthenticated;
 
   useEffect(() => {
+    if (authLoading) return;
     if (!cadastralNumber) {
       return;
     }
+
+    if (!isAuthenticated) return;
 
     let active = true;
 
@@ -32,11 +40,19 @@ function CadastruResultContent() {
       try {
         const response = await fetch("/api/cadastral", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
           body: JSON.stringify({ cadastral_number: cadastralNumber }),
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            clearAuthError();
+            if (active) setState({ loading: false, error: t("cadastru.loginToUse"), data: null });
+            return;
+          }
           if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
           return;
         }
@@ -53,10 +69,15 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [cadastralNumber, t]);
+  }, [authLoading, cadastralNumber, clearAuthError, isAuthenticated, session?.access_token, t]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
+      <AuthRequiredModal
+        open={authRequired && !authModalDismissed}
+        copyKey="cadastru.loginToUse"
+        onClose={() => setAuthModalDismissed(true)}
+      />
       <Navbar />
       <main className="flex-1">
         <section className="mx-auto w-full max-w-5xl px-6 pb-12 pt-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12">
@@ -70,7 +91,7 @@ function CadastruResultContent() {
             </h1>
           </div>
 
-          {state.loading && (
+          {state.loading && !authRequired && (
             <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600 shadow-sm sm:p-8">
               {t("cadastru.searching")}
             </div>

@@ -1,6 +1,7 @@
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
+import { resolveAccessTier } from "@/lib/access-tier";
 import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
@@ -230,7 +231,7 @@ function hasApartmentDetails(apartment) {
   );
 }
 
-async function buildCadastruDetailPayload(cadastralNumber) {
+async function buildCadastruDetailPayload(cadastralNumber, accessTier = "paid") {
   try {
     const detail = await fetchCadastruDetailData(cadastralNumber);
     if (!detail || !hasApartmentDetails(detail.apartment)) return null;
@@ -240,7 +241,7 @@ async function buildCadastruDetailPayload(cadastralNumber) {
       cadastral_number: cadastralNumber,
       form_fields: buildFormFields(detail.building || {}, detail.apartment || {}),
       partial: true,
-      access_tier: "free",
+      access_tier: accessTier,
       locked_sections: {},
     };
   } catch (error) {
@@ -267,6 +268,11 @@ export async function POST(request) {
         },
       }
     );
+  }
+
+  const access = await resolveAccessTier(request);
+  if (!access.user_id) {
+    return NextResponse.json({ error: "unauthorized", message: "Unauthorized" }, { status: 401 });
   }
 
   let body;
@@ -303,7 +309,7 @@ export async function POST(request) {
     const step1 = await fetchJsonWithTimeout(step1Url, { label: "geodata_wfs" });
 
     if (!step1.features || step1.features.length === 0) {
-      const detailPayload = await buildCadastruDetailPayload(trimmed);
+      const detailPayload = await buildCadastruDetailPayload(trimmed, access.tier);
       if (detailPayload) {
         const res = NextResponse.json(detailPayload);
         res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -327,7 +333,7 @@ export async function POST(request) {
     const step3 = await fetchJsonWithTimeout(step3Url, { label: "geodata_wms" });
 
     if (!step3.features || step3.features.length === 0) {
-      const detailPayload = await buildCadastruDetailPayload(trimmed);
+      const detailPayload = await buildCadastruDetailPayload(trimmed, access.tier);
       if (detailPayload) {
         const res = NextResponse.json(detailPayload);
         res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -366,7 +372,7 @@ export async function POST(request) {
         location,
         form_fields,
         partial: true,
-        access_tier: "free",
+        access_tier: access.tier,
         locked_sections: {},
       });
       res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -375,7 +381,7 @@ export async function POST(request) {
 
     const html = step3.features[0].properties?.html || "";
     const { building, apartment } = parseHtmlResponse(html, buildingId, apartmentId);
-    const detailPayload = hasApartmentDetails(apartment) ? null : await buildCadastruDetailPayload(trimmed);
+    const detailPayload = hasApartmentDetails(apartment) ? null : await buildCadastruDetailPayload(trimmed, access.tier);
     if (detailPayload) {
       const res = NextResponse.json({
         ...detailPayload,
@@ -393,7 +399,7 @@ export async function POST(request) {
       building,
       apartment,
       form_fields,
-      access_tier: "free",
+      access_tier: access.tier,
       locked_sections: {},
     };
 

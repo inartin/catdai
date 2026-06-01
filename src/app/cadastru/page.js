@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CadastruSourceNote from "@/components/CadastruSourceNote";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 
@@ -12,10 +13,24 @@ const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet" },
   { value: "bulevard", label: "cadastru.roadTypeBoulevard" },
 ];
+const STREET_MAX_LENGTH = 80;
+const HOUSE_NUMBER_MAX_LENGTH = 10;
+const APARTMENT_NUMBER_MAX_LENGTH = 4;
+const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/\d{1,4})?$/;
+const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
+const MAX_APARTMENT_NUMBER = 9999;
+
+function onlyHouseNumberChars(value) {
+  return value.replace(/[^\d/]/g, "").slice(0, HOUSE_NUMBER_MAX_LENGTH);
+}
+
+function onlyDigits(value, maxLength) {
+  return value.replace(/\D/g, "").slice(0, maxLength);
+}
 
 export default function CadastruPage() {
   const { lang, t } = useTranslation();
-  const { session } = useAuth();
+  const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const router = useRouter();
   const [addressForm, setAddressForm] = useState({
     roadType: "strada",
@@ -29,16 +44,56 @@ export default function CadastruPage() {
     method: null,
     error: "",
   });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const requireAuth = () => {
+    if (isAuthenticated) return false;
+    clearAuthError();
+    setLookupState({ loading: false, method: null, error: "" });
+    setIsAuthModalOpen(true);
+    return true;
+  };
 
   const setAddressField = (field, value) => {
     setAddressForm((current) => ({ ...current, [field]: value }));
   };
 
+  const validateAddressFields = () => {
+    const street = addressForm.street.trim();
+    const houseNumber = addressForm.houseNumber.trim();
+    const apartmentNumber = addressForm.apartmentNumber.trim();
+
+    if (!street || !houseNumber || !apartmentNumber) {
+      return t("cadastru.missingAddressFields");
+    }
+
+    if (
+      street.length > STREET_MAX_LENGTH ||
+      houseNumber.length > HOUSE_NUMBER_MAX_LENGTH ||
+      apartmentNumber.length > APARTMENT_NUMBER_MAX_LENGTH
+    ) {
+      return t("cadastru.invalidAddressFields");
+    }
+
+    if (!HOUSE_NUMBER_PATTERN.test(houseNumber) || !APARTMENT_NUMBER_PATTERN.test(apartmentNumber)) {
+      return t("cadastru.invalidAddressFields");
+    }
+
+    const apartmentNumberValue = Number(apartmentNumber);
+    if (apartmentNumberValue < 1 || apartmentNumberValue > MAX_APARTMENT_NUMBER) {
+      return t("cadastru.invalidAddressFields");
+    }
+
+    return "";
+  };
+
   const readErrorMessage = async (response) => {
     try {
       const payload = await response.json();
+      if (payload?.error === "unauthorized") return t("cadastru.loginToUse");
       if (payload?.error === "invalid_format") return t("form.cadastralInvalid");
       if (payload?.error === "missing_fields") return t("cadastru.missingAddressFields");
+      if (payload?.error === "invalid_address_fields") return t("cadastru.invalidAddressFields");
       if (payload?.error === "too_many_requests") return t("cadastru.rateLimitError");
       if (payload?.error === "not_found") return t("cadastru.lookupError");
       return payload?.message || payload?.error || t("cadastru.lookupError");
@@ -53,6 +108,14 @@ export default function CadastruPage() {
   });
 
   const submitAddressSearch = async () => {
+    if (requireAuth()) return;
+
+    const validationError = validateAddressFields();
+    if (validationError) {
+      setLookupState({ loading: false, method: "address", error: validationError });
+      return;
+    }
+
     setLookupState({ loading: true, method: "address", error: "" });
 
     try {
@@ -69,6 +132,12 @@ export default function CadastruPage() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          clearAuthError();
+          setLookupState({ loading: false, method: "address", error: "" });
+          setIsAuthModalOpen(true);
+          return;
+        }
         setLookupState({
           loading: false,
           method: "address",
@@ -94,6 +163,8 @@ export default function CadastruPage() {
   };
 
   const submitNumberSearch = async () => {
+    if (requireAuth()) return;
+
     setLookupState({ loading: true, method: "number", error: "" });
 
     try {
@@ -104,6 +175,12 @@ export default function CadastruPage() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          clearAuthError();
+          setLookupState({ loading: false, method: "number", error: "" });
+          setIsAuthModalOpen(true);
+          return;
+        }
         setLookupState({
           loading: false,
           method: "number",
@@ -125,6 +202,11 @@ export default function CadastruPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
+      <AuthRequiredModal
+        open={isAuthModalOpen}
+        copyKey="cadastru.loginToUse"
+        onClose={() => setIsAuthModalOpen(false)}
+      />
       <Navbar />
       <main className="flex-1">
         <section className="mx-auto w-full max-w-4xl px-6 pb-12 pt-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12">
@@ -187,6 +269,7 @@ export default function CadastruPage() {
                   </span>
                   <input
                     type="text"
+                    maxLength={STREET_MAX_LENGTH}
                     value={addressForm.street}
                     onChange={(event) => setAddressField("street", event.target.value)}
                     placeholder={t("cadastru.streetPlaceholder")}
@@ -200,9 +283,11 @@ export default function CadastruPage() {
                   </span>
                   <input
                     type="text"
-                    inputMode="text"
+                    inputMode="numeric"
+                    pattern="\d{1,4}(?:/\d{1,4})?"
+                    maxLength={HOUSE_NUMBER_MAX_LENGTH}
                     value={addressForm.houseNumber}
-                    onChange={(event) => setAddressField("houseNumber", event.target.value)}
+                    onChange={(event) => setAddressField("houseNumber", onlyHouseNumberChars(event.target.value))}
                     placeholder="18/2"
                     className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light"
                   />
@@ -214,9 +299,11 @@ export default function CadastruPage() {
                   </span>
                   <input
                     type="text"
-                    inputMode="text"
+                    inputMode="numeric"
+                    pattern="\d{1,4}"
+                    maxLength={APARTMENT_NUMBER_MAX_LENGTH}
                     value={addressForm.apartmentNumber}
-                    onChange={(event) => setAddressField("apartmentNumber", event.target.value)}
+                    onChange={(event) => setAddressField("apartmentNumber", onlyDigits(event.target.value, APARTMENT_NUMBER_MAX_LENGTH))}
                     placeholder={t("cadastru.apartmentPlaceholder")}
                     className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light"
                   />
@@ -227,7 +314,7 @@ export default function CadastruPage() {
                 <button
                   type="button"
                   onClick={submitAddressSearch}
-                  disabled={lookupState.loading}
+                  disabled={lookupState.loading || authLoading}
                   className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto"
                 >
                   {lookupState.loading && lookupState.method === "address"
@@ -262,7 +349,7 @@ export default function CadastruPage() {
                   <button
                     type="button"
                     onClick={submitNumberSearch}
-                    disabled={lookupState.loading}
+                    disabled={lookupState.loading || authLoading}
                     className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-6 text-base font-semibold text-gray-800 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 sm:w-auto"
                   >
                     {lookupState.loading && lookupState.method === "number"

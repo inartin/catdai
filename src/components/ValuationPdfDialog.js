@@ -753,6 +753,12 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
   };
 
   const handleCadastralSearch = async () => {
+    if (!accessToken) {
+      setCadastralError("cadastralAuthRequired");
+      onAuthRequired?.();
+      return;
+    }
+
     const validation = validateCadastralNumber(cadastralInput);
     if (!validation.valid) {
       setCadastralError("cadastralInvalid");
@@ -774,7 +780,10 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
       const payload = await res.json();
 
       if (!res.ok) {
-        if (payload.error === "not_found") {
+        if (res.status === 401 || payload.error === "unauthorized") {
+          setCadastralError("cadastralAuthRequired");
+          onAuthRequired?.();
+        } else if (payload.error === "not_found") {
           setCadastralError("cadastralNotFound");
         } else if (payload.error === "invalid_format") {
           setCadastralError("cadastralInvalid");

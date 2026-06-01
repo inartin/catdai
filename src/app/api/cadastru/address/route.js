@@ -2,9 +2,16 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { findCadastralByAddress } from "@/lib/cadastru-address-search";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
+import { resolveAccessTier } from "@/lib/access-tier";
 import { DISTRICTS_BY_CITY, matchDistrict, normalizeDiacritics } from "@/lib/validation";
 
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
+const STREET_MAX_LENGTH = 80;
+const HOUSE_NUMBER_MAX_LENGTH = 10;
+const APARTMENT_NUMBER_MAX_LENGTH = 4;
+const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/\d{1,4})?$/;
+const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
+const MAX_APARTMENT_NUMBER = 9999;
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -21,6 +28,31 @@ function normalizeSpaces(value) {
 function normalizeRoadType(value) {
   if (value === "bulevard") return "bd";
   return "str";
+}
+
+function validateAddressFields({ street, houseNumber, apartmentNumber }) {
+  if (
+    street.length > STREET_MAX_LENGTH ||
+    houseNumber.length > HOUSE_NUMBER_MAX_LENGTH ||
+    apartmentNumber.length > APARTMENT_NUMBER_MAX_LENGTH
+  ) {
+    return { valid: false, field: "length" };
+  }
+
+  if (!HOUSE_NUMBER_PATTERN.test(houseNumber)) {
+    return { valid: false, field: "house_number" };
+  }
+
+  if (!APARTMENT_NUMBER_PATTERN.test(apartmentNumber)) {
+    return { valid: false, field: "apartment_number" };
+  }
+
+  const apartmentNumberValue = Number(apartmentNumber);
+  if (apartmentNumberValue < 1 || apartmentNumberValue > MAX_APARTMENT_NUMBER) {
+    return { valid: false, field: "apartment_number" };
+  }
+
+  return { valid: true };
 }
 
 function findDistrictInText(value) {
@@ -74,6 +106,11 @@ export async function POST(request) {
     );
   }
 
+  const access = await resolveAccessTier(request);
+  if (!access.user_id) {
+    return NextResponse.json({ error: "unauthorized", message: "Unauthorized" }, { status: 401 });
+  }
+
   let body;
   try {
     body = await request.json();
@@ -97,6 +134,18 @@ export async function POST(request) {
   if (!street || !houseNumber || !apartmentNumber) {
     return NextResponse.json(
       { error: "missing_fields", message: "Street, house number, and apartment number are required." },
+      { status: 400 }
+    );
+  }
+
+  const fieldValidation = validateAddressFields({ street, houseNumber, apartmentNumber });
+  if (!fieldValidation.valid) {
+    return NextResponse.json(
+      {
+        error: "invalid_address_fields",
+        field: fieldValidation.field,
+        message: "House number must use digits and an optional slash. Apartment number must be a realistic number.",
+      },
       { status: 400 }
     );
   }

@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
 import CloseIcon from "@/components/icons/CloseIcon";
-import AuthOptions from "@/components/AuthOptions";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
 import ListingAlertConfigurator from "@/components/ListingAlertConfigurator";
 import ValuationPdfDialog from "@/components/ValuationPdfDialog";
 import CadastralDataCard from "@/components/CadastralDataCard";
@@ -815,27 +814,6 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       .catch(() => { });
   }, [session?.access_token]);
 
-  useEffect(() => {
-    if (!isAuthModalOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isAuthModalOpen]);
-
-  useEffect(() => {
-    if (!isAuthModalOpen) return;
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") {
-        forgetPdfLoginReturn();
-        setIsAuthModalOpen(false);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [isAuthModalOpen]);
-
   const openAuthModal = useCallback((copyKey = "result.comingSoon") => {
     if (isAuthenticated) return;
     setAuthModalCopyKey(typeof copyKey === "string" ? copyKey : "result.comingSoon");
@@ -1036,45 +1014,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const primaryActionButtonClassName = `${actionButtonClassName} w-full cursor-pointer font-semibold bg-primary text-white shadow-lg shadow-primary/20 hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 transition-all flex items-center justify-center gap-2`;
   const secondaryActionButtonClassName = getSecondaryActionButtonClassName(compactLayout);
   const actionIconClassName = getActionIconClassName(compactLayout);
-
-  const authModal =
-    isAuthModalOpen && typeof document !== "undefined"
-      ? createPortal(
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 cursor-zoom-out"
-          onClick={() => {
-            forgetPdfLoginReturn();
-            setIsAuthModalOpen(false);
-          }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl bg-white p-6 sm:p-7 cursor-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => {
-                forgetPdfLoginReturn();
-                setIsAuthModalOpen(false);
-              }}
-              aria-label="Close"
-              className="absolute top-3 right-3 inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-            >
-              <CloseIcon size={18} />
-            </button>
-
-            <p className="text-center text-base font-medium text-gray-800 mb-4 px-8">
-              {t(authModalCopyKey)}
-            </p>
-
-            <AuthOptions />
-          </div>
-        </div>,
-        document.body
-      )
-      : null;
+  const closeAuthModal = useCallback(() => {
+    forgetPdfLoginReturn();
+    setIsAuthModalOpen(false);
+  }, []);
 
   if (isRentEstimate) {
     return (
@@ -1099,7 +1042,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
   return (
     <div className={resultLayoutClassName}>
-      {authModal}
+      <AuthRequiredModal
+        open={isAuthModalOpen}
+        copyKey={authModalCopyKey}
+        onClose={closeAuthModal}
+      />
       <ValuationPdfDialog
         open={isPdfDialogOpen}
         data={data}

@@ -23,7 +23,7 @@ Implemented.
 - `/privacy`.
 
 ## App Shell
-- Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, login/profile link, language switcher, and alerts shortcut for logged-in users.
+- Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, Cadastru link, login/profile link, language switcher, and alerts shortcut for logged-in users.
 - Shared footer.
 - Cookie banner is global.
 - PWA manifest and app icons are present.

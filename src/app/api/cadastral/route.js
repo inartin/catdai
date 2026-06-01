@@ -1,4 +1,5 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
@@ -213,6 +214,43 @@ function buildFormFields(building, apartment) {
   return fields;
 }
 
+function hasApartmentDetails(apartment) {
+  return Boolean(
+    apartment?.address ||
+      apartment?.area_m2 ||
+      apartment?.type ||
+      apartment?.destination ||
+      apartment?.estimated_value_lei ||
+      apartment?.last_estimated_at ||
+      apartment?.ownership_type ||
+      apartment?.real_rights ||
+      apartment?.notes ||
+      apartment?.restrictions
+  );
+}
+
+async function buildCadastruDetailPayload(cadastralNumber) {
+  try {
+    const detail = await fetchCadastruDetailData(cadastralNumber);
+    if (!detail || !hasApartmentDetails(detail.apartment)) return null;
+
+    return {
+      ...detail,
+      cadastral_number: cadastralNumber,
+      form_fields: buildFormFields(detail.building || {}, detail.apartment || {}),
+      partial: true,
+      access_tier: "free",
+      locked_sections: {},
+    };
+  } catch (error) {
+    console.error("[cadastral] cadastru.md detail fallback failed:", {
+      message: error?.message || String(error),
+      cadastral_number: cadastralNumber,
+    });
+    return null;
+  }
+}
+
 export async function POST(request) {
   const ip = getClientIp(request);
   const { allowed, remaining, retryAfter } = limiter.check(ip);
@@ -260,6 +298,13 @@ export async function POST(request) {
     const step1 = await fetchJsonWithTimeout(step1Url, { label: "geodata_wfs" });
 
     if (!step1.features || step1.features.length === 0) {
+      const detailPayload = await buildCadastruDetailPayload(trimmed);
+      if (detailPayload) {
+        const res = NextResponse.json(detailPayload);
+        res.headers.set("X-RateLimit-Remaining", String(remaining));
+        return res;
+      }
+
       return NextResponse.json(
         { error: "not_found", message: "Cadastral number not found" },
         { status: 404 }
@@ -277,6 +322,12 @@ export async function POST(request) {
     const step3 = await fetchJsonWithTimeout(step3Url, { label: "geodata_wms" });
 
     if (!step3.features || step3.features.length === 0) {
+      const detailPayload = await buildCadastruDetailPayload(trimmed);
+      if (detailPayload) {
+        const res = NextResponse.json(detailPayload);
+        res.headers.set("X-RateLimit-Remaining", String(remaining));
+        return res;
+      }
 
       const nominatim = await fallbackNominatim(lat, lon);
       if (!nominatim?.address) {
@@ -319,6 +370,17 @@ export async function POST(request) {
 
     const html = step3.features[0].properties?.html || "";
     const { building, apartment } = parseHtmlResponse(html, buildingId, apartmentId);
+    const detailPayload = hasApartmentDetails(apartment) ? null : await buildCadastruDetailPayload(trimmed);
+    if (detailPayload) {
+      const res = NextResponse.json({
+        ...detailPayload,
+        building: Object.keys(building).length ? building : detailPayload.building,
+        form_fields: buildFormFields(Object.keys(building).length ? building : detailPayload.building, detailPayload.apartment),
+      });
+      res.headers.set("X-RateLimit-Remaining", String(remaining));
+      return res;
+    }
+
     const form_fields = buildFormFields(building, apartment);
 
     const payload = {

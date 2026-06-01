@@ -22,7 +22,8 @@ export default function Navbar() {
   const { lang, setLang, t } = useTranslation();
   const { isAuthenticated, loading } = useAuth();
   const mobileMenuRef = useRef(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileMenuPath, setMobileMenuPath] = useState(null);
+  const mobileMenuOpen = mobileMenuPath === pathname;
   const showAlertShortcut = !loading && isAuthenticated;
 
   const handleLogoClick = (e) => {
@@ -35,7 +36,7 @@ export default function Navbar() {
 
   const handleLangChange = (nextLang) => {
     setLang(nextLang);
-    setMobileMenuOpen(false);
+    setMobileMenuPath(null);
 
     if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {
       const target = `/${nextLang}/faq`;
@@ -44,19 +45,15 @@ export default function Navbar() {
   };
 
   useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
     if (!mobileMenuOpen) return;
 
     const onPointerDown = (event) => {
       if (mobileMenuRef.current?.contains(event.target)) return;
-      setMobileMenuOpen(false);
+      setMobileMenuPath(null);
     };
 
     const onKeyDown = (event) => {
-      if (event.key === "Escape") setMobileMenuOpen(false);
+      if (event.key === "Escape") setMobileMenuPath(null);
     };
 
     document.addEventListener("mousedown", onPointerDown);
@@ -90,8 +87,28 @@ export default function Navbar() {
           </Tooltip>
         </Link>
 
-        <div className="hidden items-center gap-4 md:flex">
-          <LoginButton />
+        <div className="hidden items-center gap-3 md:flex">
+          <Link
+            href="/estimeaza"
+            className={`inline-flex h-9 items-center rounded-lg px-2.5 text-sm font-medium leading-none transition-colors ${
+              pathname === "/estimeaza"
+                ? "bg-gray-50 text-gray-900"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            {t("nav.estimate")}
+          </Link>
+          <Link
+            href="/cadastru"
+            className={`inline-flex h-9 items-center rounded-lg px-2.5 text-sm font-medium leading-none transition-colors ${
+              pathname === "/cadastru"
+                ? "bg-gray-50 text-gray-900"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            {t("nav.cadastru")}
+          </Link>
+          <LoginButton className="inline-flex h-9 items-center rounded-lg px-2.5 leading-none text-gray-600 hover:bg-gray-50 hover:text-gray-900" />
           {showAlertShortcut && (
             <Link
               href="/alerts"
@@ -147,7 +164,7 @@ export default function Navbar() {
             type="button"
             aria-label={t("nav.menu")}
             aria-expanded={mobileMenuOpen}
-            onClick={() => setMobileMenuOpen((prev) => !prev)}
+            onClick={() => setMobileMenuPath((prev) => (prev === pathname ? null : pathname))}
             className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
           >
             <MenuIcon size={18} />
@@ -156,6 +173,28 @@ export default function Navbar() {
           {mobileMenuOpen && (
             <div className="absolute right-4 top-full z-50 mt-2 w-56 rounded-2xl border border-gray-200 bg-white p-3 shadow-lg">
               <div className="space-y-2">
+                <Link
+                  href="/estimeaza"
+                  onClick={() => setMobileMenuPath(null)}
+                  className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium ${
+                    pathname === "/estimeaza"
+                      ? "bg-gray-50 text-gray-900"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                  }`}
+                >
+                  {t("nav.estimate")}
+                </Link>
+                <Link
+                  href="/cadastru"
+                  onClick={() => setMobileMenuPath(null)}
+                  className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium ${
+                    pathname === "/cadastru"
+                      ? "bg-gray-50 text-gray-900"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                  }`}
+                >
+                  {t("nav.cadastru")}
+                </Link>
                 <LoginButton className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900" menuAlign="left" />
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-1">
                   <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">

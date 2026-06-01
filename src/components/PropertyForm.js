@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
+import BackButton from "@/components/BackButton";
 import LoginButton from "@/components/LoginButton";
 import { validateCadastralNumber } from "@/lib/validation";
 
@@ -452,25 +453,9 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   return (
     <section className="py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* ── Back ── */}
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-gray-400 hover:text-gray-700 transition-colors mb-6 group"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="w-5 h-5 transition-transform group-hover:-translate-x-0.5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-          <span className="text-sm font-medium">{t("form.back")}</span>
-        </button>
+        <BackButton onClick={onBack} className="mb-6">
+          {t("form.back")}
+        </BackButton>
 
         <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
           <div className="grid grid-cols-2 gap-1">

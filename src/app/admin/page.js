@@ -295,15 +295,6 @@ export default function AdminDashboard() {
             onClick={() => toggleEstimationsList("rent")}
             active={activeEstimationsType === "rent"}
           />
-          <StatCard label="Shared Links" value={fmtNum(s.totalSharedLinks)} />
-          <StatCard label="Favorites" value={fmtNum(s.totalFavorites)} />
-          <StatCard
-            label="PDF Reports"
-            value={fmtNum(s.pdfGeneration?.total)}
-            detail={showPdfGenerationList ? "Click to hide list" : `${fmtNum(s.pdfGeneration?.registered)} registered / ${fmtNum(s.pdfGeneration?.anonymous)} anonymous`}
-            onClick={() => setShowPdfGenerationList((value) => !value)}
-            active={showPdfGenerationList}
-          />
           <StatCard
             label="Cadastru Searches"
             value={fmtNum(s.cadastruSearches?.total)}
@@ -311,6 +302,15 @@ export default function AdminDashboard() {
             onClick={() => setShowCadastruSearchesList((value) => !value)}
             active={showCadastruSearchesList}
           />
+          <StatCard
+            label="PDF Reports"
+            value={fmtNum(s.pdfGeneration?.total)}
+            detail={showPdfGenerationList ? "Click to hide list" : `${fmtNum(s.pdfGeneration?.registered)} registered / ${fmtNum(s.pdfGeneration?.anonymous)} anonymous`}
+            onClick={() => setShowPdfGenerationList((value) => !value)}
+            active={showPdfGenerationList}
+          />
+          <StatCard label="Shared Links" value={fmtNum(s.totalSharedLinks)} />
+          <StatCard label="Favorites" value={fmtNum(s.totalFavorites)} />
           <StatCard
             label="Telegram Alerts"
             value={fmtNum(s.totalTelegramAlerts)}

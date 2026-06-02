@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "test": "bash scripts/dev-tunnel.sh",
     "build": "next build",
     "start": "next start",
     "pdf:demo": "node scripts/generate-demo-valuation-pdf.mjs",

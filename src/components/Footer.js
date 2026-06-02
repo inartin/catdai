@@ -57,7 +57,7 @@ export default function Footer() {
           <Link href="/about" className="hover:text-foreground transition-colors">
             {t("nav.about")}
           </Link>
-          <Link href="https://t.me/catdaimd" className="hover:text-foreground transition-colors">
+          <Link href="/noutati" className="hover:text-foreground transition-colors">
             {t("nav.news")}
           </Link>
           {/* <Link href="#" className="hover:text-foreground transition-colors">

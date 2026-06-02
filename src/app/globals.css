@@ -50,3 +50,72 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+.news-content > * + * {
+  margin-top: 1rem;
+}
+
+.news-content {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.news-content h1,
+.news-content h2,
+.news-content h3 {
+  color: #111827;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.news-content h1 {
+  font-size: 1.875rem;
+}
+
+.news-content h2 {
+  font-size: 1.5rem;
+}
+
+.news-content h3 {
+  font-size: 1.25rem;
+}
+
+.news-content ul,
+.news-content ol {
+  padding-left: 1.5rem;
+}
+
+.news-content ul {
+  list-style: disc;
+}
+
+.news-content ol {
+  list-style: decimal;
+}
+
+.news-content a {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.news-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  border: 1px solid #f3f4f6;
+  background: white;
+}
+
+@media (max-width: 640px) {
+  .news-content {
+    font-size: 1rem;
+    line-height: 1.75rem;
+  }
+}
+
+.ql-editor {
+  min-height: 14rem;
+  font-size: 0.95rem;
+}

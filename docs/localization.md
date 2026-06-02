@@ -20,6 +20,7 @@ Implemented for Romanian and Russian UI.
 - `/cadastru` has localized server metadata and visible search-page copy for `/ro/cadastru` and `/ru/cadastru`.
 - `/estimeaza`, `/evaluare`, `/alerts`, and `/profile` also read the `catdai-lang` cookie in route metadata so hard refreshes render the selected language title before hydration.
 - Localized FAQ routes exist at `/ro/faq` and `/ru/faq`.
+- `/noutati` and `/noutati/[slug]` localize static page chrome from the URL language or `catdai-lang` cookie through a route-level language provider; database-backed news content is not translated by the app.
 
 ## Current Default
 Romanian (`ro`).

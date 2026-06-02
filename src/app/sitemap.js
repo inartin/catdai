@@ -12,6 +12,7 @@ const INDEXABLE_STATIC_PATHS = [
   "/ro/cadastru",
   "/ru/cadastru",
   "/verifica-anunt",
+  "/noutati",
   "/about",
   "/terms",
   "/privacy",
@@ -26,7 +27,7 @@ const INDEXABLE_STATIC_PATHS = [
 export default async function sitemap() {
   const siteUrl = getCanonicalSiteUrl();
 
-  const staticEntries = INDEXABLE_STATIC_PATHS.map((path) => ({
+  const entries = INDEXABLE_STATIC_PATHS.map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: new Date(),
   }));
@@ -37,19 +38,39 @@ export default async function sitemap() {
       .select("slug, created_at")
       .not("slug", "is", null);
 
-    if (error || !data?.length) {
-      return staticEntries;
+    if (!error && data?.length) {
+      const dynamicEntries = data
+        .filter((entry) => entry.slug)
+        .map((entry) => ({
+          url: `${siteUrl}/imobil/${entry.slug}`,
+          lastModified: entry.created_at ? new Date(entry.created_at) : new Date(),
+        }));
+
+      entries.push(...dynamicEntries);
     }
-
-    const dynamicEntries = data
-      .filter((entry) => entry.slug)
-      .map((entry) => ({
-        url: `${siteUrl}/imobil/${entry.slug}`,
-        lastModified: entry.created_at ? new Date(entry.created_at) : new Date(),
-      }));
-
-    return [...staticEntries, ...dynamicEntries];
   } catch {
-    return staticEntries;
+    return entries;
   }
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from("news_posts")
+      .select("slug, created_at")
+      .not("slug", "is", null);
+
+    if (!error && data?.length) {
+      const newsEntries = data
+        .filter((entry) => entry.slug)
+        .map((entry) => ({
+          url: `${siteUrl}/noutati/${entry.slug}`,
+          lastModified: entry.created_at ? new Date(entry.created_at) : new Date(),
+        }));
+
+      entries.push(...newsEntries);
+    }
+  } catch {
+    return entries;
+  }
+
+  return entries;
 }

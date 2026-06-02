@@ -14,6 +14,7 @@ Implemented.
 - Admin, profile, and API routes are marked `noindex` in `next.config.mjs`.
 - `/ro/estimeaza`, `/ru/estimeaza`, `/ro/evaluare`, `/ru/evaluare`, `/ro/alerts`, `/ru/alerts`, `/ro/cadastru`, and `/ru/cadastru` are indexable localized entry points with alternate metadata.
 - `/verifica-anunt` is an indexable Romanian entry point for 999.md listing-link analysis, with canonical, description, Open Graph, and Twitter metadata; `/999` is only a redirect shortcut.
+- `/noutati` and `/noutati/[slug]` are indexable Romanian news entry points backed by `news_posts`; article pages server-render sanitized rich HTML, stable slugs, canonical metadata, Open Graph/Twitter metadata, `NewsArticle` JSON-LD, and sitemap entries.
 - Direct `/evaluare` keeps a `noindex` metadata directive to avoid duplicating the localized evaluation URLs.
 - Direct `/cadastru` keeps a `noindex` metadata directive to avoid duplicating `/ro/cadastru` and `/ru/cadastru`; `/cadastru/rezultat` is also `noindex` because it is a user-query result page.
 - Static market-analysis pages can use saved local valuation snapshots without API queries; the first Botanica pairs cover the same 2-room, 50 m², eurorepaired apartment profile in old-building and new-building variants, with reciprocal comparison links.
@@ -28,6 +29,7 @@ Implemented.
 - Google tag loads once and configures `NEXT_PUBLIC_GA_ID` plus Google Ads-provided tag `AW-18184166002`.
 - The shared Google tag script loads with the Ads ID first so Ads diagnostics see the expected source ID.
 - CSP allows Google Ads collection endpoints used by remarketing, consent mode, and view-through conversion checks.
+- CSP allows `https:` images so admin-authored news cover images and rich-description image links can render from external image hosts.
 - CSP also allows `https://static.cloudflareinsights.com` so Cloudflare Web Analytics can inject its beacon script without violating `script-src` or `script-src-elem`.
 - Default consent uses stored cookie consent when available, otherwise denies analytics/ad storage.
 - Cookie banner can grant or deny consent.

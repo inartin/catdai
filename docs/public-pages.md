@@ -18,6 +18,8 @@ Implemented.
 - `/faq`, `/ro/faq`, `/ru/faq`.
 - `/ro/cadastru` and `/ru/cadastru` for official cadastral lookup by address or cadastral number.
 - `/verifica-anunt` for 999.md listing-link analysis; `/999` permanently redirects there as a shortcut.
+- `/noutati` lists public real estate news and analysis cards from `news_posts`, and `/noutati/[slug]` renders each individual rich-text article at a stable database-backed URL.
+- `/noutati` keeps its intro subtitle wide on desktop so the short description does not wrap too early.
 - `/ro/preturi-apartamente/chisinau/botanica` and `/ru/ceny-kvartir/kishinev/botanika` are static SEO market-analysis pages for a saved Botanica old-building apartment valuation snapshot.
 - `/ro/preturi-apartamente/chisinau/botanica-constructii-noi` and `/ru/ceny-kvartir/kishinev/botanika-novostroy` are the matching new-building pages, linked from the old-building pages and back.
 - `/about`.
@@ -27,7 +29,7 @@ Implemented.
 ## App Shell
 - Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, localized Cadastru link, login/profile link, language switcher, and a logged-in notification button.
 - The notification button is UI-only for now, opens an empty right sidebar, and includes read-state and clear-notifications UI for future notification data.
-- Shared footer.
+- Shared footer. Its `Noutăți` link routes to `/noutati`; Telegram remains only as the social icon link.
 - Cookie banner is global.
 - PWA manifest and app icons are present.
 

@@ -46,7 +46,7 @@ const nextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://static.cloudflareinsights.com https://oauth.telegram.org",
               "script-src-elem 'self' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://static.cloudflareinsights.com https://oauth.telegram.org",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://www.google.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://*.doubleclick.net https://*.googleusercontent.com https://i.simpalsmedia.com https://t.me",
+              "img-src 'self' data: blob: https: https://www.google.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://*.doubleclick.net https://*.googleusercontent.com https://i.simpalsmedia.com https://t.me",
               "font-src 'self'",
               `connect-src 'self' https://*.supabase.co https://oauth.telegram.org https://www.google.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://*.google-analytics.com https://*.analytics.google.com https://*.doubleclick.net`,
               "frame-ancestors 'none'",

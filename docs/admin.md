@@ -28,6 +28,9 @@ Shows:
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
 - `/admin/feedback` is linked from the left menu as `Feedback` and shows the latest registered-user feedback rows with message, user id, date, status, and optional uploaded image preview that opens in an in-page modal.
+- `/admin/news` is linked from the left menu as `News` and lets admins list, create, edit, and remove news items with slug, title, rich description, creation date, and cover image link.
+- `/admin/uploads` is linked from the left menu as `Uploads` and lets admins upload JPEG, PNG, WebP, or GIF images up to 5 MB to Supabase Storage.
+- Admin uploads use the `img` Supabase Storage bucket by default, or `SUPABASE_IMAGE_BUCKET` when set. Files are saved at the bucket root with a unique sanitized filename. The bucket must be public to use the returned `getPublicUrl` URL without an expiration date; signed URLs are not used.
 
 ## Data Views
 - Listings list with search, active filter, rooms filter, sorting, pagination.
@@ -38,6 +41,8 @@ Shows:
 - Dashboard registered users and recent sale/rent estimations are inline expandable tables.
 - `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows `/?src=zdg` tracking grouped by visitor session, with closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, exact all-time source session/device/funnel totals in the top cards, and paged visitor journeys that load more while scrolling.
 - `/api/admin/feedback` returns the 100 latest `user_feedback` rows after route-level admin cookie verification.
+- `/api/admin/news` and `/api/admin/news/[id]` manage `news_posts` rows after route-level admin cookie verification.
+- `/api/admin/uploads` stores images in the configured Supabase Storage bucket and returns `public_url` plus the storage path after route-level admin cookie verification.
 
 ## Related Files
 - `src/proxy.js`

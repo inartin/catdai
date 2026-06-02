@@ -4,10 +4,11 @@
 Paste a 999.md listing link, auto-extract its parameters, run the standard valuation, and show how the listing's asking price compares to the calculated market median.
 
 ## Flow
-1. `LinkAnalyzer` (under "Prețuri actuale") posts the URL to `POST /api/analyze-link`.
-2. The route extracts the listing id, fetches the page, parses seller-selected attributes, validates Chișinău, and maps them to estimate params.
-3. The client redirects to `/evaluare?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
-4. `EstimateResult` runs the usual estimate and renders the listing-vs-market comparison.
+1. `LinkAnalyzer` is available on the landing page and on `/verifica-anunt`; `/estimeaza` links users to `/verifica-anunt?from=estimeaza`, where a back button returns to `/estimeaza`, and `/999` permanently redirects to `/verifica-anunt`.
+2. It posts the URL to `POST /api/analyze-link`.
+3. The route extracts the listing id, fetches the page, parses seller-selected attributes, validates Chișinău, and maps them to estimate params.
+4. The client redirects to `/evaluare?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
+5. `EstimateResult` runs the usual estimate and renders the listing-vs-market comparison.
 
 ## Parsing (`src/lib/parse-999-listing.js`)
 - Reads the seller-selected attributes only; the free-text description is ignored.
@@ -55,6 +56,9 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 
 ## Related Files
 - `src/components/LinkAnalyzer.js`
+- `src/components/ListingAnalyzerPageContent.js`
+- `src/app/verifica-anunt/page.js`
+- `src/app/999/page.js`
 - `src/app/api/analyze-link/route.js`
 - `src/lib/parse-999-listing.js`
 - `src/lib/listing-link-analysis-events.js`

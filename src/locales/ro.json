@@ -123,6 +123,8 @@
   "form.submit": "Vezi Analiza Pieței",
   "form.cityOnlyNotice": "Momentan disponibil doar pentru Chișinău și Durlești",
   "form.socialProof": "Analiză bazată pe anunțuri reale din {city}",
+  "form.linkAnalyzerPrompt": "Ai deja un anunț de pe 999.md?",
+  "form.linkAnalyzerCta": "Verifică prețul anunțului →",
   "form.cadastralSection": "Completare rapidă",
   "form.cadastralNumber": "Nr. cadastral (Optional)",
   "form.cadastralPlaceholder": "ex. 0100201.999.01.0101",

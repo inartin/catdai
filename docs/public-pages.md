@@ -17,6 +17,7 @@ Implemented.
 - The landing page how-it-works steps render as a compact two-column grid on mobile and a horizontal arrow flow on larger screens.
 - `/faq`, `/ro/faq`, `/ru/faq`.
 - `/ro/cadastru` and `/ru/cadastru` for official cadastral lookup by address or cadastral number.
+- `/verifica-anunt` for 999.md listing-link analysis; `/999` permanently redirects there as a shortcut.
 - `/ro/preturi-apartamente/chisinau/botanica` and `/ru/ceny-kvartir/kishinev/botanika` are static SEO market-analysis pages for a saved Botanica old-building apartment valuation snapshot.
 - `/ro/preturi-apartamente/chisinau/botanica-constructii-noi` and `/ru/ceny-kvartir/kishinev/botanika-novostroy` are the matching new-building pages, linked from the old-building pages and back.
 - `/about`.

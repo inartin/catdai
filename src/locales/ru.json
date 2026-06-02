@@ -123,6 +123,8 @@
   "form.submit": "Смотреть анализ рынка",
   "form.cityOnlyNotice": "Временно доступно только для Кишинёва и Дурлешт",
   "form.socialProof": "Анализ на основе реальных объявлений из {city}",
+  "form.linkAnalyzerPrompt": "Уже есть объявление с 999.md?",
+  "form.linkAnalyzerCta": "Проверьте цену объявления →",
   "form.cadastralSection": "Быстрое заполнение",
   "form.cadastralNumber": "Кадастровый номер (Опционально)",
   "form.cadastralPlaceholder": "напр. 0100201.999.01.0101",

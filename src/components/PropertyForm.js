@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
@@ -933,6 +934,16 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
           </svg>
           {t("form.submit")}
         </button>
+
+        <p className="mt-4 text-center text-sm text-gray-500">
+          {t("form.linkAnalyzerPrompt")}{" "}
+          <Link
+            href="/verifica-anunt?from=estimeaza"
+            className="font-semibold text-primary transition-colors hover:text-primary-dark"
+          >
+            {t("form.linkAnalyzerCta")}
+          </Link>
+        </p>
 
         {/* ── Social proof ── */}
         <p className="text-center text-xs text-gray-400 mt-3">

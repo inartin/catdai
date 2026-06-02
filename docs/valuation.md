@@ -5,6 +5,7 @@ Implemented and active for apartments.
 
 ## User Flow
 - `/estimeaza` shows two tabs for `Vânzare / cumpărare` and `Chirie lunară`; rent submissions use `/evaluare?type=rent`.
+- `/estimeaza` includes a bottom text link to `/verifica-anunt?from=estimeaza` for users who already have a 999.md listing URL.
 - `/estimeaza?type=rent` opens the rent tab even before any city or criteria are present.
 - The sale/buy tab uses `Estimare apartament` / `Оценка квартиры`; the rent tab uses `Estimare de piață` / `Рыночная оценка`, lets users select multiple sectors/zones and optionally multiple construction types, and hides the cadastral shortcut, total floors, first/last-floor filters, balconies, and budget fields.
 - `/estimeaza` collects city, district, rooms, building type, renovation, optional area, optional floor, optional first-floor/last-floor filters, bathrooms, balconies, cadastral number.

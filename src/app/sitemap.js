@@ -11,6 +11,7 @@ const INDEXABLE_STATIC_PATHS = [
   "/ru/alerts",
   "/ro/cadastru",
   "/ru/cadastru",
+  "/verifica-anunt",
   "/about",
   "/terms",
   "/privacy",

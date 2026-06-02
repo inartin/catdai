@@ -32,7 +32,7 @@ function buildEvaluationUrl(payload) {
   return `/evaluare?${search.toString()}`;
 }
 
-export default function LinkAnalyzer() {
+export default function LinkAnalyzer({ titleTag: TitleTag = "p" }) {
   const { t } = useTranslation();
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -83,7 +83,7 @@ export default function LinkAnalyzer() {
           </svg>
         </span>
         <div className="text-left">
-          <p className="text-sm font-bold text-gray-900">{t("linkAnalyzer.title")}</p>
+          <TitleTag className="text-sm font-bold text-gray-900">{t("linkAnalyzer.title")}</TitleTag>
           <p className="text-xs text-gray-500">{t("linkAnalyzer.subtitle")}</p>
         </div>
       </div>

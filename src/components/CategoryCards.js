@@ -5,6 +5,7 @@ import { useTranslation } from "@/context/LanguageContext";
 import { useLivePrices } from "@/lib/useLivePrices";
 import { useMarketTrends } from "@/lib/useMarketTrends";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
+import LinkAnalyzer from "@/components/LinkAnalyzer";
 
 const TREND_ARROWS = { up: "↑", down: "↓", stable: "→" };
 const TREND_COLORS = { up: "text-emerald-400/40", down: "text-red-400/40", stable: "text-gray-300/40" };
@@ -544,6 +545,8 @@ export default function CategoryCards({ onCategorySelect }) {
                   </div>
                 </div>
               )}
+
+              {cat.id === "imobil" && <LinkAnalyzer />}
             </div>
           );
         })}

@@ -22,6 +22,16 @@ function isTrueParam(value) {
   return value === "1" || value === "true";
 }
 
+function buildListingComparison(params) {
+  const price = Number(params.get("listing_price"));
+  if (!Number.isFinite(price) || price <= 0) return null;
+  return {
+    asking_price: price,
+    currency: params.get("listing_currency") || "EUR",
+    external_id: params.get("listing_id") || null,
+  };
+}
+
 function ensurePrimaryEstimateType(params) {
   if (!params.has("type") && params.get("mode") === "rent") {
     params.set("type", "rent");
@@ -253,7 +263,8 @@ function EvaluareContent() {
             setError(res1.error);
             loadedPrimaryParamsRef.current = null;
           } else {
-            setResult(res1.data);
+            const listingComparison = buildListingComparison(pRaw);
+            setResult(listingComparison ? { ...res1.data, listing_comparison: listingComparison } : res1.data);
             loadedPrimaryParamsRef.current = primaryStr;
           }
         }
@@ -339,8 +350,49 @@ function EvaluareContent() {
       }
     };
 
-    if (result) hydrateListingImages(result, setResult, "primary");
-    if (result2) hydrateListingImages(result2, setResult2, "compare");
+    const hydrateComparisonImage = async (data, updateResult, slot) => {
+      const comparison = data?.listing_comparison;
+      const externalId = comparison?.external_id ? String(comparison.external_id) : null;
+      if (!externalId || comparison.image_url) return;
+      const requestKey = `${slot}:comparison:${lang}:${externalId}`;
+      if (previewImageRequestsRef.current.has(requestKey)) return;
+      previewImageRequestsRef.current.add(requestKey);
+
+      try {
+        const res = await fetch("/api/listing-preview-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            external_ids: [externalId],
+            language: lang,
+          }),
+        });
+        if (!res.ok) return;
+
+        const payload = await res.json();
+        const imageUrl = payload?.images?.[externalId];
+        if (!imageUrl) return;
+
+        updateResult((current) => {
+          if (!current?.listing_comparison) return current;
+          return {
+            ...current,
+            listing_comparison: { ...current.listing_comparison, image_url: imageUrl },
+          };
+        });
+      } catch {
+        // Listing preview images are optional; the comparison stays usable without them.
+      }
+    };
+
+    if (result) {
+      hydrateListingImages(result, setResult, "primary");
+      hydrateComparisonImage(result, setResult, "primary");
+    }
+    if (result2) {
+      hydrateListingImages(result2, setResult2, "compare");
+      hydrateComparisonImage(result2, setResult2, "compare");
+    }
   }, [result, result2, lang]);
 
   const handleEdit = () => {

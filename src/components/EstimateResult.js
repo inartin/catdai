@@ -11,6 +11,7 @@ import ValuationPdfDialog from "@/components/ValuationPdfDialog";
 import CadastralDataCard from "@/components/CadastralDataCard";
 
 const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
+const LISTING_FAIR_BAND_PCT = 3;
 
 function rememberPdfLoginReturn() {
   if (typeof window === "undefined") return;
@@ -46,6 +47,14 @@ function formatPrice(num) {
   const value = Number(num);
   if (!Number.isFinite(value)) return "—";
   return "€" + Math.round(value).toLocaleString("ro-MD");
+}
+
+function formatCurrencyPrice(num, currency = "EUR") {
+  const value = Number(num);
+  if (!Number.isFinite(value)) return "—";
+  const normalizedCurrency = String(currency || "EUR").toUpperCase();
+  if (normalizedCurrency === "EUR") return formatPrice(value);
+  return `${Math.round(value).toLocaleString("ro-MD")} ${normalizedCurrency}`;
 }
 
 function formatTrendPercent(num) {
@@ -991,6 +1000,74 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const agencyComparableCount = Number(data.estimates_by_seller?.agency?.market_stats?.comparable_count);
   const sellerDelta = (indRate && agRate) ? (agRate - indRate) : null;
   const sellerDeltaPct = (indRate && agRate) ? ((sellerDelta / indRate) * 100) : null;
+  const listingComparison = data.listing_comparison || null;
+  const listingAsking = listingComparison ? Number(listingComparison.asking_price) : null;
+  const listingCurrency = String(listingComparison?.currency || "EUR").toUpperCase();
+  const listingUrl = listingComparison?.external_id
+    ? build999ListingUrl(listingComparison.external_id, lang)
+    : null;
+  const listingImageUrl = listingComparison?.image_url || null;
+  const marketRate = Number(estimate?.market_rate);
+  const listingComparable = !!listingComparison
+    && Number.isFinite(listingAsking) && listingAsking > 0
+    && listingCurrency === "EUR"
+    && Number.isFinite(marketRate) && marketRate > 0;
+  const listingDelta = listingComparable ? listingAsking - marketRate : null;
+  const listingDeltaPct = listingComparable ? (listingDelta / marketRate) * 100 : null;
+  const listingAskingLabel = listingComparison
+    ? formatCurrencyPrice(listingAsking, listingCurrency)
+    : null;
+  const listingDeltaAmountLabel = listingComparable
+    ? `${listingDelta > 0 ? "+" : listingDelta < 0 ? "-" : ""}${formatPrice(Math.abs(listingDelta))}`
+    : null;
+  const listingVerdict = listingComparable
+    ? (listingDeltaPct < -LISTING_FAIR_BAND_PCT ? "under" : listingDeltaPct > LISTING_FAIR_BAND_PCT ? "over" : "fair")
+    : null;
+  const listingVerdictColor = listingVerdict === "under"
+    ? "text-emerald-600"
+    : listingVerdict === "over"
+      ? "text-amber-600"
+      : "text-primary";
+  const listingVerdictLabel = listingVerdict === "under"
+    ? t("result.listingUnderMarket")
+    : listingVerdict === "over"
+      ? t("result.listingOverMarket")
+      : t("result.listingAtMarket");
+  const listingArea = Number(input?.area_m2);
+  const listingPricePerM2 = listingComparable && Number.isFinite(listingArea) && listingArea > 0
+    ? listingAsking / listingArea
+    : null;
+  const marketPricePerM2 = Number(estimate?.price_per_m2);
+  const canShowListingPerM2 = Number.isFinite(listingPricePerM2) && listingPricePerM2 > 0;
+  const canShowMarketPerM2 = Number.isFinite(marketPricePerM2) && marketPricePerM2 > 0;
+  const listingVerdictBg = listingVerdict === "under"
+    ? "bg-emerald-50/80"
+    : listingVerdict === "over"
+      ? "bg-amber-50/80"
+      : "bg-sky-50/80";
+  const listingPanelBg = listingVerdict === "under"
+    ? "bg-emerald-50/60"
+    : listingVerdict === "over"
+      ? "bg-amber-50/60"
+      : "bg-gray-50";
+  const listingAccentBg = listingVerdict === "under"
+    ? "bg-emerald-600"
+    : listingVerdict === "over"
+      ? "bg-amber-500"
+      : "bg-primary";
+  const listingToneBorder = listingVerdict === "under"
+    ? "border-emerald-100"
+    : listingVerdict === "over"
+      ? "border-amber-100"
+      : "border-sky-100";
+  const listingVerdictSentence = listingComparable
+    ? (listingVerdict === "fair"
+      ? t("result.listingDeltaFair", { percent: Math.abs(listingDeltaPct).toFixed(1) })
+      : t(listingVerdict === "under" ? "result.listingDeltaBelow" : "result.listingDeltaAbove", {
+        amount: formatPrice(Math.abs(listingDelta)),
+        percent: Math.abs(listingDeltaPct).toFixed(1),
+      }))
+    : null;
   const listingsCount = Number.isFinite(Number(market_stats?.comparable_count))
     ? Number(market_stats.comparable_count)
     : 0;
@@ -1018,6 +1095,35 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     forgetPdfLoginReturn();
     setIsAuthModalOpen(false);
   }, []);
+  const headerControls = (
+    <div className="flex items-center gap-2">
+      <ResultDateBadge lang={lang} />
+      <button
+        type="button"
+        onClick={handleToggleFavorite}
+        className={`relative inline-flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer hover:bg-gray-100 transition-all duration-200 ${favoriteAnimating ? "scale-125" : "scale-100"
+          } ${favorited ? "text-primary" : "text-gray-400 hover:text-gray-600"}`}
+        title={favorited ? t("result.removeFavorite") : t("result.addFavorite")}
+      >
+        <BookmarkIcon size={22} filled={favorited} />
+        {showLoginTooltip && (
+          <span className="absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium whitespace-nowrap shadow-lg animate-fade-in">
+            {t("result.loginToFavorite")}
+            <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900" />
+          </span>
+        )}
+      </button>
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer hover:bg-red-50 transition-all duration-200 text-gray-400 hover:text-red-500"
+        >
+          <CloseIcon size={20} />
+        </button>
+      )}
+    </div>
+  );
 
   if (isRentEstimate) {
     return (
@@ -1057,89 +1163,93 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
       {/* Property summary header */}
       <div className={`${compactLayout ? "" : "order-1"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-            <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
-              <path d="M9 21V12h6v9" />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-sm text-gray-400 uppercase tracking-wide font-medium">{t("result.profileAnalyzed")}</p>
-              <div className="flex items-center gap-2">
-                <ResultDateBadge lang={lang} />
-                <button
-                  type="button"
-                  onClick={handleToggleFavorite}
-                  className={`relative inline-flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer hover:bg-gray-100 transition-all duration-200 ${favoriteAnimating ? "scale-125" : "scale-100"
-                    } ${favorited ? "text-primary" : "text-gray-400 hover:text-gray-600"}`}
-                  title={favorited ? t("result.removeFavorite") : t("result.addFavorite")}
-                >
-                  <BookmarkIcon size={22} filled={favorited} />
-                  {showLoginTooltip && (
-                    <span className="absolute z-50 left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-medium whitespace-nowrap shadow-lg animate-fade-in">
-                      {t("result.loginToFavorite")}
-                      <span className="absolute left-1/2 -translate-x-1/2 top-full w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] border-t-gray-900" />
-                    </span>
-                  )}
-                </button>
-                {onClose && (
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="relative inline-flex items-center justify-center w-8 h-8 rounded-lg cursor-pointer hover:bg-red-50 transition-all duration-200 text-gray-400 hover:text-red-500"
-                  >
-                    <CloseIcon size={20} />
-                  </button>
-                )}
-              </div>
+        <div className="flex flex-col gap-4">
+          {listingComparison && (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-xs sm:text-sm text-gray-400 uppercase font-medium">{t("result.listingAnalysisTitle")}</p>
+              {headerControls}
             </div>
-            <div className={`mt-4 -ml-16 w-[calc(100%+4rem)] ${compactLayout ? "lg:ml-0 lg:w-auto" : "lg:mt-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-0"}`}>
-              <div className={`min-w-0 ${compactLayout ? "" : "lg:pl-16 lg:pr-6"}`}>
-                <h2 className="text-xl font-bold text-gray-900 leading-snug">
-                  {titleParts.join(" · ")}
-                </h2>
-                <p className="text-base text-gray-500 mt-1">
-                  {input.district && `${t(`data.district.${input.district}`)}, `}{t(`data.city.${input.city}`)}
-                </p>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {input.building_type && (
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                      {t(`data.buildingType.${input.building_type}`)}
-                    </span>
-                  )}
-                  {input.renovation && (
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                      {t(`data.renovationType.${input.renovation}`)}
-                    </span>
-                  )}
-                  {floorLabel && (
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                      {floorLabel}
-                    </span>
-                  )}
-                  {input.bathrooms_count != null && (
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                      {input.bathrooms_count === 0
-                        ? t("result.noBathroom")
-                        : input.bathrooms_count === 1
-                          ? t("result.oneBathroom")
-                          : t("result.bathrooms", { count: input.bathrooms_count })}
-                    </span>
-                  )}
-                  {input.balconies_count != null && (
-                    <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
-                      {input.balconies_count === 0
-                        ? t("result.noBalcony")
-                        : input.balconies_count === 1
-                          ? t("result.oneBalcony")
-                          : t("result.balconies", { count: input.balconies_count })}
-                    </span>
+          )}
+          <div className="flex items-start gap-4 sm:gap-5">
+            {listingComparison ? (
+              <div className="w-28 shrink-0 sm:w-32">
+                <div
+                  className={`flex aspect-[4/3] w-full items-center justify-center rounded-xl bg-gray-100 ${listingImageUrl
+                    ? "bg-cover bg-center"
+                    : "text-gray-300"
+                    }`}
+                  style={listingImageUrl ? { backgroundImage: `url(${JSON.stringify(listingImageUrl)})` } : undefined}
+                >
+                  {!listingImageUrl && (
+                    <svg viewBox="0 0 24 24" className="h-9 w-9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-9.5Z" />
+                      <path d="M9 21v-7h6v7" />
+                      <path d="M7 11h2M15 11h2" />
+                    </svg>
                   )}
                 </div>
               </div>
-              <MarketTrendMiniChart trend={data.market_trend} compact={compactLayout} />
+            ) : (
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z" />
+                  <path d="M9 21V12h6v9" />
+                </svg>
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              {!listingComparison && (
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm text-gray-400 uppercase font-medium">{t("result.profileAnalyzed")}</p>
+                  {headerControls}
+                </div>
+              )}
+              <div className={`${listingComparison ? "mt-0" : "mt-4 -ml-16 w-[calc(100%+4rem)]"} ${compactLayout ? "lg:ml-0 lg:w-auto" : "lg:mt-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-0"}`}>
+                <div className={`min-w-0 ${compactLayout ? "" : listingComparison ? "lg:pr-6" : "lg:pl-16 lg:pr-6"}`}>
+                  <h2 className="text-xl font-bold text-gray-900 leading-snug">
+                    {titleParts.join(" · ")}
+                  </h2>
+                  <p className="text-base text-gray-500 mt-1">
+                    {input.district && `${t(`data.district.${input.district}`)}, `}{t(`data.city.${input.city}`)}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {input.building_type && (
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                        {t(`data.buildingType.${input.building_type}`)}
+                      </span>
+                    )}
+                    {input.renovation && (
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                        {t(`data.renovationType.${input.renovation}`)}
+                      </span>
+                    )}
+                    {floorLabel && (
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                        {floorLabel}
+                      </span>
+                    )}
+                    {input.bathrooms_count != null && (
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                        {input.bathrooms_count === 0
+                          ? t("result.noBathroom")
+                          : input.bathrooms_count === 1
+                            ? t("result.oneBathroom")
+                            : t("result.bathrooms", { count: input.bathrooms_count })}
+                      </span>
+                    )}
+                    {input.balconies_count != null && (
+                      <span className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-600">
+                        {input.balconies_count === 0
+                          ? t("result.noBalcony")
+                          : input.balconies_count === 1
+                            ? t("result.oneBalcony")
+                            : t("result.balconies", { count: input.balconies_count })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <MarketTrendMiniChart trend={data.market_trend} compact={compactLayout} />
+              </div>
             </div>
           </div>
         </div>
@@ -1147,42 +1257,146 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
       {/* Main estimate */}
       <div className={`${compactLayout ? "" : "order-2"} rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden`}>
-        <div className="p-6 sm:p-8 text-center border-b border-gray-100">
-          <p className="text-base text-gray-400 mb-2">{t("result.estimatedPrice")}</p>
-          <p className="text-6xl font-bold tracking-tight text-gray-900">
-            {formatPrice(estimate.market_rate)}
-          </p>
-          <p className="text-base text-gray-500 mt-2">
-            {formatPrice(estimate.price_per_m2)}/m²
-          </p>
-        </div>
+        {listingComparison ? (
+          <>
+            <div className="p-5 sm:p-6 lg:p-8">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-stretch">
+                <div className="rounded-xl border border-gray-100 bg-gray-50 p-5 text-center sm:p-6">
+                  <p className="text-sm font-medium text-gray-400">{t("result.estimatedPrice")}</p>
+                  <p className="mt-2 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
+                    {formatPrice(estimate.market_rate)}
+                  </p>
+                  <p className="mt-2 text-sm font-medium text-gray-500">
+                    {formatPrice(estimate.price_per_m2)}/m²
+                  </p>
+                </div>
 
-        <div className="grid grid-cols-2 divide-x divide-gray-100 sm:grid-cols-3">
-          <div className="p-5 sm:p-6 text-center">
-            <p className="text-sm text-gray-400 mb-1">{t("result.fastSale")}</p>
-            <p className="text-xl font-bold text-emerald-600">
-              {formatPrice(estimate.fast_sale)}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              -10%
-            </p>
-          </div>
-          <div className="hidden p-5 text-center bg-primary/5 sm:block sm:p-6">
-            <p className="text-sm text-gray-400 mb-1">{t("result.marketPrice")}</p>
-            <p className="text-xl font-bold text-primary">
-              {formatPrice(estimate.market_rate)}
-            </p>
-          </div>
-          <div className="p-5 sm:p-6 text-center">
-            <p className="text-sm text-gray-400 mb-1">{t("result.targetPrice")}</p>
-            <p className="text-xl font-bold text-amber-600">
-              {formatPrice(estimate.premium)}
-            </p>
-            <p className="text-xs text-gray-400 mt-0.5">
-              +8%
-            </p>
-          </div>
-        </div>
+                <div className={`relative overflow-hidden rounded-xl border p-5 text-center sm:p-6 ${listingPanelBg} ${listingToneBorder}`}>
+                  {listingComparable && (
+                    <span className={`absolute inset-x-0 top-0 h-1 ${listingAccentBg}`} aria-hidden="true" />
+                  )}
+                  <div className="flex items-center justify-center gap-2">
+                    <p className="text-sm font-medium text-gray-500">{t("result.listingAskingPrice")}</p>
+                    {listingComparable && (
+                      <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full bg-white ${listingVerdictColor}`} aria-label={listingVerdictLabel} title={listingVerdictLabel}>
+                        <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          {listingVerdict === "under" ? (
+                            <>
+                              <path d="M12 5v14" />
+                              <path d="m19 12-7 7-7-7" />
+                            </>
+                          ) : listingVerdict === "over" ? (
+                            <>
+                              <path d="M12 19V5" />
+                              <path d="m5 12 7-7 7 7" />
+                            </>
+                          ) : (
+                            <path d="M5 12h14" />
+                          )}
+                        </svg>
+                      </span>
+                    )}
+                  </div>
+                  <p className={`mt-2 text-4xl font-bold tracking-tight sm:text-5xl ${listingComparable ? listingVerdictColor : "text-gray-900"}`}>
+                    {listingAskingLabel}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm font-medium">
+                    {listingComparable ? (
+                      <>
+                        <span className={listingVerdictColor}>{formatTrendPercent(listingDeltaPct)}</span>
+                        <span className="text-gray-300">·</span>
+                        <span className={listingVerdictColor}>{listingDeltaAmountLabel}</span>
+                      </>
+                    ) : (
+                      <span className="text-gray-500">{t("result.listingComparisonUnavailable")}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-gray-100 bg-white p-4 text-center shadow-sm">
+                    <p className="text-xs font-medium text-gray-400">{t("result.fastSale")}</p>
+                    <p className="mt-1 text-lg font-bold text-emerald-600">{formatPrice(estimate.fast_sale)}</p>
+                    <p className="mt-0.5 text-xs text-gray-400">-10%</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-100 bg-white p-4 text-center shadow-sm">
+                    <p className="text-xs font-medium text-gray-400">{t("result.targetPrice")}</p>
+                    <p className="mt-1 text-lg font-bold text-amber-600">{formatPrice(estimate.premium)}</p>
+                    <p className="mt-0.5 text-xs text-gray-400">+8%</p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-gray-100 bg-white p-4 text-center shadow-sm">
+                  <p className="text-xs font-medium text-gray-400">{t("result.listingAskingPerM2")}</p>
+                  <p className={`mt-1 text-lg font-bold ${canShowListingPerM2 ? listingVerdictColor : "text-gray-900"}`}>
+                    {canShowListingPerM2 ? `${formatPrice(listingPricePerM2)}/m²` : "—"}
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-400">
+                    {canShowMarketPerM2 ? `${t("result.marketPerM2")} ${formatPrice(marketPricePerM2)}/m²` : t("result.marketPerM2")}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className={`border-t border-gray-100 px-5 py-4 sm:px-6 ${listingComparable ? listingVerdictBg : "bg-gray-50"}`}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className={`text-sm font-bold sm:text-base ${listingComparable ? listingVerdictColor : "text-gray-600"}`}>
+                  {listingComparable ? listingVerdictSentence : t("result.listingComparisonUnavailable")}
+                </p>
+                {listingUrl && (
+                  <a
+                    href={listingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`inline-flex shrink-0 items-center justify-center rounded-lg border border-current px-3 py-2 text-sm font-bold transition-colors hover:bg-white/60 ${listingComparable ? listingVerdictColor : "text-primary"}`}
+                  >
+                    {t("result.viewListingCta")}
+                  </a>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="p-6 sm:p-8 text-center border-b border-gray-100">
+              <p className="text-base text-gray-400 mb-2">{t("result.estimatedPrice")}</p>
+              <p className="text-6xl font-bold tracking-tight text-gray-900">
+                {formatPrice(estimate.market_rate)}
+              </p>
+              <p className="text-base text-gray-500 mt-2">
+                {formatPrice(estimate.price_per_m2)}/m²
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 divide-x divide-gray-100 sm:grid-cols-3">
+              <div className="p-5 text-center sm:p-6">
+                <p className="text-sm text-gray-400 mb-1">{t("result.fastSale")}</p>
+                <p className="text-xl font-bold text-emerald-600">
+                  {formatPrice(estimate.fast_sale)}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  -10%
+                </p>
+              </div>
+              <div className="hidden p-5 text-center bg-primary/5 sm:block sm:p-6">
+                <p className="text-sm text-gray-400 mb-1">{t("result.marketPrice")}</p>
+                <p className="text-xl font-bold text-primary">
+                  {formatPrice(estimate.market_rate)}
+                </p>
+              </div>
+              <div className="p-5 text-center sm:p-6">
+                <p className="text-sm text-gray-400 mb-1">{t("result.targetPrice")}</p>
+                <p className="text-xl font-bold text-amber-600">
+                  {formatPrice(estimate.premium)}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  +8%
+                </p>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {!isPaid && (

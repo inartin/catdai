@@ -14,6 +14,7 @@ Implemented and active for apartments.
 - Result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
 - Sale and rent result pages share the same criteria-edit action button, including the edit icon and secondary button styling.
+- 999.md listing-link analysis opens a sale result in listing-comparison mode; the result treats the listing asking price as a second primary value beside the market estimate, keeps fast-sale/target grouped under the market side and asked-price-per-m2 under the listing side, and shows the listing verdict plus the original listing link in the same result card.
 - The sale valuation form's cadastral shortcut is login-gated and uses the shared auth popup before calling `/api/cadastral`.
 - PDF export opens a section picker for everyone, but PDF download is login-gated and requires a valid Supabase session immediately before generation. If login starts from the PDF dialog, the login prompt overlays the PDF dialog; after OAuth redirect, a localStorage flag restores the PDF dialog.
 - PDF reports always include the estimated market price, segment median price per m2, property summary, disclaimer footer, and `catdai.md` source label; optional sections include seller-type comparison and official cadastral data when available.

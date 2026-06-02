@@ -83,6 +83,7 @@ Configuration:
 next.config.mjs - Turbopack enabled, custom headers, noindex routes
 eslint.config.mjs - Next.js core-web-vitals config
 Environment variables for Supabase, Telegram, API tokens
+Project .npmrc keeps only shared install behavior. Do not commit machine-specific absolute pnpm store paths; set local store-dir in user-level pnpm config when needed.
 Current State
 Implemented: Auth, valuation (sale/rent), PDF reports, SEO, analytics, market data integration
 SEO Status: Not blocked by technical issues, robots.txt allows crawling, sitemap available, Google has crawled homepage

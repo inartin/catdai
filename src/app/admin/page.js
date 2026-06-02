@@ -33,6 +33,25 @@ function fmtCadastruSearchType(type) {
   return type || "\u2014";
 }
 
+function fmtListingLinkStatus(status) {
+  if (status === "success") return "Analyzed";
+  if (status === "unsupported_listing_type") return "Rejected type";
+  if (status === "not_chisinau") return "Outside Chișinău";
+  if (status === "insufficient_data") return "Insufficient data";
+  if (status === "not_a_listing") return "Not a listing";
+  if (status === "fetch_failed") return "Fetch failed";
+  if (status === "upstream_blocked") return "Upstream blocked";
+  return status || "\u2014";
+}
+
+function fmtListingLinkProperty(row) {
+  return [
+    row.rooms_count ? `${row.rooms_count} rooms` : null,
+    row.district,
+    row.city,
+  ].filter(Boolean).join(" · ") || "\u2014";
+}
+
 function fmtTopDistricts(byDistrict) {
   const entries = Object.entries(byDistrict || {})
     .sort((a, b) => b[1] - a[1])
@@ -148,6 +167,7 @@ export default function AdminDashboard() {
   const [showTelegramAlertsList, setShowTelegramAlertsList] = useState(false);
   const [showPdfGenerationList, setShowPdfGenerationList] = useState(false);
   const [showCadastruSearchesList, setShowCadastruSearchesList] = useState(false);
+  const [showListingLinkAnalysesList, setShowListingLinkAnalysesList] = useState(false);
 
   const loadStats = useCallback(async ({ fresh = false } = {}) => {
     if (fresh) setStatsRefreshing(true);
@@ -273,7 +293,7 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-9 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}
@@ -301,6 +321,13 @@ export default function AdminDashboard() {
             detail={showCadastruSearchesList ? "Click to hide list" : `${fmtNum(s.cadastruSearches?.address)} address / ${fmtNum(s.cadastruSearches?.number)} number`}
             onClick={() => setShowCadastruSearchesList((value) => !value)}
             active={showCadastruSearchesList}
+          />
+          <StatCard
+            label="999 Link Analyses"
+            value={fmtNum(s.listingLinkAnalyses?.total)}
+            detail={showListingLinkAnalysesList ? "Click to hide list" : `${fmtNum(s.listingLinkAnalyses?.success)} analyzed / ${fmtNum(s.listingLinkAnalyses?.unsupported)} rejected`}
+            onClick={() => setShowListingLinkAnalysesList((value) => !value)}
+            active={showListingLinkAnalysesList}
           />
           <StatCard
             label="PDF Reports"
@@ -535,6 +562,70 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {row.district || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 break-all">
+                          {row.user_id || "Anonymous"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+        {showListingLinkAnalysesList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">999 Link Analyses</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                {fmtNum(s.listingLinkAnalyses?.periods?.["24h"])} in 24h · {fmtNum(s.listingLinkAnalyses?.periods?.["7d"])} in 7 days · {fmtNum(s.listingLinkAnalyses?.failed)} failed
+              </p>
+            </div>
+
+            {!Array.isArray(s.listingLinkAnalyses?.recent) || s.listingLinkAnalyses.recent.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No 999 link analyses found</div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Listing</th>
+                      <th className="px-4 py-3">Property</th>
+                      <th className="px-4 py-3 text-right">Price</th>
+                      <th className="px-4 py-3">User</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {s.listingLinkAnalyses.recent.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {fmtDateTime(row.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 font-medium">
+                          {fmtListingLinkStatus(row.status)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 break-all">
+                          {row.listing_url ? (
+                            <a
+                              href={row.listing_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              {row.external_id || row.listing_url}
+                            </a>
+                          ) : (
+                            row.external_id || "\u2014"
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {fmtListingLinkProperty(row)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                          {fmtPrice(row.listing_price, row.listing_currency)}
                         </td>
                         <td className="px-4 py-3 text-gray-600 break-all">
                           {row.user_id || "Anonymous"}

@@ -24,6 +24,10 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - Optional fields (area, building type, renovation, floor, total floors, bathrooms, balconies) are mapped when present and within bounds.
 - Returns `external_id`, `listing_price`, `listing_currency`, `listing_url`, and the mapped `params`.
 
+## Analytics
+- Each parse attempt with a valid 999 listing id writes to `listing_link_analysis_events` when the table exists.
+- The admin dashboard shows total link analyses, analyzed/rejected/failed splits, period totals, and recent rows.
+
 ## Comparison UI (`src/components/EstimateResult.js`)
 - Only compared when the listing is in **EUR** (avoids cross-currency math).
 - Header label switches to "Analiza anunțului" when a listing is analyzed and sits above both the preview image and property title.
@@ -53,7 +57,9 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - `src/components/LinkAnalyzer.js`
 - `src/app/api/analyze-link/route.js`
 - `src/lib/parse-999-listing.js`
+- `src/lib/listing-link-analysis-events.js`
 - `src/lib/listing-cache.js` (wraps the shared Redis cache in `src/lib/cache.js`)
+- `db/listing_link_analysis_events.sql`
 - `src/components/EstimateResult.js`
 - `src/locales/ro.json`, `src/locales/ru.json` (`linkAnalyzer.*`, `result.listing*`)
 

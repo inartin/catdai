@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { getCachedListing, setCachedListing } from "@/lib/listing-cache";
+import { logListingLinkAnalysisEvent } from "@/lib/listing-link-analysis-events";
 import {
   build999ListingUrl,
   extractListingIdFromUrl,
@@ -248,18 +249,23 @@ export async function POST(request) {
   }
 
   const listingUrl = build999ListingUrl(externalId, "ro");
+  const logEvent = (event) =>
+    logListingLinkAnalysisEvent(request, { externalId, listingUrl, ...event });
 
   let parsed = await getCachedListing(externalId);
   if (!parsed) {
     const result = await fetchListingHtml(listingUrl);
     if (result.error === "blocked") {
+      await logEvent({ status: "upstream_blocked" });
       return NextResponse.json({ error: "upstream_blocked" }, { status: 503 });
     }
     if (result.error || !result.html) {
+      await logEvent({ status: "fetch_failed" });
       return NextResponse.json({ error: "fetch_failed" }, { status: 502 });
     }
     parsed = parse999Listing(result.html);
     if (!parsed) {
+      await logEvent({ status: "not_a_listing" });
       return NextResponse.json({ error: "not_a_listing" }, { status: 422 });
     }
     await setCachedListing(externalId, parsed);
@@ -267,8 +273,11 @@ export async function POST(request) {
 
   const mapped = mapToParams(parsed);
   if (mapped.error) {
+    await logEvent({ status: mapped.error, parsed });
     return NextResponse.json({ error: mapped.error }, { status: 422 });
   }
+
+  await logEvent({ status: "success", parsed, params: mapped.params });
 
   return NextResponse.json({
     external_id: externalId,

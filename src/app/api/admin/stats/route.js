@@ -170,6 +170,45 @@ function buildCadastruSearchStats(rows, cutoffs) {
   };
 }
 
+async function fetchListingLinkAnalysisEvents() {
+  const buildQuery = () =>
+    supabaseAdmin
+      .from("listing_link_analysis_events")
+      .select(
+        "id, status, error_code, user_id, external_id, listing_url, city, district, rooms_count, listing_price, listing_currency, created_at"
+      )
+      .order("created_at", { ascending: false });
+
+  const firstPage = await buildQuery().range(0, PAGE - 1);
+  if (!firstPage.error) {
+    if (!firstPage.data || firstPage.data.length < PAGE) return firstPage.data || [];
+    return fetchAllRows(buildQuery);
+  }
+
+  const code = String(firstPage.error?.code || "");
+  if (code === "42P01" || code === "PGRST204") return [];
+  throw new Error(`listing_link_analysis_events query failed: ${firstPage.error.message}`);
+}
+
+function buildListingLinkAnalysisStats(rows, cutoffs) {
+  const byStatus = countByValue(rows, "status");
+
+  return {
+    total: rows.length,
+    success: byStatus.success || 0,
+    unsupported: byStatus.unsupported_listing_type || 0,
+    failed: rows.filter((row) => row.status !== "success" && row.status !== "unsupported_listing_type").length,
+    byStatus,
+    periods: Object.fromEntries(
+      Object.entries(cutoffs).map(([period, cutoff]) => [
+        period,
+        rows.filter((row) => row.created_at && row.created_at >= cutoff).length,
+      ])
+    ),
+    recent: rows.slice(0, 50),
+  };
+}
+
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
@@ -200,6 +239,7 @@ export async function GET(request) {
           .order("created_at", { ascending: false })
       ),
       fetchCadastruSearchEvents(),
+      fetchListingLinkAnalysisEvents(),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -214,6 +254,7 @@ export async function GET(request) {
     telegramAlerts,
     pdfEvents,
     cadastruSearchEvents,
+    listingLinkAnalysisEvents,
   ] = dataResults;
 
   const result = {
@@ -229,6 +270,7 @@ export async function GET(request) {
     telegramAlerts,
     pdfGeneration: buildPdfStats(pdfEvents, cutoffs),
     cadastruSearches: buildCadastruSearchStats(cadastruSearchEvents, cutoffs),
+    listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
   };
 
   if (!bypassCache) {

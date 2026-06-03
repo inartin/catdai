@@ -231,6 +231,70 @@ function hasApartmentDetails(apartment) {
   );
 }
 
+function hasApartmentData(apartment) {
+  return Boolean(
+    apartment?.area_m2 ||
+      apartment?.floor ||
+      apartment?.toilet ||
+      apartment?.bathroom ||
+      apartment?.is_last_floor ||
+      apartment?.estimated_value_lei ||
+      apartment?.type ||
+      apartment?.destination ||
+      apartment?.last_estimated_at ||
+      apartment?.ownership_type ||
+      apartment?.real_rights ||
+      apartment?.notes ||
+      apartment?.restrictions
+  );
+}
+
+function hasBuildingData(building) {
+  return Boolean(
+    building?.classifier ||
+      building?.total_floors ||
+      building?.condition ||
+      building?.construction_year ||
+      building?.wall_material ||
+      building?.water ||
+      building?.sewage ||
+      building?.gas ||
+      building?.electricity
+  );
+}
+
+function hasAnyAddress(payload) {
+  return Boolean(
+    payload?.apartment?.address ||
+      payload?.building?.address ||
+      payload?.location?.display_name ||
+      payload?.matched_address
+  );
+}
+
+function classifyCadastralResult(payload) {
+  const apartmentData = hasApartmentData(payload?.apartment);
+  const buildingData = hasBuildingData(payload?.building);
+
+  if (apartmentData && buildingData) return "full_data";
+  if (apartmentData) return "apartment_only";
+  if (hasAnyAddress(payload) || buildingData) return "address_only";
+  return "no_data";
+}
+
+function resolveDistrictFromPayload(payload) {
+  if (payload?.form_fields?.district) return payload.form_fields.district;
+  const address = payload?.apartment?.address || payload?.building?.address || payload?.matched_address;
+  const district = resolveDistrict(address);
+  if (district) return district;
+  return resolveDistrictFromSuburb(payload?.location?.suburb);
+}
+
+function resolveSearchContext(body) {
+  if (body?.search_context !== "cadastru") return null;
+  return body.search_type === "address" ? "address" : "number";
+}
+
 async function buildCadastruDetailPayload(cadastralNumber, accessTier = "paid") {
   try {
     const detail = await fetchCadastruDetailData(cadastralNumber);
@@ -298,9 +362,28 @@ export async function POST(request) {
     );
   }
 
-  if (body.search_context === "cadastru") {
-    await logCadastruSearchEvent(request, "number");
-  }
+  const cadastruSearchType = resolveSearchContext(body);
+  const recordCadastruSearch = async (payload, resultType = null) => {
+    if (!cadastruSearchType) return;
+    await logCadastruSearchEvent(request, cadastruSearchType, {
+      cadastralNumber: payload?.cadastral_number || trimmed,
+      district: cadastruSearchType === "address" ? resolveDistrictFromPayload(payload) : null,
+      resultType: resultType || classifyCadastralResult(payload),
+    });
+  };
+  const respondWithCadastralPayload = async (payload) => {
+    await recordCadastruSearch(payload);
+    const res = NextResponse.json(payload);
+    res.headers.set("X-RateLimit-Remaining", String(remaining));
+    return res;
+  };
+  const respondWithNotFound = async (message) => {
+    await recordCadastruSearch({ cadastral_number: trimmed }, "no_data");
+    return NextResponse.json(
+      { error: "not_found", message },
+      { status: 404 }
+    );
+  };
 
   const { code, buildingId, apartmentId } = parseCadastralParts(trimmed);
 
@@ -311,15 +394,10 @@ export async function POST(request) {
     if (!step1.features || step1.features.length === 0) {
       const detailPayload = await buildCadastruDetailPayload(trimmed, access.tier);
       if (detailPayload) {
-        const res = NextResponse.json(detailPayload);
-        res.headers.set("X-RateLimit-Remaining", String(remaining));
-        return res;
+        return respondWithCadastralPayload(detailPayload);
       }
 
-      return NextResponse.json(
-        { error: "not_found", message: "Cadastral number not found" },
-        { status: 404 }
-      );
+      return respondWithNotFound("Cadastral number not found");
     }
 
     const feature = step1.features[0];
@@ -335,17 +413,12 @@ export async function POST(request) {
     if (!step3.features || step3.features.length === 0) {
       const detailPayload = await buildCadastruDetailPayload(trimmed, access.tier);
       if (detailPayload) {
-        const res = NextResponse.json(detailPayload);
-        res.headers.set("X-RateLimit-Remaining", String(remaining));
-        return res;
+        return respondWithCadastralPayload(detailPayload);
       }
 
       const nominatim = await fallbackNominatim(lat, lon);
       if (!nominatim?.address) {
-        return NextResponse.json(
-          { error: "not_found", message: "No property data found for this cadastral number" },
-          { status: 404 }
-        );
+        return respondWithNotFound("No property data found for this cadastral number");
       }
 
       const addr = nominatim.address;
@@ -365,7 +438,7 @@ export async function POST(request) {
       };
 
 
-      const res = NextResponse.json({
+      return respondWithCadastralPayload({
         cadastral_number: trimmed,
         building: {},
         apartment: {},
@@ -375,21 +448,17 @@ export async function POST(request) {
         access_tier: access.tier,
         locked_sections: {},
       });
-      res.headers.set("X-RateLimit-Remaining", String(remaining));
-      return res;
     }
 
     const html = step3.features[0].properties?.html || "";
     const { building, apartment } = parseHtmlResponse(html, buildingId, apartmentId);
     const detailPayload = hasApartmentDetails(apartment) ? null : await buildCadastruDetailPayload(trimmed, access.tier);
     if (detailPayload) {
-      const res = NextResponse.json({
+      return respondWithCadastralPayload({
         ...detailPayload,
         building: Object.keys(building).length ? building : detailPayload.building,
         form_fields: buildFormFields(Object.keys(building).length ? building : detailPayload.building, detailPayload.apartment),
       });
-      res.headers.set("X-RateLimit-Remaining", String(remaining));
-      return res;
     }
 
     const form_fields = buildFormFields(building, apartment);
@@ -403,9 +472,7 @@ export async function POST(request) {
       locked_sections: {},
     };
 
-    const res = NextResponse.json(payload);
-    res.headers.set("X-RateLimit-Remaining", String(remaining));
-    return res;
+    return respondWithCadastralPayload(payload);
   } catch (err) {
     logCadastralFetchError(err);
     return NextResponse.json(

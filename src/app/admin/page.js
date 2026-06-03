@@ -33,6 +33,27 @@ function fmtCadastruSearchType(type) {
   return type || "\u2014";
 }
 
+function fmtCadastruResultType(type) {
+  if (type === "no_data") return "No data";
+  if (type === "address_only") return "Address only";
+  if (type === "apartment_only") return "Apartment only";
+  if (type === "full_data") return "Full data";
+  return type || "\u2014";
+}
+
+function fmtCadastruResultSummary(byResultType) {
+  const counts = byResultType || {};
+  const parts = [
+    ["full_data", "full"],
+    ["apartment_only", "apartment"],
+    ["address_only", "address"],
+    ["no_data", "none"],
+  ]
+    .map(([key, label]) => counts[key] ? `${fmtNum(counts[key])} ${label}` : null)
+    .filter(Boolean);
+  return parts.length ? parts.join(" · ") : "No result data yet";
+}
+
 function fmtListingLinkStatus(status) {
   if (status === "success") return "Analyzed";
   if (status === "unsupported_listing_type") return "Rejected type";
@@ -318,7 +339,7 @@ export default function AdminDashboard() {
           <StatCard
             label="Cadastru Searches"
             value={fmtNum(s.cadastruSearches?.total)}
-            detail={showCadastruSearchesList ? "Click to hide list" : `${fmtNum(s.cadastruSearches?.address)} address / ${fmtNum(s.cadastruSearches?.number)} number`}
+            detail={showCadastruSearchesList ? "Click to hide list" : fmtCadastruResultSummary(s.cadastruSearches?.byResultType)}
             onClick={() => setShowCadastruSearchesList((value) => !value)}
             active={showCadastruSearchesList}
           />
@@ -534,6 +555,9 @@ export default function AdminDashboard() {
                 {fmtNum(s.cadastruSearches?.periods?.["24h"])} in 24h · {fmtNum(s.cadastruSearches?.periods?.["7d"])} in 7 days · {fmtNum(s.cadastruSearches?.registered)} registered / {fmtNum(s.cadastruSearches?.anonymous)} anonymous
               </p>
               <p className="mt-1 text-xs text-gray-500">
+                {fmtNum(s.cadastruSearches?.address)} address / {fmtNum(s.cadastruSearches?.number)} number · {fmtCadastruResultSummary(s.cadastruSearches?.byResultType)}
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
                 {fmtTopDistricts(s.cadastruSearches?.byDistrict)}
               </p>
             </div>
@@ -547,6 +571,8 @@ export default function AdminDashboard() {
                     <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Result</th>
+                      <th className="px-4 py-3">Cadastral number</th>
                       <th className="px-4 py-3">District</th>
                       <th className="px-4 py-3">User</th>
                     </tr>
@@ -559,6 +585,12 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-gray-900 font-medium">
                           {fmtCadastruSearchType(row.search_type)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {fmtCadastruResultType(row.result_type)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {row.cadastral_number || "\u2014"}
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {row.district || "\u2014"}

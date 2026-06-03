@@ -111,30 +111,61 @@ function buildPdfStats(rows, cutoffs) {
   };
 }
 
-function isMissingDistrictError(error) {
+function isMissingCadastruColumnError(error) {
   const code = String(error?.code || "");
   const message = String(error?.message || "");
-  return (code === "PGRST204" || code === "42703") && message.includes("district");
+  return (code === "PGRST204" || code === "42703") && (
+    message.includes("district") ||
+    message.includes("cadastral_number") ||
+    message.includes("result_type")
+  );
 }
 
-async function fetchCadastruSearchEvents() {
+async function fetchCadastruRows(columns, defaults = {}) {
   const buildTypedQuery = (columns) => () =>
     supabaseAdmin
       .from("cadastru_search_events")
       .select(columns)
       .order("created_at", { ascending: false });
 
-  const firstPage = await buildTypedQuery("id, search_type, user_id, district, created_at")().range(0, PAGE - 1);
+  const firstPage = await buildTypedQuery(columns)().range(0, PAGE - 1);
   if (!firstPage.error) {
-    if (!firstPage.data || firstPage.data.length < PAGE) return firstPage.data || [];
-    const rest = await fetchAllRows(buildTypedQuery("id, search_type, user_id, district, created_at"));
-    return rest;
+    const rows = (!firstPage.data || firstPage.data.length < PAGE)
+      ? firstPage.data || []
+      : await fetchAllRows(buildTypedQuery(columns));
+    return { rows: rows.map((row) => ({ ...defaults, ...row })) };
   }
 
-  if (!isMissingDistrictError(firstPage.error)) return [];
+  return { error: firstPage.error };
+}
 
-  const rows = await fetchAllRows(buildTypedQuery("id, search_type, user_id, created_at"));
-  return rows.map((row) => ({ ...row, district: null }));
+async function fetchCadastruSearchEvents() {
+  const columnAttempts = [
+    {
+      columns: "id, search_type, user_id, district, cadastral_number, result_type, created_at",
+      defaults: {},
+    },
+    {
+      columns: "id, search_type, user_id, district, created_at",
+      defaults: { cadastral_number: null, result_type: null },
+    },
+    {
+      columns: "id, search_type, user_id, cadastral_number, result_type, created_at",
+      defaults: { district: null },
+    },
+    {
+      columns: "id, search_type, user_id, created_at",
+      defaults: { district: null, cadastral_number: null, result_type: null },
+    },
+  ];
+
+  for (const attempt of columnAttempts) {
+    const result = await fetchCadastruRows(attempt.columns, attempt.defaults);
+    if (!result.error) return result.rows;
+    if (!isMissingCadastruColumnError(result.error)) return [];
+  }
+
+  return [];
 }
 
 function countByValue(rows, key) {
@@ -159,6 +190,7 @@ function buildCadastruSearchStats(rows, cutoffs) {
     address: byType.address,
     number: byType.number,
     byType,
+    byResultType: countByValue(rows, "result_type"),
     byDistrict: countByValue(rows, "district"),
     periods: Object.fromEntries(
       Object.entries(cutoffs).map(([period, cutoff]) => [

@@ -23,7 +23,7 @@ Shows:
 - favorites
 - Telegram alert count with an expandable list of configured Telegram alerts
 - sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
-- Cadastru search rows show only date, search type, derived district when available, and anonymous/user id. Exact addresses and cadastral numbers are not stored for this dashboard.
+- Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, and anonymous/user id. Exact searched addresses are not stored for this dashboard.
 - 999 link-analysis rows show date, status, listing id/link, mapped property summary, asking price, and anonymous/user id.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.

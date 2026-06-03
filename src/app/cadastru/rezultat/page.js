@@ -10,6 +10,33 @@ import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 
+const inFlightCadastralLookups = new Map();
+
+function fetchCadastralLookup(cacheKey, body, accessToken) {
+  const existing = inFlightCadastralLookups.get(cacheKey);
+  if (existing) return existing;
+
+  const promise = fetch("/api/cadastral", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  }).then(async (response) => ({
+    ok: response.ok,
+    status: response.status,
+    data: response.ok ? await response.json() : null,
+  }));
+
+  inFlightCadastralLookups.set(cacheKey, promise);
+  promise.then(
+    () => inFlightCadastralLookups.delete(cacheKey),
+    () => inFlightCadastralLookups.delete(cacheKey)
+  );
+  return promise;
+}
+
 function CadastruResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,8 +61,10 @@ function CadastruResultContent() {
 
     if (!isAuthenticated) return;
 
-    const requestKey = `${cadastralNumber}|${source === "number" ? "number" : ""}`;
+    const searchSource = source === "address" || source === "number" ? source : "";
+    const requestKey = `${cadastralNumber}|${searchSource}`;
     if (loadedRequestKey.current === requestKey) return;
+    if (!session?.access_token) return;
 
     let active = true;
 
@@ -44,16 +73,12 @@ function CadastruResultContent() {
 
       try {
         const body = { cadastral_number: cadastralNumber };
-        if (source === "number") body.search_context = "cadastru";
+        if (searchSource) {
+          body.search_context = "cadastru";
+          body.search_type = searchSource;
+        }
 
-        const response = await fetch("/api/cadastral", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify(body),
-        });
+        const response = await fetchCadastralLookup(`${requestKey}|${session.access_token}`, body, session.access_token);
 
         if (!response.ok) {
           if (response.status === 401) {
@@ -65,10 +90,9 @@ function CadastruResultContent() {
           return;
         }
 
-        const data = await response.json();
         if (active) {
           loadedRequestKey.current = requestKey;
-          setState({ loading: false, error: "", data });
+          setState({ loading: false, error: "", data: response.data });
         }
       } catch {
         if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });

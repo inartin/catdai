@@ -149,7 +149,7 @@ export default function CadastruPage() {
 
       const data = await response.json();
       if (data?.cadastral_number) {
-        router.push(`/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(data.cadastral_number)}`);
+        router.push(`/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(data.cadastral_number)}&source=address`);
         return;
       }
 

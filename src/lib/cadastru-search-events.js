@@ -2,10 +2,16 @@ import { resolveAccessTier } from "@/lib/access-tier";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
+const RESULT_TYPES = new Set(["no_data", "address_only", "apartment_only", "full_data"]);
 
 function normalizeSearchType(searchType) {
   const value = String(searchType || "").trim();
   return SEARCH_TYPES.has(value) ? value : null;
+}
+
+function normalizeResultType(resultType) {
+  const value = String(resultType || "").trim();
+  return RESULT_TYPES.has(value) ? value : null;
 }
 
 function isMissingSchemaError(error) {
@@ -13,15 +19,21 @@ function isMissingSchemaError(error) {
   return code === "42P01" || code === "42703" || code === "PGRST204";
 }
 
-function isMissingDistrictError(error) {
+function isMissingColumnError(error, column) {
   const message = String(error?.message || "");
-  return isMissingSchemaError(error) && message.includes("district");
+  return isMissingSchemaError(error) && message.includes(column);
 }
 
 function cleanDistrict(value) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, 80) : null;
+}
+
+function cleanCadastralNumber(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, 40) : null;
 }
 
 export async function logCadastruSearchEvent(request, searchType, options = {}) {
@@ -41,12 +53,18 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
       search_type: normalizedType,
       user_id: userId,
       district: normalizedType === "address" ? cleanDistrict(options.district) : null,
+      cadastral_number: cleanCadastralNumber(options.cadastralNumber),
+      result_type: normalizeResultType(options.resultType),
     };
 
     let { error } = await supabaseAdmin.from("cadastru_search_events").insert(row);
 
-    if (error && row.district && isMissingDistrictError(error)) {
-      delete row.district;
+    for (let attempt = 0; attempt < 3 && error; attempt++) {
+      const missingColumn = ["district", "cadastral_number", "result_type"].find((column) =>
+        column in row && isMissingColumnError(error, column)
+      );
+      if (!missingColumn) break;
+      delete row[missingColumn];
       ({ error } = await supabaseAdmin.from("cadastru_search_events").insert(row));
     }
 

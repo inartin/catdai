@@ -8,6 +8,7 @@ const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const CADASTRU_PAGE_URL = "https://www.cadastru.md/ecadastru/f?p=100:1";
 const CADASTRU_SESSION_URLS = [
   CADASTRU_PAGE_URL,
+  "https://www.cadastru.md/ecadastru/f?p=100:1::::::",
   "https://www.cadastru.md/ecadastru/",
   "https://www.cadastru.md/ecadastru/f?p=100",
 ];
@@ -585,6 +586,19 @@ function splitSetCookieHeader(value) {
     .filter(Boolean);
 }
 
+function mergeCookieHeader(cookieHeader, cookies) {
+  const merged = new Map();
+  splitSetCookieHeader(cookieHeader).forEach((cookie) => {
+    const name = cookie.split("=")[0];
+    if (name) merged.set(name, cookie);
+  });
+  cookies.forEach((cookie) => {
+    const name = cookie.split("=")[0];
+    if (name) merged.set(name, cookie);
+  });
+  return [...merged.values()].join("; ");
+}
+
 function extractCadastruSessionId(text) {
   const value = String(text || "");
   const patterns = [
@@ -613,40 +627,56 @@ function extractHtmlTitle(text) {
 
 async function createCadastruSession() {
   const attempts = [];
+  let cookieHeader = "";
 
   for (const entryUrl of CADASTRU_SESSION_URLS) {
-    try {
-      const { text, headers, status, url } = await fetchText(entryUrl, {
-        headers: {
-          "User-Agent": CADASTRU_USER_AGENT,
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        },
-      });
-      const pInstance = extractCadastruSessionId(text);
-      if (pInstance) {
-        const cookieHeader = splitSetCookieHeader(headers.get("set-cookie")).join("; ");
-        return { pInstance, cookieHeader, pageUrl: url || entryUrl };
-      }
+    for (const retryWithCookies of [false, true]) {
+      if (retryWithCookies && !cookieHeader) continue;
 
-      attempts.push({
-        entryUrl,
-        finalUrl: url || entryUrl,
-        status,
-        contentType: headers.get("content-type"),
-        title: extractHtmlTitle(text),
-      });
-    } catch (error) {
-      attempts.push({
-        entryUrl,
-        error: error?.message || String(error),
-      });
+      try {
+        const { text, headers, status, url } = await fetchText(entryUrl, {
+          headers: {
+            "User-Agent": CADASTRU_USER_AGENT,
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+            ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+          },
+        });
+        const responseCookies = splitSetCookieHeader(headers.get("set-cookie"));
+        if (responseCookies.length) cookieHeader = mergeCookieHeader(cookieHeader, responseCookies);
+
+        const pInstance = extractCadastruSessionId(text);
+        if (pInstance) {
+          return { pInstance, cookieHeader, pageUrl: url || entryUrl };
+        }
+
+        attempts.push({
+          entryUrl,
+          finalUrl: url || entryUrl,
+          retryWithCookies,
+          status,
+          contentType: headers.get("content-type"),
+          title: extractHtmlTitle(text),
+          length: text.length,
+          preview: stripHtml(text).slice(0, 120),
+        });
+      } catch (error) {
+        attempts.push({
+          entryUrl,
+          retryWithCookies,
+          error: error?.message || String(error),
+        });
+      }
     }
   }
 
   const details = attempts
     .map((attempt) => {
-      if (attempt.error) return `${attempt.entryUrl} failed: ${attempt.error}`;
-      return `${attempt.entryUrl} -> ${attempt.finalUrl} status=${attempt.status} type=${attempt.contentType || "unknown"} title=${attempt.title || "none"}`;
+      const retry = attempt.retryWithCookies ? " with cookies" : "";
+      if (attempt.error) return `${attempt.entryUrl}${retry} failed: ${attempt.error}`;
+      return `${attempt.entryUrl}${retry} -> ${attempt.finalUrl} status=${attempt.status} type=${attempt.contentType || "unknown"} title=${attempt.title || "none"} length=${attempt.length} preview=${attempt.preview || "none"}`;
     })
     .join("; ");
 

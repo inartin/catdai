@@ -37,7 +37,7 @@ Implemented and active, with partial fallback.
 - Partial cadastral responses use the same result card and still show the cadastral number plus any available address, while detailed apartment/building sections render only when official fields exist.
 - Limited cadastral result cards show a highlighted note in Romanian or Russian explaining that no more official data was found in the verified sources.
 - When Geodata lacks WMS apartment details, `/api/cadastral` calls cadastru.md APEX `GET_DETAIL_DATA` with the dotted cadastral number and object type `3`, then maps the returned table into apartment address, area, type, destination, estimated value, last valuation date, ownership type, real rights, notes, and restrictions.
-- The cadastru.md session bootstrap retries the APEX entry URLs and accepts hidden `p_instance`, APEX `APP_SESSION`, or page-context session values before calling detail/search processes.
+- The cadastru.md session bootstrap retries the APEX entry URLs with browser-like headers, carries cookies between attempts, and accepts hidden `p_instance`, APEX `APP_SESSION`, or page-context session values before calling detail/search processes.
 
 ## Data Sources
 - Geodata WFS lookup for parcel geometry.

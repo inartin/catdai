@@ -8,6 +8,7 @@ import CadastruSourceNote from "@/components/CadastruSourceNote";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
+import { validateCadastralNumber } from "@/lib/validation";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet" },
@@ -162,42 +163,17 @@ export default function CadastruPage() {
     }
   };
 
-  const submitNumberSearch = async () => {
+  const submitNumberSearch = () => {
     if (requireAuth()) return;
 
-    setLookupState({ loading: true, method: "number", error: "" });
-
-    try {
-      const response = await fetch("/api/cadastral", {
-        method: "POST",
-        headers: requestHeaders(),
-        body: JSON.stringify({ cadastral_number: cadastralNumber, search_context: "cadastru" }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          clearAuthError();
-          setLookupState({ loading: false, method: "number", error: "" });
-          setIsAuthModalOpen(true);
-          return;
-        }
-        setLookupState({
-          loading: false,
-          method: "number",
-          error: await readErrorMessage(response),
-        });
-        return;
-      }
-
-      const data = await response.json();
-      router.push(`/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(data?.cadastral_number || cadastralNumber.trim())}`);
-    } catch {
-      setLookupState({
-        loading: false,
-        method: "number",
-        error: t("cadastru.lookupError"),
-      });
+    const validation = validateCadastralNumber(cadastralNumber);
+    if (!validation.valid) {
+      setLookupState({ loading: false, method: "number", error: t("form.cadastralInvalid") });
+      return;
     }
+
+    setLookupState({ loading: true, method: "number", error: "" });
+    router.push(`/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(validation.value)}&source=number`);
   };
 
   return (

@@ -6,6 +6,11 @@ const WMS_URL = "https://geodata.gov.md/geoserver/contestare/wms";
 const WFS_URL = "https://geodata.gov.md/geoserver/w_cbi/wfs";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
 const CADASTRU_PAGE_URL = "https://www.cadastru.md/ecadastru/f?p=100:1";
+const CADASTRU_SESSION_URLS = [
+  CADASTRU_PAGE_URL,
+  "https://www.cadastru.md/ecadastru/",
+  "https://www.cadastru.md/ecadastru/f?p=100",
+];
 const CADASTRU_APEX_URL = "https://www.cadastru.md/ecadastru/wwv_flow.show";
 const CADASTRU_LAYERS = [
   "terenuri",
@@ -204,7 +209,7 @@ async function fetchText(url, options = {}) {
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} from ${url}: ${text.slice(0, 200)}`);
   }
-  return { text, headers: res.headers };
+  return { text, headers: res.headers, status: res.status, url: res.url };
 }
 
 async function fetchJson(url, options = {}) {
@@ -580,20 +585,72 @@ function splitSetCookieHeader(value) {
     .filter(Boolean);
 }
 
-async function createCadastruSession() {
-  const { text, headers } = await fetchText(CADASTRU_PAGE_URL, {
-    headers: {
-      "User-Agent": CADASTRU_USER_AGENT,
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-  });
-  const pInstance =
-    text.match(/name=["']p_instance["'][^>]*value=["']([^"']+)["']/i)?.[1] ||
-    text.match(/value=["']([^"']+)["'][^>]*name=["']p_instance["']/i)?.[1];
-  if (!pInstance) throw new Error("Could not extract cadastru.md p_instance");
+function extractCadastruSessionId(text) {
+  const value = String(text || "");
+  const patterns = [
+    /name=["']p_instance["'][^>]*value=["']([^"']+)["']/i,
+    /value=["']([^"']+)["'][^>]*name=["']p_instance["']/i,
+    /id=["']pInstance["'][^>]*value=["']([^"']+)["']/i,
+    /value=["']([^"']+)["'][^>]*id=["']pInstance["']/i,
+    /\bAPP_SESSION\s*:\s*["']([0-9]+)["']/i,
+    /p_context=100:1:([0-9]+)/i,
+    /f\?p=100:1:([0-9]+)/i,
+    /value=["']100(?:&#x3A;|:)1(?:&#x3A;|:)([0-9]+)["'][^>]*id=["']pContext["']/i,
+  ];
 
-  const cookieHeader = splitSetCookieHeader(headers.get("set-cookie")).join("; ");
-  return { pInstance, cookieHeader };
+  for (const pattern of patterns) {
+    const match = value.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+
+  return null;
+}
+
+function extractHtmlTitle(text) {
+  const match = String(text || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return match ? stripHtml(match[1]).slice(0, 120) : null;
+}
+
+async function createCadastruSession() {
+  const attempts = [];
+
+  for (const entryUrl of CADASTRU_SESSION_URLS) {
+    try {
+      const { text, headers, status, url } = await fetchText(entryUrl, {
+        headers: {
+          "User-Agent": CADASTRU_USER_AGENT,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      });
+      const pInstance = extractCadastruSessionId(text);
+      if (pInstance) {
+        const cookieHeader = splitSetCookieHeader(headers.get("set-cookie")).join("; ");
+        return { pInstance, cookieHeader, pageUrl: url || entryUrl };
+      }
+
+      attempts.push({
+        entryUrl,
+        finalUrl: url || entryUrl,
+        status,
+        contentType: headers.get("content-type"),
+        title: extractHtmlTitle(text),
+      });
+    } catch (error) {
+      attempts.push({
+        entryUrl,
+        error: error?.message || String(error),
+      });
+    }
+  }
+
+  const details = attempts
+    .map((attempt) => {
+      if (attempt.error) return `${attempt.entryUrl} failed: ${attempt.error}`;
+      return `${attempt.entryUrl} -> ${attempt.finalUrl} status=${attempt.status} type=${attempt.contentType || "unknown"} title=${attempt.title || "none"}`;
+    })
+    .join("; ");
+
+  throw new Error(`Could not extract cadastru.md p_instance: ${details}`);
 }
 
 async function callCadastruApex(session, procName, params) {
@@ -612,7 +669,7 @@ async function callCadastruApex(session, procName, params) {
       Accept: "*/*",
       "Content-Type": "application/x-www-form-urlencoded",
       Origin: "https://www.cadastru.md",
-      Referer: CADASTRU_PAGE_URL,
+      Referer: session.pageUrl || CADASTRU_PAGE_URL,
       ...(session.cookieHeader ? { Cookie: session.cookieHeader } : {}),
     },
     body,

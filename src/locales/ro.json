@@ -197,6 +197,7 @@
   "cadastru.resultPageTitle": "Rezultatul căutării cadastrale",
   "cadastru.resultMetaDescription": "Rezultatul unei căutări cadastrale Catdai. Pagina este generată pentru interogarea introdusă și nu este folosită ca pagină publică indexabilă.",
   "cadastru.backToSearch": "Înapoi la căutare",
+  "cadastru.limitedDataNote": "Nu am găsit mai multe date oficiale pentru acest număr cadastral. Afișăm tot ce este disponibil în sursele verificate.",
   "form.floorOf": "Etaj {floor}/{total}",
   "result.confidenceHigh": "Înaltă",
   "result.confidenceMedium": "Medie",

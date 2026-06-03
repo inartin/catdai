@@ -34,6 +34,14 @@ function fmtChange(n) {
   return `${sign}${fmtNum(Math.round(n))} \u20AC`;
 }
 
+function fmtSignedPrice(amount, currency) {
+  if (amount == null) return "\u2014";
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return "\u2014";
+  const sign = value > 0 ? "+" : value < 0 ? "-" : "";
+  return `${sign}${fmtPrice(Math.abs(value), currency)}`;
+}
+
 function StatCard({ label, value, detail }) {
   return (
     <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
@@ -132,6 +140,95 @@ function DistributionTable({ title, data }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function PriceChangeListingsSection({ listings }) {
+  const rows = Array.isArray(listings) ? listings : [];
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="px-5 py-4 border-b border-gray-100">
+        <h2 className="font-semibold text-gray-900">Listings With Multiple Price Changes</h2>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-5 py-8 text-center text-sm text-gray-400">
+          No listings with multiple price history entries.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="px-4 py-3">Listing</th>
+                <th className="px-4 py-3 text-right">Current Price</th>
+                <th className="px-4 py-3 text-right">Last Change</th>
+                <th className="px-4 py-3 text-right">History</th>
+                <th className="px-4 py-3 text-right">Range</th>
+                <th className="px-4 py-3">Latest</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((l) => {
+                const lastChange = l.last_change_amount == null ? null : Number(l.last_change_amount);
+                const changeClass =
+                  lastChange > 0
+                    ? "text-red-600"
+                    : lastChange < 0
+                      ? "text-green-600"
+                      : "text-gray-600";
+
+                return (
+                  <tr key={l.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 max-w-sm">
+                      <Link
+                        href={`/admin/listings/${l.id}`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {l.title}
+                      </Link>
+                      <p className="mt-0.5 text-xs text-gray-400 truncate">
+                        {[l.district, l.sector].filter(Boolean).join(", ") || "\u2014"}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap font-medium">
+                      {fmtPrice(l.price_amount ?? l.latest_history_price, l.price_currency)}
+                    </td>
+                    <td className={`px-4 py-3 text-right whitespace-nowrap font-medium ${changeClass}`}>
+                      {fmtSignedPrice(l.last_change_amount, l.price_currency)}
+                      <span className="ml-1 text-xs text-gray-400">
+                        {fmtPct(l.last_change_pct)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-gray-600">
+                      {fmtNum(l.history_count)}
+                    </td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap text-gray-600">
+                      {fmtPrice(l.min_history_price, l.price_currency)} - {fmtPrice(l.max_history_price, l.price_currency)}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-500">
+                      {fmtDate(l.latest_observed_at)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                          l.is_active
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {l.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -330,6 +427,8 @@ export default function ListingsPage() {
             <DistributionTable title="By Renovation" data={stats.byRenovation} />
             <DistributionTable title="By Building Type" data={stats.byBuildingType} />
           </div>
+
+          <PriceChangeListingsSection listings={stats.priceChangeListings} />
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">

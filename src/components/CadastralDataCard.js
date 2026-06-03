@@ -39,6 +39,7 @@ export default function CadastralDataCard({ cadastral, className = "" }) {
       cadastral.building?.electricity
   );
   const hasFullDetails = hasApartmentDetails && hasBuildingDetails;
+  const hasLimitedCadastralData = Boolean(cadastral.partial || !hasApartmentDetails || !hasBuildingDetails);
   const widthClass = hasFullDetails ? "w-full" : "mx-auto w-full max-w-xl";
   const detailsGridClass = hasFullDetails ? "grid gap-6 lg:grid-cols-2 lg:gap-8" : "grid gap-6";
   const detailValueClass = "whitespace-nowrap text-right font-medium text-gray-900";
@@ -68,6 +69,15 @@ export default function CadastralDataCard({ cadastral, className = "" }) {
           <p className="text-base text-gray-600">
             {displayAddress}
           </p>
+        )}
+
+        {hasLimitedCadastralData && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            <svg viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600">
+              <path fillRule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-4a.875.875 0 1 0 0 1.75A.875.875 0 0 0 10 6Zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0v-4Z" clipRule="evenodd" />
+            </svg>
+            <p>{t("cadastru.limitedDataNote")}</p>
+          </div>
         )}
 
         {(hasApartmentDetails || hasBuildingDetails) && (

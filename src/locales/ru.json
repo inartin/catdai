@@ -197,6 +197,7 @@
   "cadastru.resultPageTitle": "Результат кадастрового поиска",
   "cadastru.resultMetaDescription": "Результат кадастрового поиска Catdai. Страница создается для введенного запроса и не используется как публичная индексируемая страница.",
   "cadastru.backToSearch": "Назад к поиску",
+  "cadastru.limitedDataNote": "Больше официальных данных по этому кадастровому номеру не найдено. Показываем все, что доступно в проверенных источниках.",
   "form.floorOf": "Этаж {floor}/{total}",
   "result.confidenceHigh": "Высокая",
   "result.confidenceMedium": "Средняя",

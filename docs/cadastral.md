@@ -24,17 +24,20 @@ Implemented and active, with partial fallback.
 - Address input validation runs in both the browser and `/api/cadastru/address`: street is capped at 80 characters, building number accepts only digits plus one optional slash such as `18/2`, and apartment number accepts only digits from `1` to `9999`.
 - Address matching must be exact for the street and house number. Similar buildings such as `bd. Moscova 9/5` are rejected when the user enters `bd. Moscova 9`.
 - If exact WMS apartment details are missing, address search can use an exact Nominatim building match plus the containing Geodata WFS parcel/building geometry to derive the apartment cadastral number from the building/parcel code and a zero-padded apartment suffix.
-- It also shows a lower cadastral-number search section using the same placeholder format as the valuation form and posts to the existing `/api/cadastral` backend.
+- It also shows a lower cadastral-number search section using the same placeholder format as the valuation form; the page validates the number locally, then the result page makes the single `/api/cadastral` lookup.
 - Page copy presents address search and cadastral-number search as two alternative methods for the same official cadastral-data result.
 - The page displays a short official-source note below the main form card, linking to `geodata.gov.md`.
 - The shared header links to the localized Cadastru URL for the current language on desktop and mobile.
 - Successful searches navigate to `/{lang}/cadastru/rezultat?cadastral_number=...`.
 - `/cadastru/rezultat` fetches authenticated `/api/cadastral`, uses the shared back button from the estimation form, renders the shared `CadastralDataCard` component used by the evaluation result page, and is marked `noindex` because each URL is generated from a user query.
+- After a result is loaded, `/cadastru/rezultat` keeps the loaded result in component state and does not repeat the lookup on tab focus or auth token refresh unless the cadastral number changes.
 - Valid `/cadastru` search submissions are logged to `cadastru_search_events` for admin stats with only `search_type`, optional authenticated `user_id`, optional derived district for address searches, and timestamp. Exact address and cadastral number values are not stored.
 - `CadastralDataCard` highlights the cadastral number as the primary key before the address and uses two desktop columns for apartment plus building details, falling back to stacked sections on mobile.
 - When only one detail section is available, or only the cadastral number/address is available, the result card uses a compact centered width and keeps the available details on the full inner width instead of reserving an empty second column.
 - Partial cadastral responses use the same result card and still show the cadastral number plus any available address, while detailed apartment/building sections render only when official fields exist.
+- Limited cadastral result cards show a highlighted note in Romanian or Russian explaining that no more official data was found in the verified sources.
 - When Geodata lacks WMS apartment details, `/api/cadastral` calls cadastru.md APEX `GET_DETAIL_DATA` with the dotted cadastral number and object type `3`, then maps the returned table into apartment address, area, type, destination, estimated value, last valuation date, ownership type, real rights, notes, and restrictions.
+- The cadastru.md session bootstrap retries the APEX entry URLs and accepts hidden `p_instance`, APEX `APP_SESSION`, or page-context session values before calling detail/search processes.
 
 ## Data Sources
 - Geodata WFS lookup for parcel geometry.

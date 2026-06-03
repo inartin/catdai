@@ -13,6 +13,7 @@ const PERIODS = {
 };
 
 const EMPTY_PRICE_CHANGES = { total: 0, up: 0, down: 0, avgChange: 0, avgChangePct: 0 };
+const PRICE_CHANGE_LIST_LIMIT = 12;
 
 async function fetchAllRows(buildQuery) {
   let all = [];
@@ -56,6 +57,104 @@ async function fetchPriceChangeStats(cutoff) {
   const { data, error } = await supabaseAdmin.rpc("price_change_stats", params);
   if (error) return null;
   return data;
+}
+
+async function fetchListingsWithRepeatedPriceHistory(limit = PRICE_CHANGE_LIST_LIMIT) {
+  const historyRows = await fetchAllRows(() =>
+    supabaseAdmin
+      .from("listing_price_history")
+      .select("listing_id, price_amount, price_currency, price_per_m2, observed_at")
+      .order("observed_at", { ascending: true })
+  );
+
+  const grouped = new Map();
+
+  for (const row of historyRows) {
+    if (!row.listing_id) continue;
+    const existing = grouped.get(row.listing_id) || [];
+    existing.push(row);
+    grouped.set(row.listing_id, existing);
+  }
+
+  const summaries = Array.from(grouped.entries())
+    .map(([listingId, history]) => {
+      if (history.length <= 1) return null;
+
+      const first = history[0];
+      const latest = history[history.length - 1];
+      const previous = history[history.length - 2];
+      const prices = history
+        .map((item) => Number(item.price_amount))
+        .filter((price) => Number.isFinite(price));
+      const latestPrice = Number(latest.price_amount);
+      const previousPrice = Number(previous.price_amount);
+      const firstPrice = Number(first.price_amount);
+      const lastChangeAmount =
+        Number.isFinite(latestPrice) && Number.isFinite(previousPrice)
+          ? latestPrice - previousPrice
+          : null;
+      const totalChangeAmount =
+        Number.isFinite(latestPrice) && Number.isFinite(firstPrice)
+          ? latestPrice - firstPrice
+          : null;
+
+      return {
+        listingId,
+        history_count: history.length,
+        latest_observed_at: latest.observed_at,
+        latest_history_price: Number.isFinite(latestPrice) ? latestPrice : null,
+        previous_history_price: Number.isFinite(previousPrice) ? previousPrice : null,
+        min_history_price: prices.length ? Math.min(...prices) : null,
+        max_history_price: prices.length ? Math.max(...prices) : null,
+        last_change_amount: lastChangeAmount,
+        last_change_pct:
+          lastChangeAmount != null && previousPrice
+            ? (lastChangeAmount / previousPrice) * 100
+            : null,
+        total_change_amount: totalChangeAmount,
+        total_change_pct:
+          totalChangeAmount != null && firstPrice
+            ? (totalChangeAmount / firstPrice) * 100
+            : null,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.latest_observed_at) - new Date(a.latest_observed_at))
+    .slice(0, limit);
+
+  if (summaries.length === 0) return [];
+
+  const ids = summaries.map((item) => item.listingId);
+  const { data: listings, error } = await supabaseAdmin
+    .from("listing")
+    .select(
+      "id, title, price_amount, price_currency, price_per_m2, area_m2, rooms_count, floor, total_floors, district, sector, is_active, created_at, source_url, owner_id"
+    )
+    .in("id", ids);
+
+  if (error) return [];
+
+  const listingsById = new Map((listings || []).map((listing) => [listing.id, listing]));
+
+  return summaries
+    .map((summary) => {
+      const listing = listingsById.get(summary.listingId);
+      if (!listing) return null;
+      return {
+        ...listing,
+        history_count: summary.history_count,
+        latest_observed_at: summary.latest_observed_at,
+        latest_history_price: summary.latest_history_price,
+        previous_history_price: summary.previous_history_price,
+        min_history_price: summary.min_history_price,
+        max_history_price: summary.max_history_price,
+        last_change_amount: summary.last_change_amount,
+        last_change_pct: summary.last_change_pct,
+        total_change_amount: summary.total_change_amount,
+        total_change_pct: summary.total_change_pct,
+      };
+    })
+    .filter(Boolean);
 }
 
 function avg(arr) {
@@ -110,6 +209,7 @@ export async function GET(request) {
       fetchPriceChangeStats(cutoffs["24h"]),
       fetchPriceChangeStats(cutoffs["7d"]),
       fetchPriceChangeStats(cutoffs["30d"]),
+      fetchListingsWithRepeatedPriceHistory(),
     ]);
   } catch (err) {
     console.error("Failed to load admin listing stats:", err);
@@ -131,6 +231,7 @@ export async function GET(request) {
     pc24h,
     pc7d,
     pc30d,
+    priceChangeListings,
   ] = dataResults;
 
   const priced = listings.filter((l) => l.price_amount != null);
@@ -167,6 +268,7 @@ export async function GET(request) {
     byRenovation: groupBy(listings, "renovation"),
     byBuildingType: groupBy(listings, "building_type"),
     recentListings: recentRes.data || [],
+    priceChangeListings: priceChangeListings || [],
   };
 
   if (!bypassCache) {

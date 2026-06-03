@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -16,6 +16,8 @@ function CadastruResultContent() {
   const { lang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
+  const source = searchParams.get("source") || "";
+  const loadedRequestKey = useRef("");
   const [authModalDismissed, setAuthModalDismissed] = useState(false);
   const [state, setState] = useState({
     loading: true,
@@ -32,19 +34,25 @@ function CadastruResultContent() {
 
     if (!isAuthenticated) return;
 
+    const requestKey = `${cadastralNumber}|${source === "number" ? "number" : ""}`;
+    if (loadedRequestKey.current === requestKey) return;
+
     let active = true;
 
     async function loadCadastralData() {
       setState({ loading: true, error: "", data: null });
 
       try {
+        const body = { cadastral_number: cadastralNumber };
+        if (source === "number") body.search_context = "cadastru";
+
         const response = await fetch("/api/cadastral", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ cadastral_number: cadastralNumber }),
+          body: JSON.stringify(body),
         });
 
         if (!response.ok) {
@@ -58,7 +66,10 @@ function CadastruResultContent() {
         }
 
         const data = await response.json();
-        if (active) setState({ loading: false, error: "", data });
+        if (active) {
+          loadedRequestKey.current = requestKey;
+          setState({ loading: false, error: "", data });
+        }
       } catch {
         if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
       }
@@ -69,7 +80,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [authLoading, cadastralNumber, clearAuthError, isAuthenticated, session?.access_token, t]);
+  }, [authLoading, cadastralNumber, clearAuthError, isAuthenticated, session?.access_token, source, t]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">

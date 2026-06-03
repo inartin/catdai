@@ -63,6 +63,155 @@ function PriceChangeTag({ current, previous }) {
   );
 }
 
+function normalizeChartHistory(history) {
+  return history
+    .map((item) => {
+      const price = Number(item.price_amount);
+      const observedAt = item.observed_at || item.source_updated_at;
+      const observedTime = observedAt ? Date.parse(observedAt) : NaN;
+
+      if (!Number.isFinite(price) || !Number.isFinite(observedTime)) return null;
+
+      return {
+        id: item.id,
+        price,
+        date: observedAt,
+        observedTime,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.observedTime - b.observedTime);
+}
+
+function PriceHistoryChart({ history, currency }) {
+  const points = normalizeChartHistory(history);
+  if (points.length <= 1) return null;
+
+  const width = 760;
+  const height = 240;
+  const padding = { top: 22, right: 28, bottom: 46, left: 76 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const values = points.map((point) => point.price);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const valuePadding =
+    minValue === maxValue
+      ? Math.max(Math.abs(maxValue) * 0.05, 100)
+      : Math.max((maxValue - minValue) * 0.08, 1);
+  const chartMin = Math.max(0, minValue - valuePadding);
+  const chartMax = maxValue + valuePadding;
+  const valueRange = chartMax - chartMin || 1;
+  const bottomY = height - padding.bottom;
+
+  const plotted = points.map((point, index) => {
+    const x = padding.left + (index / (points.length - 1)) * chartWidth;
+    const y = bottomY - ((point.price - chartMin) / valueRange) * chartHeight;
+    return { ...point, x, y };
+  });
+  const linePoints = plotted.map((point) => `${point.x},${point.y}`).join(" ");
+  const areaPoints = `${padding.left},${bottomY} ${linePoints} ${width - padding.right},${bottomY}`;
+  const gridValues = [chartMax, (chartMax + chartMin) / 2, chartMin];
+  const firstPoint = plotted[0];
+  const lastPoint = plotted[plotted.length - 1];
+
+  return (
+    <div className="border-b border-gray-100 px-5 py-5">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Price History Chart</h3>
+          <p className="mt-1 text-xs text-gray-400">
+            {fmtDate(firstPoint.date)} - {fmtDate(lastPoint.date)}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-gray-400">Latest price</p>
+          <p className="text-lg font-semibold text-gray-900">
+            {fmtPrice(lastPoint.price, currency)}
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          role="img"
+          aria-label="Price history chart"
+          className="min-w-[620px] w-full"
+        >
+          <defs>
+            <linearGradient id="price-history-fill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#16a34a" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#16a34a" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {gridValues.map((value) => {
+            const y = bottomY - ((value - chartMin) / valueRange) * chartHeight;
+            return (
+              <g key={value}>
+                <line
+                  x1={padding.left}
+                  x2={width - padding.right}
+                  y1={y}
+                  y2={y}
+                  stroke="#e5e7eb"
+                />
+                <text
+                  x={padding.left - 12}
+                  y={y + 4}
+                  textAnchor="end"
+                  className="fill-gray-400 text-[11px]"
+                >
+                  {fmtPrice(value, currency)}
+                </text>
+              </g>
+            );
+          })}
+          <polygon points={areaPoints} fill="url(#price-history-fill)" />
+          <polyline
+            points={linePoints}
+            fill="none"
+            stroke="#16a34a"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {plotted.map((point, index) => (
+            <g key={point.id || `${point.date}-${index}`}>
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={index === plotted.length - 1 ? 5 : 4}
+                fill={index === plotted.length - 1 ? "#15803d" : "#ffffff"}
+                stroke="#16a34a"
+                strokeWidth="2"
+              />
+              <title>
+                {fmtDateTime(point.date)} - {fmtPrice(point.price, currency)}
+              </title>
+            </g>
+          ))}
+          <text
+            x={firstPoint.x}
+            y={height - 14}
+            textAnchor="start"
+            className="fill-gray-400 text-[11px]"
+          >
+            {fmtDate(firstPoint.date)}
+          </text>
+          <text
+            x={lastPoint.x}
+            y={height - 14}
+            textAnchor="end"
+            className="fill-gray-400 text-[11px]"
+          >
+            {fmtDate(lastPoint.date)}
+          </text>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export default function ListingDetailPage() {
   const { id } = useParams();
   const [listing, setListing] = useState(null);
@@ -246,6 +395,9 @@ export default function ListingDetailPage() {
             Price History ({priceHistory.length})
           </h2>
         </div>
+        {priceHistory.length > 1 && (
+          <PriceHistoryChart history={priceHistory} currency={l.price_currency} />
+        )}
         {priceHistory.length === 0 ? (
           <div className="px-5 py-8 text-center text-gray-400">
             No price history recorded

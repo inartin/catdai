@@ -117,7 +117,8 @@ function isMissingCadastruColumnError(error) {
   return (code === "PGRST204" || code === "42703") && (
     message.includes("district") ||
     message.includes("cadastral_number") ||
-    message.includes("result_type")
+    message.includes("result_type") ||
+    message.includes("lookup_source")
   );
 }
 
@@ -142,20 +143,24 @@ async function fetchCadastruRows(columns, defaults = {}) {
 async function fetchCadastruSearchEvents() {
   const columnAttempts = [
     {
-      columns: "id, search_type, user_id, district, cadastral_number, result_type, created_at",
+      columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, created_at",
       defaults: {},
     },
     {
+      columns: "id, search_type, user_id, district, cadastral_number, result_type, created_at",
+      defaults: { lookup_source: null },
+    },
+    {
       columns: "id, search_type, user_id, district, created_at",
-      defaults: { cadastral_number: null, result_type: null },
+      defaults: { cadastral_number: null, result_type: null, lookup_source: null },
     },
     {
       columns: "id, search_type, user_id, cadastral_number, result_type, created_at",
-      defaults: { district: null },
+      defaults: { district: null, lookup_source: null },
     },
     {
       columns: "id, search_type, user_id, created_at",
-      defaults: { district: null, cadastral_number: null, result_type: null },
+      defaults: { district: null, cadastral_number: null, result_type: null, lookup_source: null },
     },
   ];
 
@@ -191,6 +196,7 @@ function buildCadastruSearchStats(rows, cutoffs) {
     number: byType.number,
     byType,
     byResultType: countByValue(rows, "result_type"),
+    byLookupSource: countByValue(rows, "lookup_source"),
     byDistrict: countByValue(rows, "district"),
     periods: Object.fromEntries(
       Object.entries(cutoffs).map(([period, cutoff]) => [

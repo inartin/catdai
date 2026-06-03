@@ -54,6 +54,23 @@ function fmtCadastruResultSummary(byResultType) {
   return parts.length ? parts.join(" · ") : "No result data yet";
 }
 
+function fmtCadastruSource(source) {
+  if (source === "api") return "API";
+  if (source === "local") return "Local";
+  return source || "\u2014";
+}
+
+function fmtCadastruSourceSummary(byLookupSource) {
+  const counts = byLookupSource || {};
+  const parts = [
+    ["api", "API"],
+    ["local", "local"],
+  ]
+    .map(([key, label]) => counts[key] ? `${fmtNum(counts[key])} ${label}` : null)
+    .filter(Boolean);
+  return parts.length ? parts.join(" · ") : "No source data yet";
+}
+
 function fmtListingLinkStatus(status) {
   if (status === "success") return "Analyzed";
   if (status === "unsupported_listing_type") return "Rejected type";
@@ -560,6 +577,9 @@ export default function AdminDashboard() {
               <p className="mt-1 text-xs text-gray-500">
                 {fmtTopDistricts(s.cadastruSearches?.byDistrict)}
               </p>
+              <p className="mt-1 text-xs text-gray-500">
+                {fmtCadastruSourceSummary(s.cadastruSearches?.byLookupSource)}
+              </p>
             </div>
 
             {!Array.isArray(s.cadastruSearches?.recent) || s.cadastruSearches.recent.length === 0 ? (
@@ -572,6 +592,7 @@ export default function AdminDashboard() {
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Type</th>
                       <th className="px-4 py-3">Result</th>
+                      <th className="px-4 py-3">Source</th>
                       <th className="px-4 py-3">Cadastral number</th>
                       <th className="px-4 py-3">District</th>
                       <th className="px-4 py-3">User</th>
@@ -588,6 +609,9 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {fmtCadastruResultType(row.result_type)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {fmtCadastruSource(row.lookup_source)}
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                           {row.cadastral_number || "\u2014"}

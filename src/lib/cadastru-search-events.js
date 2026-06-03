@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
 const RESULT_TYPES = new Set(["no_data", "address_only", "apartment_only", "full_data"]);
+const LOOKUP_SOURCES = new Set(["api", "local"]);
 
 function normalizeSearchType(searchType) {
   const value = String(searchType || "").trim();
@@ -12,6 +13,11 @@ function normalizeSearchType(searchType) {
 function normalizeResultType(resultType) {
   const value = String(resultType || "").trim();
   return RESULT_TYPES.has(value) ? value : null;
+}
+
+function normalizeLookupSource(source) {
+  const value = String(source || "").trim();
+  return LOOKUP_SOURCES.has(value) ? value : null;
 }
 
 function isMissingSchemaError(error) {
@@ -55,12 +61,13 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
       district: normalizedType === "address" ? cleanDistrict(options.district) : null,
       cadastral_number: cleanCadastralNumber(options.cadastralNumber),
       result_type: normalizeResultType(options.resultType),
+      lookup_source: normalizeLookupSource(options.lookupSource),
     };
 
     let { error } = await supabaseAdmin.from("cadastru_search_events").insert(row);
 
     for (let attempt = 0; attempt < 3 && error; attempt++) {
-      const missingColumn = ["district", "cadastral_number", "result_type"].find((column) =>
+      const missingColumn = ["district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
         column in row && isMissingColumnError(error, column)
       );
       if (!missingColumn) break;

@@ -192,6 +192,7 @@ create table cadastru_search_events (
   district         text,
   cadastral_number text,
   result_type      text check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
+  lookup_source    text check (lookup_source in ('api', 'local')),
   created_at       timestamptz not null default now()
 );
 
@@ -201,6 +202,7 @@ create index idx_cadastru_search_events_user_created on cadastru_search_events (
 create index idx_cadastru_search_events_district_created on cadastru_search_events (district, created_at desc);
 create index idx_cadastru_search_events_number_created on cadastru_search_events (cadastral_number, created_at desc);
 create index idx_cadastru_search_events_result_created on cadastru_search_events (result_type, created_at desc);
+create index idx_cadastru_search_events_source_created on cadastru_search_events (lookup_source, created_at desc);
 
 -- ============================================================
 -- listing_link_analysis_events — tracks 999.md link analyzer usage

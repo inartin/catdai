@@ -1,4 +1,5 @@
 import { rateLimit } from "@/lib/rate-limit";
+import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { resolveAccessTier } from "@/lib/access-tier";
@@ -295,6 +296,18 @@ function resolveSearchContext(body) {
   return body.search_type === "address" ? "address" : "number";
 }
 
+function normalizeCadastralPayload(payload, cadastralNumber, accessTier) {
+  return {
+    ...payload,
+    cadastral_number: payload?.cadastral_number || cadastralNumber,
+    building: payload?.building || {},
+    apartment: payload?.apartment || {},
+    form_fields: payload?.form_fields || {},
+    access_tier: accessTier,
+    locked_sections: {},
+  };
+}
+
 async function buildCadastruDetailPayload(cadastralNumber, accessTier = "paid") {
   try {
     const detail = await fetchCadastruDetailData(cadastralNumber);
@@ -363,12 +376,14 @@ export async function POST(request) {
   }
 
   const cadastruSearchType = resolveSearchContext(body);
+  let lookupSource = null;
   const recordCadastruSearch = async (payload, resultType = null) => {
     if (!cadastruSearchType) return;
     await logCadastruSearchEvent(request, cadastruSearchType, {
       cadastralNumber: payload?.cadastral_number || trimmed,
       district: cadastruSearchType === "address" ? resolveDistrictFromPayload(payload) : null,
       resultType: resultType || classifyCadastralResult(payload),
+      lookupSource,
     });
   };
   const respondWithCadastralPayload = async (payload) => {
@@ -385,6 +400,37 @@ export async function POST(request) {
     );
   };
 
+  try {
+    const externalPayload = await fetchExternalCadastralData(trimmed);
+    lookupSource = "api";
+    return respondWithCadastralPayload(
+      normalizeCadastralPayload(externalPayload, trimmed, access.tier)
+    );
+  } catch (error) {
+    const details = {
+      code: error?.code || error?.name || "external_cadastru_failed",
+      status: error?.status || null,
+      message: error?.message || String(error),
+      fallback: Boolean(error?.fallbackEligible),
+      cadastral_number: trimmed,
+    };
+
+    if (!error?.fallbackEligible) {
+      console.error("[cadastral] external cadastru API failed:", details);
+      if (error?.status === 404 || error?.code === "not_found") {
+        return respondWithNotFound("Cadastral number not found");
+      }
+
+      return NextResponse.json(
+        { error: "Failed to fetch cadastral data" },
+        { status: error?.status === 400 ? 400 : 502 }
+      );
+    }
+
+    console.error("[cadastral] external cadastru API unavailable, using local backup:", details);
+  }
+
+  lookupSource = "local";
   const { code, buildingId, apartmentId } = parseCadastralParts(trimmed);
 
   try {

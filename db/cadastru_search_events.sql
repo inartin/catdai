@@ -10,6 +10,7 @@ create table if not exists cadastru_search_events (
   district         text,
   cadastral_number text,
   result_type      text check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
+  lookup_source    text check (lookup_source in ('api', 'local')),
   created_at       timestamptz not null default now()
 );
 
@@ -22,11 +23,23 @@ alter table if exists cadastru_search_events
 alter table if exists cadastru_search_events
   add column if not exists result_type text;
 
+alter table if exists cadastru_search_events
+  add column if not exists lookup_source text;
+
 do $$
 begin
   alter table cadastru_search_events
     add constraint cadastru_search_events_result_type_check
     check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data'));
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table cadastru_search_events
+    add constraint cadastru_search_events_lookup_source_check
+    check (lookup_source in ('api', 'local'));
 exception
   when duplicate_object then null;
 end $$;
@@ -48,3 +61,6 @@ create index if not exists idx_cadastru_search_events_number_created
 
 create index if not exists idx_cadastru_search_events_result_created
   on cadastru_search_events (result_type, created_at desc);
+
+create index if not exists idx_cadastru_search_events_source_created
+  on cadastru_search_events (lookup_source, created_at desc);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
+import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
@@ -33,6 +34,10 @@ export async function POST(request) {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+  }
+
+  if (!shouldPersistRuntimeData()) {
+    return NextResponse.json({ ok: true, persisted: false });
   }
 
   const access = await resolveAccessTier(request);

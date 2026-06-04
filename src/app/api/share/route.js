@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
+import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 20 });
@@ -94,6 +95,15 @@ export async function POST(request) {
     }
   }
   const canonical = JSON.stringify(canonicalParams(params));
+  const appUrl = getAppBaseUrl(request);
+
+  if (!shouldPersistRuntimeData()) {
+    const query = new URLSearchParams(params).toString();
+    return NextResponse.json(
+      { url: `${appUrl}/evaluare?${query}`, persisted: false },
+      { headers: { "X-RateLimit-Remaining": String(remaining) } }
+    );
+  }
 
   // SHA-256 hash of canonical JSON — used as the reliable dedup key
   const paramsHash = crypto.createHash("sha256").update(canonical).digest("hex");
@@ -120,7 +130,6 @@ export async function POST(request) {
     const { data: existing } = await query.maybeSingle();
 
     if (existing?.slug) {
-      const appUrl = getAppBaseUrl(request);
       return NextResponse.json(
         { url: `${appUrl}/imobil/${existing.slug}`, slug: existing.slug },
         { headers: { "X-RateLimit-Remaining": String(remaining) } }
@@ -169,7 +178,6 @@ export async function POST(request) {
     );
   }
 
-  const appUrl = getAppBaseUrl(request);
   const res = NextResponse.json({ url: `${appUrl}/imobil/${slug}`, slug });
   res.headers.set("X-RateLimit-Remaining", String(remaining));
   return res;

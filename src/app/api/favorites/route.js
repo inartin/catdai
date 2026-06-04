@@ -1,9 +1,15 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
+import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
+const devFavorites = new Map();
+
+function favoriteKey(userId, urlPath) {
+  return `${userId}:${urlPath}`;
+}
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -26,6 +32,22 @@ export async function GET(request) {
 
   const { searchParams } = new URL(request.url);
   const urlPath = searchParams.get("url_path");
+
+  if (!shouldPersistRuntimeData()) {
+    if (urlPath) {
+      return NextResponse.json({
+        favorited: devFavorites.has(favoriteKey(access.user_id, urlPath)),
+        persisted: false,
+      });
+    }
+
+    const favorites = Array.from(devFavorites.values())
+      .filter((favorite) => favorite.user_id === access.user_id)
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .map(({ user_id, ...favorite }) => favorite);
+
+    return NextResponse.json({ favorites, persisted: false });
+  }
 
   if (urlPath) {
     const { data } = await supabaseAdmin
@@ -90,6 +112,23 @@ export async function POST(request) {
       { error: "Missing required field: url_path" },
       { status: 400 }
     );
+  }
+
+  if (!shouldPersistRuntimeData()) {
+    const key = favoriteKey(access.user_id, url_path);
+    if (devFavorites.has(key)) {
+      devFavorites.delete(key);
+      return NextResponse.json({ favorited: false, persisted: false });
+    }
+
+    devFavorites.set(key, {
+      id: key,
+      user_id: access.user_id,
+      url_path,
+      label: label || null,
+      created_at: new Date().toISOString(),
+    });
+    return NextResponse.json({ favorited: true, persisted: false });
   }
 
   // Check if already favorited

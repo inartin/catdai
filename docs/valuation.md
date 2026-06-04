@@ -47,6 +47,7 @@ Implemented and active for apartments.
 - Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again, after `/api/pdf-generation-authorizations` validates the bearer token.
 - Successful authenticated PDF generation events are logged to `pdf_generation_events` with user id, device/session ids, optional estimate log id, and whether cadastral data was included.
 - Successful sale and rent estimation requests are logged to `estimate_log` with `estimate_type = 'sale'` or `estimate_type = 'rent'` for separate admin statistics. Rent requests require a client log or device id so duplicate untracked fetches do not create extra rows.
+- Estimate and PDF event DB writes are skipped outside `NODE_ENV=production`; local development still returns normal API responses without creating analytics rows.
 - The PDF dialog links to the static demo report at `/samples/demo-evaluare-catdai.md.pdf`.
 - PDF report layout uses explicit canvas coordinates for pills, seller cards, notes, and text blocks instead of HTML rasterization.
 - PDF report header reuses the product logo and displays `catdai.md` as the report brand.
@@ -85,6 +86,7 @@ Applied after RPC in `/api/estimate`.
 - `src/components/ValuationPdfDialog.js`
 - `src/app/api/pdf-generation-authorizations/route.js`
 - `src/app/api/pdf-generation-events/route.js`
+- `src/lib/runtime-persistence.js`
 - `src/lib/browser-pdf.js`
 - `scripts/generate-demo-valuation-pdf.mjs`
 - `db/pdf_generation_events.sql`

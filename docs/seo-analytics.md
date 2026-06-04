@@ -41,6 +41,7 @@ Implemented.
 - `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
 - Authenticated tracking requests store `user_id` so ZDG ad sessions can be tied to registered Supabase users after login.
 - Admin ZDG top-card totals are computed from all stored ZDG events; the visitor journey list is paged separately.
+- Runtime DB persistence for estimation logs, PDF events, cadastru search events, 999.md analysis events, shared links, and favorites runs only when `NODE_ENV=production`.
 
 ## Related Files
 - `src/app/layout.js`
@@ -51,6 +52,7 @@ Implemented.
 - `src/components/AdSourceTracker.js`
 - `src/lib/tracking.js`
 - `src/lib/admin-ad-tracking.js`
+- `src/lib/runtime-persistence.js`
 - `src/app/api/ad-source-events/route.js`
 - `src/app/api/admin/ad-tracking/route.js`
 - `db/ad_source_events.sql`

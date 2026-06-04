@@ -1,4 +1,5 @@
 import { resolveAccessTier } from "@/lib/access-tier";
+import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
@@ -43,6 +44,8 @@ function cleanCadastralNumber(value) {
 }
 
 export async function logCadastruSearchEvent(request, searchType, options = {}) {
+  if (!shouldPersistRuntimeData()) return;
+
   const normalizedType = normalizeSearchType(searchType);
   if (!normalizedType) return;
 

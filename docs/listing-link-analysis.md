@@ -28,6 +28,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 ## Analytics
 - Each parse attempt with a valid 999 listing id writes to `listing_link_analysis_events` when the table exists.
 - The admin dashboard shows total link analyses, analyzed/rejected/failed splits, period totals, and recent rows.
+- 999.md link-analysis events are written only when `NODE_ENV=production`.
 
 ## Comparison UI (`src/components/EstimateResult.js`)
 - Only compared when the listing is in **EUR** (avoids cross-currency math).
@@ -62,6 +63,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - `src/app/api/analyze-link/route.js`
 - `src/lib/parse-999-listing.js`
 - `src/lib/listing-link-analysis-events.js`
+- `src/lib/runtime-persistence.js`
 - `src/lib/listing-cache.js` (wraps the shared Redis cache in `src/lib/cache.js`)
 - `db/listing_link_analysis_events.sql`
 - `src/components/EstimateResult.js`

@@ -310,7 +310,7 @@ function MobileMarketTrendPanel({ t, lang, priceData, trendData }) {
         className="absolute inset-0 bg-no-repeat opacity-45 blur-[1.5px]"
         style={{
           backgroundImage: `url(${REAL_ESTATE_IMAGE})`,
-          backgroundPosition: "center 4rem",
+          backgroundPosition: "calc(50% + 20px) 4rem",
           backgroundSize: "140% auto",
         }}
       />

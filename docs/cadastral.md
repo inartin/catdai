@@ -34,6 +34,7 @@ Implemented and active, with partial fallback.
 - `/cadastru/rezultat` fetches authenticated `/api/cadastral`, uses the shared back button from the estimation form, renders the shared `CadastralDataCard` component used by the evaluation result page, and is marked `noindex` because each URL is generated from a user query.
 - After a result is loaded, `/cadastru/rezultat` keeps the loaded result in component state and does not repeat the lookup on tab focus or auth token refresh unless the cadastral number changes. In-flight lookups are deduped so effect reruns do not create duplicate statistics rows.
 - Valid `/cadastru` search submissions are logged to `cadastru_search_events` for admin stats with `search_type`, optional authenticated `user_id`, optional derived district for address searches, cadastral number when known, result type, lookup source, and timestamp. Result type is one of `no_data`, `address_only`, `apartment_only`, or `full_data`; lookup source is `api` for the external worker or `local` for the in-app backup.
+- Cadastru search analytics are written only when `NODE_ENV=production`.
 - `CadastralDataCard` highlights the cadastral number as the primary key before the address and uses two desktop columns for apartment plus building details, falling back to stacked sections on mobile.
 - When only one detail section is available, or only the cadastral number/address is available, the result card uses a compact centered width and keeps the available details on the full inner width instead of reserving an empty second column.
 - Partial cadastral responses use the same result card and still show the cadastral number plus any available address, while detailed apartment/building sections render only when official fields exist.
@@ -71,6 +72,7 @@ Implemented and active, with partial fallback.
 - `src/app/cadastru/rezultat/layout.js`
 - `src/lib/cadastru-address-search.js`
 - `src/lib/cadastru-search-events.js`
+- `src/lib/runtime-persistence.js`
 - `external/cadastru-api/*`
 - `src/components/AuthRequiredModal.js`
 - `src/components/BackButton.js`

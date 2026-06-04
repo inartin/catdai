@@ -1,4 +1,5 @@
 import { resolveAccessTier } from "@/lib/access-tier";
+import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const STATUSES = new Set([
@@ -33,6 +34,8 @@ function cleanInteger(value) {
 }
 
 export async function logListingLinkAnalysisEvent(request, event) {
+  if (!shouldPersistRuntimeData()) return;
+
   const status = STATUSES.has(event?.status) ? event.status : null;
   if (!status) return;
 

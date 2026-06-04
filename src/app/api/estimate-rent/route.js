@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { rateLimit } from "@/lib/rate-limit";
+import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { DISTRICTS_BY_CITY, matchBuildingType, matchCity, matchDistrict, validateEstimateInput } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
@@ -20,6 +21,7 @@ function hashIp(ip) {
 }
 
 function logEstimate(row) {
+  if (!shouldPersistRuntimeData()) return;
   supabaseAdmin
     .from("estimate_log")
     .upsert(row, { onConflict: "id" })

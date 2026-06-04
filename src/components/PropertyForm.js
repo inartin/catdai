@@ -90,6 +90,33 @@ function ChevronIcon({ open }) {
   );
 }
 
+function CalculatorIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="w-5 h-5"
+      fill="none"
+      stroke="white"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M8 7h8" />
+      <path d="M8 11h.01" />
+      <path d="M12 11h.01" />
+      <path d="M16 11h.01" />
+      <path d="M8 15h.01" />
+      <path d="M12 15h.01" />
+      <path d="M16 15h.01" />
+      <path d="M8 19h.01" />
+      <path d="M12 19h.01" />
+      <path d="M16 19h.01" />
+    </svg>
+  );
+}
+
 function SelectField({ label, required, value, onChange, placeholder, options, labelFn, disabled }) {
   return (
     <div>
@@ -211,18 +238,19 @@ function isTrueValue(value) {
   return value === true || value === "true" || value === "1";
 }
 
-export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit }) {
+export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit, variant = "estimate" }) {
   const router = useRouter();
   const { t } = useTranslation();
   const { session, isAuthenticated, clearAuthError } = useAuth();
+  const isCalculatorMode = variant === "rentYieldCalculator";
   const estimateModes = [
     { key: "sale", label: t("form.estimateModeSale") },
     { key: "rent", label: t("form.estimateModeRent") },
   ];
   const initialFirstFloor = isTrueValue(initialValues?.first_floor);
   const initialLastFloor = isTrueValue(initialValues?.last_floor);
-  const [estimateMode, setEstimateMode] = useState(initialValues?.type === "rent" || initialValues?.mode === "rent" ? "rent" : "sale");
-  const isRentMode = estimateMode === "rent";
+  const [estimateMode, setEstimateMode] = useState(isCalculatorMode ? "sale" : initialValues?.type === "rent" || initialValues?.mode === "rent" ? "rent" : "sale");
+  const isRentMode = !isCalculatorMode && estimateMode === "rent";
   const [form, setForm] = useState({
     city: initialValues?.city ?? "Chișinău",
     district: initialValues?.district ?? "",
@@ -236,6 +264,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     renovation: normalizeRenovationSelection(initialValues?.renovation ?? ""),
     bathrooms_count: initialValues?.bathrooms_count ?? null,
     balconies_count: initialValues?.balconies_count ?? null,
+  });
+  const [calculatorForm, setCalculatorForm] = useState({
+    apartment_price: initialValues?.apartment_price ?? "",
+    additional_investments: initialValues?.additional_investments ?? "",
+    include_rent_tax: isTrueValue(initialValues?.include_rent_tax),
   });
   const [showOptional, setShowOptional] = useState(
     !!((!initialFirstFloor && !initialLastFloor && initialValues?.floor) || initialFirstFloor || initialLastFloor || initialValues?.total_floors || initialValues?.bathrooms_count || initialValues?.balconies_count)
@@ -262,6 +295,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   const refArea = useRef(null);
   const refBuildingType = useRef(null);
   const refRenovation = useRef(null);
+  const refApartmentPrice = useRef(null);
 
   const update = (key, value) => {
     setHighlightField(null);
@@ -279,6 +313,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
       }
       return next;
     });
+  };
+
+  const updateCalculator = (key, value) => {
+    setHighlightField(null);
+    setCalculatorForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleCadastralSearch = async () => {
@@ -366,7 +405,9 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
             ? "building_type"
             : !form.renovation
               ? "renovation"
-              : null;
+              : isCalculatorMode && !calculatorForm.apartment_price
+                ? "apartment_price"
+                : null;
     if (firstMissing) {
       setHighlightField(firstMissing);
       const refMap = {
@@ -375,6 +416,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         rooms_count: refRooms,
         building_type: refBuildingType,
         renovation: refRenovation,
+        apartment_price: refApartmentPrice,
       };
       refMap[firstMissing].current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
@@ -403,6 +445,15 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
       const cadastralNumber = cadastralInput.trim();
       if (cadastralNumber) {
         params.set("cadastral_number", cadastralNumber);
+      }
+    }
+    if (isCalculatorMode) {
+      params.set("apartment_price", String(calculatorForm.apartment_price));
+      if (calculatorForm.additional_investments) {
+        params.set("additional_investments", String(calculatorForm.additional_investments));
+      }
+      if (calculatorForm.include_rent_tax) {
+        params.set("include_rent_tax", "1");
       }
     }
     params.set("_new", "1");
@@ -448,7 +499,8 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     && ((districtsByCity[form.city] || []).length === 0 || (isRentMode ? rentDistricts.length > 0 : form.district))
     && form.rooms_count != null
     && (isRentMode || form.building_type)
-    && form.renovation;
+    && form.renovation
+    && (!isCalculatorMode || calculatorForm.apartment_price);
 
   const districts = districtsByCity[form.city] || [];
 
@@ -466,6 +518,131 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         ? "text-amber-600"
         : "text-emerald-600";
 
+  const calculatorCardShellClass = "rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden";
+  const calculatorStandaloneCardClass = `${calculatorCardShellClass} p-5 sm:p-6`;
+  const formCardClass = isCalculatorMode
+    ? "mt-6 space-y-5"
+    : "rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden divide-y divide-gray-100";
+  const locationSectionClass = isCalculatorMode
+    ? "px-5 pb-5 sm:px-6 sm:pb-6"
+    : "p-5 sm:p-6";
+
+  function CalculatorGroupedCard({ children }) {
+    if (!isCalculatorMode) return <>{children}</>;
+    return <div className={calculatorCardShellClass}>{children}</div>;
+  }
+
+  const renderOptionalDetails = (className = "p-5 sm:p-6") => (
+    <div className={className}>
+      <button
+        type="button"
+        onClick={() => setShowOptional((p) => !p)}
+        className="w-full flex items-center justify-between"
+      >
+        <div className="flex items-center cursor-pointer gap-2">
+          <span className="w-6 h-6 rounded-full bg-amber-50 text-amber-500 text-xs font-bold flex items-center justify-center">
+            +
+          </span>
+          <span className="text-sm font-semibold text-gray-900">
+            {t("form.optionalSection")}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* {optionalGain > 0 && (
+            <span className="text-xs text-amber-500 font-medium">
+              {t("form.accuracyGain", { gain: optionalGain })}
+            </span>
+          )} */}
+          <ChevronIcon open={showOptional} />
+        </div>
+      </button>
+
+      {showOptional && (
+        <div className="mt-5 space-y-4 animate-fade-in">
+          <div className={`${isRentMode ? "" : "grid grid-cols-2 gap-3"}`}>
+            <div>
+              <label className="text-sm text-gray-600 mb-1.5 block">
+                {t("form.floor")}
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={100}
+                placeholder={t("form.floorPlaceholder")}
+                value={form.floor}
+                onChange={(e) => update("floor", e.target.value)}
+                disabled={form.first_floor || form.last_floor}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors disabled:bg-gray-50 disabled:text-gray-400"
+              />
+            </div>
+            {!isRentMode && (
+            <div>
+              <label className="text-sm text-gray-600 mb-1.5 block">
+                {t("form.totalFloors")}
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={100}
+                placeholder={t("form.totalFloorsPlaceholder")}
+                value={form.total_floors}
+                onChange={(e) => update("total_floors", e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+              />
+            </div>
+            )}
+          </div>
+          {!isRentMode && !isCalculatorMode && (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <CheckboxOption
+              checked={form.first_floor}
+              onChange={(value) => update("first_floor", value)}
+            >
+              {t("result.floorOption.first")}
+            </CheckboxOption>
+            <CheckboxOption
+              checked={form.last_floor}
+              onChange={(value) => update("last_floor", value)}
+            >
+              {t("result.floorOption.last")}
+            </CheckboxOption>
+          </div>
+          )}
+
+          <div className={`${isRentMode ? "" : "grid grid-cols-2 gap-3"}`}>
+            <div>
+              <label className="text-sm text-gray-600 mb-2 block">
+                {t("form.bathrooms")}
+              </label>
+              <PillGroup
+                options={[1, 2, "3+"]}
+                value={form.bathrooms_count}
+                onChange={(v) => update("bathrooms_count", v)}
+                columns={3}
+              />
+            </div>
+            {!isRentMode && (
+            <div>
+              <label className="text-sm text-gray-600 mb-2 block">
+                {t("form.balconies")}
+              </label>
+              <PillGroup
+                options={countOptions}
+                value={form.balconies_count}
+                onChange={(v) => update("balconies_count", v)}
+                columns={4}
+              />
+            </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <section className="py-8 px-4">
       <AuthRequiredModal
@@ -478,56 +655,63 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
           {t("form.back")}
         </BackButton>
 
-        <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
-          <div className="grid grid-cols-2 gap-1">
-            {estimateModes.map((mode) => {
-              const active = estimateMode === mode.key;
-              return (
-                <button
-                  key={mode.key}
-                  type="button"
-                  onClick={() => setEstimateMode(mode.key)}
-                  className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-150 ${active
-                    ? "bg-primary text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    }`}
-                >
-                  {mode.label}
-                </button>
-              );
-            })}
+        {!isCalculatorMode && (
+          <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
+            <div className="grid grid-cols-2 gap-1">
+              {estimateModes.map((mode) => {
+                const active = estimateMode === mode.key;
+                return (
+                  <button
+                    key={mode.key}
+                    type="button"
+                    onClick={() => setEstimateMode(mode.key)}
+                    className={`min-h-11 rounded-xl px-3 py-2 text-sm font-semibold transition-all duration-150 ${active
+                      ? "bg-primary text-white shadow-sm"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                      }`}
+                  >
+                    {mode.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="w-10 h-10 rounded-xl bg-green-600 flex items-center justify-center shrink-0">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-5 h-5"
-                fill="none"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
-              </svg>
+              {isCalculatorMode ? (
+                <CalculatorIcon />
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+              )}
             </span>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">
-                {isRentMode ? t("form.rentTitle") : t("form.title")}
+                {isCalculatorMode ? t("calculator.title") : isRentMode ? t("form.rentTitle") : t("form.title")}
               </h1>
               <p className="text-sm text-gray-400">
-                {isRentMode ? t("form.rentSubtitle") : t("form.subtitle")}
+                {isCalculatorMode ? t("calculator.subtitle") : isRentMode ? t("form.rentSubtitle") : t("form.subtitle")}
               </p>
             </div>
           </div>
         </div>
 
         {/* ── Accuracy meter ── */}
+        {!isCalculatorMode && (
         <div className="mt-6 mb-8">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-medium text-gray-400 uppercase tracking-wide">
@@ -544,9 +728,216 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
             />
           </div>
         </div>
+        )}
 
         {/* ── Form card ── */}
-        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden divide-y divide-gray-100">
+        <div className={formCardClass}>
+          {isCalculatorMode && (
+            <div className={calculatorStandaloneCardClass}>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
+                  1
+                </span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {t("calculator.investmentSection")}
+                </span>
+              </div>
+
+              <div className="space-y-4">
+                <div
+                  ref={refApartmentPrice}
+                  className={`rounded-xl transition-all duration-300 ${highlightField === "apartment_price" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
+                >
+                  <label className="text-sm text-gray-600 mb-1.5 block">
+                    {t("calculator.apartmentPrice")}
+                    <span className="text-red-400 ml-0.5">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={1}
+                    placeholder={t("calculator.apartmentPricePlaceholder")}
+                    value={calculatorForm.apartment_price}
+                    onChange={(e) => updateCalculator("apartment_price", e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm text-gray-600 mb-1.5 block">
+                    {t("calculator.additionalInvestments")}
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    placeholder={t("calculator.additionalInvestmentsPlaceholder")}
+                    value={calculatorForm.additional_investments}
+                    onChange={(e) => updateCalculator("additional_investments", e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+                  />
+                </div>
+
+                <CheckboxOption
+                  checked={calculatorForm.include_rent_tax}
+                  onChange={(value) => updateCalculator("include_rent_tax", value)}
+                >
+                  {t("calculator.includeRentTax")}
+                </CheckboxOption>
+              </div>
+            </div>
+          )}
+
+          <CalculatorGroupedCard>
+          {isCalculatorMode ? (
+          <div className="p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
+                2
+              </span>
+              <span className="text-sm font-semibold text-gray-900">
+                {t("form.locationSection")}
+              </span>
+            </div>
+
+            <div className="mx-auto mb-6 w-full max-w-xl rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 text-xs font-bold flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                </span>
+                <span className="text-sm font-semibold text-gray-900">
+                  {t("form.cadastralSection")}
+                </span>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-600 mb-1.5 block">
+                  {t("form.cadastralNumber")}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder={t("form.cadastralPlaceholder")}
+                    value={cadastralInput}
+                    onChange={(e) => {
+                      setCadastralInput(e.target.value);
+                      if (cadastralError) setCadastralError(null);
+                      if (cadastralData) setCadastralData(null);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleCadastralSearch();
+                    }}
+                    disabled={cadastralLoading}
+                    className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCadastralSearch}
+                    disabled={cadastralLoading || !cadastralInput.trim()}
+                    className="px-5 py-3 rounded-xl text-sm font-medium transition-all duration-150 bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
+                  >
+                    {cadastralLoading ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        {t("form.cadastralSearching")}
+                      </>
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        {t("form.cadastralSearch")}
+                      </>
+                    )}
+                  </button>
+                </div>
+                {cadastralError && (
+                  <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+                      <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+                    </svg>
+                    {t(`form.${cadastralError}`)}
+                  </p>
+                )}
+                {cadastralData && !cadastralError && !cadastralData.partial && (
+                  <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 animate-fade-in">
+                    <p className="text-xs font-medium text-emerald-700 flex items-center gap-1.5 mb-2">
+                      <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+                        <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
+                      </svg>
+                      {t("form.cadastralFound")}
+                    </p>
+
+                    {cadastralData.apartment?.address && (
+                      <p className="text-xs text-emerald-600">{cadastralData.apartment.address}</p>
+                    )}
+                  </div>
+                )}
+                {cadastralData && !cadastralError && cadastralData.partial && (
+                  <div className="mt-3 rounded-xl bg-sky-50 border border-sky-200 p-3 animate-fade-in">
+                    <p className="text-xs font-medium text-sky-700 flex items-center gap-1.5 mb-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+                        <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
+                      </svg>
+                      {t("form.cadastralPartial")}
+                    </p>
+                    {cadastralData.location?.display_name && (
+                      <p className="text-xs text-sky-600">{cadastralData.location.display_name}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div
+                ref={refCity}
+                className={`rounded-xl transition-all duration-300 ${highlightField === "city" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
+              >
+                <SelectField
+                  label={t("form.city")}
+                  required
+                  value={form.city}
+                  onChange={(v) => update("city", v)}
+                  placeholder={t("form.selectCity")}
+                  options={cities}
+                  labelFn={(v) => t(`data.city.${v}`)}
+                />
+                <p className="mt-1.5 flex items-center gap-1 text-xs text-blue-600/70">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
+                    <path fillRule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
+                  </svg>
+                  {t("form.cityOnlyNotice")}
+                </p>
+              </div>
+
+              {form.city && districts.length > 0 && (
+                <div
+                  ref={refDistrict}
+                  className={`rounded-xl transition-all duration-300 ${highlightField === "district" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
+                >
+                  <SelectField
+                    label={t("form.district")}
+                    required
+                    value={form.district}
+                    onChange={(v) => update("district", v)}
+                    placeholder={t("form.selectDistrict")}
+                    options={districts}
+                    labelFn={(v) => t(`data.district.${v}`)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          ) : (
+          <>
           {/* — Cadastral shortcut — */}
           {!isRentMode && (
           <div className="p-5 sm:p-6">
@@ -647,10 +1038,10 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
           )}
 
           {/* — Section 1: Location — */}
-          <div className="p-5 sm:p-6">
+          <div className={locationSectionClass}>
             <div className="flex items-center gap-2 mb-4">
               <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
-                1
+                {isCalculatorMode ? 2 : 1}
               </span>
               <span className="text-sm font-semibold text-gray-900">
                 {t("form.locationSection")}
@@ -682,7 +1073,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
               {form.city && districts.length > 0 && (
                 <div
                   ref={refDistrict}
-                  className={`animate-fade-in rounded-xl transition-all duration-300 ${highlightField === "district" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
+                  className={`rounded-xl transition-all duration-300 ${highlightField === "district" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
                 >
                   {isRentMode ? (
                     <MultiSelectField
@@ -709,16 +1100,19 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
               )}
             </div>
           </div>
+          </>
+          )}
+          </CalculatorGroupedCard>
 
           {/* — Section 2: Property basics — */}
           {form.city && ((districtsByCity[form.city] || []).length === 0 || (isRentMode ? rentDistricts.length > 0 : form.district)) && (
-            <div className="p-5 sm:p-6">
+            <div className={isCalculatorMode ? calculatorStandaloneCardClass : "p-5 sm:p-6"}>
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
-                  2
+                  {isCalculatorMode ? 3 : 2}
                 </span>
                 <span className="text-sm font-semibold text-gray-900">
-                  {t("form.propertySection")}
+                  {isCalculatorMode ? t("calculator.propertySection") : t("form.propertySection")}
                 </span>
               </div>
 
@@ -800,118 +1194,15 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                   />
                 </div>
               </div>
+              {isCalculatorMode && (
+                <div className="mt-6">
+                  {renderOptionalDetails("p-0")}
+                </div>
+              )}
             </div>
           )}
 
-          {/* — Section 3: Optional — */}
-          <div className="p-5 sm:p-6">
-            <button
-              type="button"
-              onClick={() => setShowOptional((p) => !p)}
-              className="w-full flex items-center justify-between"
-            >
-              <div className="flex items-center cursor-pointer gap-2">
-                <span className="w-6 h-6 rounded-full bg-amber-50 text-amber-500 text-xs font-bold flex items-center justify-center">
-                  +
-                </span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {t("form.optionalSection")}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {/* {optionalGain > 0 && (
-                  <span className="text-xs text-amber-500 font-medium">
-                    {t("form.accuracyGain", { gain: optionalGain })}
-                  </span>
-                )} */}
-                <ChevronIcon open={showOptional} />
-              </div>
-            </button>
-
-            {showOptional && (
-              <div className="mt-5 space-y-4 animate-fade-in">
-                <div className={`${isRentMode ? "" : "grid grid-cols-2 gap-3"}`}>
-                  <div>
-                    <label className="text-sm text-gray-600 mb-1.5 block">
-                      {t("form.floor")}
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      max={100}
-                      placeholder={t("form.floorPlaceholder")}
-                      value={form.floor}
-                      onChange={(e) => update("floor", e.target.value)}
-                      disabled={form.first_floor || form.last_floor}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors disabled:bg-gray-50 disabled:text-gray-400"
-                    />
-                  </div>
-                  {!isRentMode && (
-                  <div>
-                    <label className="text-sm text-gray-600 mb-1.5 block">
-                      {t("form.totalFloors")}
-                    </label>
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
-                      max={100}
-                      placeholder={t("form.totalFloorsPlaceholder")}
-                      value={form.total_floors}
-                      onChange={(e) => update("total_floors", e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                    />
-                  </div>
-                  )}
-                </div>
-                {!isRentMode && (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <CheckboxOption
-                    checked={form.first_floor}
-                    onChange={(value) => update("first_floor", value)}
-                  >
-                    {t("result.floorOption.first")}
-                  </CheckboxOption>
-                  <CheckboxOption
-                    checked={form.last_floor}
-                    onChange={(value) => update("last_floor", value)}
-                  >
-                    {t("result.floorOption.last")}
-                  </CheckboxOption>
-                </div>
-                )}
-
-                <div className={`${isRentMode ? "" : "grid grid-cols-2 gap-3"}`}>
-                  <div>
-                    <label className="text-sm text-gray-600 mb-2 block">
-                      {t("form.bathrooms")}
-                    </label>
-                    <PillGroup
-                      options={[1, 2, "3+"]}
-                      value={form.bathrooms_count}
-                      onChange={(v) => update("bathrooms_count", v)}
-                      columns={3}
-                    />
-                  </div>
-                  {!isRentMode && (
-                  <div>
-                    <label className="text-sm text-gray-600 mb-2 block">
-                      {t("form.balconies")}
-                    </label>
-                    <PillGroup
-                      options={countOptions}
-                      value={form.balconies_count}
-                      onChange={(v) => update("balconies_count", v)}
-                      columns={4}
-                    />
-                  </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+          {!isCalculatorMode && renderOptionalDetails()}
         </div>
 
         {/* ── CTA ── */}
@@ -932,9 +1223,10 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
             <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
           </svg>
-          {t("form.submit")}
+          {isCalculatorMode ? t("calculator.submit") : t("form.submit")}
         </button>
 
+        {!isCalculatorMode && (
         <p className="mt-4 text-center text-sm text-gray-500">
           {t("form.linkAnalyzerPrompt")}{" "}
           <Link
@@ -944,6 +1236,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
             {t("form.linkAnalyzerCta")}
           </Link>
         </p>
+        )}
 
         {/* ── Social proof ── */}
         <p className="text-center text-xs text-gray-400 mt-3">

@@ -49,6 +49,18 @@ function formatPrice(num) {
   return "€" + Math.round(value).toLocaleString("ro-MD");
 }
 
+function formatNullablePrice(num) {
+  if (num === null || num === undefined || num === "") return "—";
+  return formatPrice(num);
+}
+
+function formatCompactEuro(num) {
+  const value = Number(num);
+  if (!Number.isFinite(value)) return "—";
+  if (Math.abs(value) >= 1000) return `€${Math.round(value / 1000)}k`;
+  return formatPrice(value);
+}
+
 function formatCurrencyPrice(num, currency = "EUR") {
   const value = Number(num);
   if (!Number.isFinite(value)) return "—";
@@ -62,6 +74,20 @@ function formatTrendPercent(num) {
   if (!Number.isFinite(value)) return "—";
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
+}
+
+function formatPlainPercent(num) {
+  if (num === null || num === undefined || num === "") return "—";
+  const value = Number(num);
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toFixed(1)}%`;
+}
+
+function formatYears(num, t) {
+  if (num === null || num === undefined || num === "") return "—";
+  const value = Number(num);
+  if (!Number.isFinite(value) || value <= 0) return "—";
+  return t("calculator.resultYearsValue", { years: value.toFixed(1) });
 }
 
 function formatTrendDate(date, lang) {
@@ -592,6 +618,427 @@ function RelevantListingsPreview({ t, count, listings, onViewAll, sidebar = fals
   );
 }
 
+function RentYieldCalculatorPanel({ calculation }) {
+  const { t } = useTranslation();
+  const hasTax = calculation.include_rent_tax;
+  const gridClassName = hasTax
+    ? "lg:grid-cols-3"
+    : "lg:grid-cols-2";
+  const sectionClassName = "grid grid-cols-2 lg:grid-cols-1 lg:grid-rows-2";
+  const blockClassName = "grid min-h-36 grid-rows-[3.5rem_auto_3.5rem] items-center justify-items-center p-4 text-center lg:min-h-48 lg:grid-rows-[3.75rem_auto_3.75rem] lg:p-8";
+  const labelClassName = "text-base font-medium leading-snug text-gray-400 sm:text-sm";
+  const valueClassName = "text-3xl font-bold tracking-tight text-gray-900 lg:text-5xl";
+  const netValueClassName = "text-4xl font-bold tracking-tight text-primary lg:text-6xl";
+  const subLabelClassName = "text-base font-medium leading-snug text-gray-500";
+
+  return (
+    <>
+      <div className={`grid w-full min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm ${gridClassName}`}>
+        <section className={`${sectionClassName} border-b border-gray-100 text-center lg:border-b-0 lg:border-r`}>
+          <div className={blockClassName}>
+            <p className={labelClassName}>{t("calculator.resultRecommendedRent")}</p>
+            <EditableRecommendedRent
+              value={calculation.monthly_rent}
+              onChange={calculation.onMonthlyRentChange}
+              className={valueClassName}
+            />
+            <p className={subLabelClassName}>
+              {t("result.rentPerMonth")}
+            </p>
+          </div>
+
+          <div className={`${blockClassName} border-l border-gray-100 bg-gray-50/40 lg:border-l-0 lg:border-t`}>
+            <p aria-hidden="true" className={`${labelClassName} invisible`}>{t("calculator.resultRecommendedRent")}</p>
+            <p className={valueClassName}>
+              {formatNullablePrice(calculation.annual_gross_rent)}
+            </p>
+            <p className={subLabelClassName}>
+              {t("calculator.resultAnnualRent")}
+            </p>
+          </div>
+        </section>
+
+        {hasTax && (
+          <section className={`${sectionClassName} border-b border-gray-100 bg-primary/5 text-center lg:border-b-0 lg:border-r`}>
+            <div className={blockClassName}>
+              <p className="text-sm font-semibold leading-snug text-red-500">
+                {t("calculator.resultMonthlyTaxDeducted", { amount: formatNullablePrice(calculation.monthly_tax) })}
+              </p>
+              <p className={netValueClassName}>
+                {formatNullablePrice(calculation.monthly_effective_rent)}
+              </p>
+              <p className={subLabelClassName}>
+                {t("calculator.resultPerMonthAfterTax")}
+              </p>
+            </div>
+
+            <div className={`${blockClassName} border-l border-primary/10 bg-primary/5 lg:border-l-0 lg:border-t`}>
+              <p aria-hidden="true" className="invisible text-sm font-semibold leading-snug text-red-500">
+                {t("calculator.resultMonthlyTaxDeducted", { amount: formatNullablePrice(calculation.monthly_tax) })}
+              </p>
+              <p className={netValueClassName}>
+                {formatNullablePrice(calculation.annual_effective_rent)}
+              </p>
+              <p className={subLabelClassName}>
+                {t("calculator.resultPerYearAfterTax")}
+              </p>
+            </div>
+          </section>
+        )}
+
+        <section className={`${sectionClassName} text-center`}>
+          <div className={blockClassName}>
+            <p className={labelClassName}>{t("calculator.resultAnnualGrossYield")}</p>
+            <p className={valueClassName}>{formatPlainPercent(calculation.gross_yield_pct)}</p>
+          </div>
+
+          <div className={`${blockClassName} border-l border-gray-100 bg-gray-50/40 lg:border-l-0 lg:border-t`}>
+            <p className={labelClassName}>{t("calculator.resultPaybackPeriod")}</p>
+            <p className={valueClassName}>{formatYears(calculation.payback_years, t)}</p>
+            <p className={subLabelClassName}>
+              {t("calculator.resultTotalInvestment", { amount: formatNullablePrice(calculation.total_investment) })}
+            </p>
+          </div>
+        </section>
+      </div>
+
+      {hasTax && (
+        <>
+          <section className="w-full min-w-0 overflow-hidden rounded-2xl border border-red-100 bg-white shadow-sm">
+            <p className="border-b border-red-100 bg-red-50/50 px-5 py-4 text-sm font-bold uppercase tracking-wide text-red-500 sm:px-6">
+              {t("calculator.resultTaxesPaidTitle")}
+            </p>
+            <div className="grid sm:grid-cols-3">
+              <div className="p-5 sm:p-6">
+                <p className="text-3xl font-bold tracking-tight text-gray-900">{formatNullablePrice(calculation.monthly_tax)}</p>
+                <p className="mt-1 text-base font-medium text-gray-500">{t("calculator.resultMonthlyTaxPaid")}</p>
+              </div>
+              <div className="border-t border-red-100 p-5 sm:border-l sm:border-t-0 sm:p-6">
+                <p className="text-3xl font-bold tracking-tight text-gray-900">{formatNullablePrice(calculation.annual_tax)}</p>
+                <p className="mt-1 text-base font-medium text-gray-500">{t("calculator.resultAnnualTaxPaid")}</p>
+              </div>
+              <div className="border-t border-red-100 bg-red-50/30 p-5 sm:border-l sm:border-t-0 sm:p-6">
+                <p className="text-3xl font-bold tracking-tight text-gray-900">{formatNullablePrice(calculation.total_tax_until_payback)}</p>
+                <p className="mt-1 text-base font-medium text-gray-500">{t("calculator.resultTaxPaidUntilPayback")}</p>
+              </div>
+            </div>
+          </section>
+
+          <RentYieldAccumulationChart calculation={calculation} />
+        </>
+      )}
+    </>
+  );
+}
+
+function RentYieldAccumulationChart({ calculation }) {
+  const { t } = useTranslation();
+  const [hoveredYear, setHoveredYear] = useState(null);
+  const annualIncome = Number(calculation.annual_effective_rent);
+  const annualTax = Number(calculation.annual_tax);
+  const totalInvestment = Number(calculation.total_investment);
+  const paybackYears = Number(calculation.payback_years);
+
+  if (!Number.isFinite(annualIncome) || annualIncome <= 0 || !Number.isFinite(annualTax) || annualTax <= 0 || !Number.isFinite(totalInvestment) || totalInvestment <= 0 || !Number.isFinite(paybackYears) || paybackYears <= 0) {
+    return null;
+  }
+
+  const yearsCount = Math.max(1, Math.ceil(paybackYears));
+  const width = 680;
+  const height = 280;
+  const padding = { top: 24, right: 32, bottom: 44, left: 82 };
+  const chartHeight = height - padding.top - padding.bottom;
+  const maxValue = Math.max(totalInvestment, annualIncome * yearsCount, annualTax * yearsCount);
+  const y = (value) => padding.top + chartHeight - (value / maxValue) * chartHeight;
+  const plotInset = 18;
+  const x = (year) => padding.left + plotInset + ((year - 1) / Math.max(1, yearsCount - 1)) * (width - padding.left - padding.right - plotInset);
+  const targetY = y(totalInvestment);
+  const labelEvery = yearsCount <= 24 ? 1 : Math.ceil(yearsCount / 12);
+  const yearSpacing = (width - padding.left - padding.right) / Math.max(1, yearsCount - 1);
+  const barWidth = Math.max(7, Math.min(16, yearSpacing * 0.22));
+  const barOffset = Math.max(barWidth * 0.85, Math.min(14, yearSpacing * 0.18));
+  const hitWidth = Math.max(32, Math.min(56, yearSpacing * 0.72));
+  const hoveredIncome = hoveredYear ? annualIncome * hoveredYear : null;
+  const hoveredTax = hoveredYear ? annualTax * hoveredYear : null;
+  const tooltipWidth = 156;
+  const tooltipX = hoveredYear
+    ? Math.min(width - tooltipWidth - 12, Math.max(12, x(hoveredYear) - tooltipWidth / 2))
+    : 0;
+  const tooltipY = hoveredYear
+    ? Math.max(12, Math.min(y(Math.max(hoveredIncome, hoveredTax)) - 76, height - padding.bottom - 92))
+    : 0;
+  const axisTickCount = 4;
+  const axisTicks = Array.from({ length: axisTickCount + 1 }, (_, index) => (maxValue / axisTickCount) * index);
+
+  return (
+    <section className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-bold uppercase tracking-wide text-gray-400">{t("calculator.resultAccumulationChartTitle")}</p>
+        <div className="flex flex-wrap gap-3 text-sm font-medium text-gray-500">
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+            {t("calculator.resultAccumulatedIncome")}
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+            {t("calculator.resultAccumulatedTax")}
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 pb-2">
+        <svg
+          role="img"
+          aria-label={t("calculator.resultAccumulationChartTitle")}
+          viewBox={`0 0 ${width} ${height}`}
+          className="h-auto w-full"
+          preserveAspectRatio="none"
+        >
+          <line x1={padding.left} x2={padding.left} y1={padding.top} y2={padding.top + chartHeight} stroke="#E5E7EB" strokeWidth="1" />
+          {axisTicks.map((tick) => {
+            const tickY = y(tick);
+            return (
+              <g key={tick}>
+                <line x1={padding.left} x2={width - padding.right} y1={tickY} y2={tickY} stroke="#F3F4F6" strokeWidth="1" />
+                <line x1={padding.left - 5} x2={padding.left} y1={tickY} y2={tickY} stroke="#D1D5DB" strokeWidth="1" />
+                <text x={padding.left - 10} y={tickY + 4} textAnchor="end" fill="#6B7280" fontSize="11" fontWeight="600">
+                  {formatCompactEuro(tick)}
+                </text>
+              </g>
+            );
+          })}
+          <line x1={padding.left} x2={width - padding.right} y1={targetY} y2={targetY} stroke="#6B7280" strokeDasharray="5 5" strokeWidth="1.5" />
+          <text x={(padding.left + width - padding.right) / 2} y={Math.max(12, targetY - 8)} textAnchor="middle" fill="#6B7280" fontSize="12" fontWeight="600">
+            {t("calculator.resultTotalInvestmentLine", { amount: formatNullablePrice(totalInvestment) })}
+          </text>
+          <line x1={padding.left} x2={width - padding.right} y1={padding.top + chartHeight} y2={padding.top + chartHeight} stroke="#E5E7EB" strokeWidth="1" />
+          <text x={padding.left} y={height } fill="#6B7280" fontSize="12" fontWeight="700">
+            {t("calculator.resultRentYearsAxis")}
+          </text>
+
+          {Array.from({ length: yearsCount }, (_, index) => {
+            const year = index + 1;
+            const currentX = x(year);
+            const income = annualIncome * year;
+            const tax = annualTax * year;
+            const showLabel = year === 1 || year === yearsCount || year % labelEvery === 0;
+
+            return (
+              <g
+                key={year}
+                onMouseEnter={() => setHoveredYear(year)}
+                onMouseLeave={() => setHoveredYear(null)}
+                onFocus={() => setHoveredYear(year)}
+                onBlur={() => setHoveredYear(null)}
+              >
+                <rect
+                  x={currentX - hitWidth / 2}
+                  y={padding.top}
+                  width={hitWidth}
+                  height={chartHeight}
+                  fill="transparent"
+                  tabIndex={0}
+                  aria-label={t("calculator.resultChartHoverTitle", {
+                    year,
+                    income: formatNullablePrice(income),
+                    tax: formatNullablePrice(tax),
+                  })}
+                />
+                <line
+                  x1={currentX - barOffset / 2}
+                  x2={currentX - barOffset / 2}
+                  y1={padding.top + chartHeight}
+                  y2={y(income)}
+                  stroke="#16A34A"
+                  strokeWidth={barWidth}
+                  strokeLinecap="round"
+                >
+                  <title>{t("calculator.resultChartIncomeTitle", { year, amount: formatNullablePrice(income) })}</title>
+                </line>
+                <line
+                  x1={currentX + barOffset / 2}
+                  x2={currentX + barOffset / 2}
+                  y1={padding.top + chartHeight}
+                  y2={y(tax)}
+                  stroke="#EF4444"
+                  strokeWidth={barWidth}
+                  strokeLinecap="round"
+                >
+                  <title>{t("calculator.resultChartTaxTitle", { year, amount: formatNullablePrice(tax) })}</title>
+                </line>
+                {showLabel && (
+                  <text x={currentX} y={height - 16} textAnchor="middle" fill="#6B7280" fontSize="12" fontWeight="600">
+                    {year}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+          {hoveredYear && (
+            <g pointerEvents="none">
+              <rect x={tooltipX} y={tooltipY} width={tooltipWidth} height="70" rx="10" fill="#111827" opacity="0.94" />
+              <text x={tooltipX + 12} y={tooltipY + 22} fill="#FFFFFF" fontSize="12" fontWeight="700">
+                {t("calculator.resultChartYearLabel", { year: hoveredYear })}
+              </text>
+              <text x={tooltipX + 12} y={tooltipY + 42} fill="#BBF7D0" fontSize="12" fontWeight="600">
+                {t("calculator.resultChartIncomeShort", { amount: formatNullablePrice(hoveredIncome) })}
+              </text>
+              <text x={tooltipX + 12} y={tooltipY + 60} fill="#FCA5A5" fontSize="12" fontWeight="600">
+                {t("calculator.resultChartTaxShort", { amount: formatNullablePrice(hoveredTax) })}
+              </text>
+            </g>
+          )}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
+function EditableRecommendedRent({ value, onChange, className }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(() => String(Math.round(Number(value) || 0)));
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!editing) {
+      setDraft(String(Math.round(Number(value) || 0)));
+    }
+  }, [editing, value]);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  const applyDraft = () => {
+    const nextValue = Number(draft);
+    if (Number.isFinite(nextValue) && nextValue > 0) {
+      onChange(nextValue);
+      setDraft(String(Math.round(nextValue)));
+    } else {
+      setDraft(String(Math.round(Number(value) || 0)));
+    }
+    setEditing(false);
+  };
+
+  const cancelDraft = () => {
+    setDraft(String(Math.round(Number(value) || 0)));
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex min-w-0 items-center justify-center gap-2">
+        <label className="relative min-w-0">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xl font-bold text-gray-900">€</span>
+          <input
+            ref={inputRef}
+            type="number"
+            min="1"
+            inputMode="numeric"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={applyDraft}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") applyDraft();
+              if (event.key === "Escape") cancelDraft();
+            }}
+            className={`${className} w-28 rounded-xl border border-primary/30 bg-white py-1 pl-8 pr-2 text-center outline-none ring-2 ring-primary/10 lg:w-36`}
+          />
+        </label>
+        <button
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={applyDraft}
+          className="rounded-lg bg-primary px-2.5 py-1.5 text-xs font-bold text-white shadow-sm lg:hidden"
+        >
+          OK
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="group/rent relative rounded-xl px-2 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 lg:hover:bg-gray-50 lg:hover:ring-2 lg:hover:ring-primary/10"
+    >
+      <span className={className}>{formatPrice(value)}</span>
+      <span className="pointer-events-none absolute -right-3 top-0 hidden rounded-full bg-white p-1 text-primary opacity-0 shadow-sm ring-1 ring-primary/10 transition-opacity group-hover/rent:opacity-100 lg:block">
+        <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
+      </span>
+    </button>
+  );
+}
+
+function recalculateRentYieldCalculation(calculation, includeRentTax, monthlyRentOverride) {
+  const monthlyRent = Number(monthlyRentOverride ?? calculation?.monthly_rent);
+  const apartmentPrice = Number(calculation?.apartment_price);
+  const additionalInvestments = Number(calculation?.additional_investments) || 0;
+  const totalInvestment = Number.isFinite(Number(calculation?.total_investment))
+    ? Number(calculation.total_investment)
+    : apartmentPrice + additionalInvestments;
+  const annualGrossRent = Number.isFinite(monthlyRent) && monthlyRent > 0 ? monthlyRent * 12 : null;
+  const monthlyTax = includeRentTax && Number.isFinite(monthlyRent) && monthlyRent > 0 ? monthlyRent * 0.07 : null;
+  const annualTax = monthlyTax != null ? monthlyTax * 12 : null;
+  const monthlyEffectiveRent = monthlyTax != null ? monthlyRent - monthlyTax : monthlyRent;
+  const annualEffectiveRent = annualGrossRent ? annualGrossRent - (annualTax || 0) : null;
+  const grossYieldPct = annualGrossRent && totalInvestment > 0 ? (annualGrossRent / totalInvestment) * 100 : null;
+  const effectiveYieldPct = annualEffectiveRent && totalInvestment > 0 ? (annualEffectiveRent / totalInvestment) * 100 : null;
+  const paybackYears = annualEffectiveRent && annualEffectiveRent > 0 ? totalInvestment / annualEffectiveRent : null;
+  const totalTaxUntilPayback = annualTax && paybackYears ? annualTax * paybackYears : null;
+
+  return {
+    ...calculation,
+    total_investment: totalInvestment,
+    include_rent_tax: includeRentTax,
+    monthly_rent: monthlyRent,
+    annual_gross_rent: annualGrossRent,
+    annual_tax: annualTax,
+    monthly_tax: monthlyTax,
+    monthly_effective_rent: monthlyEffectiveRent,
+    annual_effective_rent: annualEffectiveRent,
+    gross_yield_pct: grossYieldPct,
+    effective_yield_pct: effectiveYieldPct,
+    payback_years: paybackYears,
+    total_tax_until_payback: totalTaxUntilPayback,
+  };
+}
+
+function RentTaxToggle({ checked, onChange }) {
+  const { t } = useTranslation();
+
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm transition-colors hover:border-primary/20 sm:px-6">
+      <div>
+        <p className="text-sm font-bold text-gray-900 sm:text-base">{t("calculator.resultTaxToggleTitle")}</p>
+        <p className="mt-1 text-sm font-medium text-gray-500">{t("calculator.resultTaxToggleDesc")}</p>
+      </div>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className={`relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? "bg-primary" : "bg-gray-200"}`}
+      >
+        <span
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? "translate-x-6" : "translate-x-1"}`}
+        />
+      </span>
+    </label>
+  );
+}
+
 function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const { t, lang } = useTranslation();
   const estimate = data.estimate || {};
@@ -612,6 +1059,21 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const rentLevelListings = data.rent_level_listings || {};
   const lowListing = normalizeRelevantListing(rentLevelListings.low, t, lang);
   const highListing = normalizeRelevantListing(rentLevelListings.high, t, lang);
+  const baseRentYieldCalculation = data.rent_yield_calculation || null;
+  const [includeRentTax, setIncludeRentTax] = useState(!!baseRentYieldCalculation?.include_rent_tax);
+  const [monthlyRentOverride, setMonthlyRentOverride] = useState(null);
+  useEffect(() => {
+    setIncludeRentTax(!!baseRentYieldCalculation?.include_rent_tax);
+  }, [baseRentYieldCalculation?.include_rent_tax]);
+  useEffect(() => {
+    setMonthlyRentOverride(null);
+  }, [baseRentYieldCalculation?.monthly_rent]);
+  const rentYieldCalculation = baseRentYieldCalculation
+    ? {
+        ...recalculateRentYieldCalculation(baseRentYieldCalculation, includeRentTax, monthlyRentOverride),
+        onMonthlyRentChange: setMonthlyRentOverride,
+      }
+    : null;
   const roomsLabel = input.rooms_count === 1
     ? t("result.oneRoom")
     : t("result.rooms", { count: input.rooms_count });
@@ -646,7 +1108,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         <p className="mt-1 text-base text-gray-500">
           {selectedDistrictLabel}{input.city ? `, ${t(`data.city.${input.city}`)}` : ""}
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className={`mt-4 flex flex-wrap gap-2 ${rentYieldCalculation ? "hidden sm:flex" : ""}`}>
           {input.renovation && (
             <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
               {t(`data.renovationType.${input.renovation}`)}
@@ -670,35 +1132,44 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         </div>
       </div>
 
-      <div className="grid w-full min-w-0 grid-cols-2 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:grid-cols-3">
-        <RentLevelListingCard
-          label={t("result.rentLower")}
-          listing={lowListing}
-          fallbackValue={estimate.low}
-          tone="emerald"
-          ctaLabel={t("result.viewListingCta")}
-          className="order-2 border-r border-gray-100 sm:order-1"
-        />
+      {rentYieldCalculation ? (
+        <>
+          <RentTaxToggle checked={includeRentTax} onChange={setIncludeRentTax} />
+          <RentYieldCalculatorPanel
+            calculation={rentYieldCalculation}
+          />
+        </>
+      ) : (
+        <div className="grid w-full min-w-0 grid-cols-2 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:grid-cols-3">
+          <RentLevelListingCard
+            label={t("result.rentLower")}
+            listing={lowListing}
+            fallbackValue={estimate.low}
+            tone="emerald"
+            ctaLabel={t("result.viewListingCta")}
+            className="order-2 border-r border-gray-100 sm:order-1"
+          />
 
-        <div className="order-1 col-span-2 flex min-h-56 flex-col items-center justify-center border-b border-gray-100 p-6 text-center sm:order-2 sm:col-span-1 sm:border-b-0 sm:border-r sm:p-8">
-          <p className="mb-2 text-base text-gray-400 sm:text-sm">{t("result.rentEstimatedMonthly")}</p>
-          <p className="text-6xl font-bold tracking-tight text-gray-900">
-            {formatPrice(estimate.market_rate)}
-          </p>
-          <p className="mt-2 text-base text-gray-500">
-            {t("result.rentPerMonth")}
-          </p>
+          <div className="order-1 col-span-2 flex min-h-56 flex-col items-center justify-center border-b border-gray-100 p-6 text-center sm:order-2 sm:col-span-1 sm:border-b-0 sm:border-r sm:p-8">
+            <p className="mb-2 text-base text-gray-400 sm:text-sm">{t("result.rentEstimatedMonthly")}</p>
+            <p className="text-6xl font-bold tracking-tight text-gray-900">
+              {formatPrice(estimate.market_rate)}
+            </p>
+            <p className="mt-2 text-base text-gray-500">
+              {t("result.rentPerMonth")}
+            </p>
+          </div>
+
+          <RentLevelListingCard
+            label={t("result.rentUpper")}
+            listing={highListing}
+            fallbackValue={estimate.high}
+            tone="amber"
+            ctaLabel={t("result.viewListingCta")}
+            className="order-3 sm:order-3"
+          />
         </div>
-
-        <RentLevelListingCard
-          label={t("result.rentUpper")}
-          listing={highListing}
-          fallbackValue={estimate.high}
-          tone="amber"
-          ctaLabel={t("result.viewListingCta")}
-          className="order-3 sm:order-3"
-        />
-      </div>
+      )}
 
       <div className="flex w-full min-w-0 flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
         <div className="flex min-w-0 flex-col gap-5">

@@ -30,6 +30,7 @@ Implemented and active for apartments.
 - Rent result analysis sections use a flex column on mobile and switch to the two-column grid only on desktop, so cards and sector bars stay constrained to the viewport.
 - `POST /api/estimate-rent` validates the regular property fields plus `districts` / `regions` as an array of one or more sectors and `building_types` as an optional array, calls `estimate_rent`, and returns monthly rent tiers.
 - `/evaluare?type=rent` calls `/api/estimate-rent` and renders a rent-specific result view with the same date badge as the sale result header, monthly rent levels, filters, market stats, district comparison, and relevant rent listings. Sale-only result actions such as seller breakdown and PDF export remain on the sale/buy result.
+- `/calculator?rezultat=1` also calls `/api/estimate-rent`, then uses the estimated monthly rent to calculate rent-yield metrics from the calculator investment fields.
 - Area is used as a comparable filter only when provided.
 - If area is missing, total prices and range come from matching listings' `price_amount` values instead of `price_per_m2 * area`.
 - It computes fast sale, market rate, premium, price per m2, range, confidence, district comparison, relevant listings.

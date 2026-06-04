@@ -8,6 +8,7 @@ Implemented and active, with partial fallback.
 - User can also add a cadastral number from the PDF export dialog when the current evaluation lacks official cadastral data.
 - PDF-dialog cadastral lookup sends the same authenticated bearer token as the result page, so authenticated users receive full cadastral details there too.
 - `/api/cadastral` requires a valid Supabase bearer token, then calls the signed external cadastru worker for the full cadastral lookup. The previous in-app Geodata/cadastru.md lookup remains only as a backup when the external worker is unreachable, not for normal successful external responses.
+- Successful `/api/cadastral` responses are cached in Redis for 7 days by cadastral number, whether they came from the external worker or the local backup. Failed/not-found responses are not cached.
 - It autofills city, district, area, floor, total floors, building type, and bathroom count when available.
 - Result and PDF cadastral panels show official apartment and building details when IPCBI provides them.
 - Cadastral validation accepts apartment suffixes with 3 or 4 digits, including the UI example `0100201.999.01.0101`.
@@ -20,6 +21,7 @@ Implemented and active, with partial fallback.
 - The page has localized route metadata, canonical and alternate language tags, and sitemap entries for both Romanian and Russian.
 - The Cadastru route layout passes the URL language into `LanguageProvider`, so `/ru/cadastru` renders Russian page text in the server HTML instead of waiting for client hydration.
 - Address search posts to authenticated `/api/cadastru/address`, which calls the signed external cadastru worker first and uses the reusable in-app helper in `src/lib/cadastru-address-search.js` only if the external worker is unreachable.
+- Successful address-search responses are cached in Redis for 7 days by the normalized address, whether they came from the external worker or the local backup. Failed/not-found responses are not cached.
 - It shows a fixed, non-selectable Chișinău city field, a road type dropdown for `Str.` or `Bulevard`, and separate inputs for street name, house number, and apartment number.
 - Address input validation runs in both the browser and `/api/cadastru/address`: street is capped at 80 characters, building number accepts only digits plus one optional slash such as `18/2`, and apartment number accepts only digits from `1` to `9999`.
 - Address matching must be exact for the street and house number. Similar buildings such as `bd. Moscova 9/5` are rejected when the user enters `bd. Moscova 9`.
@@ -55,7 +57,7 @@ Implemented and active, with partial fallback.
 
 ## Limits
 - Rate limited to 15 requests/minute per IP.
-- No DB cache for cadastral data yet.
+- Successful cadastral-number and address lookup responses use Redis shared cache for 7 days.
 - Upstream Geodata calls use a 10 second timeout; Nominatim fallback uses 5 seconds.
 - Timeout logs include the failing stage: `geodata_wfs`, `geodata_wms`, or `nominatim_reverse`.
 - The external cadastru worker uses HMAC headers `X-Catdai-Timestamp` and `X-Catdai-Signature` for AWS-to-worker calls and should listen on `127.0.0.1` when exposed through Cloudflare Tunnel. The main app reads `CADASTRU_EXTERNAL_API_BASE_URL` plus `CADASTRU_EXTERNAL_API_SECRET`, with `CADASTRU_EXTERNAL_API_URL` and `CADASTRU_EXTERNAL_ADDRESS_API_URL` available as explicit endpoint overrides.

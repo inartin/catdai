@@ -7,7 +7,7 @@ Backend prepared and active when Redis is reachable.
 - Uses a standard Redis server through the `redis` package.
 - Reads `REDIS_URL`, defaulting to `redis://127.0.0.1:6379`.
 - Set `REDIS_CACHE_ENABLED=false` to disable Redis without changing route code.
-- If Redis is stopped or calls fail, routes keep their in-memory fallback.
+- If Redis is stopped or calls fail, route code continues without shared-cache data; some routes also keep explicit in-memory fallbacks.
 
 ## Cached Routes
 - `GET /api/prices`: key `catdai:prices:latest:v1`, 24h TTL.
@@ -15,6 +15,14 @@ Backend prepared and active when Redis is reachable.
 - `POST /api/estimate`: key prefix `catdai:estimate:v1:`, 30m TTL for repeated validated estimate inputs.
 - `POST /api/estimate-rent`: key prefix `catdai:estimate-rent:v7:`, 12h TTL for repeated validated rent estimate inputs.
 - `POST /api/listing-preview-images`: key prefix `catdai:listing-preview-image:v1:`, 24h TTL per listing/language.
+- `POST /api/cadastral`: key prefix `catdai:cadastral:v1:`, 7d TTL for successful cadastral-number lookup responses.
+- `POST /api/cadastru/address`: key prefix `catdai:cadastru-address:v1:`, 7d TTL for successful normalized-address lookup responses.
+
+## Cadastru Cache
+- Only successful `200` cadastru payloads are cached; unauthorized, invalid, rate-limited, not-found, and upstream-error responses are not cached.
+- Cadastru routes use the shared Redis cache directly; if Redis is unavailable, they continue with the normal external/local lookup path.
+- `/api/cadastral` caches the cadastral payload without per-request access fields and restores access fields for the current authenticated request.
+- `/api/cadastral` stores the original lookup source (`api` or `local`) with the cached payload so `/cadastru` analytics keep the same source classification on cache hits.
 
 ## Estimate Cache
 - Cache keys include the normalized valuation inputs and UI language.

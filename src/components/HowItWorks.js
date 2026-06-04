@@ -54,11 +54,13 @@ export default function HowItWorks() {
       </p>
       <div className="max-w-md mx-auto w-full mt-8 flex flex-col gap-3">
         <MarketPositionChart />
-        <div className="flex items-center justify-center gap-2.5 w-full px-4 py-3.5 bg-emerald-50 text-emerald-800 rounded-2xl text-[15px] font-medium border border-emerald-200 shadow-sm">
-          <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          {t("howItWorks.independentData")}
+        <div className="grid w-full grid-cols-[auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left text-sm font-medium leading-5 text-emerald-800 shadow-sm sm:flex sm:justify-center sm:gap-2.5 sm:rounded-2xl sm:py-3.5 sm:text-center sm:text-[15px]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm ring-1 ring-emerald-100 sm:h-auto sm:w-auto sm:bg-transparent sm:shadow-none sm:ring-0">
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px] sm:h-5 sm:w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </span>
+          <span>{t("howItWorks.independentData")}</span>
         </div>
       </div>
 

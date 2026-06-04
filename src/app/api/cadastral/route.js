@@ -1,14 +1,18 @@
+import crypto from "node:crypto";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { resolveAccessTier } from "@/lib/access-tier";
+import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
 const GEODATA_TIMEOUT_MS = 10_000;
 const NOMINATIM_TIMEOUT_MS = 5_000;
+const CADASTRAL_CACHE_PREFIX = "catdai:cadastral:v1:";
+const CADASTRAL_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 async function fetchWithTimeout(url, { label, timeoutMs = GEODATA_TIMEOUT_MS, headers } = {}) {
   const started = Date.now();
@@ -308,6 +312,54 @@ function normalizeCadastralPayload(payload, cadastralNumber, accessTier) {
   };
 }
 
+function makeCadastralCacheKey(cadastralNumber) {
+  const hash = crypto
+    .createHash("sha256")
+    .update(cadastralNumber.trim())
+    .digest("hex")
+    .slice(0, 32);
+
+  return `${CADASTRAL_CACHE_PREFIX}${hash}`;
+}
+
+function normalizeLookupSource(value) {
+  return value === "api" || value === "local" ? value : null;
+}
+
+function makeCacheableCadastralPayload(payload) {
+  if (!payload || typeof payload !== "object") return payload;
+  const cacheable = { ...payload };
+  delete cacheable.access_tier;
+  delete cacheable.locked_sections;
+  return cacheable;
+}
+
+function applyCadastralAccess(payload, cadastralNumber, accessTier) {
+  return normalizeCadastralPayload(payload, cadastralNumber, accessTier);
+}
+
+async function getCachedCadastralPayload(cadastralNumber) {
+  const cached = await getSharedCache(makeCadastralCacheKey(cadastralNumber));
+  const value = cached?.value;
+  if (!value?.payload) return null;
+
+  return {
+    payload: value.payload,
+    lookupSource: normalizeLookupSource(value.lookup_source),
+  };
+}
+
+async function setCachedCadastralPayload(cadastralNumber, payload, lookupSource) {
+  await setSharedCache(
+    makeCadastralCacheKey(cadastralNumber),
+    {
+      payload: makeCacheableCadastralPayload(payload),
+      lookup_source: normalizeLookupSource(lookupSource),
+    },
+    CADASTRAL_CACHE_TTL_SECONDS
+  );
+}
+
 async function buildCadastruDetailPayload(cadastralNumber, accessTier = "paid") {
   try {
     const detail = await fetchCadastruDetailData(cadastralNumber);
@@ -387,6 +439,7 @@ export async function POST(request) {
     });
   };
   const respondWithCadastralPayload = async (payload) => {
+    await setCachedCadastralPayload(trimmed, payload, lookupSource);
     await recordCadastruSearch(payload);
     const res = NextResponse.json(payload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -399,6 +452,14 @@ export async function POST(request) {
       { status: 404 }
     );
   };
+
+  const cached = await getCachedCadastralPayload(trimmed);
+  if (cached) {
+    lookupSource = cached.lookupSource;
+    return respondWithCadastralPayload(
+      applyCadastralAccess(cached.payload, trimmed, access.tier)
+    );
+  }
 
   try {
     const externalPayload = await fetchExternalCadastralData(trimmed);
@@ -427,7 +488,7 @@ export async function POST(request) {
       );
     }
 
-    console.error("[cadastral] external cadastru API unavailable, using local backup:", details);
+    // console.error("[cadastral] external cadastru API unavailable, using local backup:", details);
   }
 
   lookupSource = "local";

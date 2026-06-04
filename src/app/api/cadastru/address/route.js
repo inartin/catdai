@@ -1,9 +1,11 @@
+import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
 import { findCadastralByAddress } from "@/lib/cadastru-address-search";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { resolveAccessTier } from "@/lib/access-tier";
+import { getSharedCache, setSharedCache } from "@/lib/cache";
 
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
 const STREET_MAX_LENGTH = 80;
@@ -12,6 +14,8 @@ const APARTMENT_NUMBER_MAX_LENGTH = 4;
 const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/\d{1,4})?$/;
 const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 const MAX_APARTMENT_NUMBER = 9999;
+const CADASTRU_ADDRESS_CACHE_PREFIX = "catdai:cadastru-address:v1:";
+const CADASTRU_ADDRESS_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -28,6 +32,29 @@ function normalizeSpaces(value) {
 function normalizeRoadType(value) {
   if (value === "bulevard") return "bd";
   return "str";
+}
+
+function makeCadastruAddressCacheKey(rawAddress) {
+  const hash = crypto
+    .createHash("sha256")
+    .update(normalizeSpaces(rawAddress).toLowerCase())
+    .digest("hex")
+    .slice(0, 32);
+
+  return `${CADASTRU_ADDRESS_CACHE_PREFIX}${hash}`;
+}
+
+async function getCachedCadastruAddress(rawAddress) {
+  const cached = await getSharedCache(makeCadastruAddressCacheKey(rawAddress));
+  return cached?.value || null;
+}
+
+async function setCachedCadastruAddress(rawAddress, payload) {
+  await setSharedCache(
+    makeCadastruAddressCacheKey(rawAddress),
+    payload,
+    CADASTRU_ADDRESS_CACHE_TTL_SECONDS
+  );
 }
 
 function validateAddressFields({ street, houseNumber, apartmentNumber }) {
@@ -117,6 +144,12 @@ export async function POST(request) {
   }
 
   const rawAddress = normalizeSpaces(`${city}, ${roadType} ${street} ${houseNumber} ap ${apartmentNumber}`);
+  const cached = await getCachedCadastruAddress(rawAddress);
+  if (cached) {
+    const response = NextResponse.json(cached);
+    response.headers.set("X-RateLimit-Remaining", String(remaining));
+    return response;
+  }
 
   try {
     const externalResult = await fetchExternalCadastruAddressData({
@@ -126,11 +159,13 @@ export async function POST(request) {
       house_number: houseNumber,
       apartment_number: apartmentNumber,
     });
-    const response = NextResponse.json({
+    const payload = {
       ...externalResult,
       method: "address",
       request_address: rawAddress,
-    });
+    };
+    await setCachedCadastruAddress(rawAddress, payload);
+    const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
@@ -168,11 +203,13 @@ export async function POST(request) {
 
   try {
     const result = await findCadastralByAddress(rawAddress);
-    const response = NextResponse.json({
+    const payload = {
       ...result,
       method: "address",
       request_address: rawAddress,
-    });
+    };
+    await setCachedCadastruAddress(rawAddress, payload);
+    const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {

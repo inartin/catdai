@@ -239,7 +239,7 @@ export default function HomeContent() {
   return (
     <div className="animate-fade-in">
       <Hero onPrimaryCta={() => handleCategorySelect("imobil")} />
-      <CategoryCards onCategorySelect={handleCategorySelect} />
+      <CategoryCards />
       <MarketScopeCards />
       <HowItWorks />
       <ExampleResults />

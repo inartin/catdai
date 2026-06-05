@@ -12,6 +12,16 @@ function fmtPrice(amount, currency) {
   return `${fmtNum(amount)} ${currency || "\u20AC"}`;
 }
 
+function fmtPct(value) {
+  if (value == null) return "\u2014";
+  return `${Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 1 })}%`;
+}
+
+function fmtYears(value) {
+  if (value == null) return "\u2014";
+  return `${Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 1 })} years`;
+}
+
 function fmtDateTime(d) {
   if (!d) return "\u2014";
   return new Date(d).toLocaleString("ro-RO", {
@@ -85,6 +95,15 @@ function fmtListingLinkStatus(status) {
 function fmtListingLinkProperty(row) {
   return [
     row.rooms_count ? `${row.rooms_count} rooms` : null,
+    row.district,
+    row.city,
+  ].filter(Boolean).join(" · ") || "\u2014";
+}
+
+function fmtCalculatorProperty(row) {
+  return [
+    row.rooms_count ? `${row.rooms_count} rooms` : null,
+    row.area_m2 ? `${fmtNum(row.area_m2)} m\u00B2` : null,
     row.district,
     row.city,
   ].filter(Boolean).join(" · ") || "\u2014";
@@ -206,6 +225,7 @@ export default function AdminDashboard() {
   const [showPdfGenerationList, setShowPdfGenerationList] = useState(false);
   const [showCadastruSearchesList, setShowCadastruSearchesList] = useState(false);
   const [showListingLinkAnalysesList, setShowListingLinkAnalysesList] = useState(false);
+  const [showCalculatorUsageList, setShowCalculatorUsageList] = useState(false);
 
   const loadStats = useCallback(async ({ fresh = false } = {}) => {
     if (fresh) setStatsRefreshing(true);
@@ -331,7 +351,7 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-9 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-10 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}
@@ -366,6 +386,13 @@ export default function AdminDashboard() {
             detail={showListingLinkAnalysesList ? "Click to hide list" : `${fmtNum(s.listingLinkAnalyses?.success)} analyzed / ${fmtNum(s.listingLinkAnalyses?.unsupported)} rejected`}
             onClick={() => setShowListingLinkAnalysesList((value) => !value)}
             active={showListingLinkAnalysesList}
+          />
+          <StatCard
+            label="Calculator Usage"
+            value={fmtNum(s.calculatorUsage?.total)}
+            detail={showCalculatorUsageList ? "Click to hide list" : `${fmtNum(s.calculatorUsage?.registered)} registered / ${fmtNum(s.calculatorUsage?.anonymous)} anonymous`}
+            onClick={() => setShowCalculatorUsageList((value) => !value)}
+            active={showCalculatorUsageList}
           />
           <StatCard
             label="PDF Reports"
@@ -682,6 +709,73 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
                           {fmtPrice(row.listing_price, row.listing_currency)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 break-all">
+                          {row.user_id || "Anonymous"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+        {showCalculatorUsageList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Calculator Usage</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                {fmtNum(s.calculatorUsage?.periods?.["24h"])} in 24h · {fmtNum(s.calculatorUsage?.periods?.["7d"])} in 7 days · {fmtNum(s.calculatorUsage?.withTax)} with tax
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Avg price {fmtPrice(s.calculatorUsage?.averages?.apartmentPrice)} · Avg rent {fmtPrice(s.calculatorUsage?.averages?.monthlyRent)} · Avg yield {fmtPct(s.calculatorUsage?.averages?.grossYieldPct)}
+              </p>
+            </div>
+
+            {!Array.isArray(s.calculatorUsage?.recent) || s.calculatorUsage.recent.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No calculator usage found</div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                      <th className="px-4 py-3">Date</th>
+                      <th className="px-4 py-3">Property</th>
+                      <th className="px-4 py-3 text-right">Investment</th>
+                      <th className="px-4 py-3 text-right">Rent</th>
+                      <th className="px-4 py-3 text-right">Yield</th>
+                      <th className="px-4 py-3 text-right">Payback</th>
+                      <th className="px-4 py-3">Tax</th>
+                      <th className="px-4 py-3">User</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {s.calculatorUsage.recent.map((row) => (
+                      <tr key={row.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {fmtDateTime(row.created_at)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 font-medium">
+                          <div>{fmtCalculatorProperty(row)}</div>
+                          <div className="mt-0.5 text-xs font-normal text-gray-500">
+                            {[row.building_type, row.renovation].filter(Boolean).join(" · ") || "\u2014"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                          {fmtPrice(row.total_investment)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                          {fmtPrice(row.estimated_monthly_rent)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                          {fmtPct(row.annual_gross_yield_pct)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                          {fmtYears(row.payback_years)}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {fmtBool(row.include_rent_tax)}
                         </td>
                         <td className="px-4 py-3 text-gray-600 break-all">
                           {row.user_id || "Anonymous"}

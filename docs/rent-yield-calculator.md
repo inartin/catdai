@@ -46,9 +46,18 @@ Implemented for rent-yield calculations.
 - The calculator does not treat 7% as a target yield.
 - The old `Alternative mai bune` explanatory text block is not shown on the calculator result.
 
+## Analytics
+- `/calculator?rezultat=1` sends a calculator usage payload with device/session ids, selected investment fields, tax selection, and language to `/api/estimate-rent`.
+- Calculator usage is stored in `calculator_usage_events` only when `NODE_ENV=production`.
+- Logged rows include anonymous or authenticated user id, property filters, investment totals, estimated monthly rent, gross/effective yield, payback period, and timestamp.
+- A stable per-result `event_id` prevents duplicate rows for the same browser session/result URL.
+- Admin dashboard shows calculator usage totals, recent rows, period totals, registered/anonymous split, tax-enabled count, and average investment/rent/yield.
+
 ## Related Files
 - `src/app/calculator/page.js`
 - `src/app/calculator/layout.js`
+- `src/lib/calculator-usage-events.js`
 - `src/components/PropertyForm.js`
 - `src/locales/ro.json`
 - `src/locales/ru.json`
+- `db/calculator_usage_events.sql`

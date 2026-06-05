@@ -42,6 +42,7 @@ Implemented.
 - Authenticated tracking requests store `user_id` so ZDG ad sessions can be tied to registered Supabase users after login.
 - Admin ZDG top-card totals are computed from all stored ZDG events; the visitor journey list is paged separately.
 - Runtime DB persistence for estimation logs, PDF events, cadastru search events, 999.md analysis events, shared links, and favorites runs only when `NODE_ENV=production`.
+- Calculator result usage is stored in `calculator_usage_events` only when `NODE_ENV=production`, including property filters, investment fields, tax selection, result rent/yield/payback metrics, and registered/anonymous attribution.
 
 ## Related Files
 - `src/app/layout.js`
@@ -52,8 +53,10 @@ Implemented.
 - `src/components/AdSourceTracker.js`
 - `src/lib/tracking.js`
 - `src/lib/admin-ad-tracking.js`
+- `src/lib/calculator-usage-events.js`
 - `src/lib/runtime-persistence.js`
 - `src/app/api/ad-source-events/route.js`
 - `src/app/api/admin/ad-tracking/route.js`
 - `db/ad_source_events.sql`
+- `db/calculator_usage_events.sql`
 - `next.config.mjs`

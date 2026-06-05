@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
+import { logCalculatorUsageEvent } from "@/lib/calculator-usage-events";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { DISTRICTS_BY_CITY, matchBuildingType, matchCity, matchDistrict, validateEstimateInput } from "@/lib/validation";
@@ -450,6 +451,11 @@ export async function POST(request) {
       responseTimeMs: Date.now() - requestStart,
       validationData: v,
     });
+    await logCalculatorUsageEvent(request, {
+      calculator_usage: body.calculator_usage,
+      data: cachedData,
+      params,
+    });
 
     const res = NextResponse.json(cachedData);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -488,6 +494,11 @@ export async function POST(request) {
     params,
     responseTimeMs,
     validationData: v,
+  });
+  await logCalculatorUsageEvent(request, {
+    calculator_usage: body.calculator_usage,
+    data: enrichedData,
+    params,
   });
 
   const res = NextResponse.json(enrichedData);

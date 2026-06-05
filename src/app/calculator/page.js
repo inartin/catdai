@@ -6,7 +6,9 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
 import PropertyForm from "@/components/PropertyForm";
+import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import { getDeviceId, getSessionId } from "@/lib/tracking";
 import { validateEstimateInput } from "@/lib/validation";
 
 function isTrueParam(value) {
@@ -28,6 +30,28 @@ function parseNonNegativeMoney(value) {
   if (value === null || value === "") return 0;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+function hashEventKey(value) {
+  let hash = 5381;
+  for (let i = 0; i < value.length; i++) {
+    hash = ((hash << 5) + hash + value.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+function getCalculatorUsageEventId(paramsString) {
+  try {
+    const key = `catdai-calculator-usage-${hashEventKey(paramsString)}`;
+    let id = sessionStorage.getItem(key);
+    if (!id) {
+      id = crypto.randomUUID();
+      sessionStorage.setItem(key, id);
+    }
+    return id;
+  } catch {
+    return `calculator-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
 }
 
 function buildRentEstimateRequest(params) {
@@ -119,7 +143,8 @@ function buildRentYieldCalculation(data, calculator) {
 function CalculatorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
+  const { session, loading: authLoading } = useAuth();
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -161,6 +186,8 @@ function CalculatorContent() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+
     if (!isResultMode) {
       setResult(null);
       setError(null);
@@ -186,10 +213,24 @@ function CalculatorContent() {
       setError(null);
 
       try {
+        const headers = { "Content-Type": "application/json" };
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+
         const res = await fetch("/api/estimate-rent", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(request.body),
+          headers,
+          body: JSON.stringify({
+            ...request.body,
+            calculator_usage: {
+              event_id: getCalculatorUsageEventId(paramsString),
+              device_id: getDeviceId(),
+              session_id: getSessionId(),
+              apartment_price: request.calculator.apartment_price,
+              additional_investments: request.calculator.additional_investments,
+              include_rent_tax: request.calculator.include_rent_tax,
+              language: lang,
+            },
+          }),
         });
         let data = {};
         try { data = await res.json(); } catch { data = {}; }
@@ -225,7 +266,7 @@ function CalculatorContent() {
     return () => {
       cancelled = true;
     };
-  }, [isResultMode, paramsString]);
+  }, [authLoading, isResultMode, lang, paramsString, session?.access_token]);
 
   if (isResultMode) {
     if (loading || (!error && !result)) {

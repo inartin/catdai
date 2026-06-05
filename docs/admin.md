@@ -19,12 +19,14 @@ Shows:
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows
 - 999.md listing-link analysis count with analyzed/rejected/failed split, period totals, and recent rows
+- calculator usage count with registered/anonymous split, tax-enabled count, period totals, average investment/rent/yield, and recent rows
 - shared links
 - favorites
 - Telegram alert count with an expandable list of configured Telegram alerts
 - sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
 - Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, and anonymous/user id. Exact searched addresses are not stored for this dashboard.
 - 999 link-analysis rows show date, status, listing id/link, mapped property summary, asking price, and anonymous/user id.
+- Calculator usage rows show date, property summary, total investment, estimated rent, yield, payback period, tax selection, and anonymous/user id.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
 - `/admin/feedback` is linked from the left menu as `Feedback` and shows the latest registered-user feedback rows with message, user id, date, status, and optional uploaded image preview that opens in an in-page modal.
@@ -54,3 +56,4 @@ Shows:
 - `db/pdf_generation_events.sql`
 - `db/cadastru_search_events.sql`
 - `db/listing_link_analysis_events.sql`
+- `db/calculator_usage_events.sql`

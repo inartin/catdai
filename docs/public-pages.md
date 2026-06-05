@@ -21,7 +21,7 @@ Implemented.
 - `/faq`, `/ro/faq`, `/ru/faq`.
 - `/ro/cadastru` and `/ru/cadastru` for official cadastral lookup by address or cadastral number.
 - `/calculator` for the rent-yield calculator form and same-route result page.
-- `/verifica-anunt` for 999.md listing-link analysis; `/999` permanently redirects there as a shortcut.
+- `/verifica-anunt` for 999.md listing-link analysis; `/999` permanently redirects there as a shortcut, and generated listing-analysis results render on noindex `/anunt`.
 - `/noutati` lists public real estate news and analysis cards from `news_posts`, and `/noutati/[slug]` renders each individual rich-text article at a stable database-backed URL.
 - `/noutati` keeps its intro subtitle wide on desktop so the short description does not wrap too early.
 - `/ro/preturi-apartamente/chisinau/botanica` and `/ru/ceny-kvartir/kishinev/botanika` are static SEO market-analysis pages for a saved Botanica old-building apartment valuation snapshot.

@@ -16,7 +16,7 @@ const ERROR_KEYS = {
   rate_limited: "linkAnalyzer.errorRateLimit",
 };
 
-function buildEvaluationUrl(payload) {
+function buildListingAnalysisUrl(payload) {
   const search = new URLSearchParams();
   Object.entries(payload.params || {}).forEach(([key, value]) => {
     if (value !== null && value !== undefined && value !== "") {
@@ -29,7 +29,7 @@ function buildEvaluationUrl(payload) {
   if (payload.listing_currency) search.set("listing_currency", payload.listing_currency);
   if (payload.external_id) search.set("listing_id", String(payload.external_id));
   search.set("_new", "1");
-  return `/evaluare?${search.toString()}`;
+  return `/anunt?${search.toString()}`;
 }
 
 export default function LinkAnalyzer({ titleTag: TitleTag = "p" }) {
@@ -58,7 +58,7 @@ export default function LinkAnalyzer({ titleTag: TitleTag = "p" }) {
         return;
       }
 
-      router.push(buildEvaluationUrl(data));
+      router.push(buildListingAnalysisUrl(data));
     } catch {
       setError(t("linkAnalyzer.errorGeneric"));
     } finally {

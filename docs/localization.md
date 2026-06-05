@@ -16,6 +16,7 @@ Implemented for Romanian and Russian UI.
 - `document.documentElement.lang` follows selected language.
 - `/estimeaza` sets a localized browser title from `estimeaza.pageTitle`.
 - `/evaluare` sets a localized browser title from `evaluare.pageTitle`.
+- `/anunt` sets a localized browser title from `anunt.pageTitle`.
 - `/alerts` sets a localized browser title from `alerts.pageTitle`.
 - `/cadastru` has localized server metadata and visible search-page copy for `/ro/cadastru` and `/ru/cadastru`.
 - `/estimeaza`, `/evaluare`, `/alerts`, and `/profile` also read the `catdai-lang` cookie in route metadata so hard refreshes render the selected language title before hydration.
@@ -30,5 +31,6 @@ Romanian (`ro`).
 - `src/context/LanguageContext.js`
 - `src/proxy.js`
 - `src/components/Navbar.js`
+- `src/app/anunt/layout.js`
 - `src/locales/ro.json`
 - `src/locales/ru.json`

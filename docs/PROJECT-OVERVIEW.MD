@@ -7,6 +7,7 @@ Property Valuation:
 Users input property details (zone, m², rooms, floor, renovation, etc.)
 Receives recommended market price, fast sale/premium scenarios, price range + confidence level
 Supports both sale and rent estimates via /api/estimate and /api/estimate-rent
+Analyzes 999.md sale listing links on /anunt against the market valuation result
 Includes cadastral data integration (IPCBI details, construction year, utilities, wall material)
 PDF report generation with QR codes and comprehensive valuation data
 Monetization planned:

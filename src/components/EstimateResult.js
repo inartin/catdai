@@ -98,6 +98,22 @@ function formatTrendDate(date, lang) {
   );
 }
 
+function formatHistoryDate(date, lang) {
+  if (!date) return "";
+  return new Date(date).toLocaleDateString(
+    lang === "ru" ? "ru-RU" : "ro-RO",
+    { day: "2-digit", month: "short", year: "numeric" }
+  );
+}
+
+function formatHistoryDateTime(date, lang) {
+  if (!date) return "";
+  return new Date(date).toLocaleDateString(
+    lang === "ru" ? "ru-RU" : "ro-RO",
+    { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }
+  );
+}
+
 function formatResultDate(lang) {
   return new Date().toLocaleDateString(
     lang === "ru" ? "ru-RU" : "ro-RO",
@@ -304,6 +320,312 @@ function MarketTrendMiniChart({ trend, compact = false }) {
       <div className="mt-1 flex items-center justify-between text-[11px] leading-none text-gray-400">
         <span>{formatTrendDate(firstPoint.date, lang)}</span>
         <span>{formatTrendDate(lastPoint.date, lang)}</span>
+      </div>
+    </div>
+  );
+}
+
+function normalizeListingPriceHistory(history) {
+  const rows = (Array.isArray(history) ? history : [])
+    .map((item) => {
+      const price = Number(item?.price_amount);
+      const date = item?.observed_at || item?.source_updated_at;
+      const observedTime = date ? Date.parse(date) : NaN;
+
+      if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(observedTime)) return null;
+
+      return {
+        id: item.id,
+        price,
+        currency: item.price_currency,
+        date,
+        observedTime,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.observedTime - b.observedTime);
+
+  const points = [];
+  for (const row of rows) {
+    const previous = points[points.length - 1] || null;
+    if (previous && previous.price === row.price) continue;
+
+    const diff = previous ? row.price - previous.price : null;
+    points.push({
+      ...row,
+      diff,
+      diffPct: diff != null && previous.price > 0 ? (diff / previous.price) * 100 : null,
+    });
+  }
+
+  return points;
+}
+
+function getListingHistoryTone(point) {
+  if (point.diff > 0) {
+    return {
+      stroke: "#d97706",
+      fill: "#fffbeb",
+      tooltipText: "text-amber-300",
+    };
+  }
+  if (point.diff < 0) {
+    return {
+      stroke: "#059669",
+      fill: "#ecfdf5",
+      tooltipText: "text-emerald-300",
+    };
+  }
+  return {
+    stroke: "#0ea5e9",
+    fill: "#eff6ff",
+    tooltipText: "text-sky-300",
+  };
+}
+
+function ListingPriceHistoryChart({ history, currency, compact = false }) {
+  const { t, lang } = useTranslation();
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [pinnedIndex, setPinnedIndex] = useState(null);
+  const points = normalizeListingPriceHistory(history);
+  const mobileFullWidthClassName =
+    "-ml-[8rem] w-[calc(100%+8rem)] sm:-ml-[9.25rem] sm:w-[calc(100%+9.25rem)] lg:ml-0 lg:w-full";
+
+  const wrapperClassName = `${compact
+    ? `mt-5 border-t border-gray-100 pt-4 ${mobileFullWidthClassName}`
+    : `mt-5 border-t border-gray-100 pt-4 ${mobileFullWidthClassName} lg:mt-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0`
+    }`;
+
+  if (points.length < 2) {
+    return (
+      <div className={wrapperClassName}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          {t("result.listingPriceHistoryTitle")}
+        </p>
+        <div className="mt-3 rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-sm font-medium text-gray-500">
+          {t("result.listingPriceHistoryNoData")}
+        </div>
+      </div>
+    );
+  }
+
+  const width = 440;
+  const height = 210;
+  const padding = { top: 22, right: 18, bottom: 48, left: 72 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const bottomY = height - padding.bottom;
+  const values = points.map((point) => point.price);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const valuePadding = minValue === maxValue
+    ? Math.max(Math.abs(maxValue) * 0.06, 100)
+    : Math.max((maxValue - minValue) * 0.12, 100);
+  const chartMin = Math.max(0, minValue - valuePadding);
+  const chartMax = maxValue + valuePadding;
+  const valueRange = chartMax - chartMin || 1;
+  const firstTime = points[0].observedTime;
+  const lastTime = points[points.length - 1].observedTime;
+  const timeRange = lastTime - firstTime;
+  const plotted = points.map((point, index) => {
+    const x = padding.left + (
+      timeRange > 0
+        ? ((point.observedTime - firstTime) / timeRange) * chartWidth
+        : (index / (points.length - 1)) * chartWidth
+    );
+    const y = bottomY - ((point.price - chartMin) / valueRange) * chartHeight;
+    return { ...point, x, y };
+  });
+  const coords = plotted.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const gridValues = [
+    chartMax,
+    chartMin + valueRange * 0.66,
+    chartMin + valueRange * 0.33,
+    chartMin,
+  ];
+  const tickIndexes = [...new Set([0, Math.floor((plotted.length - 1) / 2), plotted.length - 1])];
+  const activeIndex = pinnedIndex ?? hoveredIndex;
+  const activePoint = Number.isInteger(activeIndex) ? plotted[activeIndex] : null;
+  const lastPoint = plotted[plotted.length - 1];
+  const firstPoint = plotted[0];
+  const totalChange = lastPoint.price - firstPoint.price;
+  const totalChangePct = firstPoint.price > 0 ? (totalChange / firstPoint.price) * 100 : null;
+  const totalChangeTone = totalChange > 0
+    ? "text-amber-600"
+    : totalChange < 0
+      ? "text-emerald-600"
+      : "text-gray-500";
+
+  const buildChangeLabel = (point) => {
+    if (point.diff == null) return t("result.listingPriceHistoryInitial");
+    const sign = point.diff > 0 ? "+" : "-";
+    return `${sign}${formatCurrencyPrice(Math.abs(point.diff), point.currency || currency)} (${formatTrendPercent(point.diffPct)})`;
+  };
+  const totalChangeLabel = `${totalChange > 0 ? "+" : totalChange < 0 ? "-" : ""}${formatCurrencyPrice(Math.abs(totalChange), lastPoint.currency || currency)} (${formatTrendPercent(totalChangePct)})`;
+
+  return (
+    <div className={wrapperClassName}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            {t("result.listingPriceHistoryTitle")}
+          </p>
+          <p className="mt-0.5 text-[11px] text-gray-400">
+            {formatHistoryDate(firstPoint.date, lang)} - {formatHistoryDate(lastPoint.date, lang)}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[11px] font-medium text-gray-400">{t("result.listingPriceHistoryLatest")}</p>
+          <p className="text-base font-bold text-gray-900">
+            {formatCurrencyPrice(lastPoint.price, lastPoint.currency || currency)}
+          </p>
+          <p className={`mt-1 text-xs font-bold ${totalChangeTone}`}>
+            {totalChangeLabel}
+          </p>
+          <p className="text-[11px] font-medium text-gray-400">
+            {t("result.listingPriceHistoryFromInitial", {
+              price: formatCurrencyPrice(firstPoint.price, firstPoint.currency || currency),
+            })}
+          </p>
+        </div>
+      </div>
+
+      <div
+        className="relative mt-4 w-full overflow-visible"
+        style={{ aspectRatio: `${width} / ${height}` }}
+      >
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="absolute inset-0 h-full w-full overflow-visible"
+          role="img"
+          aria-label={t("result.listingPriceHistoryTitle")}
+        >
+          {gridValues.map((value) => {
+            const y = bottomY - ((value - chartMin) / valueRange) * chartHeight;
+            return (
+              <g key={value}>
+                <line
+                  x1={padding.left}
+                  x2={width - padding.right}
+                  y1={y}
+                  y2={y}
+                  stroke="#e5e7eb"
+                  strokeWidth="1"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <text
+                  x={padding.left - 10}
+                  y={y + 4}
+                  textAnchor="end"
+                  className="fill-gray-400 text-[10px]"
+                >
+                  {formatCompactEuro(value)}
+                </text>
+              </g>
+            );
+          })}
+          <line
+            x1={padding.left}
+            x2={padding.left}
+            y1={padding.top}
+            y2={bottomY}
+            stroke="#cbd5e1"
+            strokeWidth="1.2"
+            vectorEffect="non-scaling-stroke"
+          />
+          <line
+            x1={padding.left}
+            x2={width - padding.right}
+            y1={bottomY}
+            y2={bottomY}
+            stroke="#cbd5e1"
+            strokeWidth="1.2"
+            vectorEffect="non-scaling-stroke"
+          />
+          <polyline
+            points={coords}
+            fill="none"
+            stroke="#0ea5e9"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            vectorEffect="non-scaling-stroke"
+          />
+          {plotted.map((point, index) => {
+            const tone = getListingHistoryTone(point);
+            const isActive = activeIndex === index;
+            return (
+              <circle
+                key={point.id || `${point.date}-${point.price}`}
+                cx={point.x}
+                cy={point.y}
+                r={isActive ? 6 : 4.5}
+                fill={tone.fill}
+                stroke={tone.stroke}
+                strokeWidth={isActive ? 3 : 2}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          })}
+          {tickIndexes.map((index) => {
+            const point = plotted[index];
+            return (
+              <text
+                key={`${point.date}-${index}`}
+                x={point.x}
+                y={height - 24}
+                textAnchor={index === 0 ? "start" : index === plotted.length - 1 ? "end" : "middle"}
+                className="fill-gray-400 text-[10px]"
+              >
+                {formatHistoryDate(point.date, lang)}
+              </text>
+            );
+          })}
+          <text x={padding.left} y={12} textAnchor="start" className="fill-gray-400 text-[10px]">
+            {t("result.listingPriceHistoryAxisPrice")}
+          </text>
+          <text x={padding.left + chartWidth / 2} y={height - 4} textAnchor="middle" className="fill-gray-400 text-[10px]">
+            {t("result.listingPriceHistoryAxisDate")}
+          </text>
+        </svg>
+
+        {plotted.map((point, index) => (
+          <button
+            key={`${point.id || point.date}-${index}`}
+            type="button"
+            aria-label={`${formatHistoryDateTime(point.date, lang)} ${formatCurrencyPrice(point.price, point.currency || currency)}`}
+            className="absolute h-8 w-8 -translate-x-1/2 -translate-y-1/2 rounded-full outline-none focus:ring-2 focus:ring-primary/30"
+            style={{
+              left: `${(point.x / width) * 100}%`,
+              top: `${(point.y / height) * 100}%`,
+            }}
+            onMouseEnter={() => setHoveredIndex(index)}
+            onMouseLeave={() => setHoveredIndex(null)}
+            onFocus={() => setHoveredIndex(index)}
+            onBlur={() => setHoveredIndex(null)}
+            onClick={() => setPinnedIndex((current) => (current === index ? null : index))}
+          />
+        ))}
+
+        {activePoint && (
+          <div
+            className="pointer-events-none absolute z-10 w-max max-w-[13rem] -translate-x-1/2 -translate-y-full rounded-xl bg-gray-900 px-3 py-2 text-left text-[11px] font-medium leading-tight text-white shadow-lg"
+            style={{
+              left: `${(activePoint.x / width) * 100}%`,
+              top: `${(activePoint.y / height) * 100}%`,
+            }}
+          >
+            <span className="block whitespace-nowrap">{formatHistoryDateTime(activePoint.date, lang)}</span>
+            <span className="mt-1 block whitespace-nowrap text-sm font-bold">
+              {formatCurrencyPrice(activePoint.price, activePoint.currency || currency)}
+            </span>
+            <span className={`mt-1 block whitespace-nowrap ${getListingHistoryTone(activePoint).tooltipText}`}>
+              {activePoint.diff == null
+                ? buildChangeLabel(activePoint)
+                : `${t("result.listingPriceHistoryChange")}: ${buildChangeLabel(activePoint)}`}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1406,6 +1728,14 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     setSharing(true);
 
     try {
+      if (data.listing_comparison) {
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        setSharing(false);
+        setTimeout(() => setCopied(false), 2000);
+        return;
+      }
+
       const shareParams = {};
       const sp = new URLSearchParams(window.location.search);
       ["city", "district", "rooms", "area", "floor", "first_floor", "last_floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
@@ -1675,8 +2005,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   {headerControls}
                 </div>
               )}
-              <div className={`${listingComparison ? "mt-0" : "mt-4 -ml-16 w-[calc(100%+4rem)]"} ${compactLayout ? "lg:ml-0 lg:w-auto" : "lg:mt-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-0"}`}>
-                <div className={`min-w-0 ${compactLayout ? "" : listingComparison ? "lg:pr-6" : "lg:pl-16 lg:pr-6"}`}>
+              <div className={`${listingComparison ? "mt-0" : "mt-4 -ml-16 w-[calc(100%+4rem)]"} ${compactLayout ? "lg:ml-0 lg:w-auto" : `lg:mt-0 lg:grid lg:grid-cols-2 lg:items-start lg:gap-0 ${listingComparison ? "lg:-ml-[9.25rem] lg:w-[calc(100%+9.25rem)]" : ""}`}`}>
+                <div className={`min-w-0 ${compactLayout ? "" : listingComparison ? "lg:pl-[9.25rem] lg:pr-8" : "lg:pl-16 lg:pr-6"}`}>
                   <h2 className="text-xl font-bold text-gray-900 leading-snug">
                     {titleParts.join(" · ")}
                   </h2>
@@ -1719,7 +2049,15 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     )}
                   </div>
                 </div>
-                <MarketTrendMiniChart trend={data.market_trend} compact={compactLayout} />
+                {listingComparison ? (
+                  <ListingPriceHistoryChart
+                    history={listingComparison.price_history}
+                    currency={listingCurrency}
+                    compact={compactLayout}
+                  />
+                ) : (
+                  <MarketTrendMiniChart trend={data.market_trend} compact={compactLayout} />
+                )}
               </div>
             </div>
           </div>

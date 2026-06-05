@@ -7,8 +7,8 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 1. `LinkAnalyzer` is available on the landing page and on `/verifica-anunt`; `/estimeaza` links users to `/verifica-anunt?from=estimeaza`, where a back button returns to `/estimeaza`, and `/999` permanently redirects to `/verifica-anunt`.
 2. It posts the URL to `POST /api/analyze-link`.
 3. The route extracts the listing id, fetches the page, parses seller-selected attributes, validates Chișinău, and maps them to estimate params.
-4. The client redirects to `/evaluare?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
-5. `EstimateResult` runs the usual estimate and renders the listing-vs-market comparison.
+4. The client redirects to `/anunt?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
+5. `/anunt` runs the usual sale estimate, fetches listing price history by `listing.external_id`, and renders the listing-vs-market comparison through the shared result component.
 
 ## Parsing (`src/lib/parse-999-listing.js`)
 - Reads the seller-selected attributes only; the free-text description is ignored.
@@ -34,8 +34,14 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - Only compared when the listing is in **EUR** (avoids cross-currency math).
 - Header label switches to "Analiza anunțului" when a listing is analyzed and sits above both the preview image and property title.
 - The listing preview image is a larger 4:3 thumbnail aligned with the property title row, hydrated client-side via `/api/listing-preview-images`.
+- When `listing_price_history` has real price changes for the analyzed listing, the header shows an interactive total-price history chart instead of the sector trend. The chart includes price/date axes, visible change-point dots, and hover/click details per dot.
+- On desktop, the listing summary and price-history sections split the header card into two equal halves, with the preview image counted inside the left half.
+- On mobile, the listing price-history chart spans the full header card width instead of staying constrained to the text column beside the preview image.
+- Under the latest price, the chart shows total change from the initial recorded price, for example `-€5.500 (-3.4%)` plus `de la prețul inițial €159.900`.
+- When no price change history is found, the header shows `Nu am detectat istoric de schimbări de preț.` instead of the chart.
 - The asking price replaces the middle column in the main estimate card, with a directional arrow + signed % (emerald = under, amber = over, primary = at market within ±3%).
 - A verdict banner states the difference (e.g. "Prețul cerut este cu €5.500 (7.0%) sub prețul de piață mediu") and compares price/m² (listing vs market). The "Vezi anunțul" link sits inside the banner.
+- Sharing a listing-analysis result copies the current `/anunt` URL so the listing comparison stays attached.
 
 ## Anti-Blocking Measures
 - **Caching** (`src/lib/listing-cache.js`): uses the shared Redis cache (`src/lib/cache.js`) with key prefix `catdai:listing-analyze:v2:` and a 6h TTL, plus a 500-entry in-memory LRU fallback for when Redis is unavailable. Repeat analyses of the same listing skip the upstream fetch. Only successfully parsed listings are cached; transient failures are not. Mapping still runs per request so logic changes apply immediately.
@@ -57,10 +63,13 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 
 ## Related Files
 - `src/components/LinkAnalyzer.js`
+- `src/app/anunt/page.js`
 - `src/components/ListingAnalyzerPageContent.js`
 - `src/app/verifica-anunt/page.js`
 - `src/app/999/page.js`
 - `src/app/api/analyze-link/route.js`
+- `src/app/api/listing-price-history/route.js`
+- `src/components/EvaluationResultPage.js`
 - `src/lib/parse-999-listing.js`
 - `src/lib/listing-link-analysis-events.js`
 - `src/lib/runtime-persistence.js`

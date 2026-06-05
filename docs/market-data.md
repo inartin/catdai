@@ -6,6 +6,7 @@ Implemented, depends on external parser and Supabase snapshots.
 ## Listings Data
 - Main DB tables are `listing`, `owner`, and `listing_price_history`.
 - Data is consumed by estimates, relevant listings, admin views, and market stats.
+- `/anunt` reads `listing_price_history` through `/api/listing-price-history` to show analyzed-listing total-price changes when available.
 - Parser/importer code is outside this app repo.
 
 ## Live Prices API

@@ -154,6 +154,7 @@ export default function Navbar() {
   const unreadNotificationCount = notifications.filter((notification) => notification.unread).length;
   const cadastruHref = `/${lang}/cadastru`;
   const isCadastruPath = pathname === "/cadastru" || /^\/(ro|ru)\/cadastru\/?$/.test(pathname);
+  const isCalculatorPath = pathname === "/calculator";
 
   const handleLogoClick = (e) => {
     if (pathname === "/") {
@@ -273,6 +274,16 @@ export default function Navbar() {
           >
             {t("nav.cadastru")}
           </Link>
+          <Link
+            href="/calculator"
+            className={`inline-flex h-9 items-center rounded-lg px-2.5 text-sm font-medium leading-none transition-colors ${
+              isCalculatorPath
+                ? "bg-gray-50 text-gray-900"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            {t("nav.calculator")}
+          </Link>
           <LoginButton className="inline-flex h-9 items-center rounded-lg px-2.5 leading-none text-gray-600 hover:bg-gray-50 hover:text-gray-900" />
           {showAlertShortcut && (
             <NotificationButton
@@ -357,6 +368,17 @@ export default function Navbar() {
                   }`}
                 >
                   {t("nav.cadastru")}
+                </Link>
+                <Link
+                  href="/calculator"
+                  onClick={() => setMobileMenuPath(null)}
+                  className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium ${
+                    isCalculatorPath
+                      ? "bg-gray-50 text-gray-900"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                  }`}
+                >
+                  {t("nav.calculator")}
                 </Link>
                 <LoginButton className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900" menuAlign="left" />
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-1">

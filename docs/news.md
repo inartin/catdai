@@ -16,7 +16,7 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 ## Admin
 - `/admin/news` is linked from the admin sidebar.
 - Admins can list news, create a news item, edit title/rich description/cover image link, and remove news.
-- The rich content editor uses Quill with headings, bold, italic, underline, ordered/bullet lists, links, image URL insertion, and clear formatting.
+- The rich content editor uses Tiptap with headings, bold, italic, underline, ordered/bullet lists, custom ordered-list start/item numbers, public marker fallback for custom item numbers, links, image URL insertion, small/medium/large/full image sizing, left/center/right image alignment, and clear formatting.
 - Admin API routes sanitize rich content with `sanitize-html` before writing it to `news_posts`.
 - Admin rows show the stable public URL `/noutati/[slug]`.
 - Cover image links can be pasted from `/admin/uploads`, which returns the public Supabase Storage URL for a public bucket.
@@ -27,6 +27,7 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 ## Public Pages
 - `/noutati` server-renders all news rows as linked cards with cover image and title.
 - `/noutati/[slug]` server-renders an individual news article with sanitized rich HTML, a back link to `/noutati`, and a right sidebar with up to 5 latest other news items in the relevant-listings card style.
+- Article body images on `/noutati/[slug]` open in a full-size lightbox when clicked.
 - News detail pages use narrower mobile padding and mobile article type, and sanitized article HTML normalizes non-breaking spaces so admin-authored paragraphs can wrap within the viewport.
 - `sitemap.xml` includes every news detail URL with `created_at` as `lastModified`.
 - Static page chrome and list-page metadata on `/noutati` and `/noutati/[slug]` use the active UI language from the URL prefix or `catdai-lang` cookie, while database news title/body content stays exactly as stored in `news_posts`.

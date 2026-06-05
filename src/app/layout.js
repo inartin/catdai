@@ -5,7 +5,6 @@ import CookieBanner from "@/components/CookieBanner";
 import AdSourceTracker from "@/components/AdSourceTracker";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import { getCanonicalSiteUrl, serializeJsonLd } from "@/lib/seo";
-import "quill/dist/quill.snow.css";
 import "./globals.css";
 
 const geistSans = Geist({

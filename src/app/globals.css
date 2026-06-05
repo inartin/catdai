@@ -93,6 +93,10 @@ body {
   list-style: decimal;
 }
 
+.news-content ol > li[data-value]::marker {
+  content: attr(data-value) ". ";
+}
+
 .news-content a {
   color: var(--color-primary);
   font-weight: 600;
@@ -101,11 +105,45 @@ body {
 
 .news-content img {
   display: block;
+  margin-left: auto;
+  margin-right: auto;
   max-width: 100%;
   height: auto;
   border-radius: 0.75rem;
   border: 1px solid #f3f4f6;
   background: white;
+  cursor: zoom-in;
+}
+
+.news-content img[data-size="small"] {
+  width: min(100%, 320px);
+}
+
+.news-content img[data-size="medium"] {
+  width: min(100%, 520px);
+}
+
+.news-content img[data-size="large"] {
+  width: min(100%, 760px);
+}
+
+.news-content img[data-size="full"] {
+  width: 100%;
+}
+
+.news-content img[data-align="left"] {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.news-content img[data-align="right"] {
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.news-content img[data-align="center"] {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 @media (max-width: 640px) {
@@ -115,7 +153,7 @@ body {
   }
 }
 
-.ql-editor {
+.tiptap-editor-content {
   min-height: 14rem;
   font-size: 0.95rem;
 }

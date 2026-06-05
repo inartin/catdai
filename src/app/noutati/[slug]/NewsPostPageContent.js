@@ -3,6 +3,7 @@
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 
 function fmtDate(value, lang) {
@@ -16,6 +17,33 @@ function fmtDate(value, lang) {
 
 export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml, jsonLdHtml }) {
   const { lang, t } = useTranslation();
+  const [openImage, setOpenImage] = useState(null);
+
+  useEffect(() => {
+    if (!openImage) return undefined;
+
+    function closeOnEscape(event) {
+      if (event.key === "Escape") setOpenImage(null);
+    }
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [openImage]);
+
+  function openArticleImage(event) {
+    const image = event.target.closest?.(".news-content img");
+    if (!image) return;
+
+    setOpenImage({
+      src: image.currentSrc || image.src,
+      alt: image.alt || post.title,
+    });
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -64,6 +92,7 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
 
             <div
               className="news-content mt-8 text-gray-700 sm:text-lg sm:leading-8"
+              onClick={openArticleImage}
               dangerouslySetInnerHTML={{ __html: articleHtml }}
             />
           </article>
@@ -100,6 +129,30 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
           )}
         </div>
       </main>
+      {openImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setOpenImage(null)}
+        >
+          <button
+            type="button"
+            aria-label="Close image"
+            onClick={() => setOpenImage(null)}
+            className="absolute right-4 top-4 rounded-full bg-white/10 px-3 py-1.5 text-2xl leading-none text-white transition-colors hover:bg-white/20"
+          >
+            ×
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={openImage.src}
+            alt={openImage.alt}
+            className="max-h-[92vh] max-w-[96vw] object-contain"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
       <Footer />
     </div>
   );

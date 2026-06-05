@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 
+const PRICE_CHANGE_LOAD_SIZE = 10;
+
 function fmtNum(n) {
   if (n == null) return "\u2014";
   return Number(n).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
@@ -144,13 +146,28 @@ function DistributionTable({ title, data }) {
   );
 }
 
-function PriceChangeListingsSection({ listings }) {
+function PriceChangeListingsSection({ listings, total, loadingMore, onLoadMore }) {
   const rows = Array.isArray(listings) ? listings : [];
+  const count = Number(total);
+  const totalCount = Number.isFinite(count) ? count : rows.length;
+  const hasMore = rows.length < totalCount;
+  const [historySortAsc, setHistorySortAsc] = useState(null);
+  const sortedRows =
+    historySortAsc == null
+      ? rows
+      : [...rows].sort((a, b) => {
+          const aCount = Number(a.history_count) || 0;
+          const bCount = Number(b.history_count) || 0;
+          return historySortAsc ? aCount - bCount : bCount - aCount;
+        });
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100">
+      <div className="flex flex-col gap-1 px-5 py-4 border-b border-gray-100 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-semibold text-gray-900">Listings With Multiple Price Changes</h2>
+        <p className="text-sm text-gray-500">
+          {fmtNum(totalCount)} total
+        </p>
       </div>
       {rows.length === 0 ? (
         <div className="px-5 py-8 text-center text-sm text-gray-400">
@@ -164,14 +181,25 @@ function PriceChangeListingsSection({ listings }) {
                 <th className="px-4 py-3">Listing</th>
                 <th className="px-4 py-3 text-right">Current Price</th>
                 <th className="px-4 py-3 text-right">Last Change</th>
-                <th className="px-4 py-3 text-right">History</th>
+                <th className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => setHistorySortAsc((value) => (value == null ? false : !value))}
+                    className="w-full text-right hover:text-gray-700"
+                  >
+                    History
+                    {historySortAsc != null && (
+                      <span className="ml-1">{historySortAsc ? "\u2191" : "\u2193"}</span>
+                    )}
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-right">Range</th>
                 <th className="px-4 py-3">Latest</th>
                 <th className="px-4 py-3">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {rows.map((l) => {
+              {sortedRows.map((l) => {
                 const lastChange = l.last_change_amount == null ? null : Number(l.last_change_amount);
                 const changeClass =
                   lastChange > 0
@@ -227,6 +255,20 @@ function PriceChangeListingsSection({ listings }) {
               })}
             </tbody>
           </table>
+          {hasMore && (
+            <div className="border-t border-gray-100 px-5 py-4 text-center">
+              <button
+                type="button"
+                onClick={onLoadMore}
+                disabled={loadingMore}
+                className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loadingMore
+                  ? "Loading..."
+                  : `Load ${fmtNum(Math.min(PRICE_CHANGE_LOAD_SIZE, totalCount - rows.length))} more`}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -262,6 +304,8 @@ export default function ListingsPage() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
   const [period, setPeriod] = useState("7d");
+  const [priceChangeLimit, setPriceChangeLimit] = useState(PRICE_CHANGE_LOAD_SIZE);
+  const [priceChangeLoadingMore, setPriceChangeLoadingMore] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -309,6 +353,28 @@ export default function ListingsPage() {
         setStatsLoading(false);
       });
   }, []);
+
+  const loadMorePriceChangeListings = useCallback(async () => {
+    if (!stats || priceChangeLoadingMore) return;
+
+    const totalCount = Number(stats.priceChangeListingsTotal);
+    const nextLimit = Number.isFinite(totalCount)
+      ? Math.min(priceChangeLimit + PRICE_CHANGE_LOAD_SIZE, totalCount)
+      : priceChangeLimit + PRICE_CHANGE_LOAD_SIZE;
+    setPriceChangeLoadingMore(true);
+
+    try {
+      const res = await fetch(`/api/admin/listings/stats?priceChangeLimit=${nextLimit}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setStats(data);
+      setPriceChangeLimit(nextLimit);
+    } catch (err) {
+      setStatsError(err.message || "Failed to load listing stats");
+    } finally {
+      setPriceChangeLoadingMore(false);
+    }
+  }, [priceChangeLimit, priceChangeLoadingMore, stats]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const md = stats?.marketDirection?.[period] || {};
@@ -428,7 +494,12 @@ export default function ListingsPage() {
             <DistributionTable title="By Building Type" data={stats.byBuildingType} />
           </div>
 
-          <PriceChangeListingsSection listings={stats.priceChangeListings} />
+          <PriceChangeListingsSection
+            listings={stats.priceChangeListings}
+            total={stats.priceChangeListingsTotal}
+            loadingMore={priceChangeLoadingMore}
+            onLoadMore={loadMorePriceChangeListings}
+          />
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">

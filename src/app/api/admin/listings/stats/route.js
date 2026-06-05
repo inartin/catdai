@@ -13,7 +13,7 @@ const PERIODS = {
 };
 
 const EMPTY_PRICE_CHANGES = { total: 0, up: 0, down: 0, avgChange: 0, avgChangePct: 0 };
-const PRICE_CHANGE_LIST_LIMIT = 12;
+const PRICE_CHANGE_LIST_LIMIT = 10;
 
 async function fetchAllRows(buildQuery) {
   let all = [];
@@ -119,12 +119,16 @@ async function fetchListingsWithRepeatedPriceHistory(limit = PRICE_CHANGE_LIST_L
       };
     })
     .filter(Boolean)
-    .sort((a, b) => new Date(b.latest_observed_at) - new Date(a.latest_observed_at))
-    .slice(0, limit);
+    .sort((a, b) => new Date(b.latest_observed_at) - new Date(a.latest_observed_at));
 
-  if (summaries.length === 0) return [];
+  const total = summaries.length;
+  const limitedSummaries = summaries.slice(0, limit);
 
-  const ids = summaries.map((item) => item.listingId);
+  if (limitedSummaries.length === 0) {
+    return { data: [], total };
+  }
+
+  const ids = limitedSummaries.map((item) => item.listingId);
   const { data: listings, error } = await supabaseAdmin
     .from("listing")
     .select(
@@ -132,29 +136,32 @@ async function fetchListingsWithRepeatedPriceHistory(limit = PRICE_CHANGE_LIST_L
     )
     .in("id", ids);
 
-  if (error) return [];
+  if (error) return { data: [], total };
 
   const listingsById = new Map((listings || []).map((listing) => [listing.id, listing]));
 
-  return summaries
-    .map((summary) => {
-      const listing = listingsById.get(summary.listingId);
-      if (!listing) return null;
-      return {
-        ...listing,
-        history_count: summary.history_count,
-        latest_observed_at: summary.latest_observed_at,
-        latest_history_price: summary.latest_history_price,
-        previous_history_price: summary.previous_history_price,
-        min_history_price: summary.min_history_price,
-        max_history_price: summary.max_history_price,
-        last_change_amount: summary.last_change_amount,
-        last_change_pct: summary.last_change_pct,
-        total_change_amount: summary.total_change_amount,
-        total_change_pct: summary.total_change_pct,
-      };
-    })
-    .filter(Boolean);
+  return {
+    data: limitedSummaries
+      .map((summary) => {
+        const listing = listingsById.get(summary.listingId);
+        if (!listing) return null;
+        return {
+          ...listing,
+          history_count: summary.history_count,
+          latest_observed_at: summary.latest_observed_at,
+          latest_history_price: summary.latest_history_price,
+          previous_history_price: summary.previous_history_price,
+          min_history_price: summary.min_history_price,
+          max_history_price: summary.max_history_price,
+          last_change_amount: summary.last_change_amount,
+          last_change_pct: summary.last_change_pct,
+          total_change_amount: summary.total_change_amount,
+          total_change_pct: summary.total_change_pct,
+        };
+      })
+      .filter(Boolean),
+    total,
+  };
 }
 
 function avg(arr) {
@@ -166,8 +173,17 @@ export async function GET(request) {
   if (unauthorized) return unauthorized;
 
   const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
+  const requestedPriceChangeLimit = Number(request.nextUrl.searchParams.get("priceChangeLimit"));
+  const priceChangeLimit = Number.isFinite(requestedPriceChangeLimit)
+    ? Math.max(PRICE_CHANGE_LIST_LIMIT, Math.floor(requestedPriceChangeLimit))
+    : PRICE_CHANGE_LIST_LIMIT;
 
-  if (!bypassCache && cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
+  if (
+    !bypassCache &&
+    priceChangeLimit === PRICE_CHANGE_LIST_LIMIT &&
+    cache.data &&
+    Date.now() - cache.ts < CACHE_TTL_MS
+  ) {
     return NextResponse.json(cache.data);
   }
 
@@ -209,7 +225,7 @@ export async function GET(request) {
       fetchPriceChangeStats(cutoffs["24h"]),
       fetchPriceChangeStats(cutoffs["7d"]),
       fetchPriceChangeStats(cutoffs["30d"]),
-      fetchListingsWithRepeatedPriceHistory(),
+      fetchListingsWithRepeatedPriceHistory(priceChangeLimit),
     ]);
   } catch (err) {
     console.error("Failed to load admin listing stats:", err);
@@ -231,7 +247,7 @@ export async function GET(request) {
     pc24h,
     pc7d,
     pc30d,
-    priceChangeListings,
+    priceChangeListingsRes,
   ] = dataResults;
 
   const priced = listings.filter((l) => l.price_amount != null);
@@ -268,10 +284,11 @@ export async function GET(request) {
     byRenovation: groupBy(listings, "renovation"),
     byBuildingType: groupBy(listings, "building_type"),
     recentListings: recentRes.data || [],
-    priceChangeListings: priceChangeListings || [],
+    priceChangeListings: priceChangeListingsRes?.data || [],
+    priceChangeListingsTotal: priceChangeListingsRes?.total || 0,
   };
 
-  if (!bypassCache) {
+  if (!bypassCache && priceChangeLimit === PRICE_CHANGE_LIST_LIMIT) {
     cache = { data: result, ts: Date.now() };
   }
 

@@ -37,7 +37,7 @@ Shows:
 ## Data Views
 - Listings list with search, active filter, rooms filter, sorting, pagination.
 - Listings page loads `/api/admin/listings/stats` for total listings, active/inactive listings, owner count, average price, average price per m2, market direction for 24h/7d/30d, distributions by district/rooms/renovation/building type, and recent listings.
-- Listings page also shows listings with multiple price-history entries and links each row to the admin listing detail.
+- Listings page also shows listings with multiple price-history entries, displays the total count for that group, loads the newest 10 first, has a `Load more` button for 10 more rows, and lets the loaded rows be sorted by history count.
 - Listing detail with full data, owner link, price history, and a price-history chart when at least two history entries exist.
 - Owners list with search and pagination.
 - Owner detail with profile fields and listings.

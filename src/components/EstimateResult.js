@@ -9,6 +9,7 @@ import AuthRequiredModal from "@/components/AuthRequiredModal";
 import ListingAlertConfigurator from "@/components/ListingAlertConfigurator";
 import ValuationPdfDialog from "@/components/ValuationPdfDialog";
 import CadastralDataCard from "@/components/CadastralDataCard";
+import InfoCallout from "@/components/InfoCallout";
 
 const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
 const LISTING_FAIR_BAND_PCT = 3;
@@ -1738,6 +1739,12 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
           <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
         </aside>
       </div>
+
+      {rentYieldCalculation && (
+        <InfoCallout title={t("calculator.infoTitle")}>
+          {t("calculator.infoText")}
+        </InfoCallout>
+      )}
     </div>
   );
 }

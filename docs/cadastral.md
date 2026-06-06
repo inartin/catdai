@@ -16,6 +16,7 @@ Implemented and active, with partial fallback.
 ## Address-Based Page
 - `/ro/cadastru` and `/ru/cadastru` are the indexable localized search pages; direct `/cadastru` is a noindex duplicate that canonicals to the current language version.
 - `/cadastru` lets users find official cadastral data by exact address or by entering a cadastral number directly.
+- `/evaluare` without result query parameters reuses the same cadastru search form and source note, placing the compact cadastral-number quick-fill card first under the `Locație` category header.
 - Anonymous users can open the page, but search actions show the shared auth popup used by PDF export instead of calling the cadastral APIs.
 - The page title and subtitle sit above the input card so the page purpose is clear before choosing a search method.
 - The page has localized route metadata, canonical and alternate language tags, and sitemap entries for both Romanian and Russian.
@@ -26,7 +27,8 @@ Implemented and active, with partial fallback.
 - Address input validation runs in both the browser and `/api/cadastru/address`: street is capped at 80 characters, building number accepts only digits plus one optional slash such as `18/2`, and apartment number accepts only digits from `1` to `9999`.
 - Address matching must be exact for the street and house number. Similar buildings such as `bd. Moscova 9/5` are rejected when the user enters `bd. Moscova 9`.
 - If exact WMS apartment details are missing, address search can use an exact Nominatim building match plus the containing Geodata WFS parcel/building geometry to derive the apartment cadastral number from the building/parcel code and a zero-padded apartment suffix.
-- It also shows a lower cadastral-number search section using the same placeholder format as the valuation form; the page validates the number locally, then the result page makes the single `/api/cadastral` lookup.
+- It also shows a lower cadastral-number search section using the original `/cadastru` inline layout and the same placeholder format as the valuation form; the page validates the number locally, then the result page makes the single `/api/cadastral` lookup.
+- The compact optional quick-fill card remains separate from the `/cadastru` page layout and is used only where the valuation-style shortcut is needed, such as `/evaluare` without result query parameters.
 - Page copy presents address search and cadastral-number search as two alternative methods for the same official cadastral-data result.
 - The page displays a short official-source note below the main form card, linking to `geodata.gov.md`.
 - The shared header links to the localized Cadastru URL for the current language on desktop and mobile.
@@ -70,6 +72,10 @@ Implemented and active, with partial fallback.
 - `src/app/cadastru/layout.js`
 - `src/app/cadastru/rezultat/page.js`
 - `src/app/cadastru/rezultat/layout.js`
+- `src/components/CadastruSearchForm.js`
+- `src/components/CadastralQuickSearchCard.js`
+- `src/components/CadastruSourceNote.js`
+- `src/components/EvaluationResultPage.js`
 - `src/lib/cadastru-address-search.js`
 - `src/lib/cadastru-search-events.js`
 - `src/lib/runtime-persistence.js`

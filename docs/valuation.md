@@ -10,6 +10,7 @@ Implemented and active for apartments.
 - The sale/buy tab uses `Estimare apartament` / `Оценка квартиры`; the rent tab uses `Estimare de piață` / `Рыночная оценка`, lets users select multiple sectors/zones and optionally multiple construction types, and hides the cadastral shortcut, total floors, first/last-floor filters, balconies, and budget fields.
 - `/estimeaza` collects city, district, rooms, building type, renovation, optional area, optional floor, optional first-floor/last-floor filters, bathrooms, balconies, cadastral number.
 - `/evaluare` reads URL params and calls `/api/estimate`.
+- `/evaluare` without valuation query params shows the reusable cadastru search form from `/cadastru` instead of redirecting to the homepage.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
 - Result supports edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Regular `/evaluare` result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
@@ -20,6 +21,8 @@ Implemented and active for apartments.
 - For `/anunt`, duplicate candidates from `/api/listing-duplicates` are shown with a combined high + medium count in the header and a text-only duplicate-candidate section above relevant listings; exact address conflicts exclude candidates when parsed addresses are available.
 - For `/anunt`, the bottom action embeds the `Verifică un anunț 999.md` link analyzer form so another listing check can start directly on the result page.
 - The sale valuation form's cadastral shortcut is login-gated and uses the shared auth popup before calling `/api/cadastral`.
+- The compact cadastral shortcut UI is shared through `CadastralQuickSearchCard`; in the valuation form it sits inside the `Locație` section below the section title and above the city/sector fields, matching the calculator layout, and is presented as an optional shortcut collapsed by default with title, subtitle, badge, search icon, and chevron; expanding it shows the input and search button.
+- The valuation form uses separate numbered cards for `Locație` and property details, matching the calculator page section style.
 - PDF export opens a section picker for everyone, but PDF download is login-gated and requires a valid Supabase session immediately before generation. If login starts from the PDF dialog, the login prompt overlays the PDF dialog; after OAuth redirect, a localStorage flag restores the PDF dialog.
 - PDF reports always include the estimated market price, segment median price per m2, property summary, disclaimer footer, and `catdai.md` source label; optional sections include seller-type comparison and official cadastral data when available.
 - PDF reports intentionally exclude market statistics, relevant listing cards/links, and sector/city trend charts.

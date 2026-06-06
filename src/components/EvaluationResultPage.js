@@ -7,6 +7,8 @@ import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
 import LinkAnalyzer from "@/components/LinkAnalyzer";
 import PropertyForm from "@/components/PropertyForm";
+import CadastruSearchForm from "@/components/CadastruSearchForm";
+import CadastruSourceNote from "@/components/CadastruSourceNote";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import {
@@ -69,6 +71,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
   const { session, loading: authLoading } = useAuth();
   const paramsString = searchParams.toString();
   const isListingAnalysisPage = routePath === "/anunt";
+  const showCadastruSearch = !isListingAnalysisPage && !paramsString;
 
   useEffect(() => {
     document.title = `${t(pageTitleKey)} | Catdai`;
@@ -113,6 +116,15 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
       const hasCompare = !!pRaw.get("c_city");
       const needsPrimaryFetch = primaryStr && primaryStr !== loadedPrimaryParamsRef.current;
       const needsCompareFetch = hasCompare && compareStr !== loadedCompareParamsRef.current;
+
+      if (!primaryStr && !hasCompare) {
+        setResult(null);
+        setError(null);
+        setLoading(false);
+        loadedPrimaryParamsRef.current = null;
+        loadedCompareParamsRef.current = null;
+        return;
+      }
 
       if (!needsPrimaryFetch && !needsCompareFetch) {
         if (!hasCompare && loadedCompareParamsRef.current !== null) {
@@ -440,6 +452,27 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
       hydrateComparisonImage(result2, setResult2, "compare");
     }
   }, [result, result2, lang]);
+
+  if (showCadastruSearch) {
+    return (
+      <section className="mx-auto w-full max-w-4xl px-6 pb-12 pt-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12">
+        <div className="mb-6">
+          <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
+            {t("cadastru.pageTitle")}
+          </h1>
+          <p className="mt-3 max-w-2xl text-base text-gray-600">
+            {t("cadastru.subtitle")}
+          </p>
+        </div>
+
+        <CadastruSearchForm
+          quickSearchPlacement="top"
+          showLocationHeader
+        />
+        <CadastruSourceNote />
+      </section>
+    );
+  }
 
   const handleEdit = () => {
     setIsListingsMode(false);

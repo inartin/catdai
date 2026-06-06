@@ -13,10 +13,12 @@ Implemented for rent-yield calculations.
 - Reuses `PropertyForm` with the `rentYieldCalculator` variant.
 - Keeps cadastral quick fill, location, property details, and optional property details from the estimate flow.
 - Adds investment fields: apartment price, optional additional investments, and an optional official 7% monthly rent tax checkbox.
+- The rent tax checkbox is labeled `Include impozitul pe chirie de 7%` in Romanian.
 - Apartment price, additional investments, and rent tax are not sent to the rent-estimate API; they are used only for yield and payback calculations.
 - The calculator variant hides the sale/rent tabs, estimate accuracy meter, and 999.md prompt.
 - On `/calculator` only, the form uses separate cards ordered as investment, quick fill plus location, and `Despre Proprietate`. The regular estimator keeps the original single divided card.
 - In the location card, the card header appears first, followed by a centered compact optional cadastral quick-fill block and then the full-width city/sector fields.
+- The compact cadastral quick-fill block uses the shared `CadastralQuickSearchCard` component and presents the cadastral number as an optional shortcut collapsed by default; expanding it shows the input and search button.
 - Calculator optional property details do not show the sale-specific first-floor and last-floor checkboxes.
 - The calculator page header uses a calculator icon instead of the estimate form's house icon.
 - Sector/zone fields no longer use fade-in animation, preventing animation replay during normal typing or checkbox changes.
@@ -45,6 +47,7 @@ Implemented for rent-yield calculations.
 - When selected, the 7% rent tax is calculated monthly from estimated rent and deducted for after-tax yield and payback period.
 - The calculator does not treat 7% as a target yield.
 - The old `Alternative mai bune` explanatory text block is not shown on the calculator result.
+- The form and result page both end with the reusable info block `Cum funcționează calculul`, explaining that monthly rent is estimated from similar listings and then annual yield, net after-tax income, and estimated payback period are calculated.
 
 ## Analytics
 - `/calculator?rezultat=1` sends a calculator usage payload with device/session ids, selected investment fields, tax selection, and language to `/api/estimate-rent`.
@@ -58,6 +61,8 @@ Implemented for rent-yield calculations.
 - `src/app/calculator/layout.js`
 - `src/lib/calculator-usage-events.js`
 - `src/components/PropertyForm.js`
+- `src/components/InfoCallout.js`
+- `src/components/CadastralQuickSearchCard.js`
 - `src/locales/ro.json`
 - `src/locales/ru.json`
 - `db/calculator_usage_events.sql`

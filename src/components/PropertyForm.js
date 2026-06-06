@@ -7,6 +7,8 @@ import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import BackButton from "@/components/BackButton";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
+import InfoCallout from "@/components/InfoCallout";
+import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
 import { validateCadastralNumber } from "@/lib/validation";
 
 const cities = [
@@ -520,17 +522,29 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
 
   const calculatorCardShellClass = "rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden";
   const calculatorStandaloneCardClass = `${calculatorCardShellClass} p-5 sm:p-6`;
-  const formCardClass = isCalculatorMode
-    ? "mt-6 space-y-5"
-    : "rounded-2xl border border-gray-100 bg-white shadow-sm overflow-hidden divide-y divide-gray-100";
-  const locationSectionClass = isCalculatorMode
-    ? "px-5 pb-5 sm:px-6 sm:pb-6"
-    : "p-5 sm:p-6";
+  const formCardClass = "mt-6 space-y-5";
+  const locationSectionClass = "p-5 sm:p-6";
 
   function CalculatorGroupedCard({ children }) {
-    if (!isCalculatorMode) return <>{children}</>;
     return <div className={calculatorCardShellClass}>{children}</div>;
   }
+
+  const renderCadastralQuickSearch = (className = "") => (
+    <CadastralQuickSearchCard
+      value={cadastralInput}
+      onChange={(value) => {
+        setCadastralInput(value);
+        if (cadastralError) setCadastralError(null);
+        if (cadastralData) setCadastralData(null);
+      }}
+      onSearch={handleCadastralSearch}
+      loading={cadastralLoading}
+      error={cadastralError ? t(`form.${cadastralError}`) : ""}
+      successText={!cadastralError && cadastralData && !cadastralData.partial ? cadastralData.apartment?.address || " " : ""}
+      partialText={!cadastralError && cadastralData?.partial ? cadastralData.location?.display_name || " " : ""}
+      className={className}
+    />
+  );
 
   const renderOptionalDetails = (className = "p-5 sm:p-6") => (
     <div className={className}>
@@ -800,101 +814,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
               </span>
             </div>
 
-            <div className="mx-auto mb-6 w-full max-w-xl rounded-xl border border-blue-100 bg-blue-50/30 p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 text-xs font-bold flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                  </svg>
-                </span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {t("form.cadastralSection")}
-                </span>
-              </div>
-
-              <div>
-                <label className="text-sm text-gray-600 mb-1.5 block">
-                  {t("form.cadastralNumber")}
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder={t("form.cadastralPlaceholder")}
-                    value={cadastralInput}
-                    onChange={(e) => {
-                      setCadastralInput(e.target.value);
-                      if (cadastralError) setCadastralError(null);
-                      if (cadastralData) setCadastralData(null);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCadastralSearch();
-                    }}
-                    disabled={cadastralLoading}
-                    className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-60"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCadastralSearch}
-                    disabled={cadastralLoading || !cadastralInput.trim()}
-                    className="px-5 py-3 rounded-xl text-sm font-medium transition-all duration-150 bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
-                  >
-                    {cadastralLoading ? (
-                      <>
-                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        {t("form.cadastralSearching")}
-                      </>
-                    ) : (
-                      <>
-                        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="11" cy="11" r="8" />
-                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                        </svg>
-                        {t("form.cadastralSearch")}
-                      </>
-                    )}
-                  </button>
-                </div>
-                {cadastralError && (
-                  <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-                      <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
-                    </svg>
-                    {t(`form.${cadastralError}`)}
-                  </p>
-                )}
-                {cadastralData && !cadastralError && !cadastralData.partial && (
-                  <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 animate-fade-in">
-                    <p className="text-xs font-medium text-emerald-700 flex items-center gap-1.5 mb-2">
-                      <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-                        <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
-                      </svg>
-                      {t("form.cadastralFound")}
-                    </p>
-
-                    {cadastralData.apartment?.address && (
-                      <p className="text-xs text-emerald-600">{cadastralData.apartment.address}</p>
-                    )}
-                  </div>
-                )}
-                {cadastralData && !cadastralError && cadastralData.partial && (
-                  <div className="mt-3 rounded-xl bg-sky-50 border border-sky-200 p-3 animate-fade-in">
-                    <p className="text-xs font-medium text-sky-700 flex items-center gap-1.5 mb-1.5">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-                        <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
-                      </svg>
-                      {t("form.cadastralPartial")}
-                    </p>
-                    {cadastralData.location?.display_name && (
-                      <p className="text-xs text-sky-600">{cadastralData.location.display_name}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            {renderCadastralQuickSearch("mb-6")}
 
             <div className="space-y-3">
               <div
@@ -938,105 +858,6 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
           </div>
           ) : (
           <>
-          {/* — Cadastral shortcut — */}
-          {!isRentMode && (
-          <div className="p-5 sm:p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-500 text-xs font-bold flex items-center justify-center">
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </span>
-              <span className="text-sm font-semibold text-gray-900">
-                {t("form.cadastralSection")}
-              </span>
-            </div>
-
-            <div>
-              <label className="text-sm text-gray-600 mb-1.5 block">
-                {t("form.cadastralNumber")}
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder={t("form.cadastralPlaceholder")}
-                  value={cadastralInput}
-                  onChange={(e) => {
-                    setCadastralInput(e.target.value);
-                    if (cadastralError) setCadastralError(null);
-                    if (cadastralData) setCadastralData(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleCadastralSearch();
-                  }}
-                  disabled={cadastralLoading}
-                  className="flex-1 rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors disabled:opacity-60"
-                />
-                <button
-                  type="button"
-                  onClick={handleCadastralSearch}
-                  disabled={cadastralLoading || !cadastralInput.trim()}
-                  className="px-5 py-3 rounded-xl text-sm font-medium transition-all duration-150 bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed flex items-center gap-2 shrink-0"
-                >
-                  {cadastralLoading ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      {t("form.cadastralSearching")}
-                    </>
-                  ) : (
-                    <>
-                      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="11" cy="11" r="8" />
-                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                      </svg>
-                      {t("form.cadastralSearch")}
-                    </>
-                  )}
-                </button>
-              </div>
-              {cadastralError && (
-                <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-                    <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM8 4a.75.75 0 0 1 .75.75v3a.75.75 0 0 1-1.5 0v-3A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
-                  </svg>
-                  {t(`form.${cadastralError}`)}
-                </p>
-              )}
-              {cadastralData && !cadastralError && !cadastralData.partial && (
-                <div className="mt-3 rounded-xl bg-emerald-50 border border-emerald-200 p-3 animate-fade-in">
-                  <p className="text-xs font-medium text-emerald-700 flex items-center gap-1.5 mb-2">
-                    <svg viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-                      <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14Zm3.844-8.791a.75.75 0 0 0-1.188-.918l-3.7 4.79-1.649-1.833a.75.75 0 1 0-1.114 1.004l2.25 2.5a.75.75 0 0 0 1.15-.043l4.25-5.5Z" clipRule="evenodd" />
-                    </svg>
-                    {t("form.cadastralFound")}
-                  </p>
-
-                  {cadastralData.apartment?.address && (
-                    <p className="text-xs text-emerald-600">{cadastralData.apartment.address}</p>
-                  )}
-                </div>
-              )}
-              {cadastralData && !cadastralError && cadastralData.partial && (
-                <div className="mt-3 rounded-xl bg-sky-50 border border-sky-200 p-3 animate-fade-in">
-                  <p className="text-xs font-medium text-sky-700 flex items-center gap-1.5 mb-1.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="w-3.5 h-3.5 shrink-0">
-                      <path fillRule="evenodd" d="M8 15A7 7 0 1 0 8 1a7 7 0 0 0 0 14ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clipRule="evenodd" />
-                    </svg>
-                    {t("form.cadastralPartial")}
-                  </p>
-                  {cadastralData.location?.display_name && (
-                    <p className="text-xs text-sky-600">{cadastralData.location.display_name}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          )}
-
           {/* — Section 1: Location — */}
           <div className={locationSectionClass}>
             <div className="flex items-center gap-2 mb-4">
@@ -1047,6 +868,12 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                 {t("form.locationSection")}
               </span>
             </div>
+
+            {!isRentMode && (
+              <div className="mb-6">
+                {renderCadastralQuickSearch()}
+              </div>
+            )}
 
             <div className="space-y-3">
               <div
@@ -1106,7 +933,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
 
           {/* — Section 2: Property basics — */}
           {form.city && ((districtsByCity[form.city] || []).length === 0 || (isRentMode ? rentDistricts.length > 0 : form.district)) && (
-            <div className={isCalculatorMode ? calculatorStandaloneCardClass : "p-5 sm:p-6"}>
+            <div className={calculatorStandaloneCardClass}>
               <div className="flex items-center gap-2 mb-4">
                 <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
                   {isCalculatorMode ? 3 : 2}
@@ -1194,15 +1021,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                   />
                 </div>
               </div>
-              {isCalculatorMode && (
-                <div className="mt-6">
-                  {renderOptionalDetails("p-0")}
-                </div>
-              )}
+              <div className="mt-6">
+                {renderOptionalDetails("p-0")}
+              </div>
             </div>
           )}
-
-          {!isCalculatorMode && renderOptionalDetails()}
         </div>
 
         {/* ── CTA ── */}
@@ -1242,6 +1065,12 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         <p className="text-center text-xs text-gray-400 mt-3">
           {form.city ? t("form.socialProof", { city: t(`data.city.${form.city}`) }) : ""}
         </p>
+
+        {isCalculatorMode && (
+          <InfoCallout title={t("calculator.infoTitle")} className="mt-6">
+            {t("calculator.infoText")}
+          </InfoCallout>
+        )}
       </div>
     </section>
   );

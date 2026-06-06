@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
+import { useAuth } from "@/context/AuthContext";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
 
 const ERROR_KEYS = {
@@ -35,6 +36,7 @@ function buildListingAnalysisUrl(payload) {
 
 export default function LinkAnalyzer({ titleTag: TitleTag = "p", className = "mt-5" }) {
   const { t } = useTranslation();
+  const { session } = useAuth();
   const router = useRouter();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,7 +51,10 @@ export default function LinkAnalyzer({ titleTag: TitleTag = "p", className = "mt
     try {
       const res = await fetch("/api/analyze-link", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ url: trimmed }),
       });
       const data = await res.json().catch(() => ({}));

@@ -119,6 +119,7 @@ export default function ProfilePage() {
   const [alertDeleteTarget, setAlertDeleteTarget] = useState(null);
   const [isDeletingAlert, setIsDeletingAlert] = useState(false);
   const [activeTab, setActiveTab] = useState("favorites");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [favorites, setFavorites] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
   const [listingAlerts, setListingAlerts] = useState([]);
@@ -277,16 +278,41 @@ export default function ProfilePage() {
                 </button>
               </div>
             </div>
-            <div className="mt-8 pt-8 border-t border-gray-100">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">{t("profile.config")}</h3>
-              <TelegramConnectionCard className="mb-4" />
-              <button 
+            <div className="mt-8 border-t border-gray-100 pt-6">
+              <button
                 type="button"
-                className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-md text-sm font-medium transition-colors border border-red-200"
-                onClick={() => setIsDeleteModalOpen(true)}
+                className="flex w-full items-center justify-between gap-3 rounded-lg px-1 py-2 text-left text-lg font-medium text-gray-900 transition-colors hover:text-primary"
+                aria-expanded={isSettingsOpen}
+                aria-controls="profile-settings-panel"
+                onClick={() => setIsSettingsOpen((value) => !value)}
               >
-                {t("profile.delete")}
+                <span>{t("profile.config")}</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  className={`h-5 w-5 text-gray-400 transition-transform ${isSettingsOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </button>
+              <div
+                id="profile-settings-panel"
+                className={`mt-4 ${isSettingsOpen ? "block" : "hidden"}`}
+              >
+                <TelegramConnectionCard className="mb-4" />
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-md text-sm font-medium transition-colors border border-red-200"
+                  onClick={() => setIsDeleteModalOpen(true)}
+                >
+                  {t("profile.delete")}
+                </button>
+              </div>
             </div>
           </div>
 

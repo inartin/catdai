@@ -14,7 +14,8 @@ Implemented as read-only admin dashboard.
 
 ## Dashboard
 Shows:
-- registered users
+- registered users with login provider type such as Telegram or Gmail, registration date, and last visit
+- The user admin API includes a response version in its short cache so table schema changes do not reuse stale in-memory rows.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows

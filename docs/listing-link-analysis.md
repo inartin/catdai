@@ -6,6 +6,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 ## Flow
 1. `LinkAnalyzer` is available on the landing page and on `/verifica-anunt`; `/estimeaza` links users to `/verifica-anunt?from=estimeaza`, where a back button returns to `/estimeaza`, and `/999` permanently redirects to `/verifica-anunt`.
 2. It posts the URL to `POST /api/analyze-link`.
+   - When the visitor is authenticated, the client includes the Supabase bearer token so analytics can attach `user_id`.
 3. The route extracts the listing id, fetches the page, parses seller-selected attributes, validates Chișinău, and maps them to estimate params.
 4. The client redirects to `/anunt?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
 5. `/anunt` runs the usual sale estimate, fetches listing price history by `listing.external_id`, and renders the listing-vs-market comparison through the shared result component.
@@ -29,6 +30,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 
 ## Analytics
 - Each parse attempt with a valid 999 listing id writes to `listing_link_analysis_events` when the table exists.
+- Cached successful fallback responses also write success analytics, so authenticated cached analyses still attach `user_id`.
 - The admin dashboard shows total link analyses, analyzed/rejected/failed splits, period totals, and recent rows.
 - 999.md link-analysis events are written only when `NODE_ENV=production`.
 

@@ -33,6 +33,15 @@ function fmtDateTime(d) {
   });
 }
 
+function fmtDate(d) {
+  if (!d) return "\u2014";
+  return new Date(d).toLocaleDateString("ro-RO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function fmtBool(value) {
   return value ? "Yes" : "No";
 }
@@ -440,6 +449,8 @@ export default function AdminDashboard() {
                   <thead className="sticky top-0">
                     <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
                       <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Registered Type</th>
+                      <th className="px-4 py-3">Registered Date</th>
                       <th className="px-4 py-3">Last Visit</th>
                       <th className="px-4 py-3 text-right">Estimations</th>
                       <th className="px-4 py-3 text-right">Shared Links</th>
@@ -451,6 +462,12 @@ export default function AdminDashboard() {
                       <tr key={u.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-gray-900 font-medium">
                           {u.name || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {u.authProvider || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {fmtDate(u.registeredAt)}
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                           {fmtDateTime(u.lastVisitAt)}

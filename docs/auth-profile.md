@@ -20,8 +20,7 @@ Implemented and active.
 - logout
 - favorites
 - listing alerts
-- always-visible Telegram connection controls
-- account deletion
+- closed `Setări` panel with Telegram connection controls and account deletion; Telegram status is fetched once with the profile page, not every time the panel opens
 - localized browser title from `nav.profile`
 
 ## Activity Tracking

@@ -239,11 +239,11 @@ function buildSuccessPayload(externalId, parsed, params) {
   };
 }
 
-function fallbackCachedResponse(externalId, parsed) {
+function buildFallbackCachedPayload(externalId, parsed) {
   if (!parsed) return null;
   const mapped = mapToParams(parsed);
   if (mapped.error) return null;
-  return NextResponse.json(buildSuccessPayload(externalId, parsed, mapped.params));
+  return { parsed, params: mapped.params, payload: buildSuccessPayload(externalId, parsed, mapped.params) };
 }
 
 export async function POST(request) {
@@ -276,21 +276,30 @@ export async function POST(request) {
   if (!parsed || !hasExactListingAddress(getParsedListingAddress(parsed))) {
     const result = await fetchListingHtml(listingUrl);
     if (result.error === "blocked") {
-      const fallback = fallbackCachedResponse(externalId, parsed);
-      if (fallback) return fallback;
+      const fallback = buildFallbackCachedPayload(externalId, parsed);
+      if (fallback) {
+        await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
+        return NextResponse.json(fallback.payload);
+      }
       await logEvent({ status: "upstream_blocked" });
       return NextResponse.json({ error: "upstream_blocked" }, { status: 503 });
     }
     if (result.error || !result.html) {
-      const fallback = fallbackCachedResponse(externalId, parsed);
-      if (fallback) return fallback;
+      const fallback = buildFallbackCachedPayload(externalId, parsed);
+      if (fallback) {
+        await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
+        return NextResponse.json(fallback.payload);
+      }
       await logEvent({ status: "fetch_failed" });
       return NextResponse.json({ error: "fetch_failed" }, { status: 502 });
     }
     const fetchedParsed = parse999Listing(result.html);
     if (!fetchedParsed) {
-      const fallback = fallbackCachedResponse(externalId, parsed);
-      if (fallback) return fallback;
+      const fallback = buildFallbackCachedPayload(externalId, parsed);
+      if (fallback) {
+        await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
+        return NextResponse.json(fallback.payload);
+      }
       await logEvent({ status: "not_a_listing" });
       return NextResponse.json({ error: "not_a_listing" }, { status: 422 });
     }

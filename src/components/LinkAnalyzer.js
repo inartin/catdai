@@ -27,12 +27,13 @@ function buildListingAnalysisUrl(payload) {
     search.set("listing_price", String(payload.listing_price));
   }
   if (payload.listing_currency) search.set("listing_currency", payload.listing_currency);
+  if (payload.listing_address) search.set("listing_address", payload.listing_address);
   if (payload.external_id) search.set("listing_id", String(payload.external_id));
   search.set("_new", "1");
   return `/anunt?${search.toString()}`;
 }
 
-export default function LinkAnalyzer({ titleTag: TitleTag = "p" }) {
+export default function LinkAnalyzer({ titleTag: TitleTag = "p", className = "mt-5" }) {
   const { t } = useTranslation();
   const router = useRouter();
   const [url, setUrl] = useState("");
@@ -74,7 +75,7 @@ export default function LinkAnalyzer({ titleTag: TitleTag = "p" }) {
   };
 
   return (
-    <div className="mt-5 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+    <div className={`${className} rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm`}>
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-white">
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

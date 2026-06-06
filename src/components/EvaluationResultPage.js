@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
+import LinkAnalyzer from "@/components/LinkAnalyzer";
 import PropertyForm from "@/components/PropertyForm";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
@@ -29,6 +30,7 @@ function buildListingComparison(params) {
     asking_price: price,
     currency: params.get("listing_currency") || "EUR",
     external_id: params.get("listing_id") || null,
+    address_text: params.get("listing_address") || null,
   };
 }
 
@@ -66,6 +68,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
   const { t, lang } = useTranslation();
   const { session, loading: authLoading } = useAuth();
   const paramsString = searchParams.toString();
+  const isListingAnalysisPage = routePath === "/anunt";
 
   useEffect(() => {
     document.title = `${t(pageTitleKey)} | Catdai`;
@@ -268,17 +271,46 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
             loadedPrimaryParamsRef.current = null;
           } else {
             let listingComparison = buildListingComparison(pRaw);
+            let listingDuplicates = null;
             if (listingComparison?.external_id) {
-              const historyRes = await fetchJson(
-                `/api/listing-price-history?external_id=${encodeURIComponent(listingComparison.external_id)}`
-              );
+              const [historyRes, duplicateRes] = await Promise.all([
+                fetchJson(`/api/listing-price-history?external_id=${encodeURIComponent(listingComparison.external_id)}`),
+                fetchJson("/api/listing-duplicates", {
+                  method: "POST",
+                  headers,
+                  body: JSON.stringify({
+                    listing_type: "sale",
+                    external_id: listingComparison.external_id,
+                    listing_price: listingComparison.asking_price,
+                    listing_currency: listingComparison.currency,
+                    listing_address: listingComparison.address_text,
+                    params: {
+                      city: res1.data?.input?.city,
+                      district: res1.data?.input?.district,
+                      rooms_count: res1.data?.input?.rooms_count,
+                      area_m2: res1.data?.input?.area_m2,
+                      floor: res1.data?.input?.floor,
+                      total_floors: res1.data?.input?.total_floors,
+                      building_type: res1.data?.input?.building_type,
+                      renovation: res1.data?.input?.renovation,
+                      bathrooms_count: res1.data?.input?.bathrooms_count,
+                      balconies_count: res1.data?.input?.balconies_count,
+                    },
+                  }),
+                }),
+              ]);
               if (cancelled) return;
               listingComparison = {
                 ...listingComparison,
                 price_history: historyRes.ok ? (historyRes.data.price_history || []) : [],
               };
+              listingDuplicates = duplicateRes.ok ? duplicateRes.data : null;
             }
-            setResult(listingComparison ? { ...res1.data, listing_comparison: listingComparison } : res1.data);
+            setResult(listingComparison ? {
+              ...res1.data,
+              listing_comparison: listingComparison,
+              ...(listingDuplicates ? { listing_duplicates: listingDuplicates } : {}),
+            } : res1.data);
             loadedPrimaryParamsRef.current = primaryStr;
           }
         }
@@ -644,19 +676,25 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
         )}
       </div>
       {!isListingsMode && (
-        <div className="mt-8 flex justify-center">
-          <button
-            type="button"
-            onClick={handleNewEstimate}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-              <path d="M21 3v6h-6" />
-            </svg>
-            {t("evaluare.newEstimate")}
-          </button>
-        </div>
+        isListingAnalysisPage ? (
+          <div className="mx-auto max-w-3xl">
+            <LinkAnalyzer titleTag="h2" className="mt-8" />
+          </div>
+        ) : (
+          <div className="mt-8 flex justify-center">
+            <button
+              type="button"
+              onClick={handleNewEstimate}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary/90"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                <path d="M21 3v6h-6" />
+              </svg>
+              {t("evaluare.newEstimate")}
+            </button>
+          </div>
+        )
       )}
     </div>
   );

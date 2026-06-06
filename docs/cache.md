@@ -31,6 +31,7 @@ Backend prepared and active when Redis is reachable.
 - `/api/estimate` still resolves access and logs each estimate request on cache hits.
 - Process memory keeps up to 250 recent estimates as a fallback when Redis is unavailable.
 - `999.md` preview image scraping is outside the estimate response path and is cached separately.
+- `/api/analyze-link` and `/api/listing-duplicates` reuse the 999.md parsed-listing cache, but refresh stale entries that only contain a broad location before exact-address duplicate checks.
 
 ## AWS Setup
 - Install and run Redis on the same host as the app through the OS service, or point `REDIS_URL` at the host Redis endpoint.

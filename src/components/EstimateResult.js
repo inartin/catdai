@@ -184,6 +184,62 @@ function normalizeRelevantListing(listing, t, lang) {
   };
 }
 
+function normalizeDuplicateListing(listing, t, lang, probability) {
+  const href = build999ListingUrl(listing?.external_id, lang);
+  if (!href) return null;
+
+  const tags = [
+    listing.rooms_count === 1
+      ? t("result.oneRoom")
+      : (listing.rooms_count ? t("result.rooms", { count: listing.rooms_count }) : null),
+    formatArea(listing.area_m2),
+    listing.building_type ? t(`data.buildingType.${listing.building_type}`) : null,
+    listing.renovation ? t(`data.renovationType.${listing.renovation}`) : null,
+  ].filter(Boolean);
+
+  return {
+    externalId: String(listing.external_id),
+    href,
+    title: listing.title || t("result.listingDuplicateFallbackTitle"),
+    address: formatDuplicateListingAddress(listing.address_text),
+    meta: formatListingMeta(listing, t),
+    price: listing.price_amount,
+    priceCurrency: listing.price_currency,
+    pricePerM2: listing.price_per_m2,
+    areaFloor: formatListingAreaFloor(listing, t),
+    tags,
+    probability,
+    score: listing.match?.score ?? null,
+    reasons: Array.isArray(listing.match?.reasons) ? listing.match.reasons : [],
+  };
+}
+
+function formatDuplicateListingAddress(address) {
+  if (!address || typeof address !== "string") return null;
+
+  const parts = address.split(",").map((part) => part.trim()).filter(Boolean);
+  const streetIndex = parts.findIndex((part) =>
+    /\b(strada|str\.?|bd\.?|bulevardul|bulevard|blvd|aleea|sos\.?|soseaua)\b/i.test(part)
+  );
+  if (streetIndex >= 0) {
+    return parts.slice(streetIndex).join(", ");
+  }
+
+  return address.trim() || null;
+}
+
+function getDuplicateHighReasons(listing, t) {
+  if (listing.probability !== "high") return [];
+
+  const reasonPriority = [
+    ["same_owner", "result.listingDuplicateReasonSameOwner"],
+    ["same_address", "result.listingDuplicateReasonSameAddress"],
+  ];
+  return reasonPriority
+    .filter(([reason]) => listing.reasons.includes(reason))
+    .map(([, key]) => t(key));
+}
+
 function appendDefinedParam(params, key, value) {
   if (value === null || value === undefined || value === "") return;
   params.append(key, String(value));
@@ -940,6 +996,128 @@ function RelevantListingsPreview({ t, count, listings, onViewAll, sidebar = fals
   );
 }
 
+function DuplicateListingCard({ listing, t }) {
+  const metaParts = listing.meta ? listing.meta.split(" · ").filter(Boolean) : [];
+  const isHigh = listing.probability === "high";
+  const highReasons = getDuplicateHighReasons(listing, t);
+  const badgeClassName = isHigh
+    ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+    : "bg-amber-50 text-amber-700 ring-1 ring-amber-100";
+
+  return (
+    <a
+      href={listing.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h4 className="truncate text-sm font-semibold text-gray-900">{listing.title}</h4>
+          {listing.address && (
+            <p className="mt-1 text-xs font-medium text-gray-500">{listing.address}</p>
+          )}
+          {metaParts.length > 0 && (
+            <p className="mt-1 text-xs text-gray-400">
+              {metaParts.map((part, index) => (
+                <span key={`${part}-${index}`} className="block">
+                  {part}
+                </span>
+              ))}
+            </p>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <span className={`rounded-lg px-2.5 py-1 text-center ${badgeClassName}`}>
+            <span className="block text-[10px] font-semibold uppercase leading-none tracking-wide">
+              {t("result.listingDuplicateMatch")}
+            </span>
+            <span className="mt-0.5 block text-xs font-bold uppercase leading-none">
+              {isHigh ? t("result.listingDuplicateHigh") : t("result.listingDuplicateMedium")}
+            </span>
+          </span>
+          {highReasons.map((reason) => (
+            <span key={reason} className="rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-semibold leading-none text-emerald-700 ring-1 ring-emerald-100">
+              {reason}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-lg font-bold tracking-tight text-gray-900">
+            {formatCurrencyPrice(listing.price, listing.priceCurrency)}
+          </p>
+          {listing.pricePerM2 != null && (
+            <p className="mt-0.5 text-xs text-gray-400">
+              {formatCurrencyPrice(listing.pricePerM2, listing.priceCurrency)}/m²
+            </p>
+          )}
+        </div>
+        {listing.areaFloor && (
+          <p className="shrink-0 text-right text-xs font-medium text-gray-500">{listing.areaFloor}</p>
+        )}
+      </div>
+      {listing.tags.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {listing.tags.map((tag) => (
+            <span key={tag} className="rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-500">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </a>
+  );
+}
+
+function DuplicateListingsPreview({ t, count, listings, sectionRef }) {
+  const [showAll, setShowAll] = useState(false);
+  if (count <= 0 || listings.length === 0) return null;
+
+  const visibleListings = showAll ? listings : listings.slice(0, 3);
+  const hiddenCount = Math.max(0, listings.length - visibleListings.length);
+
+  return (
+    <section ref={sectionRef} className="scroll-mt-6 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div className="border-b border-gray-100 p-6 sm:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold text-gray-900">{t("result.listingDuplicatesTitle")}</h3>
+              <span className="shrink-0 rounded-lg bg-primary/10 px-3 py-1.5 text-sm font-bold text-primary">
+                {count.toLocaleString("ro-MD")}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-gray-400">{t("result.listingDuplicatesDesc")}</p>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {visibleListings.map((listing) => (
+            <DuplicateListingCard
+              key={`${listing.probability}-${listing.externalId}`}
+              listing={listing}
+              t={t}
+            />
+          ))}
+        </div>
+        {hiddenCount > 0 && (
+          <div className="mt-5 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              {t("result.listingDuplicatesShowMore", { count: hiddenCount.toLocaleString("ro-MD") })}
+            </button>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function RentYieldCalculatorPanel({ calculation }) {
   const { t } = useTranslation();
   const hasTax = calculation.include_rent_tax;
@@ -1586,6 +1764,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const [showListingsView, setShowListingsView] = useState(false);
   const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false);
   const favoriteChecked = useRef(false);
+  const duplicatesSectionRef = useRef(null);
   const { t, lang } = useTranslation();
   const { session, isAuthenticated, clearAuthError } = useAuth();
   const isRentEstimate = data.estimate_type === "rent";
@@ -1808,6 +1987,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     ? build999ListingUrl(listingComparison.external_id, lang)
     : null;
   const listingImageUrl = listingComparison?.image_url || null;
+  const listingAddressLabel = listingComparison?.address_text
+    ? formatDuplicateListingAddress(listingComparison.address_text)
+    : null;
   const marketRate = Number(estimate?.market_rate);
   const listingComparable = !!listingComparison
     && Number.isFinite(listingAsking) && listingAsking > 0
@@ -1876,6 +2058,18 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     .map((listing) => normalizeRelevantListing(listing, t, lang))
     .filter(Boolean)
     .slice(0, 3);
+  const listingDuplicatesData = data.listing_duplicates || null;
+  const listingDuplicateHighItems = (Array.isArray(listingDuplicatesData?.high) ? listingDuplicatesData.high : [])
+    .map((listing) => normalizeDuplicateListing(listing, t, lang, "high"))
+    .filter(Boolean);
+  const listingDuplicateMediumItems = (Array.isArray(listingDuplicatesData?.medium) ? listingDuplicatesData.medium : [])
+    .map((listing) => normalizeDuplicateListing(listing, t, lang, "medium"))
+    .filter(Boolean);
+  const listingDuplicateItems = [...listingDuplicateHighItems, ...listingDuplicateMediumItems];
+  const listingDuplicateCount = listingDuplicatesData
+    ? listingDuplicateItems.length
+    : 0;
+  const hasListingDuplicates = listingDuplicateCount > 0;
   const resultLayoutClassName = compactLayout
     ? "animate-fade-in flex flex-col gap-5"
     : "animate-fade-in flex flex-col gap-5 lg:gap-6";
@@ -1895,6 +2089,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const closeAuthModal = useCallback(() => {
     forgetPdfLoginReturn();
     setIsAuthModalOpen(false);
+  }, []);
+  const scrollToDuplicateListings = useCallback(() => {
+    duplicatesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
   const headerControls = (
     <div className="flex items-center gap-2">
@@ -2012,6 +2209,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   </h2>
                   <p className="text-base text-gray-500 mt-1">
                     {input.district && `${t(`data.district.${input.district}`)}, `}{t(`data.city.${input.city}`)}
+                    {listingComparison && listingAddressLabel ? `, ${listingAddressLabel}` : ""}
                   </p>
                   <div className="flex flex-wrap gap-2 mt-3">
                     {input.building_type && (
@@ -2048,6 +2246,31 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                       </span>
                     )}
                   </div>
+                  {listingComparison && listingDuplicatesData && (
+                    <button
+                      type="button"
+                      onClick={hasListingDuplicates ? scrollToDuplicateListings : undefined}
+                      disabled={!hasListingDuplicates}
+                      className={`mt-4 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 ${
+                        hasListingDuplicates
+                          ? "cursor-pointer border-primary/10 bg-primary/5 hover:border-primary/30 hover:bg-primary/10"
+                          : "cursor-default border-emerald-100 bg-emerald-50"
+                      }`}
+                    >
+                      {hasListingDuplicates ? (
+                        <>
+                          <span className="text-lg font-bold leading-none text-primary">{listingDuplicateCount.toLocaleString("ro-MD")}</span>
+                          <span className="text-sm font-medium text-gray-600">
+                            {t("result.listingDuplicateCount", { count: listingDuplicateCount })}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-sm font-semibold text-emerald-700">
+                          {t("result.listingDuplicateNoneFound")}
+                        </span>
+                      )}
+                    </button>
+                  )}
                 </div>
                 {listingComparison ? (
                   <ListingPriceHistoryChart
@@ -2515,6 +2738,13 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
         </div>
         <aside className={supportColumnClassName}>
+
+          <DuplicateListingsPreview
+            t={t}
+            count={listingDuplicateCount}
+            listings={listingDuplicateItems}
+            sectionRef={duplicatesSectionRef}
+          />
 
           <RelevantListingsPreview
             t={t}

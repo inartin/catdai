@@ -18,6 +18,14 @@ function decodeEntities(value) {
     .replaceAll("&nbsp;", " ");
 }
 
+function decodeJsonString(value) {
+  try {
+    return JSON.parse(`"${String(value).replace(/"/g, '\\"')}"`);
+  } catch {
+    return value;
+  }
+}
+
 export function extractListingIdFromUrl(url) {
   if (!url || typeof url !== "string") return null;
   let parsed;
@@ -94,6 +102,67 @@ function extractJsonLd(html) {
   return null;
 }
 
+function normalizeEmbeddedJsonText(html) {
+  return decodeEntities(html)
+    .replace(/\\"/g, '"')
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+function extractAdFeatureValue(source, key) {
+  const escapedKey = escapeRegExp(key);
+  const match = source.match(new RegExp(`"${escapedKey}"\\s*:\\s*\\{[\\s\\S]{0,900}?"__typename"\\s*:\\s*"FeatureValue"`, "i"));
+  const block = match?.[0];
+  if (!block) return null;
+
+  const translated = block.match(/"translated"\s*:\s*"([^"]*)"/i);
+  if (translated?.[1]) return decodeJsonString(translated[1]).trim();
+
+  const direct = block.match(/"value"\s*:\s*"([^"]*)"/i);
+  return direct?.[1] ? decodeJsonString(direct[1]).trim() : null;
+}
+
+function extractStructuredAddress(html) {
+  const source = normalizeEmbeddedJsonText(html);
+  const region = extractAdFeatureValue(source, "region");
+  const city = extractAdFeatureValue(source, "city");
+  const district = extractAdFeatureValue(source, "district");
+  const street = extractAdFeatureValue(source, "street");
+  const house = extractAdFeatureValue(source, "appartment") || extractAdFeatureValue(source, "apartment");
+
+  if (!street || !house) return null;
+  return [region, city, district, street, house].filter(Boolean).join(", ");
+}
+
+function normalizeAddressText(value) {
+  if (Array.isArray(value)) return value.map((part) => String(part || "").trim()).filter(Boolean).join(", ");
+  const trimmed = String(value || "").trim();
+  return trimmed || null;
+}
+
+export function hasExactListingAddress(value) {
+  const address = normalizeAddressText(value);
+  if (!address) return false;
+  const hasStreet = /\b(strada|str\.?|bd\.?|bulevardul|bulevard|blvd|aleea|sos\.?|soseaua)\b/i.test(address);
+  const hasHouse = /\b\d+[a-z]?(?:\s*\/\s*(?:\d+[a-z]?|[a-z]))?\b/i.test(address);
+  return hasStreet && hasHouse;
+}
+
+export function getParsedListingAddress(parsed) {
+  const candidates = [
+    normalizeAddressText(parsed?.address_text),
+    normalizeAddressText(parsed?.location_parts),
+    normalizeAddressText(parsed?.display_location),
+  ].filter(Boolean);
+
+  candidates.sort((a, b) => {
+    const exactDiff = Number(hasExactListingAddress(b)) - Number(hasExactListingAddress(a));
+    if (exactDiff) return exactDiff;
+    return b.length - a.length;
+  });
+
+  return candidates[0] || null;
+}
+
 function extractFeatures(html) {
   const features = {};
   const liRe = /<li class="styles_group__feature__[^"]*">([\s\S]*?)<\/li>/gi;
@@ -124,10 +193,14 @@ export function parse999Listing(html) {
   const ld = extractJsonLd(html);
   const name = ld?.name || null;
   const title = extractTitle(html);
+  const structuredAddress = extractStructuredAddress(html);
   const displayLocation = ld?.displayLocation || null;
   const locationParts = name
     ? name.split(",").map((part) => part.trim()).filter(Boolean).slice(1)
     : [];
+  if (structuredAddress) {
+    locationParts.splice(0, locationParts.length, ...structuredAddress.split(",").map((part) => part.trim()).filter(Boolean));
+  }
 
   const priceAmountRaw = getMetaContent(html, "product:price:amount");
   const priceCurrency = getMetaContent(html, "product:price:currency");
@@ -149,6 +222,7 @@ export function parse999Listing(html) {
     title,
     name,
     display_location: displayLocation,
+    address_text: structuredAddress,
     location_parts: locationParts,
     features,
   };

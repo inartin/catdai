@@ -5,7 +5,8 @@ Implemented, depends on external parser and Supabase snapshots.
 
 ## Listings Data
 - Main DB tables are `listing`, `owner`, and `listing_price_history`.
-- Data is consumed by estimates, relevant listings, admin views, and market stats.
+- Data is consumed by estimates, relevant listings, admin views, market stats, and duplicate-candidate detection.
+- Current imported sale/rent listing rows have empty exact-address fields (`address_text`, `sector`, `latitude`, `longitude`), so address-aware duplicate checks depend on parsed/cached 999.md page data. The parser reads embedded street and house fields when available until the importer starts storing address data.
 - `/anunt` reads `listing_price_history` through `/api/listing-price-history` to show analyzed-listing total-price changes when available.
 - Parser/importer code is outside this app repo.
 
@@ -34,4 +35,6 @@ Implemented, depends on external parser and Supabase snapshots.
 - `src/lib/useLivePrices.js`
 - `src/app/api/market-trends/route.js`
 - `src/app/api/estimate/route.js`
+- `src/app/api/listing-duplicates/route.js`
+- `src/lib/listing-duplicates.js`
 - `db/supabase_schema.sql`

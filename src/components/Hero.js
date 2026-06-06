@@ -2,7 +2,6 @@
 
 import { useTranslation } from "@/context/LanguageContext";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
-import LinkAnalyzer from "@/components/LinkAnalyzer";
 
 export default function Hero({ onPrimaryCta }) {
   const { t } = useTranslation();
@@ -23,9 +22,6 @@ export default function Hero({ onPrimaryCta }) {
         {t("hero.cta")}
         <ArrowRight size={18} className="translate-y-[-1px]" />
       </button>
-      <div className="mx-auto mt-10 max-w-sm text-left md:hidden [&>div]:mt-0">
-        <LinkAnalyzer />
-      </div>
     </section>
   );
 }

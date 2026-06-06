@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import { useLivePrices } from "@/lib/useLivePrices";
 import { useMarketTrends } from "@/lib/useMarketTrends";
-import LinkAnalyzer from "@/components/LinkAnalyzer";
 
 const TREND_ARROWS = { up: "↑", down: "↓", stable: "→" };
 const TREND_COLORS = { up: "text-emerald-400/40", down: "text-red-400/40", stable: "text-gray-300/40" };
@@ -527,9 +526,6 @@ export default function CategoryCards() {
           priceData={priceData}
           trendData={trendData}
         />
-        <div className="hidden md:block">
-          <LinkAnalyzer />
-        </div>
       </div>
     </section>
   );

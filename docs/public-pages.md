@@ -6,16 +6,20 @@ Implemented.
 ## Public Pages
 - `/` landing page with hero, categories, how it works, examples, and alerts teaser.
 - Landing page ends with a compact product FAQ preview focused on calculation logic, input data, and seller-type price differences, plus a link to the full FAQ page.
+- Landing example-results section is titled `Cum arată o estimare` and uses a subtitle about real CatDai-generated result examples.
 - Landing hero copy positions the product as apartment market analysis for sellers, buyers, and monthly rent context.
-- Landing hero subtitle repeats the main H1 terms in body copy so homepage SEO analyzers see the heading language reflected in visible text.
+- Landing hero subtitle says the product estimates the market price for sale, purchase, or rent.
 - Landing shows compact sell/buy/rent scope cards below the main market card.
+- Landing scope card descriptions explain realistic seller pricing before publishing or accepting an agent offer, buyer price checks against similar area/parameters, and estimated rent by area and characteristics.
 - Landing marks visible rent scope labels with a localized `În curând` / `Скоро` badge until rent analysis is active.
 - Landing real estate market card keeps the desktop center column focused on the Chișinău image and market context, while the CTA still routes to the existing `/estimeaza` flow.
 - Landing mobile combines live prices and compact 60-day trend charts in one softly blurred Chișinău image-backed market card, with the city in the header, each price label above its matching green or blue chart, and analyzed-listing count at the bottom.
-- Landing mobile places the 999.md link analyzer directly under the primary hero CTA with balanced spacing before the market card; desktop keeps it under the market card.
-- Landing `How it works` keeps the original short intro above the `Prețul tău` chart, while the more detailed calculation wording lives in the landing FAQ preview.
+- Landing places the 999.md link analyzer below the sell/buy/rent scope cards.
+- Landing 999.md link analyzer shows flat white paper-style feature tabs with custom line icons dropping from under the analyzer for price analysis, similar-listing comparison, duplicate checks, and price history.
+- Landing `How it works` intro says users can see whether the price is below market, near market, or too high.
+- Landing `How it works` steps are input data, view estimate, compare with market, and compare scenarios; the estimate step uses a euro icon.
 - Landing `How it works` mobile trust note uses a compact left-icon layout so the two-line copy stays balanced.
-- Landing hero has the primary CTA button below the hero text and routes directly to `/estimeaza`.
+- Landing hero has the `Evaluează gratuit` primary CTA button below the hero text and routes directly to `/estimeaza`.
 - The desktop real estate card is supporting market context only; the primary CTA lives in the hero.
 - The landing page how-it-works steps render as a compact two-column grid on mobile and a horizontal arrow flow on larger screens.
 - `/faq`, `/ro/faq`, `/ru/faq`.

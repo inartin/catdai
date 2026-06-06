@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
+import {
+  DuplicateCheckIcon,
+  PriceAnalysisIcon,
+  PriceHistoryIcon,
+  SimilarListingsIcon,
+} from "@/components/icons/AnalyzerFeatureIcons";
 
 const ERROR_KEYS = {
   invalid_url: "linkAnalyzer.errorInvalidUrl",
@@ -16,6 +22,19 @@ const ERROR_KEYS = {
   upstream_blocked: "linkAnalyzer.errorUpstreamBlocked",
   rate_limited: "linkAnalyzer.errorRateLimit",
 };
+
+const FEATURE_ITEMS = [
+  { key: "linkAnalyzer.featurePriceAnalysis", Icon: PriceAnalysisIcon, mobileClassName: "rounded-none" },
+  { key: "linkAnalyzer.featureSimilarListings", Icon: SimilarListingsIcon, mobileClassName: "rounded-none" },
+  { key: "linkAnalyzer.featureDuplicates", Icon: DuplicateCheckIcon, mobileClassName: "rounded-b-xl" },
+  { key: "linkAnalyzer.featurePriceHistory", Icon: PriceHistoryIcon, mobileClassName: "rounded-b-xl" },
+];
+
+function splitFeatureLabel(label) {
+  const words = String(label || "").split(" ");
+  const mid = Math.ceil(words.length / 2);
+  return [words.slice(0, mid).join(" "), words.slice(mid).join(" ")].filter(Boolean);
+}
 
 function buildListingAnalysisUrl(payload) {
   const search = new URLSearchParams();
@@ -34,7 +53,11 @@ function buildListingAnalysisUrl(payload) {
   return `/anunt?${search.toString()}`;
 }
 
-export default function LinkAnalyzer({ titleTag: TitleTag = "p", className = "mt-5" }) {
+export default function LinkAnalyzer({
+  titleTag: TitleTag = "p",
+  className = "mt-5",
+  showFeaturePapers = false,
+}) {
   const { t } = useTranslation();
   const { session } = useAuth();
   const router = useRouter();
@@ -80,59 +103,80 @@ export default function LinkAnalyzer({ titleTag: TitleTag = "p", className = "mt
   };
 
   return (
-    <div className={`${className} rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm`}>
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-white">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-          </svg>
-        </span>
-        <div className="text-left">
-          <TitleTag className="text-sm font-bold text-gray-900">{t("linkAnalyzer.title")}</TitleTag>
-          <p className="text-xs text-gray-500">{t("linkAnalyzer.subtitle")}</p>
+    <div className={`${className} relative isolate`}>
+      <div className="relative z-10 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-white">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+          </span>
+          <div className="text-left">
+            <TitleTag className="text-sm font-bold text-gray-900">{t("linkAnalyzer.title")}</TitleTag>
+            <p className="text-xs text-gray-500">{t("linkAnalyzer.subtitle")}</p>
+          </div>
         </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input
+            type="url"
+            inputMode="url"
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder={t("linkAnalyzer.placeholder")}
+            disabled={loading}
+            aria-label={t("linkAnalyzer.title")}
+            className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
+          />
+          <button
+            type="button"
+            onClick={analyze}
+            disabled={loading || !url.trim()}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+                  <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                {t("linkAnalyzer.analyzing")}
+              </>
+            ) : (
+              <>
+                {t("linkAnalyzer.button")}
+                <ArrowRight size={16} className="translate-y-[-1px]" />
+              </>
+            )}
+          </button>
+        </div>
+
+        {error && (
+          <p className="mt-2 text-xs font-medium text-red-600" role="alert">
+            {error}
+          </p>
+        )}
       </div>
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <input
-          type="url"
-          inputMode="url"
-          value={url}
-          onChange={(event) => setUrl(event.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={t("linkAnalyzer.placeholder")}
-          disabled={loading}
-          aria-label={t("linkAnalyzer.title")}
-          className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
-        />
-        <button
-          type="button"
-          onClick={analyze}
-          disabled={loading || !url.trim()}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? (
-            <>
-              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
-                <path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-              </svg>
-              {t("linkAnalyzer.analyzing")}
-            </>
-          ) : (
-            <>
-              {t("linkAnalyzer.button")}
-              <ArrowRight size={16} className="translate-y-[-1px]" />
-            </>
-          )}
-        </button>
-      </div>
-
-      {error && (
-        <p className="mt-2 text-xs font-medium text-red-600" role="alert">
-          {error}
-        </p>
+      {showFeaturePapers && (
+        <div className="relative z-0 -mt-1 mx-10 grid grid-cols-[repeat(2,8rem)] justify-between gap-y-0 sm:mx-16 sm:grid-cols-[repeat(4,9rem)]">
+          {FEATURE_ITEMS.map(({ key, Icon, mobileClassName }) => {
+            const featureLines = splitFeatureLabel(t(key));
+            return (
+            <div
+              key={key}
+              className={`flex min-h-24 flex-col items-center justify-center border-x border-b border-gray-200 bg-white px-2 pb-3 pt-5 text-center text-[13px] font-extrabold leading-tight text-gray-800 sm:rounded-b-xl ${mobileClassName}`}
+            >
+              <Icon size={18} className="mb-2 text-gray-500" />
+              {featureLines.map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

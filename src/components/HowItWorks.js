@@ -27,10 +27,7 @@ const stepIcons = [
     <line x1="16" y1="13" x2="8" y2="13" />
     <line x1="16" y1="17" x2="8" y2="17" />
   </svg>,
-  <svg key="s2" viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="#2e7d32" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <polygon points="10 8 16 12 10 16 10 8" fill="#2e7d32" stroke="none" />
-  </svg>,
+  <span key="s2" className="flex h-6 w-6 items-center justify-center pb-0.5 text-2xl font-semibold leading-none text-[#2e7d32]">€</span>,
   <svg key="s3" viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="#2e7d32" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 11l3 3L22 4" />
     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
@@ -68,11 +65,11 @@ export default function HowItWorks() {
         <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-center sm:gap-6">
           {stepKeys.map((key, i) => (
             <div key={key} className="contents">
-              <div className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-emerald-100 bg-white px-2.5 py-4 shadow-sm sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
+              <div className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-emerald-100 bg-white px-2.5 py-4 shadow-sm sm:min-w-max sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-light sm:h-14 sm:w-14">
                   {stepIcons[i]}
                 </div>
-                <span className="text-center text-xs font-medium leading-tight text-gray-600 sm:text-sm">
+                <span className="text-center text-xs font-medium leading-tight text-gray-600 sm:whitespace-nowrap sm:text-sm">
                   {t(key)}
                 </span>
               </div>

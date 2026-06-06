@@ -525,10 +525,6 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   const formCardClass = "mt-6 space-y-5";
   const locationSectionClass = "p-5 sm:p-6";
 
-  function CalculatorGroupedCard({ children }) {
-    return <div className={calculatorCardShellClass}>{children}</div>;
-  }
-
   const renderCadastralQuickSearch = (className = "") => (
     <CadastralQuickSearchCard
       value={cadastralInput}
@@ -802,7 +798,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
             </div>
           )}
 
-          <CalculatorGroupedCard>
+          <div className={calculatorCardShellClass}>
           {isCalculatorMode ? (
           <div className="p-5 sm:p-6">
             <div className="flex items-center gap-2 mb-5">
@@ -929,7 +925,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
           </div>
           </>
           )}
-          </CalculatorGroupedCard>
+          </div>
 
           {/* — Section 2: Property basics — */}
           {form.city && ((districtsByCity[form.city] || []).length === 0 || (isRentMode ? rentDistricts.length > 0 : form.district)) && (

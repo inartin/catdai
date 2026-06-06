@@ -8,6 +8,7 @@ import CategoryCards from "@/components/CategoryCards";
 import HowItWorks from "@/components/HowItWorks";
 import ExampleResults from "@/components/ExampleResults";
 import LandingFaqPreview from "@/components/LandingFaqPreview";
+import LinkAnalyzer from "@/components/LinkAnalyzer";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
 import { useTranslation } from "@/context/LanguageContext";
@@ -221,6 +222,9 @@ function MarketScopeCards() {
             </p>
           </div>
         ))}
+      </div>
+      <div className="mx-auto mt-8 max-w-4xl text-left">
+        <LinkAnalyzer showFeaturePapers />
       </div>
     </section>
   );

@@ -3,6 +3,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
+import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
@@ -438,8 +439,15 @@ export async function POST(request) {
       lookupSource,
     });
   };
-  const respondWithCadastralPayload = async (payload) => {
+  const respondWithCadastralPayload = async (payload, options = {}) => {
     await setCachedCadastralPayload(trimmed, payload, lookupSource);
+    await persistCadastruRecord(payload, {
+      cadastralNumber: trimmed,
+      lookupSource,
+      resultType: options.resultType || classifyCadastralResult(payload),
+      countLookup: options.countLookup !== false,
+      officialFetch: options.officialFetch === true,
+    });
     await recordCadastruSearch(payload);
     const res = NextResponse.json(payload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -457,7 +465,17 @@ export async function POST(request) {
   if (cached) {
     lookupSource = cached.lookupSource;
     return respondWithCadastralPayload(
-      applyCadastralAccess(cached.payload, trimmed, access.tier)
+      applyCadastralAccess(cached.payload, trimmed, access.tier),
+      { countLookup: true }
+    );
+  }
+
+  const stored = await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true });
+  if (stored) {
+    lookupSource = stored.lookupSource;
+    return respondWithCadastralPayload(
+      applyCadastralAccess(stored.payload, trimmed, access.tier),
+      { countLookup: true, resultType: stored.resultType }
     );
   }
 
@@ -465,7 +483,8 @@ export async function POST(request) {
     const externalPayload = await fetchExternalCadastralData(trimmed);
     lookupSource = "api";
     return respondWithCadastralPayload(
-      normalizeCadastralPayload(externalPayload, trimmed, access.tier)
+      normalizeCadastralPayload(externalPayload, trimmed, access.tier),
+      { officialFetch: true }
     );
   } catch (error) {
     const details = {
@@ -501,7 +520,7 @@ export async function POST(request) {
     if (!step1.features || step1.features.length === 0) {
       const detailPayload = await buildCadastruDetailPayload(trimmed, access.tier);
       if (detailPayload) {
-        return respondWithCadastralPayload(detailPayload);
+        return respondWithCadastralPayload(detailPayload, { officialFetch: true });
       }
 
       return respondWithNotFound("Cadastral number not found");
@@ -520,7 +539,7 @@ export async function POST(request) {
     if (!step3.features || step3.features.length === 0) {
       const detailPayload = await buildCadastruDetailPayload(trimmed, access.tier);
       if (detailPayload) {
-        return respondWithCadastralPayload(detailPayload);
+        return respondWithCadastralPayload(detailPayload, { officialFetch: true });
       }
 
       const nominatim = await fallbackNominatim(lat, lon);
@@ -554,7 +573,7 @@ export async function POST(request) {
         partial: true,
         access_tier: access.tier,
         locked_sections: {},
-      });
+      }, { officialFetch: true });
     }
 
     const html = step3.features[0].properties?.html || "";
@@ -565,7 +584,7 @@ export async function POST(request) {
         ...detailPayload,
         building: Object.keys(building).length ? building : detailPayload.building,
         form_fields: buildFormFields(Object.keys(building).length ? building : detailPayload.building, detailPayload.apartment),
-      });
+      }, { officialFetch: true });
     }
 
     const form_fields = buildFormFields(building, apartment);
@@ -579,7 +598,7 @@ export async function POST(request) {
       locked_sections: {},
     };
 
-    return respondWithCadastralPayload(payload);
+    return respondWithCadastralPayload(payload, { officialFetch: true });
   } catch (err) {
     logCadastralFetchError(err);
     return NextResponse.json(

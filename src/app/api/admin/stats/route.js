@@ -25,8 +25,8 @@ async function fetchAllRows(buildQuery) {
   return all;
 }
 
-async function countAllUsers() {
-  let total = 0;
+async function listAllUsers() {
+  let users = [];
   let page = 1;
   try {
     while (true) {
@@ -36,14 +36,34 @@ async function countAllUsers() {
         break;
       }
       if (!data || !data.users) break;
-      total += data.users.length;
+      users = users.concat(data.users);
       if (data.users.length < 1000) break;
       page++;
     }
   } catch (err) {
-    console.error("Error in countAllUsers:", err);
+    console.error("Error in listAllUsers:", err);
   }
-  return total;
+  return users;
+}
+
+function userDisplayName(user) {
+  const meta = user?.user_metadata || {};
+  const composed = [meta.first_name, meta.last_name].filter(Boolean).join(" ").trim();
+
+  return (
+    meta.full_name ||
+    meta.name ||
+    meta.display_name ||
+    composed ||
+    user?.email ||
+    user?.phone ||
+    user?.id ||
+    "Unknown"
+  );
+}
+
+function buildUserNameMap(users) {
+  return new Map((users || []).map((user) => [user.id, userDisplayName(user)]));
 }
 
 async function fetchTelegramAlerts() {
@@ -208,6 +228,13 @@ function buildCadastruSearchStats(rows, cutoffs) {
   };
 }
 
+function attachUserNames(rows, usersById) {
+  return rows.map((row) => ({
+    ...row,
+    user_name: row.user_id ? usersById.get(row.user_id) || row.user_id : null,
+  }));
+}
+
 async function fetchListingLinkAnalysisEvents() {
   const buildQuery = () =>
     supabaseAdmin
@@ -316,7 +343,7 @@ export async function GET(request) {
   let dataResults;
   try {
     dataResults = await Promise.all([
-      countAllUsers(),
+      listAllUsers(),
       fetchEstimationCounts(),
       supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
       supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
@@ -337,7 +364,7 @@ export async function GET(request) {
   }
 
   const [
-    totalUsers,
+    users,
     estimationCounts,
     countSharedLinks,
     countFavorites,
@@ -347,9 +374,11 @@ export async function GET(request) {
     listingLinkAnalysisEvents,
     calculatorUsageEvents,
   ] = dataResults;
+  const usersById = buildUserNameMap(users);
+  const cadastruSearchesWithUsers = attachUserNames(cadastruSearchEvents, usersById);
 
   const result = {
-    totalUsers: totalUsers || 0,
+    totalUsers: users.length,
     totalEstimations: estimationCounts.sale || 0,
     totalSaleEstimations: estimationCounts.sale || 0,
     totalRentEstimations: estimationCounts.rent || 0,
@@ -360,7 +389,7 @@ export async function GET(request) {
     totalTelegramAlerts: telegramAlerts.length,
     telegramAlerts,
     pdfGeneration: buildPdfStats(pdfEvents, cutoffs),
-    cadastruSearches: buildCadastruSearchStats(cadastruSearchEvents, cutoffs),
+    cadastruSearches: buildCadastruSearchStats(cadastruSearchesWithUsers, cutoffs),
     listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
   };

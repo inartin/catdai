@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 60 * 1000;
-const CACHE_VERSION = 2;
+const CACHE_VERSION = 6;
 let cache = { data: null, ts: 0 };
 
 function isMissingSchemaError(error) {
@@ -170,18 +170,26 @@ export async function GET(request) {
   }
 
   try {
-    const [users, estimationRows, sharedRows, favoriteRows, activityRows] = await Promise.all([
+    const [users, estimationRows, sharedRows, favoriteRows, activityRows, cadastruSearchRows, calculatorUsageRows, pdfReportRows, listingLinkRows] = await Promise.all([
       listAllUsers(),
       fetchUserIdRows("estimate_log", "user_id"),
       fetchUserIdRows("shared_links", "sharer_user_id"),
       fetchUserIdRows("user_favorites", "user_id"),
       fetchActivityRows(),
+      fetchUserIdRows("cadastru_search_events", "user_id"),
+      fetchUserIdRows("calculator_usage_events", "user_id"),
+      fetchUserIdRows("pdf_generation_events", "user_id"),
+      fetchUserIdRows("listing_link_analysis_events", "user_id"),
     ]);
 
     const estimationsByUser = toCountMap(estimationRows, "user_id");
     const sharedByUser = toCountMap(sharedRows, "sharer_user_id");
     const favoritesByUser = toCountMap(favoriteRows, "user_id");
     const lastVisitByUser = toLatestTimestampMap(activityRows, "user_id", "last_seen_at");
+    const cadastruSearchesByUser = toCountMap(cadastruSearchRows, "user_id");
+    const calculatorUsageByUser = toCountMap(calculatorUsageRows, "user_id");
+    const pdfReportsByUser = toCountMap(pdfReportRows, "user_id");
+    const listingLinksByUser = toCountMap(listingLinkRows, "user_id");
 
     const data = {
       version: CACHE_VERSION,
@@ -191,6 +199,10 @@ export async function GET(request) {
         authProvider: userAuthProvider(user),
         registeredAt: userRegisteredAt(user),
         totalEstimations: estimationsByUser.get(user.id) || 0,
+        cadastruSearches: cadastruSearchesByUser.get(user.id) || 0,
+        calculatorUsage: calculatorUsageByUser.get(user.id) || 0,
+        pdfReports: pdfReportsByUser.get(user.id) || 0,
+        listingLinks: listingLinksByUser.get(user.id) || 0,
         sharedLinks: sharedByUser.get(user.id) || 0,
         favorites: favoritesByUser.get(user.id) || 0,
         lastVisitAt: lastVisitByUser.get(user.id) || null,

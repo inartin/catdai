@@ -447,19 +447,23 @@ export default function AdminDashboard() {
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0">
-                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase [&>*+*]:border-l [&>*+*]:border-gray-100">
                       <th className="px-4 py-3">Name</th>
                       <th className="px-4 py-3">Registered Type</th>
                       <th className="px-4 py-3">Registered Date</th>
                       <th className="px-4 py-3">Last Visit</th>
                       <th className="px-4 py-3 text-right">Estimations</th>
+                      <th className="px-4 py-3 text-right">Cadastru Searches</th>
+                      <th className="px-4 py-3 text-right">Calculator Usage</th>
+                      <th className="px-4 py-3 text-right">PDF Reports</th>
+                      <th className="px-4 py-3 text-right">999 Links</th>
                       <th className="px-4 py-3 text-right">Shared Links</th>
                       <th className="px-4 py-3 text-right">Favorites</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {users.map((u) => (
-                      <tr key={u.id} className="hover:bg-gray-50">
+                      <tr key={u.id} className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
                         <td className="px-4 py-3 text-gray-900 font-medium">
                           {u.name || "\u2014"}
                         </td>
@@ -474,6 +478,18 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600">
                           {fmtNum(u.totalEstimations)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtNum(u.cadastruSearches)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtNum(u.calculatorUsage)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtNum(u.pdfReports)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">
+                          {fmtNum(u.listingLinks)}
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600">
                           {fmtNum(u.sharedLinks)}
@@ -664,7 +680,7 @@ export default function AdminDashboard() {
                           {row.district || "\u2014"}
                         </td>
                         <td className="px-4 py-3 text-gray-600 break-all">
-                          {row.user_id || "Anonymous"}
+                          {row.user_name || "Anonymous"}
                         </td>
                       </tr>
                     ))}

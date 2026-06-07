@@ -14,7 +14,8 @@ Implemented as read-only admin dashboard.
 
 ## Dashboard
 Shows:
-- registered users with login provider type such as Telegram or Gmail, registration date, and last visit
+- registered users with login provider type such as Telegram or Gmail, registration date, last visit, estimation count, cadastru search count, calculator usage count, PDF report count, 999 link count, shared links, and favorites
+- Registered users table uses vertical column dividers for scanability.
 - The user admin API includes a response version in its short cache so table schema changes do not reuse stale in-memory rows.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
@@ -25,7 +26,7 @@ Shows:
 - favorites
 - Telegram alert count with an expandable list of configured Telegram alerts
 - sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
-- Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, and anonymous/user id. Exact searched addresses are not stored for this dashboard.
+- Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, and anonymous/user name. Exact searched addresses are not stored for this dashboard.
 - 999 link-analysis rows show date, status, listing id/link, mapped property summary, asking price, and anonymous/user id.
 - Calculator usage rows show date, property summary, total investment, estimated rent, yield, payback period, tax selection, and anonymous/user id.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.

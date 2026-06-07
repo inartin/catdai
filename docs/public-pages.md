@@ -35,8 +35,8 @@ Implemented.
 - `/privacy`.
 
 ## App Shell
-- Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, localized Cadastru link, Calculator link to `/calculator`, login/profile link, language switcher, and a logged-in notification button.
-- The notification button is UI-only for now, opens an empty right sidebar, and includes read-state and clear-notifications UI for future notification data.
+- Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, localized Cadastru link, Calculator link to `/calculator`, login/profile link, language switcher, and an always-visible notification button.
+- The notification button is UI-only for now, opens an empty right sidebar for authenticated users, stays visible but disabled while auth is loading or anonymous, and includes read-state and clear-notifications UI for future notification data.
 - Shared footer. Its `Noutăți` link routes to `/noutati`; Telegram remains only as the social icon link.
 - Cookie banner is global.
 - PWA manifest and app icons are present.

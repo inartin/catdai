@@ -95,7 +95,6 @@ async function persistAddressResult(payload, options = {}) {
     resultType: "address_only",
     officialFetch: options.officialFetch === true,
     countLookup: options.countLookup === true,
-    countAliasLookup: options.countAliasLookup === true,
   });
 }
 
@@ -200,14 +199,13 @@ export async function POST(request) {
       structuredAddress,
       lookupSource: cached.lookupSource,
       countLookup: false,
-      countAliasLookup: true,
     });
     const response = NextResponse.json(cached.payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   }
 
-  const stored = await getCadastruRecordByAddress(rawAddress, { touchAlias: false });
+  const stored = await getCadastruRecordByAddress(rawAddress, { structuredAddress });
   if (stored?.payload?.cadastral_number) {
     const payload = {
       ...stored.payload,
@@ -220,7 +218,6 @@ export async function POST(request) {
       structuredAddress,
       lookupSource: stored.lookupSource,
       countLookup: false,
-      countAliasLookup: true,
     });
     const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -247,7 +244,6 @@ export async function POST(request) {
       lookupSource: "api",
       officialFetch: true,
       countLookup: false,
-      countAliasLookup: true,
     });
     const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -299,7 +295,6 @@ export async function POST(request) {
       lookupSource: "local",
       officialFetch: true,
       countLookup: false,
-      countAliasLookup: true,
     });
     const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));

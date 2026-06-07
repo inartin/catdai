@@ -103,10 +103,6 @@ export function normalizeCadastruAddressForDb(value) {
     .trim();
 }
 
-function addressHash(value) {
-  return crypto.createHash("md5").update(value).digest("hex");
-}
-
 function cadastralDigits(value) {
   return String(value || "").replace(/\D/g, "");
 }
@@ -215,6 +211,71 @@ function resolveDistrictFromLocation(location) {
   );
 }
 
+function parseAddressParts(address) {
+  const value = cleanText(address, 1000);
+  if (!value) return {};
+
+  const streetMatch = value.match(
+    /(?:^|[\s,])((?:str(?:ada)?|bd|bulevard(?:ul)?|sos|șos|al|ул|улица|пр|проспект)\.?\s+[^,\d]+?)[,\s]+(\d+[a-zA-Z]?(?:\/\d+[a-zA-Z]?)?)(?:\s*(?:ap\.?|apartament(?:ul)?|apt|кв\.?|квартира)\s*([0-9a-zA-Z/-]+))?/i
+  );
+
+  if (!streetMatch) return {};
+
+  return {
+    street: cleanText(streetMatch[1], 200),
+    houseNumber: cleanText(streetMatch[2], 40),
+    apartmentNumber: cleanText(streetMatch[3], 40),
+  };
+}
+
+function normalizeStreetPart(value) {
+  return normalizeCadastruAddressForDb(value)
+    .replace(/\bmun\b|\bsect\b|\bstr\b|\bbd\b|\bsos\b|\bal\b|\bap\b/g, " ")
+    .replace(/\d+[a-z]?(?:\/\d+[a-z]?)?/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function numberMatchesAddress(normalizedAddress, value) {
+  const normalized = cleanText(value, 40);
+  if (!normalized) return false;
+  const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|\\s)${escaped}(?=\\s|$)`, "i").test(normalizedAddress);
+}
+
+function recordMatchesStructuredAddress(row, normalizedAddress, structuredAddress = {}) {
+  const houseNumber = cleanText(structuredAddress.houseNumber, 40);
+  const apartmentNumber = cleanText(structuredAddress.apartmentNumber, 40);
+  const requestedStreet = normalizeStreetPart(structuredAddress.street);
+  const recordStreet = normalizeStreetPart(row.street);
+  const addressText = normalizeCadastruAddressForDb(
+    [row.full_address, row.address_ro, row.address_ru].filter(Boolean).join(" ")
+  );
+
+  if (houseNumber) {
+    const recordHouse = cleanText(row.house_number, 40);
+    if (recordHouse && recordHouse !== houseNumber) return false;
+    if (!recordHouse && !numberMatchesAddress(addressText, houseNumber)) return false;
+  }
+
+  if (apartmentNumber) {
+    const recordApartment = cleanText(row.apartment_number, 40);
+    if (recordApartment && recordApartment !== apartmentNumber) return false;
+    if (!recordApartment && !numberMatchesAddress(addressText, apartmentNumber)) return false;
+  }
+
+  if (!requestedStreet) return addressText === normalizedAddress || Boolean(houseNumber || apartmentNumber);
+  if (recordStreet && (recordStreet.includes(requestedStreet) || requestedStreet.includes(recordStreet))) return true;
+  return requestedStreet
+    .split(" ")
+    .filter((token) => token.length > 1)
+    .every((token) => addressText.includes(token));
+}
+
+function sameStructuredAddressIsUnique(rows, structuredAddress = {}) {
+  return rows.length === 1 && cleanText(structuredAddress.houseNumber, 40) && cleanText(structuredAddress.apartmentNumber, 40);
+}
+
 function classifyCadastruPayload(payload) {
   return hasDetailedPayload(payload) ? classifyDetailedCadastruPayload(payload) : "address_only";
 }
@@ -315,6 +376,16 @@ function buildRecordRow(payload, options = {}, existing = null) {
   const payloadHash = hashPayload(storagePayload);
   const now = new Date().toISOString();
   const language = detectAddressLanguage(fullAddress);
+  const requestAddress = cleanText(options.requestAddress, 1000);
+  const requestLanguage = detectAddressLanguage(requestAddress);
+  const parsedAddress = parseAddressParts(fullAddress);
+  const parsedRequestAddress = parseAddressParts(requestAddress);
+  const resolvedStreet = cleanText(options.structuredAddress?.street, 200) || parsedAddress.street || parsedRequestAddress.street;
+  const resolvedHouseNumber = cleanText(options.structuredAddress?.houseNumber, 40) || parsedAddress.houseNumber || parsedRequestAddress.houseNumber;
+  const resolvedApartmentNumber =
+    cleanText(options.structuredAddress?.apartmentNumber, 40) || parsedAddress.apartmentNumber || parsedRequestAddress.apartmentNumber;
+  const addressRo = language === "ro" ? fullAddress : requestLanguage === "ro" ? requestAddress : existing?.address_ro || null;
+  const addressRu = language === "ru" ? fullAddress : requestLanguage === "ru" ? requestAddress : existing?.address_ru || null;
 
   return {
     cadastral_number: cadastralNumber,
@@ -322,14 +393,14 @@ function buildRecordRow(payload, options = {}, existing = null) {
     raw_cadastral_number: cleanText(storagePayload.raw_cadastral_number, 80),
     building_cadastral_number: cleanText(storagePayload.building_cadastral_number, 80),
     full_address: fullAddress,
-    address_ro: language === "ro" ? fullAddress : existing?.address_ro || null,
-    address_ru: language === "ru" ? fullAddress : existing?.address_ru || null,
+    address_ro: addressRo,
+    address_ru: addressRu,
     city: city || existing?.city || null,
     region: region || existing?.region || null,
     district: district || existing?.district || null,
-    street: cleanText(options.structuredAddress?.street, 200) || existing?.street || null,
-    house_number: cleanText(options.structuredAddress?.houseNumber, 40) || existing?.house_number || null,
-    apartment_number: cleanText(options.structuredAddress?.apartmentNumber, 40) || existing?.apartment_number || null,
+    street: resolvedStreet || existing?.street || null,
+    house_number: resolvedHouseNumber || existing?.house_number || null,
+    apartment_number: resolvedApartmentNumber || existing?.apartment_number || null,
     result_type: normalizeResultType(options.resultType || classifyCadastruPayload(storagePayload)),
     lookup_source: normalizeLookupSource(options.lookupSource),
     source: cleanText(storagePayload.source, 80),
@@ -349,53 +420,6 @@ function buildRecordRow(payload, options = {}, existing = null) {
     data_updated_at: existing?.payload_hash && existing.payload_hash === payloadHash ? existing.data_updated_at : now,
     last_official_fetch_at: options.officialFetch ? now : existing?.last_official_fetch_at || null,
   };
-}
-
-function aliasFromAddress(addressText, aliasType, options = {}) {
-  const address = cleanText(addressText, 1000);
-  if (!address) return null;
-  const normalized = normalizeCadastruAddressForDb(address);
-  if (!normalized) return null;
-
-  return {
-    address_text: address,
-    address_normalized: normalized,
-    language: options.language || detectAddressLanguage(address),
-    alias_type: aliasType,
-    city: cleanText(options.city, 120),
-    region: cleanText(options.region, 120),
-    district: cleanText(options.district, 120),
-    street: cleanText(options.street, 200),
-    house_number: cleanText(options.houseNumber, 40),
-    apartment_number: cleanText(options.apartmentNumber, 40),
-  };
-}
-
-function buildAliases(payload, row, options = {}) {
-  const apartment = getApartmentData(payload);
-  const building = getBuildingData(payload);
-  const location = getLocationData(payload);
-  const base = {
-    city: row.city,
-    region: row.region,
-    district: row.district,
-  };
-  const requestBase = {
-    ...base,
-    street: options.structuredAddress?.street,
-    houseNumber: options.structuredAddress?.houseNumber,
-    apartmentNumber: options.structuredAddress?.apartmentNumber,
-    language: options.addressLanguage,
-  };
-
-  return [
-    aliasFromAddress(options.requestAddress, "request", requestBase),
-    aliasFromAddress(apartment.address, "official_apartment", base),
-    aliasFromAddress(building.address, "official_building", base),
-    aliasFromAddress(payload?.matched_address, "matched", base),
-    aliasFromAddress(location.display_name, "geocoded", base),
-    aliasFromAddress(row.full_address, "matched", base),
-  ].filter(Boolean);
 }
 
 async function findRecordByColumn(column, value) {
@@ -446,52 +470,6 @@ function hydratePayloadFromRecord(row) {
 function isAddressResolverOnlyRecord(row) {
   const payload = isObject(row?.raw_payload) ? row.raw_payload : {};
   return payload.method === "address" && !hasDetailedPayload(payload);
-}
-
-async function upsertAddressAliases(recordId, aliases, { countLookup = false } = {}) {
-  const uniqueAliases = new Map();
-  aliases.forEach((alias) => {
-    uniqueAliases.set(addressHash(alias.address_normalized), alias);
-  });
-
-  for (const [hash, alias] of uniqueAliases) {
-    const { data: existingRows, error: lookupError } = await supabaseAdmin
-      .from("cadastru_address_aliases")
-      .select("id, lookup_count")
-      .eq("address_hash", hash)
-      .limit(1);
-
-    if (lookupError) {
-      logDbError("address alias lookup failed", lookupError);
-      continue;
-    }
-
-    const existing = existingRows?.[0] || null;
-    const now = new Date().toISOString();
-    if (existing) {
-      const updateRow = {
-        ...alias,
-        cadastru_record_id: recordId,
-        lookup_count: Math.max(0, Number(existing.lookup_count) || 0) + (countLookup ? 1 : 0),
-      };
-      if (countLookup) updateRow.last_used_at = now;
-
-      const { error } = await supabaseAdmin
-        .from("cadastru_address_aliases")
-        .update(updateRow)
-        .eq("id", existing.id);
-      logDbError("address alias update failed", error);
-      continue;
-    }
-
-    const { error } = await supabaseAdmin.from("cadastru_address_aliases").insert({
-      ...alias,
-      cadastru_record_id: recordId,
-      lookup_count: countLookup ? 1 : 0,
-      last_used_at: now,
-    });
-    logDbError("address alias insert failed", error);
-  }
 }
 
 export async function persistCadastruRecord(payload, options = {}) {
@@ -562,12 +540,6 @@ export async function persistCadastruRecord(payload, options = {}) {
       record = data?.[0] || null;
     }
 
-    if (record?.id) {
-      await upsertAddressAliases(record.id, buildAliases(row.raw_payload, row, options), {
-        countLookup: options.countAliasLookup === true,
-      });
-    }
-
     return record ? hydratePayloadFromRecord(record) : null;
   } catch (error) {
     if (!isMissingSchemaError(error)) {
@@ -605,34 +577,47 @@ export async function getCadastruRecordByAddress(rawAddress, options = {}) {
     const normalized = normalizeCadastruAddressForDb(rawAddress);
     if (!normalized) return null;
 
-    const { data: aliasRows, error: aliasError } = await supabaseAdmin
-      .from("cadastru_address_aliases")
-      .select("id, cadastru_record_id, lookup_count")
-      .eq("address_hash", addressHash(normalized))
-      .limit(1);
+    const structuredAddress = options.structuredAddress || {};
+    const queryHouse = cleanText(structuredAddress.houseNumber, 40);
+    const queryApartment = cleanText(structuredAddress.apartmentNumber, 40);
+    const queryCity = cleanText(structuredAddress.city, 120);
 
-    if (aliasError) {
-      logDbError("address lookup failed", aliasError);
+    let query = supabaseAdmin.from("cadastru_records").select(RECORD_COLUMNS).limit(50);
+    if (queryCity) query = query.eq("city", queryCity);
+    if (queryHouse) query = query.eq("house_number", queryHouse);
+    if (queryApartment) query = query.eq("apartment_number", queryApartment);
+
+    const { data: exactRows, error: exactError } = await query;
+    if (exactError) {
+      logDbError("structured address lookup failed", exactError);
       return null;
     }
 
-    const alias = aliasRows?.[0] || null;
-    if (!alias?.cadastru_record_id) return null;
-
-    const row = await findRecordByColumn("id", alias.cadastru_record_id);
-    if (!row) return null;
-
-    if (options.touchAlias !== false) {
-      const now = new Date().toISOString();
-      const { error: touchError } = await supabaseAdmin
-        .from("cadastru_address_aliases")
-        .update({
-          lookup_count: Math.max(0, Number(alias.lookup_count) || 0) + 1,
-          last_used_at: now,
-        })
-        .eq("id", alias.id);
-      logDbError("address touch failed", touchError);
+    let row = (exactRows || []).find((candidate) =>
+      recordMatchesStructuredAddress(candidate, normalized, structuredAddress)
+    );
+    if (!row && sameStructuredAddressIsUnique(exactRows || [], structuredAddress)) {
+      row = exactRows[0];
     }
+
+    if (!row && queryHouse) {
+      const { data: broadRows, error: broadError } = await supabaseAdmin
+        .from("cadastru_records")
+        .select(RECORD_COLUMNS)
+        .ilike("full_address", `%${queryHouse}%`)
+        .limit(100);
+
+      if (broadError) {
+        logDbError("broad address lookup failed", broadError);
+        return null;
+      }
+
+      row = (broadRows || []).find((candidate) =>
+        recordMatchesStructuredAddress(candidate, normalized, structuredAddress)
+      );
+    }
+
+    if (!row) return null;
 
     return {
       payload: hydratePayloadFromRecord(row),

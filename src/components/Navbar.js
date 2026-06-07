@@ -17,18 +17,21 @@ export function emitGoHome() {
   if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent(GO_HOME_EVENT));
 }
 
-function NotificationButton({ open, unreadCount, onClick, t }) {
+function NotificationButton({ disabled = false, open, unreadCount, onClick, t }) {
   return (
     <button
       type="button"
       aria-controls="notification-sidebar"
       aria-expanded={open}
       aria-label={t("notifications.open")}
+      disabled={disabled}
       onClick={onClick}
       className={`relative inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
-        open
+        open && !disabled
           ? "border-primary bg-primary-light text-primary-dark"
-          : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
+          : disabled
+            ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300"
+            : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
       }`}
     >
       <AlertIcon size={18} />
@@ -150,7 +153,8 @@ export default function Navbar() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const mobileMenuOpen = mobileMenuPath === pathname;
-  const showAlertShortcut = !loading && isAuthenticated;
+  const notificationDisabled = loading || !isAuthenticated;
+  const effectiveNotificationOpen = isAuthenticated && notificationOpen;
   const unreadNotificationCount = notifications.filter((notification) => notification.unread).length;
   const cadastruHref = `/${lang}/cadastru`;
   const isCadastruPath = pathname === "/cadastru" || /^\/(ro|ru)\/cadastru\/?$/.test(pathname);
@@ -213,6 +217,8 @@ export default function Navbar() {
   }, [notificationOpen]);
 
   const handleNotificationToggle = () => {
+    if (notificationDisabled) return;
+
     setMobileMenuPath(null);
     if (!notificationOpen) {
       setNotifications((current) =>
@@ -285,14 +291,13 @@ export default function Navbar() {
             {t("nav.calculator")}
           </Link>
           <LoginButton className="inline-flex h-9 items-center rounded-lg px-2.5 leading-none text-gray-600 hover:bg-gray-50 hover:text-gray-900" />
-          {showAlertShortcut && (
-            <NotificationButton
-              open={notificationOpen}
-              unreadCount={unreadNotificationCount}
-              onClick={handleNotificationToggle}
-              t={t}
-            />
-          )}
+          <NotificationButton
+            disabled={notificationDisabled}
+            open={effectiveNotificationOpen}
+            unreadCount={unreadNotificationCount}
+            onClick={handleNotificationToggle}
+            t={t}
+          />
           <div
             className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm font-medium"
             role="group"
@@ -326,14 +331,13 @@ export default function Navbar() {
         </div>
 
       <div ref={mobileMenuRef} className="flex items-center gap-2 md:hidden">
-          {showAlertShortcut && (
-            <NotificationButton
-              open={notificationOpen}
-              unreadCount={unreadNotificationCount}
-              onClick={handleNotificationToggle}
-              t={t}
-            />
-          )}
+          <NotificationButton
+            disabled={notificationDisabled}
+            open={effectiveNotificationOpen}
+            unreadCount={unreadNotificationCount}
+            onClick={handleNotificationToggle}
+            t={t}
+          />
           <button
             type="button"
             aria-label={t("nav.menu")}
@@ -422,9 +426,9 @@ export default function Navbar() {
         </div>
       </div>
     </header>
-    {showAlertShortcut && (
+    {isAuthenticated && (
       <NotificationSidebar
-        open={notificationOpen}
+        open={effectiveNotificationOpen}
         notifications={notifications}
         onClear={handleNotificationClear}
         onClose={handleNotificationClose}

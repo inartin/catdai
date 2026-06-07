@@ -16,11 +16,11 @@ Backend prepared and active when Redis is reachable.
 - `POST /api/estimate-rent`: key prefix `catdai:estimate-rent:v7:`, 12h TTL for repeated validated rent estimate inputs.
 - `POST /api/listing-preview-images`: key prefix `catdai:listing-preview-image:v1:`, 24h TTL per listing/language.
 - `POST /api/cadastral`: key prefix `catdai:cadastral:v1:`, 7d TTL for successful cadastral-number lookup responses before the long-lived DB store is checked.
-- `POST /api/cadastru/address`: key prefix `catdai:cadastru-address:v1:`, 7d TTL for successful normalized-address lookup responses before address aliases in DB are checked.
+- `POST /api/cadastru/address`: key prefix `catdai:cadastru-address:v1:`, 7d TTL for successful normalized-address lookup responses before structured address fields in DB are checked.
 
 ## Cadastru Cache
 - Only successful `200` cadastru payloads are cached; unauthorized, invalid, rate-limited, not-found, and upstream-error responses are not cached.
-- Cadastru routes use Redis first; if Redis is unavailable or misses, they check `cadastru_records` / `cadastru_address_aliases` before calling official sources.
+- Cadastru routes use Redis first; if Redis is unavailable or misses, they check `cadastru_records` before calling official sources.
 - `/api/cadastral` caches the cadastral payload without per-request access fields and restores access fields for the current authenticated request.
 - `/api/cadastral` stores the original lookup source (`api` or `local`) with the cached payload so `/cadastru` analytics keep the same source classification on cache hits.
 - Successful official cadastru payloads are also persisted in Supabase through `src/lib/cadastru-records.js` only in production. This DB store is long-lived because official cadastru data changes rarely.

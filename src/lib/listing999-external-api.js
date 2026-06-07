@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { trackExternalApiUsage } from "@/lib/external-api-usage";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -77,6 +78,7 @@ export async function fetchExternal999Listing(externalId) {
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
+    trackExternalApiUsage("999_listing", "failure");
     throw externalError(error?.message || "External 999 listing API request failed", {
       code: error?.name === "TimeoutError" ? "external_listing999_timeout" : "external_listing999_unreachable",
       fallbackEligible: true,
@@ -85,11 +87,13 @@ export async function fetchExternal999Listing(externalId) {
 
   const payload = await response.json().catch(() => null);
   if (response.ok && payload?.ok && payload?.data) {
+    trackExternalApiUsage("999_listing", "success");
     return payload.data;
   }
 
   const code = payload?.error || `external_listing999_http_${response.status}`;
   const message = payload?.message || `External 999 listing API returned ${response.status}`;
+  trackExternalApiUsage("999_listing", "failure");
   throw externalError(message, {
     code,
     status: response.status,

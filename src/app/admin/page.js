@@ -126,6 +126,43 @@ function fmtTopDistricts(byDistrict) {
   return entries.map(([district, count]) => `${district}: ${fmtNum(count)}`).join(" · ");
 }
 
+function fmtExternalApiUsageSummary(usage) {
+  if (!usage?.total) return "No external calls yet";
+  const byService = usage.byService || {};
+  const listing999 = byService["999_listing"]?.total || 0;
+  const cadastru = (byService.cadastru_number?.total || 0) + (byService.cadastru_address?.total || 0);
+  return `999 ${fmtNum(listing999)} / cadastru ${fmtNum(cadastru)} · ${fmtNum(usage.failure)} failed`;
+}
+
+function fmtExternalApiService(service) {
+  if (service === "999_listing") return "999 listing";
+  if (service === "cadastru_number") return "Cadastru number";
+  if (service === "cadastru_address") return "Cadastru address";
+  return service || "\u2014";
+}
+
+function groupExternalApiUsageRows(rows) {
+  const grouped = new Map();
+
+  for (const row of rows || []) {
+    const key = `${row.usage_date || ""}|${row.service || ""}`;
+    const item = grouped.get(key) || {
+      usage_date: row.usage_date,
+      service: row.service,
+      success: 0,
+      failure: 0,
+      total: 0,
+    };
+    const count = Number(row.count) || 0;
+    if (row.status === "success") item.success += count;
+    if (row.status === "failure") item.failure += count;
+    item.total += count;
+    grouped.set(key, item);
+  }
+
+  return Array.from(grouped.values());
+}
+
 const BASE_FILTER_LABELS = {
   city: "City",
   district: "District",
@@ -234,6 +271,7 @@ export default function AdminDashboard() {
   const [showPdfGenerationList, setShowPdfGenerationList] = useState(false);
   const [showCadastruSearchesList, setShowCadastruSearchesList] = useState(false);
   const [showListingLinkAnalysesList, setShowListingLinkAnalysesList] = useState(false);
+  const [showExternalApiUsageList, setShowExternalApiUsageList] = useState(false);
   const [showCalculatorUsageList, setShowCalculatorUsageList] = useState(false);
 
   const loadStats = useCallback(async ({ fresh = false } = {}) => {
@@ -418,6 +456,13 @@ export default function AdminDashboard() {
             detail={showTelegramAlertsList ? "Click to hide list" : "Click to view alerts"}
             onClick={() => setShowTelegramAlertsList((value) => !value)}
             active={showTelegramAlertsList}
+          />
+          <StatCard
+            label="External API"
+            value={fmtNum(s.externalApiUsage?.total)}
+            detail={showExternalApiUsageList ? "Click to hide details" : fmtExternalApiUsageSummary(s.externalApiUsage)}
+            onClick={() => setShowExternalApiUsageList((value) => !value)}
+            active={showExternalApiUsageList}
           />
         </div>
         {showUsersList && (
@@ -751,6 +796,74 @@ export default function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        )}
+        {showExternalApiUsageList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">External API Usage</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                {fmtNum(s.externalApiUsage?.success)} successful · {fmtNum(s.externalApiUsage?.failure)} failed
+              </p>
+            </div>
+
+            {!s.externalApiUsage?.total ? (
+              <div className="px-5 py-8 text-center text-gray-400">No external API calls found</div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 border-b border-gray-100">
+                  {Object.entries(s.externalApiUsage.byService || {}).map(([service, item]) => (
+                    <div key={service} className="px-5 py-4 md:border-r md:last:border-r-0 border-gray-100">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        {fmtExternalApiService(service)}
+                      </p>
+                      <p className="mt-1 text-lg font-semibold text-gray-900">{fmtNum(item.total)}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {fmtNum(item.success)} successful · {fmtNum(item.failure)} failed
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {groupExternalApiUsageRows(s.externalApiUsage.recent).length === 0 ? (
+                  <div className="px-5 py-8 text-center text-gray-400">No recent external API rows found</div>
+                ) : (
+                  <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0">
+                        <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-4 py-3">Date</th>
+                          <th className="px-4 py-3">Service</th>
+                          <th className="px-4 py-3 text-right">Success</th>
+                          <th className="px-4 py-3 text-right">Failure</th>
+                          <th className="px-4 py-3 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {groupExternalApiUsageRows(s.externalApiUsage.recent).map((row) => (
+                          <tr key={`${row.usage_date}-${row.service}`} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                              {fmtDate(row.usage_date)}
+                            </td>
+                            <td className="px-4 py-3 text-gray-900 font-medium">
+                              {fmtExternalApiService(row.service)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-600">
+                              {fmtNum(row.success)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-600">
+                              {fmtNum(row.failure)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-gray-600">
+                              {fmtNum(row.total)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

@@ -28,6 +28,7 @@ Shows:
 - sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
 - Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, and anonymous/user name. Exact searched addresses are not stored for this dashboard.
 - 999 link-analysis rows show date, status, listing id/link, mapped property summary, asking price, and anonymous/user id.
+- External API usage shows aggregate signed-worker calls for 999 and cadastru, with success/failure totals counted from background writes; the card opens service totals and recent daily rows.
 - Calculator usage rows show date, property summary, total investment, estimated rent, yield, payback period, tax selection, and anonymous/user id.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
@@ -57,5 +58,6 @@ Shows:
 - `src/lib/admin-ad-tracking.js`
 - `db/pdf_generation_events.sql`
 - `db/cadastru_search_events.sql`
+- `db/external_api_usage_daily.sql`
 - `db/listing_link_analysis_events.sql`
 - `db/calculator_usage_events.sql`

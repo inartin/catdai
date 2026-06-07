@@ -39,6 +39,8 @@ export default function AdSourceTracker() {
         referrer: document.referrer || null,
       });
       trackAdSourceEvent("source_landing_visit");
+      lastTrackedPathRef.current = currentPath;
+      return;
     }
 
     if (!getActiveAdSource()) return;

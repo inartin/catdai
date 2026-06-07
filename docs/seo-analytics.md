@@ -41,7 +41,7 @@ Implemented.
 - Estimate logging stores device/session ids, input summary, result price, language, response time, and hashed IP.
 - Landing-only ad source tracking supports `/?src=zdg` and `/?utm_source=reddit`.
 - When a supported landing source is seen on `/`, the browser stores the source for the session and posts simple events to `/api/ad-source-events`.
-- `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
+- `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, later page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
 - Authenticated tracking requests store `user_id` so ad sessions can be tied to registered Supabase users after login.
 - Admin ad-tracking top-card totals are computed per selected source from all stored events; the visitor journey list is paged separately.
 - Runtime DB persistence for estimation logs, PDF events, cadastru search events, long-lived cadastru records, 999.md analysis events, shared links, and favorites runs only when `NODE_ENV=production`.

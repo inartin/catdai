@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { trackExternalApiUsage } from "@/lib/external-api-usage";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
@@ -34,7 +35,7 @@ function externalError(message, options = {}) {
   return error;
 }
 
-async function fetchSignedExternalCadastru(path, body, explicitUrl) {
+async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
   const { url, secret, timeoutMs } = externalCadastruConfig(path, explicitUrl);
   if (!url || !secret) {
     throw externalError("External cadastru API is not configured", {
@@ -60,6 +61,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl) {
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
+    trackExternalApiUsage(service, "failure");
     throw externalError(error?.message || "External cadastru API request failed", {
       code: error?.name === "TimeoutError" ? "external_cadastru_timeout" : "external_cadastru_unreachable",
       fallbackEligible: true,
@@ -68,12 +70,14 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl) {
 
   const payload = await response.json().catch(() => null);
   if (response.ok && payload?.ok && payload?.data) {
+    trackExternalApiUsage(service, "success");
     return payload.data;
   }
 
   const code = payload?.error || `external_cadastru_http_${response.status}`;
   const message = payload?.message || `External cadastru API returned ${response.status}`;
   const fallbackEligible = response.status === 502 || response.status === 503 || response.status === 504;
+  trackExternalApiUsage(service, "failure");
   throw externalError(message, {
     code,
     status: response.status,
@@ -85,7 +89,8 @@ export async function fetchExternalCadastralData(cadastralNumber) {
   return fetchSignedExternalCadastru(
     "v1/cadastral",
     { cadastral_number: cadastralNumber },
-    process.env.CADASTRU_EXTERNAL_API_URL
+    process.env.CADASTRU_EXTERNAL_API_URL,
+    "cadastru_number"
   );
 }
 
@@ -93,6 +98,7 @@ export async function fetchExternalCadastruAddressData(addressFields) {
   return fetchSignedExternalCadastru(
     "v1/cadastru/address",
     addressFields,
-    process.env.CADASTRU_EXTERNAL_ADDRESS_API_URL
+    process.env.CADASTRU_EXTERNAL_ADDRESS_API_URL,
+    "cadastru_address"
   );
 }

@@ -33,6 +33,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - Each parse attempt with a valid 999 listing id writes to `listing_link_analysis_events` when the table exists.
 - Cached successful fallback responses also write success analytics, so authenticated cached analyses still attach `user_id`.
 - External 999 worker usage does not change analytics ownership; the main app still writes all listing-link analysis events.
+- Successful and failed external worker calls are counted in `external_api_usage_daily` through a fire-and-forget stats write after the worker response or failure.
 - The admin dashboard shows total link analyses, analyzed/rejected/failed splits, period totals, and recent rows.
 - 999.md link-analysis events are written only when `NODE_ENV=production`.
 

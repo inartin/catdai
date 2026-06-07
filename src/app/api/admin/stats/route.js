@@ -325,6 +325,45 @@ function buildCalculatorUsageStats(rows, cutoffs) {
   };
 }
 
+async function fetchExternalApiUsageRows() {
+  const { data, error } = await supabaseAdmin
+    .from("external_api_usage_daily")
+    .select("usage_date, service, status, count, updated_at")
+    .order("usage_date", { ascending: false });
+
+  if (!error) return data || [];
+
+  const code = String(error?.code || "");
+  if (code === "42P01" || code === "42703" || code === "PGRST204") return [];
+  throw new Error(`external_api_usage_daily query failed: ${error.message}`);
+}
+
+function buildExternalApiUsageStats(rows) {
+  const emptyService = () => ({ success: 0, failure: 0, total: 0 });
+  const byService = {
+    "999_listing": emptyService(),
+    cadastru_number: emptyService(),
+    cadastru_address: emptyService(),
+  };
+
+  for (const row of rows) {
+    const service = byService[row.service];
+    if (!service) continue;
+    const count = Number(row.count) || 0;
+    if (row.status === "success") service.success += count;
+    if (row.status === "failure") service.failure += count;
+    service.total += count;
+  }
+
+  return {
+    total: Object.values(byService).reduce((sum, item) => sum + item.total, 0),
+    success: Object.values(byService).reduce((sum, item) => sum + item.success, 0),
+    failure: Object.values(byService).reduce((sum, item) => sum + item.failure, 0),
+    byService,
+    recent: rows.slice(0, 60),
+  };
+}
+
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
@@ -357,6 +396,7 @@ export async function GET(request) {
       fetchCadastruSearchEvents(),
       fetchListingLinkAnalysisEvents(),
       fetchCalculatorUsageEvents(),
+      fetchExternalApiUsageRows(),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -373,6 +413,7 @@ export async function GET(request) {
     cadastruSearchEvents,
     listingLinkAnalysisEvents,
     calculatorUsageEvents,
+    externalApiUsageRows,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const cadastruSearchesWithUsers = attachUserNames(cadastruSearchEvents, usersById);
@@ -392,6 +433,7 @@ export async function GET(request) {
     cadastruSearches: buildCadastruSearchStats(cadastruSearchesWithUsers, cutoffs),
     listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
+    externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows),
   };
 
   if (!bypassCache) {

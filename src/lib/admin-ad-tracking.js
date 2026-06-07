@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 const PAGE = 1000;
 const DEFAULT_JOURNEY_LIMIT = 50;
 const MAX_JOURNEY_LIMIT = 100;
+const LANDING_EVENT_NAMES = new Set(["source_landing_visit"]);
 
 export const AD_TRACKING_SOURCES = {
   zdg: {
@@ -166,7 +167,15 @@ export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
     acc[event.event_name] = (acc[event.event_name] || 0) + 1;
     return acc;
   }, {});
-  const allJourneys = groupAdJourneys(events, usersById);
+  const journeyEvents = events.filter((event) => {
+    if (event.event_name !== "page_view") return true;
+    return !events.some((candidate) =>
+      LANDING_EVENT_NAMES.has(candidate.event_name) &&
+      candidate.session_id === event.session_id &&
+      candidate.path === event.path
+    );
+  });
+  const allJourneys = groupAdJourneys(journeyEvents, usersById);
   const journeys = allJourneys.slice(offset, offset + limit);
 
   return {

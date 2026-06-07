@@ -7,10 +7,11 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 1. `LinkAnalyzer` is available on the landing page and on `/verifica-anunt`; `/estimeaza` links users to `/verifica-anunt?from=estimeaza`, where a back button returns to `/estimeaza`, and `/999` permanently redirects to `/verifica-anunt`.
 2. It posts the URL to `POST /api/analyze-link`.
    - When the visitor is authenticated, the client includes the Supabase bearer token so analytics can attach `user_id`.
-3. The route extracts the listing id, fetches the page, parses seller-selected attributes, validates Chișinău, and maps them to estimate params.
-4. The client redirects to `/anunt?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
-5. `/anunt` runs the usual sale estimate, fetches listing price history by `listing.external_id`, and renders the listing-vs-market comparison through the shared result component.
-6. At the bottom of the `/anunt` result, the page embeds `LinkAnalyzer` directly so users can start another 999.md listing check without returning to `/verifica-anunt`.
+3. The route extracts the listing id, checks the parsed-listing cache, then tries the signed external 999 worker when configured; if the worker is unavailable or fails, it falls back to the local 999 fetch/parser.
+4. The app validates Chișinău sale apartments and maps the parsed seller-selected fields to estimate params.
+5. The client redirects to `/anunt?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
+6. `/anunt` runs the usual sale estimate, fetches listing price history by `listing.external_id`, and renders the listing-vs-market comparison through the shared result component.
+7. At the bottom of the `/anunt` result, the page embeds `LinkAnalyzer` directly so users can start another 999.md listing check without returning to `/verifica-anunt`.
 
 ## Parsing (`src/lib/parse-999-listing.js`)
 - Reads the seller-selected attributes only; the free-text description is ignored.
@@ -31,6 +32,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 ## Analytics
 - Each parse attempt with a valid 999 listing id writes to `listing_link_analysis_events` when the table exists.
 - Cached successful fallback responses also write success analytics, so authenticated cached analyses still attach `user_id`.
+- External 999 worker usage does not change analytics ownership; the main app still writes all listing-link analysis events.
 - The admin dashboard shows total link analyses, analyzed/rejected/failed splits, period totals, and recent rows.
 - 999.md link-analysis events are written only when `NODE_ENV=production`.
 
@@ -53,10 +55,19 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 
 ## Anti-Blocking Measures
 - **Caching** (`src/lib/listing-cache.js`): uses the shared Redis cache (`src/lib/cache.js`) with key prefix `catdai:listing-analyze:v2:` and a 6h TTL, plus a 500-entry in-memory LRU fallback for when Redis is unavailable. Repeat analyses of the same listing skip the upstream fetch. Only successfully parsed listings are cached; transient failures are not. Mapping still runs per request so logic changes apply immediately.
+- **External worker first** (`src/lib/listing999-external-api.js`): when `LISTING999_EXTERNAL_API_BASE_URL` or `CADASTRU_EXTERNAL_API_BASE_URL` plus the matching shared secret are configured, `/api/analyze-link` asks the signed external worker for parsed 999 data before using local fetch. External failures, timeouts, blocks, or missing config fall back to local fetch/parse.
 - **Backoff**: `fetchListingHtml` retries up to 3 times with exponential backoff (600ms → 4s cap), honoring upstream `Retry-After` on `429`/`503`. `403` is treated as a block immediately (no hammering); network/timeout errors retry.
 - **Block signaling**: blocks return `upstream_blocked` (503), shown to the user as a "temporarily limited, try again in a few minutes" message.
 - **Consistent headers**: a single stable Chrome-on-macOS header set (`Accept-Language`, `Referer`, `Sec-Fetch-*`, `Sec-Ch-Ua*`). `Accept-Encoding` is intentionally left unset so the runtime auto-decompresses the response.
 - Rotating proxies / headless browser are not used; escalate to those only if real blocking appears.
+
+## External Worker Env
+
+- `LISTING999_EXTERNAL_API_BASE_URL` points to the external worker base URL and calls `/v1/999/listing`.
+- `LISTING999_EXTERNAL_API_URL` can override the full endpoint.
+- `LISTING999_EXTERNAL_API_SECRET` signs requests; if absent, the app reuses `CADASTRU_EXTERNAL_API_SECRET`.
+- `LISTING999_EXTERNAL_API_TIMEOUT_MS` defaults to 10 seconds.
+- If no 999-specific base URL is set, the app can reuse `CADASTRU_EXTERNAL_API_BASE_URL` because both routes can live in the same worker.
 
 ## Error Codes
 | Code | Meaning |
@@ -81,6 +92,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - `src/components/EvaluationResultPage.js`
 - `src/lib/listing-duplicates.js`
 - `src/lib/parse-999-listing.js`
+- `src/lib/listing999-external-api.js`
 - `src/lib/listing-link-analysis-events.js`
 - `src/lib/runtime-persistence.js`
 - `src/lib/listing-cache.js` (wraps the shared Redis cache in `src/lib/cache.js`)

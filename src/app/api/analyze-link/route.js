@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { getCachedListing, setCachedListing } from "@/lib/listing-cache";
+import { fetchExternal999Listing } from "@/lib/listing999-external-api";
 import { logListingLinkAnalysisEvent } from "@/lib/listing-link-analysis-events";
 import {
   build999ListingUrl,
@@ -246,6 +247,24 @@ function buildFallbackCachedPayload(externalId, parsed) {
   return { parsed, params: mapped.params, payload: buildSuccessPayload(externalId, parsed, mapped.params) };
 }
 
+async function fetchAndParseListing(externalId, listingUrl) {
+  try {
+    const parsed = await fetchExternal999Listing(externalId);
+    return parsed ? { parsed, source: "external" } : { error: "not_a_listing" };
+  } catch (error) {
+    if (!error?.fallbackEligible) return { error: error?.code || "fetch_failed" };
+  }
+
+  const result = await fetchListingHtml(listingUrl);
+  if (result.error) return { error: result.error };
+  if (!result.html) return { error: "fetch_failed" };
+
+  const parsed = parse999Listing(result.html);
+  if (!parsed) return { error: "not_a_listing" };
+
+  return { parsed, source: "local" };
+}
+
 export async function POST(request) {
   const ip = getClientIp(request);
   const { allowed, retryAfter } = limiter.check(ip);
@@ -274,7 +293,7 @@ export async function POST(request) {
 
   let parsed = await getCachedListing(externalId);
   if (!parsed || !hasExactListingAddress(getParsedListingAddress(parsed))) {
-    const result = await fetchListingHtml(listingUrl);
+    const result = await fetchAndParseListing(externalId, listingUrl);
     if (result.error === "blocked") {
       const fallback = buildFallbackCachedPayload(externalId, parsed);
       if (fallback) {
@@ -284,17 +303,16 @@ export async function POST(request) {
       await logEvent({ status: "upstream_blocked" });
       return NextResponse.json({ error: "upstream_blocked" }, { status: 503 });
     }
-    if (result.error || !result.html) {
+    if (result.error === "upstream_blocked") {
       const fallback = buildFallbackCachedPayload(externalId, parsed);
       if (fallback) {
         await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
         return NextResponse.json(fallback.payload);
       }
-      await logEvent({ status: "fetch_failed" });
-      return NextResponse.json({ error: "fetch_failed" }, { status: 502 });
+      await logEvent({ status: "upstream_blocked" });
+      return NextResponse.json({ error: "upstream_blocked" }, { status: 503 });
     }
-    const fetchedParsed = parse999Listing(result.html);
-    if (!fetchedParsed) {
+    if (result.error === "not_a_listing") {
       const fallback = buildFallbackCachedPayload(externalId, parsed);
       if (fallback) {
         await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
@@ -303,7 +321,16 @@ export async function POST(request) {
       await logEvent({ status: "not_a_listing" });
       return NextResponse.json({ error: "not_a_listing" }, { status: 422 });
     }
-    parsed = fetchedParsed;
+    if (result.error) {
+      const fallback = buildFallbackCachedPayload(externalId, parsed);
+      if (fallback) {
+        await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
+        return NextResponse.json(fallback.payload);
+      }
+      await logEvent({ status: "fetch_failed" });
+      return NextResponse.json({ error: "fetch_failed" }, { status: 502 });
+    }
+    parsed = result.parsed;
     await setCachedListing(externalId, parsed);
   }
 

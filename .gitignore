@@ -15,6 +15,7 @@
 tmp/
 .cursor/
 demo-valuation-report.pdf
+/external
 
 # next.js
 /.next/

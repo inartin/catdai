@@ -44,7 +44,7 @@ Shows:
 - Owners list with search and pagination.
 - Owner detail with profile fields and listings.
 - Dashboard registered users and recent sale/rent estimations are inline expandable tables.
-- `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows `/?src=zdg` tracking grouped by visitor session, with closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, exact all-time source session/device/funnel totals in the top cards, and paged visitor journeys that load more while scrolling.
+- `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows source tabs for `/?src=zdg` and `/?utm_source=reddit` tracking grouped by visitor session, with closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, exact all-time source session/device/funnel totals in the top cards, paged visitor journeys that load more while scrolling, and a `Hard refresh` button that bypasses the 10-minute Redis cache.
 - `/api/admin/feedback` returns the 100 latest `user_feedback` rows after route-level admin cookie verification.
 - `/api/admin/news` and `/api/admin/news/[id]` manage `news_posts` rows after route-level admin cookie verification.
 - `/api/admin/uploads` stores images in the configured Supabase Storage bucket and returns `public_url` plus the storage path after route-level admin cookie verification.

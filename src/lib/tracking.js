@@ -1,7 +1,7 @@
 const DEVICE_KEY = "catdai-device-id";
 const SESSION_KEY = "catdai-session-id";
 const AD_SOURCE_KEY = "catdai-ad-source";
-const TRACKED_AD_SOURCES = new Set(["zdg"]);
+const TRACKED_AD_SOURCES = new Set(["zdg", "reddit"]);
 
 export function getDeviceId() {
   try {

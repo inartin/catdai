@@ -17,6 +17,7 @@ Backend prepared and active when Redis is reachable.
 - `POST /api/listing-preview-images`: key prefix `catdai:listing-preview-image:v1:`, 24h TTL per listing/language.
 - `POST /api/cadastral`: key prefix `catdai:cadastral:v1:`, 7d TTL for successful cadastral-number lookup responses before the long-lived DB store is checked.
 - `POST /api/cadastru/address`: key prefix `catdai:cadastru-address:v1:`, 7d TTL for successful normalized-address lookup responses before structured address fields in DB are checked.
+- `GET /api/admin/ad-tracking`: key prefix `catdai:admin-ad-tracking:v1`, 10m TTL per source, journey limit, and offset; `fresh=1` bypasses the cache.
 
 ## Cadastru Cache
 - Only successful `200` cadastru payloads are cached; unauthorized, invalid, rate-limited, not-found, and upstream-error responses are not cached.

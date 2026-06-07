@@ -4,6 +4,17 @@ const PAGE = 1000;
 const DEFAULT_JOURNEY_LIMIT = 50;
 const MAX_JOURNEY_LIMIT = 100;
 
+export const AD_TRACKING_SOURCES = {
+  zdg: {
+    label: "ZDG",
+    entryPath: "/?src=zdg",
+  },
+  reddit: {
+    label: "Reddit",
+    entryPath: "/?utm_source=reddit",
+  },
+};
+
 async function fetchAllRows(buildQuery) {
   let all = [];
   let from = 0;
@@ -122,7 +133,12 @@ function normalizePagination({ journeyLimit, journeyOffset } = {}) {
   };
 }
 
-export async function fetchZdgAdStats(options = {}) {
+export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
+  const sourceConfig = AD_TRACKING_SOURCES[source];
+  if (!sourceConfig) {
+    return { available: false, error: "Unknown ad source.", events: [] };
+  }
+
   const { limit, offset } = normalizePagination(options);
 
   let events;
@@ -131,15 +147,15 @@ export async function fetchZdgAdStats(options = {}) {
       supabaseAdmin
         .from("ad_source_events")
         .select("event_name, user_id, device_id, session_id, path, referrer, metadata, created_at")
-        .eq("source", "zdg")
+        .eq("source", source)
         .order("created_at", { ascending: false })
     );
   } catch (error) {
     if (error.code === "42P01") {
       return { available: false, error: "ad_source_events table is missing.", events: [] };
     }
-    console.error("Failed to load ZDG ad events:", error.message);
-    return { available: false, error: "Failed to load ZDG ad events.", events: [] };
+    console.error(`Failed to load ${sourceConfig.label} ad events:`, error.message);
+    return { available: false, error: `Failed to load ${sourceConfig.label} ad events.`, events: [] };
   }
 
   const usersById = await fetchUsersById(events.map((event) => event.user_id));
@@ -155,7 +171,9 @@ export async function fetchZdgAdStats(options = {}) {
 
   return {
     available: true,
-    source: "zdg",
+    source,
+    sourceLabel: sourceConfig.label,
+    entryPath: sourceConfig.entryPath,
     totalEvents: events.length,
     uniqueSessions: uniqueSessions.size,
     uniqueDevices: uniqueDevices.size,
@@ -168,4 +186,8 @@ export async function fetchZdgAdStats(options = {}) {
     totalJourneys: allJourneys.length,
     hasMoreJourneys: offset + journeys.length < allJourneys.length,
   };
+}
+
+export async function fetchZdgAdStats(options = {}) {
+  return fetchAdSourceStats({ source: "zdg", ...options });
 }

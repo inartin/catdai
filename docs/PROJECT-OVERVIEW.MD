@@ -45,7 +45,7 @@ Dynamic sitemap.xml and robots.txt
 OG/Twitter metadata for shared result pages (/imobil/[slug])
 JSON-LD structured data
 Cookie consent banner
-Ad source tracking (ZDG campaigns) with user journey analytics
+Ad source tracking (ZDG and Reddit campaigns) with user journey analytics
 Admin routes marked noindex
 Market Data:
 

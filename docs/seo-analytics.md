@@ -39,11 +39,11 @@ Implemented.
 - The `/estimeaza` submit button fires Google Ads conversion `AW-18184166002/Afy1CNv4g7McEPK08d5D` before navigating to `/evaluare`.
 - `/estimeaza` sends `conversion_event_page_view_1` once on client mount when GA is available.
 - Estimate logging stores device/session ids, input summary, result price, language, response time, and hashed IP.
-- Landing-only ad source tracking supports `/?src=zdg`.
-- When `src=zdg` is seen on `/`, the browser stores the source for the session and posts simple events to `/api/ad-source-events`.
+- Landing-only ad source tracking supports `/?src=zdg` and `/?utm_source=reddit`.
+- When a supported landing source is seen on `/`, the browser stores the source for the session and posts simple events to `/api/ad-source-events`.
 - `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
-- Authenticated tracking requests store `user_id` so ZDG ad sessions can be tied to registered Supabase users after login.
-- Admin ZDG top-card totals are computed from all stored ZDG events; the visitor journey list is paged separately.
+- Authenticated tracking requests store `user_id` so ad sessions can be tied to registered Supabase users after login.
+- Admin ad-tracking top-card totals are computed per selected source from all stored events; the visitor journey list is paged separately.
 - Runtime DB persistence for estimation logs, PDF events, cadastru search events, long-lived cadastru records, 999.md analysis events, shared links, and favorites runs only when `NODE_ENV=production`.
 - Calculator result usage is stored in `calculator_usage_events` only when `NODE_ENV=production`, including property filters, investment fields, tax selection, result rent/yield/payback metrics, and registered/anonymous attribution.
 

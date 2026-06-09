@@ -18,10 +18,12 @@ Implemented and active, with partial fallback.
 - `/cadastru` lets users find official cadastral data by exact address or by entering a cadastral number directly.
 - `/evaluare` without result query parameters reuses the same cadastru search form and source note, placing the compact cadastral-number quick-fill card first under the `Locație` category header.
 - Anonymous users can open the page, but search actions show the shared auth popup used by PDF export instead of calling the cadastral APIs.
+- During beta, `/cadastru` search actions are limited to 5 searches per authenticated user per day. The limit is enforced in the cadastru API search context and the page shows a localized popup without login options when the user reaches it.
 - The page title and subtitle sit above the input card so the page purpose is clear before choosing a search method.
 - The page has localized route metadata, canonical and alternate language tags, and sitemap entries for both Romanian and Russian.
 - The Cadastru route layout passes the URL language into `LanguageProvider`, so `/ru/cadastru` renders Russian page text in the server HTML instead of waiting for client hydration.
 - Address search posts to authenticated `/api/cadastru/address`, which checks Redis, the structured address fields in `cadastru_records`, the signed external cadastru worker, and finally the reusable in-app helper in `src/lib/cadastru-address-search.js` if the worker is unreachable.
+- `/cadastru` performs a lightweight authenticated `/api/cadastru/search-limit` check before a search so the frontend can show the beta-limit popup before starting a lookup; the lookup APIs still enforce the same limit when called with the cadastru search context.
 - Successful address-search responses are cached in Redis for 7 days by the normalized address and store/update only the matching `cadastru_records` row. Failed/not-found responses are not cached.
 - It shows a fixed, non-selectable Chișinău city field, a road type dropdown for `Str.` or `Bulevard`, and separate inputs for street name, house number, and apartment number.
 - Address input validation runs in both the browser and `/api/cadastru/address`: street is capped at 80 characters, building number accepts only digits plus one optional slash such as `18/2`, and apartment number accepts only digits from `1` to `9999`.
@@ -63,6 +65,7 @@ Implemented and active, with partial fallback.
 
 ## Limits
 - Rate limited to 15 requests/minute per IP.
+- `/cadastru` beta search usage is capped at 5 logged searches per authenticated user per day. Valuation/PDF cadastral lookups outside the `/cadastru` search flow are not included in this beta page limit.
 - Successful cadastral-number and address lookup responses use Redis shared cache for 7 days before falling back to the long-lived Supabase cadastru store.
 - Upstream Geodata calls use a 10 second timeout; Nominatim fallback uses 5 seconds.
 - Timeout logs include the failing stage: `geodata_wfs`, `geodata_wms`, or `nominatim_reverse`.
@@ -71,6 +74,7 @@ Implemented and active, with partial fallback.
 ## Related Files
 - `src/app/api/cadastral/route.js`
 - `src/app/api/cadastru/address/route.js`
+- `src/app/api/cadastru/search-limit/route.js`
 - `src/lib/cadastru-external-api.js`
 - `src/app/cadastru/layout.js`
 - `src/app/cadastru/rezultat/page.js`

@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
 import { findCadastralByAddress } from "@/lib/cadastru-address-search";
-import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
+import {
+  CADASTRU_DAILY_SEARCH_LIMIT,
+  getUserCadastruDailySearchStatus,
+  logCadastruSearchEvent,
+} from "@/lib/cadastru-search-events";
 import { getCadastruRecordByAddress, persistCadastruRecord } from "@/lib/cadastru-records";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
@@ -38,6 +42,29 @@ function normalizeRoadType(value) {
 function displayRoadType(value) {
   if (value === "bulevard") return "Bulevard";
   return "Strada";
+}
+
+function hasAddressPayloadDetails(payload) {
+  return Boolean(
+    payload?.apartment_area_m2 ||
+      payload?.apartment_floor ||
+      payload?.apartment_type ||
+      payload?.estimated_value_lei ||
+      payload?.apartment?.area_m2 ||
+      payload?.apartment?.floor ||
+      payload?.apartment?.type ||
+      payload?.apartment?.estimated_value_lei ||
+      payload?.building?.total_floors ||
+      payload?.building?.construction_year
+  );
+}
+
+function classifyAddressPayload(payload) {
+  return hasAddressPayloadDetails(payload) ? "apartment_only" : "address_only";
+}
+
+function resolvePayloadDistrict(payload) {
+  return payload?.form_fields?.district || null;
 }
 
 function makeCadastruAddressCacheKey(rawAddress) {
@@ -83,6 +110,18 @@ function buildStructuredAddress({ city, roadType, street, houseNumber, apartment
     houseNumber,
     apartmentNumber,
   };
+}
+
+function dailyLimitResponse(status) {
+  return NextResponse.json(
+    {
+      error: "daily_limit_reached",
+      message: "Cadastru searches are limited during beta.",
+      limit: status?.limit || CADASTRU_DAILY_SEARCH_LIMIT,
+      remaining: 0,
+    },
+    { status: 429 }
+  );
 }
 
 async function persistAddressResult(payload, options = {}) {
@@ -152,6 +191,8 @@ export async function POST(request) {
     return NextResponse.json({ error: "invalid_json", message: "Invalid JSON body" }, { status: 400 });
   }
 
+  const shouldTrackCadastruSearch = body?.search_context === "cadastru";
+
   const city = normalizeSpaces(body.city || "Chișinău");
   const roadType = normalizeRoadType(body.road_type);
   const street = normalizeSpaces(body.street);
@@ -184,6 +225,20 @@ export async function POST(request) {
     );
   }
 
+  if (shouldTrackCadastruSearch) {
+    let dailyLimit;
+    try {
+      dailyLimit = await getUserCadastruDailySearchStatus(access.user_id);
+    } catch (error) {
+      console.error("[cadastru/address] daily limit check failed:", error?.message || String(error));
+      return NextResponse.json({ error: "limit_check_failed", message: "Could not verify search limit." }, { status: 500 });
+    }
+
+    if (!dailyLimit.allowed) {
+      return dailyLimitResponse(dailyLimit);
+    }
+  }
+
   const rawAddress = normalizeSpaces(`${city}, ${roadType} ${street} ${houseNumber} ap ${apartmentNumber}`);
   const structuredAddress = buildStructuredAddress({
     city,
@@ -200,6 +255,14 @@ export async function POST(request) {
       lookupSource: cached.lookupSource,
       countLookup: false,
     });
+    if (shouldTrackCadastruSearch) {
+      await logCadastruSearchEvent(request, "address", {
+        cadastralNumber: cached.payload?.cadastral_number,
+        district: resolvePayloadDistrict(cached.payload),
+        resultType: classifyAddressPayload(cached.payload),
+        lookupSource: cached.lookupSource,
+      });
+    }
     const response = NextResponse.json(cached.payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
@@ -219,6 +282,14 @@ export async function POST(request) {
       lookupSource: stored.lookupSource,
       countLookup: false,
     });
+    if (shouldTrackCadastruSearch) {
+      await logCadastruSearchEvent(request, "address", {
+        cadastralNumber: payload?.cadastral_number,
+        district: resolvePayloadDistrict(payload),
+        resultType: stored.resultType || classifyAddressPayload(payload),
+        lookupSource: stored.lookupSource,
+      });
+    }
     const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
@@ -245,6 +316,14 @@ export async function POST(request) {
       officialFetch: true,
       countLookup: false,
     });
+    if (shouldTrackCadastruSearch) {
+      await logCadastruSearchEvent(request, "address", {
+        cadastralNumber: payload?.cadastral_number,
+        district: resolvePayloadDistrict(payload),
+        resultType: classifyAddressPayload(payload),
+        lookupSource: "api",
+      });
+    }
     const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
@@ -259,7 +338,9 @@ export async function POST(request) {
     if (!error?.fallbackEligible) {
       console.error("[cadastru/address] external cadastru API failed:", details);
       if (error?.status === 404 || error?.code === "not_found") {
-        await logCadastruSearchEvent(request, "address", { resultType: "no_data", lookupSource: "api" });
+        if (shouldTrackCadastruSearch) {
+          await logCadastruSearchEvent(request, "address", { resultType: "no_data", lookupSource: "api" });
+        }
         return NextResponse.json(
           {
             error: "not_found",
@@ -296,6 +377,14 @@ export async function POST(request) {
       officialFetch: true,
       countLookup: false,
     });
+    if (shouldTrackCadastruSearch) {
+      await logCadastruSearchEvent(request, "address", {
+        cadastralNumber: payload?.cadastral_number,
+        district: resolvePayloadDistrict(payload),
+        resultType: classifyAddressPayload(payload),
+        lookupSource: "local",
+      });
+    }
     const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
@@ -305,7 +394,9 @@ export async function POST(request) {
       address: rawAddress,
     });
 
-    await logCadastruSearchEvent(request, "address", { resultType: "no_data", lookupSource: "local" });
+    if (shouldTrackCadastruSearch) {
+      await logCadastruSearchEvent(request, "address", { resultType: "no_data", lookupSource: "local" });
+    }
 
     const isTimeout = error?.name === "TimeoutError" || error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT";
     return NextResponse.json(

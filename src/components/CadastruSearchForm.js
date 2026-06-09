@@ -32,6 +32,7 @@ export default function CadastruSearchForm({
   quickSearchPlacement = "bottom",
   showLocationHeader = false,
   locationStepNumber = 2,
+  limitDailySearches = false,
 }) {
   const { lang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
@@ -49,6 +50,7 @@ export default function CadastruSearchForm({
     error: "",
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
 
   const requireAuth = () => {
     if (isAuthenticated) return false;
@@ -98,6 +100,7 @@ export default function CadastruSearchForm({
       if (payload?.error === "invalid_format") return t("form.cadastralInvalid");
       if (payload?.error === "missing_fields") return t("cadastru.missingAddressFields");
       if (payload?.error === "invalid_address_fields") return t("cadastru.invalidAddressFields");
+      if (payload?.error === "daily_limit_reached") return t("cadastru.dailyLimitReached");
       if (payload?.error === "too_many_requests") return t("cadastru.rateLimitError");
       if (payload?.error === "not_found") return t("cadastru.lookupError");
       return payload?.message || payload?.error || t("cadastru.lookupError");
@@ -111,6 +114,35 @@ export default function CadastruSearchForm({
     ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
   });
 
+  const ensureDailySearchAllowed = async (method) => {
+    if (!limitDailySearches) return true;
+
+    const response = await fetch("/api/cadastru/search-limit", {
+      headers: requestHeaders(),
+    });
+    const payload = await response.json().catch(() => null);
+
+    if (response.status === 401 || payload?.error === "unauthorized") {
+      clearAuthError();
+      setLookupState({ loading: false, method, error: "" });
+      setIsAuthModalOpen(true);
+      return false;
+    }
+
+    if (response.ok && payload?.allowed === false) {
+      setLookupState({ loading: false, method, error: "" });
+      setIsLimitModalOpen(true);
+      return false;
+    }
+
+    if (!response.ok) {
+      setLookupState({ loading: false, method, error: t("cadastru.lookupError") });
+      return false;
+    }
+
+    return true;
+  };
+
   const submitAddressSearch = async () => {
     if (requireAuth()) return;
 
@@ -123,6 +155,8 @@ export default function CadastruSearchForm({
     setLookupState({ loading: true, method: "address", error: "" });
 
     try {
+      if (!(await ensureDailySearchAllowed("address"))) return;
+
       const response = await fetch("/api/cadastru/address", {
         method: "POST",
         headers: requestHeaders(),
@@ -132,6 +166,7 @@ export default function CadastruSearchForm({
           street: addressForm.street,
           house_number: addressForm.houseNumber,
           apartment_number: addressForm.apartmentNumber,
+          ...(limitDailySearches ? { search_context: "cadastru" } : {}),
         }),
       });
 
@@ -140,6 +175,20 @@ export default function CadastruSearchForm({
           clearAuthError();
           setLookupState({ loading: false, method: "address", error: "" });
           setIsAuthModalOpen(true);
+          return;
+        }
+        if (response.status === 429) {
+          const errorMessage = await readErrorMessage(response);
+          if (errorMessage === t("cadastru.dailyLimitReached")) {
+            setLookupState({ loading: false, method: "address", error: "" });
+            setIsLimitModalOpen(true);
+            return;
+          }
+          setLookupState({
+            loading: false,
+            method: "address",
+            error: errorMessage,
+          });
           return;
         }
         setLookupState({
@@ -152,7 +201,12 @@ export default function CadastruSearchForm({
 
       const data = await response.json();
       if (data?.cadastral_number) {
-        router.push(`/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(data.cadastral_number)}&source=address`);
+        const params = new URLSearchParams({
+          cadastral_number: data.cadastral_number,
+          source: "address",
+        });
+        if (limitDailySearches) params.set("limited", "1");
+        router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
         return;
       }
 
@@ -166,7 +220,7 @@ export default function CadastruSearchForm({
     }
   };
 
-  const submitNumberSearch = () => {
+  const submitNumberSearch = async () => {
     if (requireAuth()) return;
 
     const validation = validateCadastralNumber(cadastralNumber);
@@ -176,7 +230,19 @@ export default function CadastruSearchForm({
     }
 
     setLookupState({ loading: true, method: "number", error: "" });
-    router.push(`/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(validation.value)}&source=number`);
+    try {
+      if (!(await ensureDailySearchAllowed("number"))) return;
+    } catch {
+      setLookupState({ loading: false, method: "number", error: t("cadastru.lookupError") });
+      return;
+    }
+
+    const params = new URLSearchParams({
+      cadastral_number: validation.value,
+      source: "number",
+    });
+    if (limitDailySearches) params.set("limited", "1");
+    router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
   };
 
   const quickSearchBlock = quickSearchPlacement === "top" ? (
@@ -254,6 +320,12 @@ export default function CadastruSearchForm({
         open={isAuthModalOpen}
         copyKey="cadastru.loginToUse"
         onClose={() => setIsAuthModalOpen(false)}
+      />
+      <AuthRequiredModal
+        open={isLimitModalOpen}
+        copyKey="cadastru.dailyLimitReached"
+        showAuthOptions={false}
+        onClose={() => setIsLimitModalOpen(false)}
       />
 
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10">

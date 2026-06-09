@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 const SEARCH_TYPES = new Set(["address", "number"]);
 const RESULT_TYPES = new Set(["no_data", "address_only", "apartment_only", "full_data"]);
 const LOOKUP_SOURCES = new Set(["api", "local"]);
+export const CADASTRU_DAILY_SEARCH_LIMIT = 5;
 
 function normalizeSearchType(searchType) {
   const value = String(searchType || "").trim();
@@ -41,6 +42,35 @@ function cleanCadastralNumber(value) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, 40) : null;
+}
+
+function startOfTodayIso() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.toISOString();
+}
+
+export async function getUserCadastruDailySearchStatus(userId) {
+  const limit = CADASTRU_DAILY_SEARCH_LIMIT;
+  if (!userId || !shouldPersistRuntimeData()) {
+    return { allowed: true, count: 0, limit, remaining: limit };
+  }
+
+  const { count, error } = await supabaseAdmin
+    .from("cadastru_search_events")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", startOfTodayIso());
+
+  if (error) throw error;
+
+  const used = count || 0;
+  return {
+    allowed: used < limit,
+    count: used,
+    limit,
+    remaining: Math.max(limit - used, 0),
+  };
 }
 
 export async function logCadastruSearchEvent(request, searchType, options = {}) {

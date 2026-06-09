@@ -26,7 +26,7 @@ function fetchCadastralLookup(cacheKey, body, accessToken) {
   }).then(async (response) => ({
     ok: response.ok,
     status: response.status,
-    data: response.ok ? await response.json() : null,
+    data: await response.json().catch(() => null),
   }));
 
   inFlightCadastralLookups.set(cacheKey, promise);
@@ -44,12 +44,15 @@ function CadastruResultContent() {
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
   const source = searchParams.get("source") || "";
+  const limitDailySearches = searchParams.get("limited") === "1";
   const loadedRequestKey = useRef("");
   const [authModalDismissed, setAuthModalDismissed] = useState(false);
+  const [limitModalDismissed, setLimitModalDismissed] = useState(false);
   const [state, setState] = useState({
     loading: true,
     error: "",
     data: null,
+    dailyLimitReached: false,
   });
   const authRequired = !authLoading && Boolean(cadastralNumber) && !isAuthenticated;
 
@@ -69,11 +72,11 @@ function CadastruResultContent() {
     let active = true;
 
     async function loadCadastralData() {
-      setState({ loading: true, error: "", data: null });
+      setState({ loading: true, error: "", data: null, dailyLimitReached: false });
 
       try {
         const body = { cadastral_number: cadastralNumber };
-        if (searchSource) {
+        if (searchSource === "number" && limitDailySearches) {
           body.search_context = "cadastru";
           body.search_type = searchSource;
         }
@@ -83,19 +86,26 @@ function CadastruResultContent() {
         if (!response.ok) {
           if (response.status === 401) {
             clearAuthError();
-            if (active) setState({ loading: false, error: t("cadastru.loginToUse"), data: null });
+            if (active) setState({ loading: false, error: t("cadastru.loginToUse"), data: null, dailyLimitReached: false });
             return;
           }
-          if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
+          if (response.status === 429 && response.data?.error === "daily_limit_reached") {
+            if (active) {
+              setLimitModalDismissed(false);
+              setState({ loading: false, error: "", data: null, dailyLimitReached: true });
+            }
+            return;
+          }
+          if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null, dailyLimitReached: false });
           return;
         }
 
         if (active) {
           loadedRequestKey.current = requestKey;
-          setState({ loading: false, error: "", data: response.data });
+          setState({ loading: false, error: "", data: response.data, dailyLimitReached: false });
         }
       } catch {
-        if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
+        if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null, dailyLimitReached: false });
       }
     }
 
@@ -104,7 +114,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [authLoading, cadastralNumber, clearAuthError, isAuthenticated, session?.access_token, source, t]);
+  }, [authLoading, cadastralNumber, clearAuthError, isAuthenticated, limitDailySearches, session?.access_token, source, t]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -112,6 +122,12 @@ function CadastruResultContent() {
         open={authRequired && !authModalDismissed}
         copyKey="cadastru.loginToUse"
         onClose={() => setAuthModalDismissed(true)}
+      />
+      <AuthRequiredModal
+        open={state.dailyLimitReached && !limitModalDismissed}
+        copyKey="cadastru.dailyLimitReached"
+        showAuthOptions={false}
+        onClose={() => setLimitModalDismissed(true)}
       />
       <Navbar />
       <main className="flex-1">

@@ -252,6 +252,7 @@
   "cadastru.missingAddressFields": "Completează strada, numărul blocului și numărul apartamentului.",
   "cadastru.invalidAddressFields": "Nr. bloc trebuie să conțină doar cifre și opțional /",
   "cadastru.rateLimitError": "Prea multe căutări. Încearcă din nou peste puțin timp.",
+  "cadastru.dailyLimitReached": "În perioada beta, căutările cadastrale sunt limitate la 5 pe zi. Revino mai târziu.",
   "cadastru.loginToUse": "Autentifică-te ca să cauți date cadastrale",
   "cadastru.resultPageTitle": "Rezultatul căutării cadastrale",
   "cadastru.resultMetaDescription": "Rezultatul unei căutări cadastrale Catdai. Pagina este generată pentru interogarea introdusă și nu este folosită ca pagină publică indexabilă.",

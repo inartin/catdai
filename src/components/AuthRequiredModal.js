@@ -9,6 +9,7 @@ import CloseIcon from "@/components/icons/CloseIcon";
 export default function AuthRequiredModal({
   open,
   copyKey = "result.comingSoon",
+  showAuthOptions = true,
   onClose,
 }) {
   const { t } = useTranslation();
@@ -53,11 +54,11 @@ export default function AuthRequiredModal({
           <CloseIcon size={18} />
         </button>
 
-        <p className="text-center text-base font-medium text-gray-800 mb-4 px-8">
+        <p className={`text-center text-base font-medium text-gray-800 px-8 ${showAuthOptions ? "mb-4" : "mb-0"}`}>
           {t(copyKey)}
         </p>
 
-        <AuthOptions />
+        {showAuthOptions && <AuthOptions />}
       </div>
     </div>,
     document.body

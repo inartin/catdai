@@ -23,7 +23,7 @@ export default function CadastruPage() {
             </p>
           </div>
 
-          <CadastruSearchForm />
+          <CadastruSearchForm limitDailySearches />
           <CadastruSourceNote />
         </section>
       </main>

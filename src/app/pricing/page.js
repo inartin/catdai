@@ -1,18 +1,19 @@
-import Navbar from "@/components/Navbar";
-import HomeContent from "@/components/HomeContent";
 import Footer from "@/components/Footer";
+import Navbar from "@/components/Navbar";
+import Pricing from "@/components/Pricing";
 import { getPricingConfig } from "@/lib/pricing-config";
 
-export default function Home() {
+export default function PricingPage() {
   const prices = getPricingConfig();
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       <Navbar />
       <main className="flex-1">
-        <HomeContent prices={prices} />
+        <Pricing prices={prices} />
       </main>
       <Footer />
     </div>
   );
 }
+

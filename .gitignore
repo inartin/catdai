@@ -16,6 +16,7 @@ tmp/
 .cursor/
 demo-valuation-report.pdf
 /external
+CLAUDE.md
 
 # next.js
 /.next/

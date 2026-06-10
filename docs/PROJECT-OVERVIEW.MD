@@ -12,9 +12,9 @@ Includes cadastral data integration (IPCBI details, construction year, utilities
 PDF report generation with QR codes and comprehensive valuation data
 Monetization planned:
 
-Free tier: limited estimates + Google Adsense
-Paid tier: full reports + unlimited estimates
-Business plan: for agencies with PDF export and history
+Free tier: limited estimates and simple yield calculator
+Paid single actions and one-property package shown in the reusable Pricing section
+Monthly plans shown for active users and agents
 Tech Stack
 Framework & Runtime:
 
@@ -86,7 +86,7 @@ eslint.config.mjs - Next.js core-web-vitals config
 Environment variables for Supabase, Telegram, API tokens
 Project .npmrc keeps only shared install behavior. Do not commit machine-specific absolute pnpm store paths; set local store-dir in user-level pnpm config when needed.
 Current State
-Implemented: Auth, valuation (sale/rent), PDF reports, SEO, analytics, market data integration
+Implemented: Auth, valuation (sale/rent), PDF reports, pricing UI, SEO, analytics, market data integration
 SEO Status: Not blocked by technical issues, robots.txt allows crawling, sitemap available, Google has crawled homepage
 Deployment: PM2 production setup on port 3000
 The project is production-ready with comprehensive documentation in docs/ covering auth, valuation, SEO, market data, and admin features.

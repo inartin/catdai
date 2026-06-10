@@ -9,6 +9,7 @@ import HowItWorks from "@/components/HowItWorks";
 import ExampleResults from "@/components/ExampleResults";
 import LandingFaqPreview from "@/components/LandingFaqPreview";
 import LinkAnalyzer from "@/components/LinkAnalyzer";
+import Pricing from "@/components/Pricing";
 import TelegramIcon from "@/components/icons/TelegramIcon";
 import { ArrowRight } from "@/components/icons/ArrowsIcons";
 import { useTranslation } from "@/context/LanguageContext";
@@ -230,7 +231,7 @@ function MarketScopeCards() {
   );
 }
 
-export default function HomeContent() {
+export default function HomeContent({ prices }) {
   const router = useRouter();
 
   const handleCategorySelect = useCallback((category) => {
@@ -248,6 +249,7 @@ export default function HomeContent() {
       <HowItWorks />
       <ExampleResults />
       {/* <ListingAlertsTeaser /> Temporarily Disabled - will add in near future */}
+      {/* <Pricing prices={prices} compact />  Temporarily Disabled - will add in near future */}
       <LandingFaqPreview />
     </div>
   );

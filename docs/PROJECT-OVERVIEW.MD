@@ -32,7 +32,7 @@ Infrastructure:
 Tailwind CSS 4 with PostCSS
 Sharp for image processing
 QRCode generation for PDF reports
-Cloudflared tunnel for local dev testing (scripts/dev-tunnel.sh)
+Cloudflared tunnel for local dev testing (scripts/dev-tunnel.sh); the script now traps normal exit and signals so `pnpm test` does not leave `cloudflared` running afterward.
 Key Features
 Authentication:
 

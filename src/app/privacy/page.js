@@ -22,6 +22,8 @@ const sections = [
     ],
     bullets: [
       "date introduse direct de utilizator, cum ar fi criteriile proprietății, preferințele de filtrare și alte informații furnizate în formulare;",
+      "date de cont, cum ar fi identificatorul de utilizator, numele, adresa de e-mail sau datele furnizate de serviciile de autentificare folosite;",
+      "date necesare pentru plăți și acces plătit, cum ar fi produsul cumpărat, suma, moneda, numărul intern al facturii/comenzii, statusul tranzacției, identificatorul tranzacției primit de la procesatorul de plăți și informații de contact necesare pentru confirmare sau suport;",
       "date tehnice, cum ar fi adresa IP, tipul browserului, sistemul de operare, limba browserului, paginile accesate, data și ora accesării;",
       "date privind utilizarea serviciului, inclusiv interacțiunea cu paginile, funcțiile folosite și erorile tehnice;",
       "date de contact, dacă ne scrii sau ne trimiți o solicitare;",
@@ -36,6 +38,7 @@ const sections = [
     bullets: [
       "funcționarea, menținerea și securizarea platformei;",
       "generarea estimărilor și a analizelor solicitate de utilizator;",
+      "crearea comenzilor, procesarea plăților, confirmarea tranzacțiilor, acordarea accesului plătit sau a creditelor cumpărate și soluționarea solicitărilor legate de plată;",
       "îmbunătățirea performanței, calității și relevanței serviciului;",
       "diagnosticarea erorilor tehnice și prevenirea utilizării abuzive;",
       "comunicarea cu utilizatorii în legătură cu solicitări, reclamații sau notificări;",
@@ -45,7 +48,7 @@ const sections = [
   {
     title: "5. Temeiul prelucrării",
     paragraphs: [
-      "În funcție de context, prelucrarea datelor poate avea loc pentru executarea serviciului solicitat de utilizator, pentru respectarea obligațiilor legale, în baza interesului legitim al operatorului sau, acolo unde este necesar, în baza consimțământului utilizatorului.",
+      "În funcție de context, prelucrarea datelor poate avea loc pentru executarea serviciului solicitat de utilizator, inclusiv pentru crearea contului, livrarea funcțiilor plătite și procesarea comenzilor, pentru respectarea obligațiilor legale, în baza interesului legitim al operatorului sau, acolo unde este necesar, în baza consimțământului utilizatorului.",
     ],
   },
   {
@@ -63,28 +66,39 @@ const sections = [
     ],
     bullets: [
       "furnizori de servicii tehnice, găzduire, infrastructură, analiză, monitorizare sau suport;",
+      "procesatori de plăți, cum ar fi Paynet, pentru inițierea, autorizarea, confirmarea și reconcilierea plăților;",
+      "furnizori de autentificare, atunci când alegi să te conectezi printr-un serviciu terț;",
       "consultanți, contabili, avocați sau auditori, dacă este necesar;",
       "autorități publice sau instituții competente, atunci când există o obligație legală;",
       "alte părți, în măsura în care acest lucru este necesar pentru apărarea unui drept, prevenirea fraudei sau asigurarea securității platformei.",
     ],
   },
   {
-    title: "8. Stocarea și securitatea datelor",
+    title: "8. Plăți și date de card",
+    paragraphs: [
+      "Plățile sunt procesate prin Paynet sau prin alt procesator de plăți indicat în platformă. CatDai nu colectează și nu stochează numărul complet al cardului, codul CVV/CVC sau alte date sensibile ale instrumentului de plată.",
+      "Pentru verificarea și suportul tranzacțiilor, CatDai poate primi și păstra date limitate despre plată, cum ar fi identificatorul tranzacției, numărul intern al comenzii, suma, moneda, statusul plății, data plății și răspunsurile tehnice ale procesatorului.",
+      "Procesatorul de plăți prelucrează datele de plată conform propriilor reguli și obligații legale aplicabile.",
+    ],
+  },
+  {
+    title: "9. Stocarea și securitatea datelor",
     paragraphs: [
       "Păstrăm datele doar atât timp cât este necesar pentru scopurile pentru care au fost colectate, pentru respectarea obligațiilor legale sau pentru apărarea intereselor legitime ale CatDai.",
+      "Datele privind conturile, comenzile, plățile, creditele acordate și utilizarea funcțiilor plătite pot fi păstrate pe durata necesară pentru livrarea serviciului, suport, audit, prevenirea fraudei, evidențe contabile și obligații legale.",
       "Aplicăm măsuri tehnice și organizatorice rezonabile pentru a proteja datele împotriva accesului neautorizat, pierderii, distrugerii sau modificării nepermise.",
       "Totuși, nicio metodă de transmitere sau stocare electronică nu poate fi garantată ca fiind complet sigură.",
     ],
   },
   {
-    title: "9. Cookie-uri și tehnologii similare",
+    title: "10. Cookie-uri și tehnologii similare",
     paragraphs: [
       "Platforma poate utiliza cookie-uri sau tehnologii similare pentru funcționare, preferințe, analiză de utilizare și îmbunătățirea experienței.",
       "În măsura în care anumite cookie-uri neesențiale sunt utilizate, acestea ar trebui gestionate în conformitate cu regulile aplicabile și, după caz, cu opțiunile de consimțământ oferite utilizatorului.",
     ],
   },
   {
-    title: "10. Drepturile tale",
+    title: "11. Drepturile tale",
     paragraphs: [
       "În condițiile prevăzute de lege, poți avea următoarele drepturi în legătură cu datele tale personale:",
     ],
@@ -99,30 +113,31 @@ const sections = [
     ],
   },
   {
-    title: "11. Date ale minorilor",
+    title: "12. Date ale minorilor",
     paragraphs: [
       "CatDai nu este destinat în mod intenționat minorilor, iar dacă observăm că au fost colectate date personale ale unui minor cu încălcarea legii aplicabile, putem lua măsuri rezonabile pentru ștergerea acestora.",
     ],
   },
   {
-    title: "12. Transferuri și servicii terțe",
+    title: "13. Transferuri și servicii terțe",
     paragraphs: [
       "Anumite servicii tehnice sau furnizori terți folosiți de platformă pot implica prelucrarea datelor în afara infrastructurii directe a CatDai.",
       "În măsura în care au loc asemenea transferuri, acestea trebuie gestionate prin măsuri rezonabile și în conformitate cu cerințele legale aplicabile.",
     ],
   },
   {
-    title: "13. Modificarea politicii",
+    title: "14. Modificarea politicii",
     paragraphs: [
       "Putem actualiza această Politică de Confidențialitate din când în când. Versiunea actualizată produce efecte de la data publicării pe site, dacă nu este menționat altfel.",
     ],
   },
   {
-    title: "14. Contact",
+    title: "15. Contact",
     paragraphs: [
       "Pentru întrebări, solicitări sau reclamații privind protecția datelor, ne poți contacta la:",
       "info@catdai.md",
-      "Data intrării în vigoare: 10 Martie 2026",
+      "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
+      "Data intrării în vigoare: 10 Iunie 2026",
     ],
   },
 ];

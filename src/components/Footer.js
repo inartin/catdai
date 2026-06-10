@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useTranslation } from "@/context/LanguageContext";
 import TelegramIcon from "@/components/icons/TelegramIcon";
@@ -46,6 +47,30 @@ const socialLinks = [
   // { icon: <InstagramIcon />, label: "Instagram" },
 ];
 
+const paymentLogos = [
+  {
+    src: "/brands/logo_paynet.svg",
+    alt: "Paynet",
+    width: 181,
+    height: 93,
+    className: "h-6 sm:h-7 max-w-[70px]",
+  },
+  {
+    src: "/brands/mastercard.svg",
+    alt: "Mastercard",
+    width: 152,
+    height: 108,
+    className: "h-6 sm:h-7 max-w-[42px]",
+  },
+  {
+    src: "/brands/visa_blue.svg",
+    alt: "Visa",
+    width: 3385,
+    height: 2078,
+    className: "h-8 sm:h-9 max-w-[82px] -ml-4",
+  },
+];
+
 export default function Footer() {
   const { lang, t } = useTranslation();
   const faqHref = lang === "ru" ? "/ru/faq" : "/ro/faq";
@@ -90,6 +115,21 @@ export default function Footer() {
         <p className="text-center text-xs text-gray-400 mt-4">
           {t("footer.copyright")}
         </p>
+
+        <div className="mt-4 flex items-center justify-center gap-4" aria-label="Payment systems">
+          {paymentLogos.map((logo) => (
+            <Image
+              key={logo.alt}
+              src={logo.src}
+              alt={logo.alt}
+              width={logo.width}
+              height={logo.height}
+              className={`${logo.className} w-auto object-contain opacity-90`}
+              loading="lazy"
+              unoptimized
+            />
+          ))}
+        </div>
       </div>
     </footer>
   );

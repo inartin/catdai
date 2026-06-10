@@ -74,55 +74,82 @@ const sections = [
     ],
   },
   {
-    title: "10. Excluderea garanțiilor",
+    title: "10. Conturi, produse plătite și plată",
+    paragraphs: [
+      "Anumite funcții CatDai pot fi disponibile gratuit, iar altele pot necesita autentificare și plată. Produsele plătite sunt cumpărate ca acces sau credite de utilizare unică pentru funcțiile indicate pe pagina de prețuri sau în ecranul de plată.",
+      "Prețul, moneda, produsul ales și beneficiile incluse sunt afișate înainte de inițierea plății. Plata este procesată prin Paynet sau prin alt procesator de plăți indicat în interfață.",
+      "CatDai nu colectează și nu stochează datele cardului bancar. Datele de card și autorizarea plății sunt gestionate de procesatorul de plăți.",
+      "Accesul plătit sau creditele sunt activate numai după confirmarea plății de către procesatorul de plăți și verificarea tranzacției de către sistemele CatDai.",
+      "Înainte de plată, utilizatorul trebuie să confirme că acceptă acești Termeni și Condiții și că a verificat produsul, prețul și datele afișate în ecranul de confirmare.",
+    ],
+  },
+  {
+    title: "11. Anulare, returnări și rambursări",
+    paragraphs: [
+      "Dacă plata este anulată, respinsă, expirată sau neconfirmată, accesul plătit ori creditele aferente nu sunt acordate.",
+      "Produsele digitale CatDai sunt livrate electronic. După confirmarea plății și acordarea accesului sau a creditelor, rambursarea poate fi limitată atunci când serviciul a fost deja furnizat sau creditul a fost consumat, în măsura permisă de lege.",
+      "Dacă a fost efectuată o plată eronată, dublă sau dacă accesul plătit nu a fost acordat după confirmarea tranzacției, ne poți contacta la info@catdai.md cu detaliile plății pentru verificare.",
+      "Orice rambursare aprobată se face, de regulă, prin aceeași metodă de plată folosită la cumpărare, conform regulilor procesatorului de plăți și legislației aplicabile.",
+    ],
+  },
+  {
+    title: "12. Confirmări, suport și evidența tranzacțiilor",
+    paragraphs: [
+      "După inițierea sau finalizarea unei plăți, CatDai poate afișa o pagină de confirmare, anulare sau status al tranzacției. Redirecționarea către o pagină de succes nu reprezintă singură confirmarea definitivă a plății.",
+      "Pentru întrebări privind plățile, accesul plătit, anulările sau rambursările, ne poți contacta la info@catdai.md. Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
+      "Datele minime despre tranzacție pot fi păstrate pentru reconciliere, suport, prevenirea fraudelor, contabilitate și obligații legale.",
+    ],
+  },
+  {
+    title: "13. Excluderea garanțiilor",
     paragraphs: [
       "În măsura maximă permisă de lege, serviciul este oferit în forma disponibilă, fără garanții exprese sau implicite privind exactitatea, caracterul complet, disponibilitatea continuă sau potrivirea pentru un anumit scop.",
       "Nu garantăm că platforma va funcționa fără întreruperi, fără erori sau fără întârzieri și nu garantăm că toate datele externe vor rămâne disponibile.",
     ],
   },
   {
-    title: "11. Limitarea răspunderii",
+    title: "14. Limitarea răspunderii",
     paragraphs: [
       "În măsura maximă permisă de lege, CatDai nu răspunde pentru pierderi indirecte, pierderi de profit, pierderi de oportunitate, pierderi comerciale, decizii de investiții, decizii de cumpărare sau vânzare, ori alte consecințe rezultate din utilizarea serviciului.",
       "Utilizarea estimărilor și a analizelor oferite de CatDai se face pe propriul tău risc.",
     ],
   },
   {
-    title: "12. Suspendare sau încetare",
+    title: "15. Suspendare sau încetare",
     paragraphs: [
       "Ne rezervăm dreptul de a limita, suspenda sau înceta accesul la serviciu în orice moment, inclusiv atunci când considerăm că utilizarea platformei creează un risc legal, operațional sau de securitate ori încalcă acești termeni.",
     ],
   },
   {
-    title: "13. Modificarea serviciului și a termenilor",
+    title: "16. Modificarea serviciului și a termenilor",
     paragraphs: [
       "Putem modifica, suspenda sau întrerupe parțial ori total serviciul, precum și acești Termeni și Condiții, în orice moment.",
       "Versiunea actualizată produce efecte din momentul publicării pe site, dacă nu este prevăzut altfel.",
     ],
   },
   {
-    title: "14. Reclamații și notificări privind drepturile",
+    title: "17. Reclamații și notificări privind drepturile",
     paragraphs: [
       "Dacă consideri că anumite materiale, referințe sau utilizări din cadrul CatDai îți încalcă drepturile, ne poți contacta la adresa indicată mai jos, cu suficiente detalii pentru analiză.",
       "Ne rezervăm dreptul de a investiga și de a elimina ori restricționa anumite materiale atunci când acest lucru este justificat.",
     ],
   },
   {
-    title: "15. Legea aplicabilă",
+    title: "18. Legea aplicabilă",
     paragraphs: [
       "Acești Termeni și Condiții sunt guvernați de legislația Republicii Moldova, în măsura permisă de lege.",
       "Orice litigiu care decurge din utilizarea serviciului va fi soluționat de instanțele competente din Republica Moldova, cu excepția cazului în care legea aplicabilă prevede altfel.",
     ],
   },
-  // {
-  //   title: "16. Datele operatorului",
-  //   paragraphs: [
-  //     "Operator: [DENUMIREA COMPLETĂ A ENTITĂȚII JURIDICE]",
-  //     "Adresă: [ADRESA JURIDICĂ]",
-  //     "E-mail de contact: [EMAIL]",
-  //     "Data intrării în vigoare: [DATA]",
-  //   ],
-  // },
+  {
+    title: "19. Datele operatorului",
+    paragraphs: [
+      "Operator: CatDai",
+      "E-mail de contact: info@catdai.md",
+      "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
+      "Data intrării în vigoare: 10 Iunie 2026",
+    ],
+  },
 ];
 
 export default function TermsPage() {

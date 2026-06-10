@@ -19,8 +19,8 @@ Implemented and active.
 - Telegram app-managed placeholder emails like `telegram-<id>@auth.catdai.md` are hidden; Telegram username is shown when available.
 - logout
 - favorites
-- listing alerts
-- closed `Setări` panel with Telegram connection controls and account deletion; Telegram status is fetched once with the profile page, not every time the panel opens
+- paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus analytics fields in details
+- closed `Setări` panel with account deletion
 - localized browser title from `nav.profile`
 
 ## Activity Tracking
@@ -45,5 +45,6 @@ Implemented and active.
 - `src/components/LoginButton.js`
 - `src/app/profile/page.js`
 - `src/app/api/activity/ping/route.js`
+- `src/app/api/profile/history/route.js`
 - `src/app/api/profile/delete/route.js`
 - `src/app/api/auth/telegram/route.js`

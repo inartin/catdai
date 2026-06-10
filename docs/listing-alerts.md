@@ -8,7 +8,7 @@ UI and storage implemented. Matching/sending worker is not in this repo.
 - Create alerts from estimate results.
 - Configure base market filters and notification filters.
 - Optionally enable Telegram notifications on `/alerts` and connect from the profile-style Telegram card.
-- View and delete saved alerts in `/profile`.
+- Saved alerts are not currently shown in `/profile`; the profile second tab is reserved for user history and currently shows valuation history only.
 - `/alerts` has a localized browser title from `alerts.pageTitle`.
 
 ## Filters

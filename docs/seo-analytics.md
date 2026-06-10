@@ -39,6 +39,7 @@ Implemented.
 - The `/estimeaza` submit button fires Google Ads conversion `AW-18184166002/Afy1CNv4g7McEPK08d5D` before navigating to `/evaluare`.
 - `/estimeaza` sends `conversion_event_page_view_1` once on client mount when GA is available.
 - Estimate logging stores device/session ids, input summary, result price, language, response time, and hashed IP.
+- `/profile` exposes the authenticated user's own analytics rows in the paginated `Istoric` tab: `estimate_log` rows for sale/rent valuations and `cadastru_search_events` rows for cadastru searches. Cadastru rows show the cadastral number as the result plus search type, result type, lookup source, and district when available.
 - Landing-only ad source tracking supports `/?src=zdg` and `/?utm_source=reddit`.
 - When a supported landing source is seen on `/`, the browser stores the source for the session and posts simple events to `/api/ad-source-events`.
 - `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, later page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
@@ -59,6 +60,7 @@ Implemented.
 - `src/lib/calculator-usage-events.js`
 - `src/lib/runtime-persistence.js`
 - `src/app/api/ad-source-events/route.js`
+- `src/app/api/profile/history/route.js`
 - `src/app/api/admin/ad-tracking/route.js`
 - `db/ad_source_events.sql`
 - `db/calculator_usage_events.sql`

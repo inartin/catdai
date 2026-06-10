@@ -20,19 +20,19 @@ echo "☁️ Starting cloudflared tunnel '$TUNNEL_NAME'..."
 cloudflared tunnel run "$TUNNEL_NAME" &
 CLOUDFLARED_PID=$!
 
-# Handle shutdown cleanly on Ctrl+C, SIGTERM, or normal script exit.
+# Handle shutdown cleanly on Ctrl+C (SIGINT) or SIGTERM
 cleanup() {
   echo -e "\n🛑 Stopping dev server and tunnel..."
-  kill "$NEXT_PID" 2>/dev/null
-  kill "$CLOUDFLARED_PID" 2>/dev/null
-  kill 0 2>/dev/null
+  kill $NEXT_PID 2>/dev/null
+  kill $CLOUDFLARED_PID 2>/dev/null
+
   wait $NEXT_PID 2>/dev/null
   wait $CLOUDFLARED_PID 2>/dev/null
   echo "✅ Done!"
   exit 0
 }
 
-trap cleanup EXIT
+
 trap cleanup SIGINT SIGTERM
 
 # Wait for background processes to finish

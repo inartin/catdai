@@ -8,24 +8,35 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ConfigIcon from "@/components/icons/ConfigIcon";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
-import TelegramConnectionCard from "@/components/TelegramConnectionCard";
+import HistoryIcon from "@/components/icons/HistoryIcon";
 
-function formatDate(value, lang) {
-  if (!value) return null;
-  return new Date(value).toLocaleDateString(
-    lang === "ru" ? "ru-RU" : "ro-RO",
-    { day: "numeric", month: "short", year: "numeric" }
-  );
-}
+const HISTORY_PAGE_SIZE = 10;
 
-function formatNumber(value) {
+function formatNumber(value, lang, options = {}) {
   const number = Number(value);
   if (!Number.isFinite(number)) return value;
-  return number.toLocaleString("ro-MD");
+  return number.toLocaleString(lang === "ru" ? "ru-RU" : "ro-RO", options);
 }
 
-function isEmptyRoomValue(value) {
-  return value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0);
+function formatHistoryDate(value, lang) {
+  if (!value) return "—";
+  const date = new Date(value);
+  const locale = lang === "ru" ? "ru-RU" : "ro-RO";
+  const datePart = date.toLocaleDateString(locale, {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const timePart = date.toLocaleTimeString(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${datePart}, ${timePart}`;
+}
+
+function formatHistoryPrice(amount, lang) {
+  if (amount == null) return "—";
+  return `${formatNumber(amount, lang, { maximumFractionDigits: 0 })} €`;
 }
 
 function formatRoomValue(value, t) {
@@ -34,61 +45,48 @@ function formatRoomValue(value, t) {
     : t("result.rooms", { count: value });
 }
 
-function formatRooms(value, t) {
-  if (isEmptyRoomValue(value)) return null;
-  if (Array.isArray(value)) {
-    return value.map((roomValue) => formatRoomValue(roomValue, t)).join(", ");
-  }
-
-  return formatRoomValue(value, t);
+function translateDataValue(prefix, value, t) {
+  if (!value) return null;
+  const key = `${prefix}.${value}`;
+  const translated = t(key);
+  return translated === key ? value : translated;
 }
 
-function formatAlertFilter(key, value, t) {
-  if (value === null || value === undefined || value === "" || value === false) return null;
-
-  switch (key) {
-    case "price_min":
-      return `${t("result.priceFrom")}: €${formatNumber(value)}`;
-    case "price_max":
-      return `${t("result.priceTo")}: €${formatNumber(value)}`;
-    case "max_price_per_m2":
-      return `${t("result.maxPricePerM2")}: €${formatNumber(value)}`;
-    case "area_min":
-      return `${t("alerts.areaFrom")}: ${formatNumber(value)}m²`;
-    case "area_max":
-      return `${t("alerts.areaTo")}: ${formatNumber(value)}m²`;
-    case "floor_min":
-      return `${t("result.floorFrom")}: ${formatNumber(value)}`;
-    case "floor_max":
-      return `${t("result.floorTo")}: ${formatNumber(value)}`;
-    case "first_floor":
-      return t("result.floorOption.first");
-    case "last_floor":
-      return t("result.floorOption.last");
-    case "seller_type":
-      return `${t("result.sellerTypeFilter")}: ${t(`result.sellerType.${value}`)}`;
-    default:
-      return null;
-  }
-}
-
-function buildAlertChips(alert, t) {
-  const filters = alert?.alert_filters || {};
-  return Object.entries(filters)
-    .map(([key, value]) => formatAlertFilter(key, value, t))
-    .filter(Boolean);
-}
-
-function buildBaseSummary(alert, t) {
-  const filters = alert?.base_filters || {};
+function formatHistoryProperty(row, t, lang) {
   return [
-    filters.city ? t(`data.city.${filters.city}`) : null,
-    filters.district ? t(`data.district.${filters.district}`) : null,
-    formatRooms(filters.rooms_count, t),
-    filters.area_m2 ? `${formatNumber(filters.area_m2)}m²` : null,
-    filters.building_type ? t(`data.buildingType.${filters.building_type}`) : null,
-    filters.renovation ? t(`data.renovationType.${filters.renovation}`) : null,
-  ].filter(Boolean).join(" · ");
+    row.roomsCount ? formatRoomValue(row.roomsCount, t) : null,
+    row.areaM2 ? `${formatNumber(row.areaM2, lang, { maximumFractionDigits: 0 })} m²` : null,
+    translateDataValue("data.district", row.district, t),
+    translateDataValue("data.city", row.city, t),
+  ].filter(Boolean).join(" · ") || "—";
+}
+
+function formatHistoryPropertyDetails(row, t) {
+  if (row.type === "cadastru") {
+    return [
+      row.searchType ? t(`profile.historyCadastruSearchType.${row.searchType}`) : null,
+      row.resultType ? t(`profile.historyCadastruResultType.${row.resultType}`) : null,
+      row.lookupSource ? t(`profile.historyCadastruSource.${row.lookupSource}`) : null,
+      translateDataValue("data.district", row.district, t),
+    ].filter(Boolean).join(" · ") || "—";
+  }
+
+  return [
+    translateDataValue("data.buildingType", row.buildingType, t),
+    translateDataValue("data.renovationType", row.renovation, t),
+  ].filter(Boolean).join(" · ") || "—";
+}
+
+function formatHistoryResult(row, lang) {
+  if (row.type === "cadastru") return row.cadastralNumber || "—";
+  return formatHistoryPrice(row.estimatedPrice, lang);
+}
+
+function formatHistoryType(row, t) {
+  if (row.type === "cadastru") return t("profile.historyTypeCadastru");
+  return row.estimateType === "rent"
+    ? t("profile.historyTypeRentEstimate")
+    : t("profile.historyTypeEstimate");
 }
 
 function isManagedTelegramEmail(email) {
@@ -116,14 +114,14 @@ export default function ProfilePage() {
   const router = useRouter();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [alertDeleteTarget, setAlertDeleteTarget] = useState(null);
-  const [isDeletingAlert, setIsDeletingAlert] = useState(false);
   const [activeTab, setActiveTab] = useState("favorites");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [favorites, setFavorites] = useState([]);
   const [favoritesLoading, setFavoritesLoading] = useState(true);
-  const [listingAlerts, setListingAlerts] = useState([]);
-  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyNextCursor, setHistoryNextCursor] = useState(null);
   const profileName = getProfileName(user);
   const profileSubtitle = getProfileSubtitle(user);
 
@@ -163,6 +161,41 @@ export default function ProfilePage() {
     }
   }, [loading, isAuthenticated, router]);
 
+  const fetchHistoryPage = async ({ cursor, append = false } = {}) => {
+    if (!session?.access_token) return;
+
+    if (append) {
+      setHistoryLoadingMore(true);
+    } else {
+      setHistoryLoading(true);
+    }
+
+    try {
+      const params = new URLSearchParams({ limit: String(HISTORY_PAGE_SIZE) });
+      if (cursor) params.set("cursor", cursor);
+
+      const res = await fetch(`/api/profile/history?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+
+      if (append) {
+        setHistory((prev) => [...prev, ...(data.history || [])]);
+      } else {
+        setHistory(data.history || []);
+      }
+      setHistoryNextCursor(data.nextCursor || null);
+    } catch {
+      if (!append) {
+        setHistory([]);
+        setHistoryNextCursor(null);
+      }
+    } finally {
+      setHistoryLoading(false);
+      setHistoryLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
     if (!session?.access_token) return;
     let cancelled = false;
@@ -170,18 +203,19 @@ export default function ProfilePage() {
 
     Promise.all([
       fetch("/api/favorites", { headers }).then((res) => res.json()),
-      fetch("/api/listing-alerts", { headers }).then((res) => res.json()),
+      fetch(`/api/profile/history?limit=${HISTORY_PAGE_SIZE}`, { headers }).then((res) => res.json()),
     ])
-      .then(([favoritesData, alertsData]) => {
+      .then(([favoritesData, historyData]) => {
         if (cancelled) return;
         setFavorites(favoritesData.favorites || []);
-        setListingAlerts(alertsData.alerts || []);
+        setHistory(historyData.history || []);
+        setHistoryNextCursor(historyData.nextCursor || null);
       })
       .catch(() => {})
       .finally(() => {
         if (cancelled) return;
         setFavoritesLoading(false);
-        setAlertsLoading(false);
+        setHistoryLoading(false);
       });
 
     return () => {
@@ -202,28 +236,6 @@ export default function ProfilePage() {
       });
     } catch {
       // Silently fail — the item is already removed from UI
-    }
-  };
-
-  const handleDeleteListingAlert = async () => {
-    if (!alertDeleteTarget) return;
-    const alertId = alertDeleteTarget.id;
-    setIsDeletingAlert(true);
-    setListingAlerts((prev) => prev.filter((item) => item.id !== alertId));
-    try {
-      await fetch("/api/listing-alerts", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ id: alertId }),
-      });
-    } catch {
-      // Silently fail — the item is already removed from UI
-    } finally {
-      setIsDeletingAlert(false);
-      setAlertDeleteTarget(null);
     }
   };
 
@@ -304,7 +316,6 @@ export default function ProfilePage() {
                 id="profile-settings-panel"
                 className={`mt-4 ${isSettingsOpen ? "block" : "hidden"}`}
               >
-                <TelegramConnectionCard className="mb-4" />
                 <button
                   type="button"
                   className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-md text-sm font-medium transition-colors border border-red-200"
@@ -321,22 +332,24 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("favorites")}
-                className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === "favorites"
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === "favorites"
                   ? "bg-primary text-white"
                   : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                 }`}
               >
+                <BookmarkIcon size={18} filled={activeTab === "favorites"} />
                 {t("profile.favorites")}
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("alerts")}
-                className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === "alerts"
+                onClick={() => setActiveTab("history")}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === "history"
                   ? "bg-primary text-white"
                   : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                 }`}
               >
-                {t("profile.alerts")}
+                <HistoryIcon size={18} />
+                {t("profile.history")}
               </button>
             </div>
 
@@ -377,108 +390,65 @@ export default function ProfilePage() {
               </section>
             )}
 
-            {activeTab === "alerts" && (
+            {activeTab === "history" && (
               <section>
-                <h3 className="mb-4 text-lg font-semibold text-gray-900">{t("profile.alerts")}</h3>
-                {alertsLoading ? (
+                {historyLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400" />
                   </div>
-                ) : listingAlerts.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-gray-400">{t("profile.noAlerts")}</p>
+                ) : history.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-gray-400">{t("profile.noHistory")}</p>
                 ) : (
-                  <div className="space-y-3">
-                    {listingAlerts.map((listingAlert) => {
-                      const baseSummary = buildBaseSummary(listingAlert, t);
-                      const alertChips = buildAlertChips(listingAlert, t);
-                      const createdAt = formatDate(listingAlert.created_at, lang);
-                      const lastNotifiedAt = formatDate(listingAlert.last_notified_at, lang);
-
-                      return (
-                        <article
-                          key={listingAlert.id}
-                          className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
+                  <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[680px] text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
+                            <th className="px-4 py-3">{t("profile.historyDate")}</th>
+                            <th className="px-4 py-3">{t("profile.historyType")}</th>
+                            <th className="px-4 py-3">{t("profile.historyProperty")}</th>
+                            <th className="px-4 py-3 text-right">{t("profile.historyResult")}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {history.map((row) => (
+                            <tr key={row.id} className="hover:bg-gray-50">
+                              <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                                {formatHistoryDate(row.createdAt, lang)}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-gray-900">
+                                {formatHistoryType(row, t)}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-gray-900">
+                                <div>
+                                  {row.type === "cadastru"
+                                    ? t("profile.historyTypeCadastru")
+                                    : formatHistoryProperty(row, t, lang)}
+                                </div>
+                                <div className="mt-0.5 text-xs font-normal text-gray-500">
+                                  {formatHistoryPropertyDetails(row, t)}
+                                </div>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
+                                {formatHistoryResult(row, lang)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {historyNextCursor && (
+                      <div className="border-t border-gray-100 px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => fetchHistoryPage({ cursor: historyNextCursor, append: true })}
+                          disabled={historyLoadingMore}
+                          className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
                         >
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0">
-                              <h4 className="truncate text-sm font-semibold text-gray-900">
-                                {listingAlert.label || t("profile.listingAlert")}
-                              </h4>
-                              {baseSummary && (
-                                <p className="mt-1 text-sm text-gray-500">{baseSummary}</p>
-                              )}
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                              <span className={`w-fit rounded-lg px-3 py-1 text-xs font-bold ${listingAlert.is_active
-                                ? "bg-emerald-50 text-emerald-600"
-                                : "bg-gray-100 text-gray-500"
-                              }`}>
-                                {listingAlert.is_active ? t("profile.alertActive") : t("profile.alertInactive")}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setAlertDeleteTarget(listingAlert)}
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-                                title={t("profile.deleteAlert")}
-                              >
-                                <span className="sr-only">{t("profile.deleteAlert")}</span>
-                                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M3 6h18" />
-                                  <path d="M8 6V4h8v2" />
-                                  <path d="M19 6l-1 14H6L5 6" />
-                                  <path d="M10 11v5" />
-                                  <path d="M14 11v5" />
-                                </svg>
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${listingAlert.website_enabled
-                              ? "bg-primary/10 text-primary"
-                              : "bg-gray-100 text-gray-400"
-                            }`}>
-                              {t("profile.websiteNotifications")}
-                            </span>
-                            <span className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${listingAlert.telegram_enabled
-                              ? "bg-primary/10 text-primary"
-                              : "bg-gray-100 text-gray-400"
-                            }`}>
-                              {t("profile.telegramNotifications")}
-                            </span>
-                          </div>
-
-                          <div className="mt-4">
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                              {t("profile.alertFilters")}
-                            </p>
-                            {alertChips.length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {alertChips.map((chip) => (
-                                  <span
-                                    key={chip}
-                                    className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600"
-                                  >
-                                    {chip}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-sm text-gray-400">{t("profile.noExtraAlertFilters")}</p>
-                            )}
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-100 pt-3 text-xs text-gray-400">
-                            {createdAt && (
-                              <span>{t("profile.createdAt")}: {createdAt}</span>
-                            )}
-                            <span>
-                              {t("profile.lastNotified")}: {lastNotifiedAt || t("profile.neverNotified")}
-                            </span>
-                          </div>
-                        </article>
-                      );
-                    })}
+                          {historyLoadingMore ? t("profile.historyLoadingMore") : t("profile.historyLoadMore")}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </section>
@@ -516,43 +486,6 @@ export default function ProfilePage() {
                   <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
                 )}
                 {t("profile.delete")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {alertDeleteTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              {t("profile.deleteAlert")}
-            </h3>
-            <p className="text-sm text-gray-600">
-              {t("profile.confirmDeleteAlert")}
-            </p>
-            <p className="mt-3 rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-              {alertDeleteTarget.label || t("profile.listingAlert")}
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                onClick={() => setAlertDeleteTarget(null)}
-                disabled={isDeletingAlert}
-              >
-                {t("form.back")}
-              </button>
-              <button
-                type="button"
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors flex items-center justify-center gap-2"
-                onClick={handleDeleteListingAlert}
-                disabled={isDeletingAlert}
-              >
-                {isDeletingAlert && (
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                )}
-                {t("profile.deleteAlert")}
               </button>
             </div>
           </div>

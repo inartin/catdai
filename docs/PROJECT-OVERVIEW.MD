@@ -14,6 +14,7 @@ Monetization planned:
 
 Free tier: limited estimates and simple yield calculator
 Paid single actions and one-property package shown in the reusable Pricing section
+Paynet one-time payment database schema and backend order/notification routes are prepared; checkout UI is not connected yet
 Monthly plans shown for active users and agents
 Tech Stack
 Framework & Runtime:
@@ -86,7 +87,7 @@ eslint.config.mjs - Next.js core-web-vitals config
 Environment variables for Supabase, Telegram, API tokens
 Project .npmrc keeps only shared install behavior. Do not commit machine-specific absolute pnpm store paths; set local store-dir in user-level pnpm config when needed.
 Current State
-Implemented: Auth, valuation (sale/rent), PDF reports, pricing UI, SEO, analytics, market data integration
+Implemented: Auth, valuation (sale/rent), PDF reports, pricing UI, SEO, analytics, market data integration, Paynet payment schema and backend payment flow preparation
 SEO Status: Not blocked by technical issues, robots.txt allows crawling, sitemap available, Google has crawled homepage
 Deployment: PM2 production setup on port 3000
 The project is production-ready with comprehensive documentation in docs/ covering auth, valuation, SEO, market data, and admin features.

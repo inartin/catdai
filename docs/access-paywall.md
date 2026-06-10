@@ -1,12 +1,15 @@
 # Access And Paywall
 
 ## Stage
-Preview paywall implemented. Real payments not implemented.
+Preview paywall implemented. Paynet database schema and backend payment routes are prepared.
 
 ## Current Access Rule
 - Anonymous users are `free`.
 - Any authenticated Supabase user is currently returned as `paid`.
 - `user_entitlements` schema exists, but `resolveAccessTier()` does not read it yet.
+- `db/paynet_payments.sql` prepares the simplified Paynet MVP schema: payment orders, Paynet notifications, aggregate user feature credits, and idempotent feature usage events.
+- `POST /api/payments/paynet/create` and `POST /api/paynet/notifications` create Paynet orders and grant credits after verified paid notifications.
+- Current app access logic does not read the Paynet credit tables yet, and no frontend checkout UI is connected yet.
 
 ## Result Payload
 Estimate results return the same valuation numbers for anonymous and authenticated users:
@@ -35,3 +38,8 @@ If a shared link was created by a paid user, `/api/estimate` allows full result 
 - `src/components/EstimateResult.js`
 - `src/components/BlurWall.js`
 - `db/user_entitlements.sql`
+- `db/paynet_payments.sql`
+- `src/app/api/payments/paynet/create/route.js`
+- `src/app/api/paynet/notifications/route.js`
+- `src/lib/paynet.js`
+- `src/lib/paynet-products.js`

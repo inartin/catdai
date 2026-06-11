@@ -23,18 +23,42 @@ const ERROR_KEYS = {
   rate_limited: "linkAnalyzer.errorRateLimit",
 };
 
+// Tear-off strips, like the fringe of a street ad glued on a pillar: each one
+// hangs at its own angle, with its own torn bottom edge and slightly different length.
 const FEATURE_ITEMS = [
-  { key: "linkAnalyzer.featurePriceAnalysis", Icon: PriceAnalysisIcon, mobileClassName: "rounded-none" },
-  { key: "linkAnalyzer.featureSimilarListings", Icon: SimilarListingsIcon, mobileClassName: "rounded-none" },
-  { key: "linkAnalyzer.featureDuplicates", Icon: DuplicateCheckIcon, mobileClassName: "rounded-b-xl" },
-  { key: "linkAnalyzer.featurePriceHistory", Icon: PriceHistoryIcon, mobileClassName: "rounded-b-xl" },
+  {
+    key: "linkAnalyzer.featurePriceAnalysis",
+    Icon: PriceAnalysisIcon,
+    tilt: -2.4,
+    heightClassName: "h-[6.5rem] sm:h-28",
+    tornEdge:
+      "polygon(0 0, 100% 0, 100% calc(100% - 7px), 87% calc(100% - 2px), 72% calc(100% - 8px), 58% calc(100% - 3px), 44% calc(100% - 9px), 30% calc(100% - 2px), 16% calc(100% - 7px), 6% calc(100% - 3px), 0 calc(100% - 8px))",
+  },
+  {
+    key: "linkAnalyzer.featureSimilarListings",
+    Icon: SimilarListingsIcon,
+    tilt: 1.7,
+    heightClassName: "h-[7.25rem] sm:h-[7.5rem]",
+    tornEdge:
+      "polygon(0 0, 100% 0, 100% calc(100% - 4px), 85% calc(100% - 9px), 70% calc(100% - 2px), 55% calc(100% - 8px), 42% calc(100% - 3px), 27% calc(100% - 9px), 13% calc(100% - 4px), 0 calc(100% - 7px))",
+  },
+  {
+    key: "linkAnalyzer.featureDuplicates",
+    Icon: DuplicateCheckIcon,
+    tilt: -1.1,
+    heightClassName: "h-[6.25rem] sm:h-[6.75rem]",
+    tornEdge:
+      "polygon(0 0, 100% 0, 100% calc(100% - 8px), 90% calc(100% - 3px), 75% calc(100% - 9px), 62% calc(100% - 2px), 47% calc(100% - 7px), 32% calc(100% - 3px), 18% calc(100% - 9px), 7% calc(100% - 2px), 0 calc(100% - 6px))",
+  },
+  {
+    key: "linkAnalyzer.featurePriceHistory",
+    Icon: PriceHistoryIcon,
+    tilt: 2.6,
+    heightClassName: "h-[6.75rem] sm:h-28",
+    tornEdge:
+      "polygon(0 0, 100% 0, 100% calc(100% - 6px), 86% calc(100% - 1px), 73% calc(100% - 8px), 59% calc(100% - 3px), 45% calc(100% - 9px), 31% calc(100% - 2px), 17% calc(100% - 8px), 6% calc(100% - 4px), 0 calc(100% - 7px))",
+  },
 ];
-
-function splitFeatureLabel(label) {
-  const words = String(label || "").split(" ");
-  const mid = Math.ceil(words.length / 2);
-  return [words.slice(0, mid).join(" "), words.slice(mid).join(" ")].filter(Boolean);
-}
 
 function buildListingAnalysisUrl(payload) {
   const search = new URLSearchParams();
@@ -102,9 +126,25 @@ export default function LinkAnalyzer({
     }
   };
 
+  const cardClassName = showFeaturePapers
+    ? "relative z-10 rotate-[-0.4deg] rounded-sm border border-gray-200 bg-[#fdfcf6] p-5"
+    : "relative z-10 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm";
+
   return (
     <div className={`${className} relative isolate`}>
-      <div className="relative z-10 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+      <div className={cardClassName}>
+        {showFeaturePapers && (
+          <>
+            <span
+              aria-hidden="true"
+              className="absolute -top-2.5 left-5 z-20 h-5 w-16 -rotate-6 rounded-[2px] bg-[#fbf6dd]/80 shadow-sm ring-1 ring-black/5"
+            />
+            <span
+              aria-hidden="true"
+              className="absolute -top-2.5 right-5 z-20 h-5 w-16 rotate-3 rounded-[2px] bg-[#fbf6dd]/80 shadow-sm ring-1 ring-black/5"
+            />
+          </>
+        )}
         <div className="flex items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-white">
             <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -161,21 +201,32 @@ export default function LinkAnalyzer({
       </div>
 
       {showFeaturePapers && (
-        <div className="relative z-0 -mt-1 mx-10 grid grid-cols-[repeat(2,8rem)] justify-between gap-y-0 sm:mx-16 sm:grid-cols-[repeat(4,9rem)]">
-          {FEATURE_ITEMS.map(({ key, Icon, mobileClassName }) => {
-            const featureLines = splitFeatureLabel(t(key));
-            return (
+        <div className="relative z-0 -mt-2 grid grid-cols-4 gap-1.5 px-4 sm:gap-2.5 sm:px-8">
+          {FEATURE_ITEMS.map(({ key, Icon, tilt, heightClassName, tornEdge }) => (
             <div
               key={key}
-              className={`flex min-h-24 flex-col items-center justify-center border-x border-b border-gray-200 bg-white px-2 pb-3 pt-5 text-center text-[13px] font-extrabold leading-tight text-gray-800 sm:rounded-b-xl ${mobileClassName}`}
+              className={`relative origin-top ${heightClassName}`}
+              style={{ transform: `rotate(${tilt}deg)` }}
             >
-              <Icon size={18} className="mb-2 text-gray-500" />
-              {featureLines.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
+              <div
+                className="flex h-full flex-col items-center justify-start border-x border-gray-200/80 bg-[#fdfcf6] px-1.5 pt-6 sm:pt-7 shadow-[0_10px_18px_rgba(15,23,42,0.18)] sm:px-2"
+                style={{
+                  clipPath: tornEdge,
+                  backgroundImage:
+                    "repeating-linear-gradient(0deg, transparent, transparent 22px, rgba(120,113,80,0.07) 22px, rgba(120,113,80,0.07) 23px)",
+                }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-3 bg-gradient-to-b from-black/15 to-transparent"
+                />
+                <Icon size={24} className="mb-2 shrink-0 text-gray-600" />
+                <span className="text-center text-[11px] font-extrabold leading-snug text-gray-800 sm:text-xs">
+                  {t(key)}
+                </span>
+              </div>
             </div>
-            );
-          })}
+          ))}
         </div>
       )}
     </div>

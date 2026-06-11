@@ -69,6 +69,13 @@ const paymentLogos = [
     height: 2078,
     className: "h-8 sm:h-9 max-w-[82px] -ml-4",
   },
+  {
+    src: "/brands/mia_clean.svg",
+    alt: "MIA",
+    width: 245,
+    height: 59,
+    className: "h-3.5 sm:h-4 max-w-[70px]",
+  },
 ];
 
 export default function Footer() {

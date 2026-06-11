@@ -84,7 +84,7 @@
   "linkAnalyzer.button": "Проверить",
   "linkAnalyzer.analyzing": "Анализируем...",
   "linkAnalyzer.featurePriceAnalysis": "Анализ цены",
-  "linkAnalyzer.featureSimilarListings": "Сравнение с похожими объявлениями",
+  "linkAnalyzer.featureSimilarListings": "Похожие объявления",
   "linkAnalyzer.featureDuplicates": "Есть дубликаты?",
   "linkAnalyzer.featurePriceHistory": "История цены",
   "linkAnalyzer.errorInvalidUrl": "Неверная ссылка 999.md. Проверьте адрес и попробуйте снова.",

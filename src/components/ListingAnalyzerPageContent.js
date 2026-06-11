@@ -10,13 +10,13 @@ export default function ListingAnalyzerPageContent({ showEstimateBack = false })
   const { t } = useTranslation();
 
   return (
-    <div className="mx-auto w-full max-w-3xl">
+    <div className="mx-auto w-full max-w-4xl">
       {showEstimateBack && (
         <BackButton onClick={() => router.push("/estimeaza")} className="mb-6">
           {t("form.back")}
         </BackButton>
       )}
-      <LinkAnalyzer titleTag="h1" />
+      <LinkAnalyzer titleTag="h1" showFeaturePapers />
     </div>
   );
 }

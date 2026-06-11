@@ -224,7 +224,7 @@ function MarketScopeCards() {
           </div>
         ))}
       </div>
-      <div className="mx-auto mt-8 max-w-4xl text-left">
+      <div className="mx-auto mt-16 sm:mt-24 max-w-4xl text-left">
         <LinkAnalyzer showFeaturePapers />
       </div>
     </section>

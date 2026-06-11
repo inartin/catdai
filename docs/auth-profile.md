@@ -9,7 +9,7 @@ Implemented and active.
 - Telegram login uses Telegram's current OAuth popup ID token through `/api/auth/telegram`, then signs the browser into Supabase with an app-managed Telegram account.
 - Telegram does not use Supabase's hosted OIDC callback because Telegram lacks a UserInfo endpoint and that callback can fail with `Error getting user profile from external provider`.
 - Telegram direct OIDC popup ID tokens are not passed to `signInWithIdToken` because those can fail with `Bad ID token`.
-- Redirect returns to the current page.
+- Redirect returns to the current page. Before Google OAuth or Telegram popup login starts, the app stores the current path/query and restores it after the session is created, so `/evaluare` preview URLs keep the same valuation criteria after login.
 - OAuth params are stripped from the URL after session sync.
 - The auth cleanup only strips `type` when other OAuth callback params are present, so app URLs such as `/evaluare?type=rent` keep their valuation mode on refresh.
 

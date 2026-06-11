@@ -16,16 +16,13 @@ Preview paywall implemented. Paynet and Paddle backend payment routes are prepar
 - Current app access logic also does not read Paddle-backed credits yet. Paddle has only a standalone default payment link page for test payments, not pricing-page checkout UI.
 
 ## Result Payload
-Estimate results return the same valuation numbers for anonymous and authenticated users:
-- fast sale, market, and premium prices
-- numeric range
-- market stats
-- district comparison values
-- market position numbers
-- seller breakdown values
+Sale/buy estimate results return a preview for anonymous users:
+- the main market estimate stays visible
+- locked values are removed from `/api/estimate` before the JSON response
+- the UI shows blurred placeholder values with the shared tooltip
+- clicking a blurred value opens the shared auth popup
 
-UI renders these values directly. There is no blur, tooltip, lock marker, or fake numeric placeholder on estimate result numbers.
-`src/components/BlurWall.js` keeps the reusable blur-wall presentation available for future paywall variants.
+Locked preview sections include fast/target prices, price per m2, range numbers, market stats, district comparison values, seller breakdown, and listing details.
 
 ## Paid Payload
 Paid users receive the full estimate response.
@@ -41,6 +38,9 @@ If a shared link was created by a paid user, `/api/estimate` allows full result 
 - `src/app/api/cadastral/route.js`
 - `src/components/EstimateResult.js`
 - `src/components/BlurWall.js`
+- `src/components/Tooltip.js`
+- `src/locales/ro.json`
+- `src/locales/ru.json`
 - `db/user_entitlements.sql`
 - `db/paynet_payments.sql`
 - `src/app/api/payments/paynet/create/route.js`

@@ -7,6 +7,7 @@ import { getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
 const AuthContext = createContext(null);
 const ACTIVITY_PING_INTERVAL_MS = 5 * 60 * 1000;
 const TELEGRAM_LOGIN_SCRIPT_SRC = "https://oauth.telegram.org/js/telegram-login.js?5";
+const AUTH_RETURN_TO_KEY = "catdai:auth-return-to";
 const OAUTH_URL_KEYS = [
   "access_token",
   "refresh_token",
@@ -43,6 +44,47 @@ function hasOAuthTypeCompanionParam(params) {
 function buildRedirectTo() {
   if (typeof window === "undefined") return undefined;
   return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+}
+
+function persistAuthReturnTo() {
+  if (typeof window === "undefined") return undefined;
+  const returnTo = buildRedirectTo();
+  try {
+    localStorage.setItem(AUTH_RETURN_TO_KEY, returnTo);
+  } catch {
+    // OAuth redirect still uses returnTo when storage is unavailable.
+  }
+  return returnTo;
+}
+
+function restoreAuthReturnTo() {
+  if (typeof window === "undefined") return false;
+
+  let storedReturnTo;
+  try {
+    storedReturnTo = localStorage.getItem(AUTH_RETURN_TO_KEY);
+    localStorage.removeItem(AUTH_RETURN_TO_KEY);
+  } catch {
+    return false;
+  }
+
+  if (!storedReturnTo) return false;
+
+  let target;
+  try {
+    target = new URL(storedReturnTo, window.location.origin);
+  } catch {
+    return false;
+  }
+
+  if (target.origin !== window.location.origin) return false;
+
+  const targetPath = `${target.pathname}${target.search}${target.hash}`;
+  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (targetPath && targetPath !== currentPath) {
+    window.location.replace(targetPath);
+  }
+  return true;
 }
 
 function getTelegramClientId() {
@@ -198,6 +240,9 @@ export function AuthProvider({ children }) {
 
       await syncAuthState(data?.session ?? null);
       setLoading(false);
+      if (data?.session && restoreAuthReturnTo()) {
+        return;
+      }
       stripOAuthParamsFromUrl();
     };
 
@@ -206,7 +251,9 @@ export function AuthProvider({ children }) {
     const { data } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       await syncAuthState(nextSession ?? null);
       setLoading(false);
-      if (nextSession) stripOAuthParamsFromUrl();
+      if (nextSession) {
+        if (!restoreAuthReturnTo()) stripOAuthParamsFromUrl();
+      }
     });
 
     return () => {
@@ -246,7 +293,7 @@ export function AuthProvider({ children }) {
     setActiveProvider(providerKey);
     setError(null);
 
-    const redirectTo = buildRedirectTo();
+    const redirectTo = persistAuthReturnTo();
     let lastError = null;
 
     try {
@@ -295,6 +342,7 @@ export function AuthProvider({ children }) {
 
     setActiveProvider("telegram");
     setError(null);
+    persistAuthReturnTo();
 
     try {
       const telegramLogin = await loadTelegramLoginScript();

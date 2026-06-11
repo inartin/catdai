@@ -9,10 +9,11 @@ Implemented and active for apartments.
 - `/estimeaza?type=rent` opens the rent tab even before any city or criteria are present.
 - The sale/buy tab uses `Estimare apartament` / `Оценка квартиры`; the rent tab uses `Estimare de piață` / `Рыночная оценка`, lets users select multiple sectors/zones and optionally multiple construction types, and hides the cadastral shortcut, total floors, first/last-floor filters, balconies, and budget fields.
 - `/estimeaza` collects city, district, rooms, building type, renovation, optional area, optional floor, optional first-floor/last-floor filters, bathrooms, balconies, cadastral number.
-- `/evaluare` reads URL params and calls `/api/estimate`.
+- `/evaluare` reads URL params and calls `/api/estimate`; anonymous sale/buy users can submit the form and see only a preview result.
 - `/evaluare` without valuation query params shows the reusable cadastru search form from `/cadastru` instead of redirecting to the homepage.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
-- Result supports edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
+- Anonymous sale/buy results show the main market estimate, while the rest of the detailed result values are blurred and open the shared auth popup.
+- Authenticated sale/buy results support edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Regular `/evaluare` result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
 - Sale and rent result pages share the same criteria-edit action button, including the edit icon and secondary button styling.
@@ -44,6 +45,7 @@ Implemented and active for apartments.
 - Rent computes the market monthly rent from the comparable median, while the result-page low and high levels come from the cheapest and most expensive matched rent listings and link directly to their 999.md pages.
 - Rent also returns price per m2 per month, range, confidence, district comparison, relevant rent listings, and the comparable listing count used for the result.
 - `/api/estimate` calls the RPC with the server-side Supabase admin client so server valuation work does not inherit the anonymous client timeout.
+- Anonymous `/api/estimate` responses remove locked sale/buy values before returning JSON and mark `locked_sections` for the UI placeholders.
 - Backend also runs seller-category estimates for owner vs agency/developer.
 - Seller-category estimates use the same property filters and seller filters, but skip district comparison and relevant listings because the UI only renders their price/range/stats.
 - Seller breakdown shows the comparable listing count for each seller type under the price per m2.
@@ -95,7 +97,10 @@ Applied after RPC in `/api/estimate`.
 - `src/app/api/listing-preview-images/route.js`
 - `src/components/PropertyForm.js`
 - `src/components/EstimateResult.js`
+- `src/components/Tooltip.js`
 - `src/components/ValuationPdfDialog.js`
+- `src/locales/ro.json`
+- `src/locales/ru.json`
 - `src/app/api/pdf-generation-authorizations/route.js`
 - `src/app/api/pdf-generation-events/route.js`
 - `src/lib/runtime-persistence.js`

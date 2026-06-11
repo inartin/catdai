@@ -27,7 +27,7 @@ TELEGRAM_LOGIN_SECRET=<random-login-password-secret>
   - `https://catdai.md/**`
   - `http://localhost:3000/**` for local testing
 
-Reason: the app redirects users back to the current page after OAuth.
+Reason: the app redirects users back to the current page after OAuth. The client also stores the pre-login path/query and restores it after session sync, preserving evaluation result URLs with blurred preview data.
 
 ## Provider Config
 

@@ -5,6 +5,11 @@ import { useState, useEffect } from "react";
 const STORAGE_KEY = "catdai_live_prices";
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Read cached price data from localStorage.
+ * Returns { data, fresh } where `fresh` is true if < 24h old.
+ * Never deletes stale data — it serves as a last-resort fallback.
+ */
 function readCache() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -13,11 +18,7 @@ function readCache() {
     if (!parsed?.updated_at) return null;
 
     const age = Date.now() - new Date(parsed.updated_at).getTime();
-    if (age < TWENTY_FOUR_HOURS_MS) return parsed;
-
-    // Cache expired, remove it proactively
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
+    return { data: parsed, fresh: age < TWENTY_FOUR_HOURS_MS };
   } catch {
     return null;
   }
@@ -38,10 +39,17 @@ export function useLivePrices() {
 
   useEffect(() => {
     const cached = readCache();
-    if (cached) {
-      setData(cached);
+
+    // If cache is fresh, use it directly — no fetch needed
+    if (cached?.fresh) {
+      setData(cached.data);
       setLoading(false);
       return;
+    }
+
+    // Show stale data immediately while we try to refresh
+    if (cached?.data) {
+      setData(cached.data);
     }
 
     let cancelled = false;
@@ -53,13 +61,22 @@ export function useLivePrices() {
       })
       .then((json) => {
         if (cancelled) return;
-        writeCache(json);
-        setData(json);
+        // Only update if we got valid data (not an error response)
+        if (json && !json.error) {
+          writeCache(json);
+          setData(json);
+        } else if (!cached?.data) {
+          // API returned an error shape and we have no stale data
+          setError(new Error(json?.error || "Invalid price data"));
+        }
       })
       .catch((err) => {
         if (cancelled) return;
         console.error("useLivePrices:", err.message);
-        setError(err);
+        // Only set error if we have no stale data to fall back on
+        if (!cached?.data) {
+          setError(err);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

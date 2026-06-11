@@ -109,7 +109,7 @@ Created `db/paynet_payments.sql`.
   - `consume_user_feature_credit(user_id, feature_key, idempotency_key, metadata)`
 - Enabled RLS and revoked direct `anon` / `authenticated` access for all payment and credit tables.
 - Granted table and RPC access to `service_role`; app API routes must enforce user auth before using these tables.
-- Kept product config and product-to-credit mapping out of the DB for the first implementation. They should live in app code/env until the model is proven.
+- Kept product config and product-to-credit mapping out of the DB for the first implementation. Shared product grants now live in `src/lib/payment-products.js`, with Paynet-specific request formatting in `src/lib/paynet-products.js`.
 - Excluded `extra_pack` from checkout-eligible product keys until we clarify whether it means 50 uses per feature, one-month access, or both.
 - Supabase migration was run manually.
 - Added backend-only Paynet flow:

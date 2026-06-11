@@ -1,11 +1,14 @@
 # Pricing
 
 ## Stage
-Implemented as a reusable UI section. Paynet backend payment routes are prepared, but checkout UI is not connected yet.
+Implemented as a reusable UI section. Paynet and Paddle backend payment routes are prepared, but pricing cards are not connected to checkout yet.
 
 ## Routes
 - Landing page shows pricing near the bottom, before the FAQ preview.
 - `/pricing` renders the same pricing component as a standalone page.
+- `/payment/paddle/checkout` is a standalone Paddle default payment link page for test payments and is not linked from pricing.
+- `/payment/paddle/success` is a standalone Paddle test status page and is not linked from pricing.
+- `/payment/paddle/test` is a temporary standalone test page for creating a `cadastru_lookup_single` Paddle checkout and is not linked from pricing.
 
 ## Content
 - UI is localized through `src/locales/ro.json` and `src/locales/ru.json`.
@@ -23,7 +26,10 @@ Implemented as a reusable UI section. Paynet backend payment routes are prepared
 - Prices are read server-side from env and passed into the client component.
 - If an env value is missing or invalid, the component falls back to the current default price.
 - `db/paynet_payments.sql` allows MVP one-time payment product keys for Standard, Pro, and single-feature purchases.
+- `db/paddle_payments.sql` mirrors the same allowed one-time product keys for Paddle.
 - Paynet product prices and product-to-credit mapping live in `src/lib/paynet-products.js` for now.
+- Shared product definitions now live in `src/lib/payment-products.js`.
+- Paddle price IDs are read per product key from env through `src/lib/paddle-products.js`; the backend rejects Paddle transaction responses that contain recurring items or a subscription id.
 - `standard_pack` grants 2 uses per paid feature; `pro_pack` grants 10 uses per paid feature.
 - Single-feature products grant 1 use for 999 analysis, cadastru lookup, yield calculator, or PDF report.
 - `extra_pack` is still not checkout-eligible until the product rule is clarified.
@@ -33,6 +39,12 @@ Implemented as a reusable UI section. Paynet backend payment routes are prepared
 CATDAI_PRICE_STANDARD_MDL=99
 CATDAI_PRICE_PRO_MDL=199
 CATDAI_PRICE_EXTRA_MDL=499
+PADDLE_PRICE_STANDARD_PACK=
+PADDLE_PRICE_PRO_PACK=
+PADDLE_PRICE_LISTING_ANALYSIS_SINGLE=
+PADDLE_PRICE_CADASTRU_LOOKUP_SINGLE=
+PADDLE_PRICE_YIELD_CALCULATOR_SINGLE=
+PADDLE_PRICE_PDF_REPORT_SINGLE=
 ```
 
 ## Related Files
@@ -45,5 +57,12 @@ CATDAI_PRICE_EXTRA_MDL=499
 - `src/locales/ro.json`
 - `src/locales/ru.json`
 - `db/paynet_payments.sql`
+- `db/paddle_payments.sql`
+- `src/lib/payment-products.js`
 - `src/lib/paynet-products.js`
+- `src/lib/paddle-products.js`
 - `src/app/api/payments/paynet/create/route.js`
+- `src/app/api/payments/paddle/create/route.js`
+- `src/app/payment/paddle/checkout/page.js`
+- `src/app/payment/paddle/success/page.js`
+- `src/app/payment/paddle/test/page.js`

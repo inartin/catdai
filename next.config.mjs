@@ -6,6 +6,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  allowedDevOrigins: ["dev.catdai.md"],
 
   turbopack: {
     root: __dirname,
@@ -43,12 +44,13 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://static.cloudflareinsights.com https://oauth.telegram.org",
-              "script-src-elem 'self' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://static.cloudflareinsights.com https://oauth.telegram.org",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://static.cloudflareinsights.com https://oauth.telegram.org https://cdn.paddle.com",
+              "script-src-elem 'self' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://static.cloudflareinsights.com https://oauth.telegram.org https://cdn.paddle.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https: https://www.google.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://*.doubleclick.net https://*.googleusercontent.com https://i.simpalsmedia.com https://t.me",
               "font-src 'self'",
-              `connect-src 'self' https://*.supabase.co https://oauth.telegram.org https://www.google.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://*.google-analytics.com https://*.analytics.google.com https://*.doubleclick.net`,
+              `connect-src 'self' https://*.supabase.co https://oauth.telegram.org https://www.google.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://*.google-analytics.com https://*.analytics.google.com https://*.doubleclick.net https://*.paddle.com`,
+              "frame-src https://*.paddle.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

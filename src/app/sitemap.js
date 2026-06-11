@@ -17,6 +17,7 @@ const INDEXABLE_STATIC_PATHS = [
   "/about",
   "/terms",
   "/privacy",
+  "/refund",
   "/ro/faq",
   "/ru/faq",
   "/ro/preturi-apartamente/chisinau/botanica",

@@ -63,6 +63,7 @@ const sections = [
     title: "8. Fără consultanță profesională",
     paragraphs: [
       "CatDai nu oferă evaluări oficiale, consultanță juridică, consultanță fiscală, consultanță investițională, servicii de intermediere sau servicii de reprezentare în tranzacții.",
+      "Informațiile din CatDai nu reprezintă consultanță financiară și nu trebuie folosite ca recomandare de investiție, credit ipotecar, tranzacționare sau cumpărare ori vânzare a unei proprietăți.",
       "Dacă ai nevoie de o evaluare oficială, de opinie juridică sau de o analiză profesională cu efecte legale ori bancare, trebuie să consulți un specialist autorizat.",
     ],
   },
@@ -90,6 +91,7 @@ const sections = [
       "Produsele digitale CatDai sunt livrate electronic. După confirmarea plății și acordarea accesului sau a creditelor, rambursarea poate fi limitată atunci când serviciul a fost deja furnizat sau creditul a fost consumat, în măsura permisă de lege.",
       "Dacă a fost efectuată o plată eronată, dublă sau dacă accesul plătit nu a fost acordat după confirmarea tranzacției, ne poți contacta la info@catdai.md cu detaliile plății pentru verificare.",
       "Orice rambursare aprobată se face, de regulă, prin aceeași metodă de plată folosită la cumpărare, conform regulilor procesatorului de plăți și legislației aplicabile.",
+      "Regulile generale privind eligibilitatea, procesul și termenele de rambursare sunt descrise și în pagina separată /refund.",
     ],
   },
   {
@@ -147,7 +149,7 @@ const sections = [
       "Operator: CatDai",
       "E-mail de contact: info@catdai.md",
       "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
-      "Data intrării în vigoare: 10 Iunie 2026",
+      "Data intrării în vigoare: 11 Iunie 2026",
     ],
   },
 ];

@@ -275,8 +275,9 @@ Paynet compliance docs require these before production:
 - consistent information in every site language
 
 Current gap:
-- `terms` now covers one-time paid digital products, Paynet/processor-owned card entry, activation only after verified payment, mandatory Terms acceptance before payment, canceled/unconfirmed payment handling, refund review for duplicate/failed/non-delivered access cases, support contact, and support hours.
+- `terms` now covers one-time paid digital products, Paynet/processor-owned card entry, activation only after verified payment, mandatory Terms acceptance before payment, canceled/unconfirmed payment handling, refund review for duplicate/failed/non-delivered access cases, support contact, support hours, and an explicit no-financial-advice disclaimer for investment, mortgage/credit, trading, and property buy/sell decisions.
 - `privacy` now covers account data, payment/order metadata, processor disclosure, no CatDai card-data storage, transaction retention, and payment support.
+- `refund` now covers digital-product delivery, refund eligibility, common refusal cases, request steps, and processing timing.
 - Production legal company name and legal address still need final business text.
 - Checkout UI still needs the Terms acceptance checkbox, transaction confirmation message, and customer information fields when required by Paynet.
 

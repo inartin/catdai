@@ -11,6 +11,7 @@ import BookmarkIcon from "@/components/icons/BookmarkIcon";
 import HistoryIcon from "@/components/icons/HistoryIcon";
 
 const HISTORY_PAGE_SIZE = 10;
+const TRANSACTIONS_PAGE_SIZE = 10;
 
 function formatNumber(value, lang, options = {}) {
   const number = Number(value);
@@ -37,6 +38,16 @@ function formatHistoryDate(value, lang) {
 function formatHistoryPrice(amount, lang) {
   if (amount == null) return "—";
   return `${formatNumber(amount, lang, { maximumFractionDigits: 0 })} €`;
+}
+
+function formatPaymentAmount(amountMinor, currencyCode, lang) {
+  const amount = Number(amountMinor);
+  if (!Number.isFinite(amount)) return "—";
+
+  return new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-RO", {
+    style: "currency",
+    currency: currencyCode || "MDL",
+  }).format(amount / 100);
 }
 
 function formatRoomValue(value, t) {
@@ -89,6 +100,18 @@ function formatHistoryType(row, t) {
     : t("profile.historyTypeEstimate");
 }
 
+function formatPaymentProduct(productKey, t) {
+  const key = `profile.paymentProduct.${productKey}`;
+  const translated = t(key);
+  return translated === key ? productKey || "—" : translated;
+}
+
+function formatPaymentStatus(status, t) {
+  const key = `profile.paymentStatus.${status}`;
+  const translated = t(key);
+  return translated === key ? t("payment.orderStatusUnknown") : translated;
+}
+
 function isManagedTelegramEmail(email) {
   return /^telegram-\d+@auth\.catdai\.md$/i.test(String(email || ""));
 }
@@ -122,6 +145,10 @@ export default function ProfilePage() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
   const [historyNextCursor, setHistoryNextCursor] = useState(null);
+  const [transactions, setTransactions] = useState([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const [transactionsLoadingMore, setTransactionsLoadingMore] = useState(false);
+  const [transactionsNextCursor, setTransactionsNextCursor] = useState(null);
   const profileName = getProfileName(user);
   const profileSubtitle = getProfileSubtitle(user);
 
@@ -196,6 +223,41 @@ export default function ProfilePage() {
     }
   };
 
+  const fetchTransactionsPage = async ({ cursor, append = false } = {}) => {
+    if (!session?.access_token) return;
+
+    if (append) {
+      setTransactionsLoadingMore(true);
+    } else {
+      setTransactionsLoading(true);
+    }
+
+    try {
+      const params = new URLSearchParams({ limit: String(TRANSACTIONS_PAGE_SIZE) });
+      if (cursor) params.set("cursor", cursor);
+
+      const res = await fetch(`/api/profile/transactions?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+
+      if (append) {
+        setTransactions((prev) => [...prev, ...(data.transactions || [])]);
+      } else {
+        setTransactions(data.transactions || []);
+      }
+      setTransactionsNextCursor(data.nextCursor || null);
+    } catch {
+      if (!append) {
+        setTransactions([]);
+        setTransactionsNextCursor(null);
+      }
+    } finally {
+      setTransactionsLoading(false);
+      setTransactionsLoadingMore(false);
+    }
+  };
+
   useEffect(() => {
     if (!session?.access_token) return;
     let cancelled = false;
@@ -204,18 +266,22 @@ export default function ProfilePage() {
     Promise.all([
       fetch("/api/favorites", { headers }).then((res) => res.json()),
       fetch(`/api/profile/history?limit=${HISTORY_PAGE_SIZE}`, { headers }).then((res) => res.json()),
+      fetch(`/api/profile/transactions?limit=${TRANSACTIONS_PAGE_SIZE}`, { headers }).then((res) => res.json()),
     ])
-      .then(([favoritesData, historyData]) => {
+      .then(([favoritesData, historyData, transactionsData]) => {
         if (cancelled) return;
         setFavorites(favoritesData.favorites || []);
         setHistory(historyData.history || []);
         setHistoryNextCursor(historyData.nextCursor || null);
+        setTransactions(transactionsData.transactions || []);
+        setTransactionsNextCursor(transactionsData.nextCursor || null);
       })
       .catch(() => {})
       .finally(() => {
         if (cancelled) return;
         setFavoritesLoading(false);
         setHistoryLoading(false);
+        setTransactionsLoading(false);
       });
 
     return () => {
@@ -328,11 +394,11 @@ export default function ProfilePage() {
           </div>
 
           <div className="mt-8">
-            <div className="mb-4 flex gap-2 rounded-xl border border-gray-100 bg-white p-1 shadow-sm">
+            <div className="mb-4 flex gap-2 overflow-x-auto rounded-xl border border-gray-100 bg-white p-1 shadow-sm">
               <button
                 type="button"
                 onClick={() => setActiveTab("favorites")}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === "favorites"
+                className={`flex flex-none items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors sm:flex-1 ${activeTab === "favorites"
                   ? "bg-primary text-white"
                   : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                 }`}
@@ -343,13 +409,24 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("history")}
-                className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${activeTab === "history"
+                className={`flex flex-none items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors sm:flex-1 ${activeTab === "history"
                   ? "bg-primary text-white"
                   : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                 }`}
               >
                 <HistoryIcon size={18} />
                 {t("profile.history")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("transactions")}
+                className={`flex flex-none items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors sm:flex-1 ${activeTab === "transactions"
+                  ? "bg-primary text-white"
+                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
+                }`}
+              >
+                <span className="text-base" aria-hidden="true">€</span>
+                {t("profile.transactions")}
               </button>
             </div>
 
@@ -446,6 +523,70 @@ export default function ProfilePage() {
                           className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
                         >
                           {historyLoadingMore ? t("profile.historyLoadingMore") : t("profile.historyLoadMore")}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {activeTab === "transactions" && (
+              <section>
+                {transactionsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400" />
+                  </div>
+                ) : transactions.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-gray-400">{t("profile.noTransactions")}</p>
+                ) : (
+                  <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[760px] text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
+                            <th className="px-4 py-3">{t("profile.paymentDate")}</th>
+                            <th className="px-4 py-3">{t("profile.paymentProduct")}</th>
+                            <th className="px-4 py-3">{t("profile.paymentStatus")}</th>
+                            <th className="px-4 py-3 text-right">{t("profile.paymentAmount")}</th>
+                            <th className="px-4 py-3">{t("profile.paymentTransactionId")}</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {transactions.map((row) => (
+                            <tr key={row.id} className="hover:bg-gray-50">
+                              <td className="whitespace-nowrap px-4 py-3 text-gray-600">
+                                {formatHistoryDate(row.paidAt || row.createdAt, lang)}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-gray-900">
+                                <div>{formatPaymentProduct(row.productKey, t)}</div>
+                                <div className="mt-0.5 text-xs font-normal text-gray-500">
+                                  {t("profile.paymentOrderId")}: {row.id}
+                                </div>
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-gray-700">
+                                {formatPaymentStatus(row.status, t)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
+                                {formatPaymentAmount(row.amountMinor, row.currencyCode, lang)}
+                              </td>
+                              <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-600">
+                                {row.transactionId || "—"}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {transactionsNextCursor && (
+                      <div className="border-t border-gray-100 px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => fetchTransactionsPage({ cursor: transactionsNextCursor, append: true })}
+                          disabled={transactionsLoadingMore}
+                          className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
+                        >
+                          {transactionsLoadingMore ? t("profile.historyLoadingMore") : t("profile.historyLoadMore")}
                         </button>
                       </div>
                     )}

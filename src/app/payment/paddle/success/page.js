@@ -9,6 +9,7 @@ const TERMINAL_STATUSES = new Set(["paid", "canceled", "payment_failed", "failed
 const PAYMENT_STATUS_KEYS = {
   pending: "payment.orderStatusPending",
   registered: "payment.orderStatusRegistered",
+  checkout_closed: "payment.orderStatusCheckoutClosed",
   paid: "payment.orderStatusPaid",
   payment_failed: "payment.orderStatusFailed",
   failed: "payment.orderStatusFailed",
@@ -75,11 +76,19 @@ function getDisplayState({ loading, error, order, checkout }) {
     };
   }
 
-  if (order?.status === "canceled" || checkout === "closed") {
+  if (order?.status === "canceled") {
     return {
       tone: "error",
       titleKey: "payment.statusCanceledTitle",
       messageKey: "payment.statusFailedMessage",
+    };
+  }
+
+  if (order?.status === "checkout_closed" || checkout === "closed") {
+    return {
+      tone: "neutral",
+      titleKey: "payment.statusClosedTitle",
+      messageKey: "payment.statusClosedMessage",
     };
   }
 
@@ -123,6 +132,24 @@ export default function PaddlePaymentSuccessPage() {
 
     let active = true;
     let timeoutId;
+    let closedMarked = false;
+
+    async function markCheckoutClosed() {
+      if (closedMarked || params.checkout !== "closed") return;
+      closedMarked = true;
+
+      await fetch("/api/payments/paddle/checkout-closed", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          order_id: params.orderId,
+          transaction_id: params.transactionId,
+        }),
+      }).catch(() => {});
+    }
 
     async function checkStatus() {
       setLoading(true);
@@ -132,6 +159,8 @@ export default function PaddlePaymentSuccessPage() {
       if (params.transactionId) searchParams.set("transaction_id", params.transactionId);
 
       try {
+        await markCheckoutClosed();
+
         const response = await fetch(`/api/payments/paddle/status?${searchParams.toString()}`, {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
@@ -168,7 +197,7 @@ export default function PaddlePaymentSuccessPage() {
       active = false;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [authLoading, immediateError, params.orderId, params.transactionId, session?.access_token, t]);
+  }, [authLoading, immediateError, params.checkout, params.orderId, params.transactionId, session?.access_token, t]);
 
   const display = getDisplayState({ loading: loading && !immediateError, error: immediateError || error, order, checkout: params.checkout });
   const accentClass = display.tone === "success" ? "bg-emerald-500" : display.tone === "error" ? "bg-red-500" : "bg-primary";

@@ -49,7 +49,7 @@ create table if not exists public.paddle_payment_orders (
       'pdf_report_single'
     )),
   constraint paddle_payment_orders_status_check
-    check (status in ('pending', 'registered', 'paid', 'canceled', 'payment_failed', 'failed')),
+    check (status in ('pending', 'registered', 'checkout_closed', 'paid', 'canceled', 'payment_failed', 'failed')),
   constraint paddle_payment_orders_amount_check
     check (amount_minor is null or amount_minor >= 0),
   constraint paddle_payment_orders_currency_check
@@ -88,6 +88,23 @@ begin
       'cadastru_lookup_single',
       'yield_calculator_single',
       'pdf_report_single'
+    ));
+end $$;
+
+do $$
+begin
+  alter table public.paddle_payment_orders
+    drop constraint if exists paddle_payment_orders_status_check;
+  alter table public.paddle_payment_orders
+    add constraint paddle_payment_orders_status_check
+    check (status in (
+      'pending',
+      'registered',
+      'checkout_closed',
+      'paid',
+      'canceled',
+      'payment_failed',
+      'failed'
     ));
 end $$;
 

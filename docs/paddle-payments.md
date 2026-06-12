@@ -22,11 +22,19 @@ Backend Paddle one-time payment flow is prepared. Evaluation limit popups can st
 - `POST /api/paddle/webhooks`
   - public endpoint for Paddle notifications
   - verifies `Paddle-Signature` using the raw request body
-  - processes `transaction.completed`
+  - processes `transaction.completed`, `transaction.canceled`, and `transaction.payment_failed`
   - stores all webhook deliveries for audit and idempotency
 - `GET /api/payments/paddle/status`
   - requires Supabase bearer token
   - returns the authenticated user's Paddle order status by `order_id` or `transaction_id`
+- `POST /api/payments/paddle/checkout-closed`
+  - requires Supabase bearer token
+  - marks the authenticated user's open Paddle order as `checkout_closed` when Paddle.js reports `checkout.closed`
+  - does not change already paid, failed, or canceled orders
+- `GET /api/profile/transactions`
+  - requires Supabase bearer token
+  - returns the authenticated user's Paddle order rows for the profile transactions tab
+  - includes product key, status, amount, currency, Paddle transaction id, paid date, created date, and internal order id
 - `GET /payment/paddle/checkout`
   - noindex default payment link page for Paddle
   - loads Paddle.js and opens the transaction passed by Paddle as `_ptxn`
@@ -36,6 +44,7 @@ Backend Paddle one-time payment flow is prepared. Evaluation limit popups can st
 - `GET /payment/paddle/success`
   - noindex status page for the Paddle flow
   - polls the status endpoint and shows paid, pending, failed, or canceled state
+  - marks the local order `checkout_closed` when reached after the overlay checkout was closed by the user, without treating it as a final payment cancellation
   - uses the same checkout shell and localized RO/RU status copy, including internal order states like `registered`
   - links back to the originating evaluation path when checkout started from a limit popup
 - `GET /payment/paddle/test`
@@ -62,6 +71,7 @@ Backend Paddle one-time payment flow is prepared. Evaluation limit popups can st
 - The create route verifies catalog price IDs and no recurring billing cycle.
 - Non-production create-route failures include a short `details` field so the temporary Paddle test page can show the exact Paddle/API/Supabase failure during setup.
 - Webhook access is granted only after a verified `transaction.completed` event.
+- Subscribe the Paddle webhook destination to `transaction.completed`, `transaction.payment_failed`, and `transaction.canceled`. Closing an overlay checkout is handled client-side with Paddle.js `checkout.closed`; Paddle says `transaction.canceled` is not typically part of automatic checkout workflows.
 - `PADDLE_WEBHOOK_SECRET_KEY` must be the webhook endpoint secret from Paddle, not the `ntfset_...` notification setting id.
 - If a Paddle webhook includes a `subscription_id`, CatDai rejects it because this integration is one-time only.
 - The Paddle API key needs `transaction.write`.
@@ -93,6 +103,7 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
   - `grant_paddle_payment_order_feature_credits(...)`
   - `complete_paddle_payment(...)`
 - Paddle grants write into the existing shared `user_feature_credits` table.
+- `paddle_payment_orders.status` includes `checkout_closed` for a user-closed overlay checkout that has not received a final Paddle payment outcome.
 - Run the shared credit schema from `db/paynet_payments.sql` before `db/paddle_payments.sql`, because that file still defines shared credit tables and helpers used by Paddle. Do not use the Paynet order/notification tables for checkout.
 
 ## Related Files

@@ -633,6 +633,51 @@ function buildDistrictComparisonPreview(items) {
   }).filter(Boolean);
 }
 
+function buildMarketTrendPreview(input) {
+  const baseValue = 9999;
+  const today = new Date();
+  const dateAt = (daysAgo) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - daysAgo);
+    return date.toISOString().slice(0, 10);
+  };
+  const multipliers = [
+    1.018,
+    1.014,
+    1.008,
+    1.015,
+    1.011,
+    1.004,
+    0.992,
+    0.992,
+    0.988,
+    0.982,
+    0.981,
+    0.988,
+    0.993,
+    0.993,
+    0.993,
+    0.993,
+    1.002,
+    0.999,
+    1.003,
+    1,
+  ];
+  const step = 30 / (multipliers.length - 1);
+
+  return {
+    scope: input?.district ? "district" : "city",
+    metric: "median_price_per_m2",
+    period_days: 30,
+    end_value: baseValue,
+    change_pct: -1,
+    points: multipliers.map((multiplier, index) => ({
+      date: dateAt(Math.round(30 - index * step)),
+      value: Math.round(baseValue * multiplier),
+    })),
+  };
+}
+
 function buildEstimatePreview(payload) {
   const maskEstimateData = (estData, { keepMarketRate = false } = {}) => {
     if (!estData) return null;
@@ -672,7 +717,7 @@ function buildEstimatePreview(payload) {
       agency: maskEstimateData(payload.estimates_by_seller.agency),
     } : null,
     market_position: { marker_pct: 50 },
-    market_trend: null,
+    market_trend: buildMarketTrendPreview(payload.input),
     relevant_listings: [],
     listing_duplicates: null,
     locked_sections: {
@@ -680,6 +725,7 @@ function buildEstimatePreview(payload) {
       market_position_numbers: true,
       district_comparison_values: true,
       market_stats_values: true,
+      market_trend: true,
       seller_breakdown_values: true,
       listing_details: true,
     },

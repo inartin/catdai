@@ -24,10 +24,12 @@ Preview paywall implemented. Paddle checkout is connected for evaluation limit p
 Sale/buy estimate results return a preview for anonymous users:
 - the main market estimate stays visible
 - locked values are removed from `/api/estimate` before the JSON response
-- the UI shows blurred placeholder values with the shared tooltip
+- the UI shows blurred placeholder values with a lock icon and the shared tooltip
 - clicking a blurred value opens the shared auth popup
+- when the monthly free limit is reached, blurred values use the unlock-evaluation tooltip instead of the login tooltip
 
 Locked preview sections include fast/target prices, price per m2, range numbers, market stats, district comparison values, seller breakdown, and listing details.
+The sale/buy preview still shows the sector/city trend card title and period, but uses fake blurred `9.999`-style trend data and the shared auth tooltip instead of exposing the real trend payload.
 
 ## Full Payload
 Authenticated free users receive the full sale/buy estimate response while they have monthly free allowance remaining. After the monthly allowance is exhausted, `/api/estimate` returns the same preview payload shape used for anonymous users plus `access_limit.reason = free_monthly_limit_reached`.

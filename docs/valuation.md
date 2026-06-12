@@ -12,7 +12,7 @@ Implemented and active for apartments.
 - `/evaluare` reads URL params and calls `/api/estimate`; anonymous sale/buy users can submit the form and see only a preview result.
 - `/evaluare` without valuation query params shows the reusable cadastru search form from `/cadastru` instead of redirecting to the homepage.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
-- Anonymous sale/buy and rent evaluation results show the headline estimate, while detailed values are blurred and open the shared auth popup.
+- Anonymous sale/buy and rent evaluation results show the headline estimate, while detailed values are blurred and open the shared auth popup. Sale/buy previews also keep the sector/city trend card visible with fake blurred trend data.
 - Authenticated free sale/buy and rent evaluation users receive 2 full evaluations per UTC month; after that, the result falls back to the blurred preview and shows the monthly-limit message.
 - When the monthly limit is hit, the popup and the result action column both include the same reusable feature-price block with the sale/rent single-access price in EUR and the rounded MDL equivalent, plus a checkout button.
 - The sale and rent purchase flow both use `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE` as the Paddle price ID, show `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` in the UI, and grant one paid evaluation credit after Paddle confirms payment.
@@ -49,7 +49,7 @@ Implemented and active for apartments.
 - Rent computes the market monthly rent from the comparable median, while the result-page low and high levels come from the cheapest and most expensive matched rent listings and link directly to their 999.md pages.
 - Rent also returns price per m2 per month, range, confidence, district comparison, relevant rent listings, and the comparable listing count used for the result.
 - `/api/estimate` calls the RPC with the server-side Supabase admin client so server valuation work does not inherit the anonymous client timeout.
-- Anonymous `/api/estimate` responses remove locked sale/buy values before returning JSON and mark `locked_sections` for the UI placeholders.
+- Anonymous `/api/estimate` responses remove locked sale/buy values before returning JSON and mark `locked_sections` for the UI placeholders. Locked preview responses replace the real market trend with fake trend data before it reaches the browser.
 - Authenticated free `/api/estimate` and gated `/api/estimate-rent` responses consume the monthly free full-evaluation allowance in `user_feature_usage_events` after a successful cached or fresh estimate. The idempotency key is based on the UTC month and normalized estimate params so refreshes do not consume another use.
 - Backend also runs seller-category estimates for owner vs agency/developer.
 - Seller-category estimates use the same property filters and seller filters, but skip district comparison and relevant listings because the UI only renders their price/range/stats.

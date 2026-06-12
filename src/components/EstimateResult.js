@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
@@ -15,6 +15,7 @@ import InfoCallout from "@/components/InfoCallout";
 
 const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
 const LISTING_FAIR_BAND_PCT = 3;
+const LockedTooltipContext = createContext("result.loginToSeeFullAnalysis");
 
 function rememberPdfLoginReturn() {
   if (typeof window === "undefined") return;
@@ -44,6 +45,30 @@ function hasPdfLoginReturn() {
   } catch {
     return false;
   }
+}
+
+function LockedOverlayIcon({ className = "" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 z-10 flex items-center justify-center ${className}`}
+    >
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-primary shadow-sm ring-1 ring-primary/15">
+        <svg
+          viewBox="0 0 24 24"
+          className="h-3 w-3"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+      </span>
+    </span>
+  );
 }
 
 function formatPrice(num) {
@@ -252,8 +277,9 @@ function buildEvaluationUrl(params) {
   return `/evaluare?${params.toString()}`;
 }
 
-function MarketTrendMiniChart({ trend, compact = false }) {
+function MarketTrendMiniChart({ trend, compact = false, locked = false, onLockedClick }) {
   const { t, lang } = useTranslation();
+  const lockedTooltipKey = useContext(LockedTooltipContext);
   const [activeIndex, setActiveIndex] = useState(null);
   const points = Array.isArray(trend?.points)
     ? trend.points
@@ -294,11 +320,13 @@ function MarketTrendMiniChart({ trend, compact = false }) {
     : isDown
       ? "text-red-600 bg-red-50"
       : "text-gray-500 bg-gray-100";
+  const lockedTextClassName = locked ? "select-none blur-sm" : "";
+  const lockedChartClassName = locked ? "opacity-80" : "";
   const metricLabel = trend.metric === "average_price_per_m2"
     ? t("result.trendMetricAverage")
     : t("result.trendMetricMedian");
 
-  return (
+  const chartContent = (
     <div
       className={`${compact
         ? "mt-5 border-t border-gray-100 pt-4"
@@ -317,20 +345,20 @@ function MarketTrendMiniChart({ trend, compact = false }) {
       </div>
 
       <div className="mt-2 flex items-center gap-2">
-        <p className="text-lg font-bold leading-none text-gray-900">
+        <p className={`text-lg font-bold leading-none text-gray-900 ${lockedTextClassName}`}>
           {formatPrice(endValue)}/m²
         </p>
-        <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${toneClass}`}>
+        <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${toneClass} ${lockedTextClassName}`}>
           {formatTrendPercent(changePct)}
         </span>
       </div>
-      <p className="mt-1 text-[11px] text-gray-400">{metricLabel}</p>
+      <p className={`mt-1 text-[11px] text-gray-400 ${lockedTextClassName}`}>{metricLabel}</p>
 
       <div className="relative mt-3 h-14 w-full">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
-          className="absolute inset-0 h-full w-full overflow-visible text-primary"
+          className={`absolute inset-0 h-full w-full overflow-visible text-primary ${lockedChartClassName}`}
           role="img"
           aria-label={t("result.districtTrend")}
         >
@@ -339,13 +367,13 @@ function MarketTrendMiniChart({ trend, compact = false }) {
             points={coords}
             fill="none"
             stroke="currentColor"
-            strokeWidth="3"
+            strokeWidth={locked ? "4" : "3"}
             strokeLinecap="round"
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
           />
         </svg>
-        {chartPoints.map((point, index) => (
+        {!locked && chartPoints.map((point, index) => (
           <button
             key={`${point.date}-${point.value}`}
             type="button"
@@ -376,11 +404,29 @@ function MarketTrendMiniChart({ trend, compact = false }) {
           </div>
         )}
       </div>
-      <div className="mt-1 flex items-center justify-between text-[11px] leading-none text-gray-400">
+      <div className={`mt-1 flex items-center justify-between text-[11px] leading-none text-gray-400 ${lockedTextClassName}`}>
         <span>{formatTrendDate(firstPoint.date, lang)}</span>
         <span>{formatTrendDate(lastPoint.date, lang)}</span>
       </div>
     </div>
+  );
+
+  if (!locked) return chartContent;
+
+  return (
+    <Tooltip text={t(lockedTooltipKey)} className="block w-full" wrapperClassName="block w-full">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onLockedClick?.();
+        }}
+        className="relative block w-full cursor-pointer border-0 bg-transparent p-0 text-left"
+      >
+        {chartContent}
+        <LockedOverlayIcon />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -690,22 +736,24 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
   );
 }
 
-function LockedValue({ text = "999999", className = "", onClick }) {
+function LockedValue({ text = "999999", className = "", onClick, showLock = true }) {
   const { t } = useTranslation();
+  const lockedTooltipKey = useContext(LockedTooltipContext);
 
   return (
-    <Tooltip text={t("result.loginToSeeFullAnalysis")}>
+    <Tooltip text={t(lockedTooltipKey)}>
       <button
         type="button"
         onClick={(event) => {
           event.stopPropagation();
           onClick?.();
         }}
-        className="inline-flex cursor-pointer border-0 bg-transparent p-0"
+        className="relative inline-flex cursor-pointer border-0 bg-transparent p-0"
       >
         <span className={`inline-block select-none blur-sm ${className}`}>
           {text}
         </span>
+        {showLock && <LockedOverlayIcon />}
       </button>
     </Tooltip>
   );
@@ -1679,8 +1727,10 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
     appendDefinedParam(params, "renovation", input.renovation);
     return buildEvaluationUrl(params);
   };
+  const lockedTooltipKey = freeMonthlyLimitReached ? "payment.buyAccess" : "result.loginToSeeFullAnalysis";
 
   return (
+    <LockedTooltipContext.Provider value={lockedTooltipKey}>
     <div className={compactLayout ? "animate-fade-in flex w-full min-w-0 flex-col gap-5" : "animate-fade-in flex w-full min-w-0 flex-col gap-6"}>
       <AuthRequiredModal
         open={isAuthModalOpen}
@@ -1880,6 +1930,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         </InfoCallout>
       )}
     </div>
+    </LockedTooltipContext.Provider>
   );
 }
 
@@ -2233,6 +2284,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     ? listingDuplicateItems.length
     : 0;
   const hasListingDuplicates = listingDuplicateCount > 0;
+  const lockMarketTrend = !isPaid && !listingComparison && lockedSections.market_trend === true;
+  const marketTrend = data.market_trend;
+  const lockedTooltipKey = freeMonthlyLimitReached ? "payment.buyAccess" : "result.loginToSeeFullAnalysis";
   const resultLayoutClassName = compactLayout
     ? "animate-fade-in flex flex-col gap-5"
     : "animate-fade-in flex flex-col gap-5 lg:gap-6";
@@ -2308,6 +2362,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   }
 
   return (
+    <LockedTooltipContext.Provider value={lockedTooltipKey}>
     <div className={resultLayoutClassName}>
       <AuthRequiredModal
         open={isAuthModalOpen}
@@ -2447,7 +2502,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     compact={compactLayout}
                   />
                 ) : (
-                  <MarketTrendMiniChart trend={data.market_trend} compact={compactLayout} />
+                  <MarketTrendMiniChart
+                    trend={marketTrend}
+                    compact={compactLayout}
+                    locked={lockMarketTrend}
+                    onLockedClick={openFullAnalysisAuthModal}
+                  />
                 )}
               </div>
             </div>
@@ -2531,7 +2591,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     </p>
                     <p className="mt-0.5 text-xs text-gray-400">
                       {hidePriceTiers ? (
-                        <LockedValue onClick={openFullAnalysisAuthModal} text="-99%" />
+                        <LockedValue onClick={openFullAnalysisAuthModal} text="-99%" showLock={false} />
                       ) : (
                         "-10%"
                       )}
@@ -2548,7 +2608,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     </p>
                     <p className="mt-0.5 text-xs text-gray-400">
                       {hidePriceTiers ? (
-                        <LockedValue onClick={openFullAnalysisAuthModal} text="+99%" />
+                        <LockedValue onClick={openFullAnalysisAuthModal} text="+99%" showLock={false} />
                       ) : (
                         "+8%"
                       )}
@@ -2617,7 +2677,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {hidePriceTiers ? (
-                    <LockedValue onClick={openFullAnalysisAuthModal} text="-99%" />
+                    <LockedValue onClick={openFullAnalysisAuthModal} text="-99%" showLock={false} />
                   ) : (
                     "-10%"
                   )}
@@ -2640,7 +2700,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {hidePriceTiers ? (
-                    <LockedValue onClick={openFullAnalysisAuthModal} text="+99%" />
+                    <LockedValue onClick={openFullAnalysisAuthModal} text="+99%" showLock={false} />
                   ) : (
                     "+8%"
                   )}
@@ -2695,7 +2755,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
                         {hideSellerBreakdownValues ? (
-                          <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" className="text-gray-400" />
+                          <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" className="text-gray-400" showLock={false} />
                         ) : (
                           `${formatPrice(data.estimates_by_seller.individual.estimate.price_per_m2)}/m²`
                         )}
@@ -2723,7 +2783,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                       </p>
                       <p className="text-xs text-gray-400 mt-1">
                         {hideSellerBreakdownValues ? (
-                          <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" className="text-gray-400" />
+                          <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" className="text-gray-400" showLock={false}/>
                         ) : (
                           `${formatPrice(data.estimates_by_seller.agency.estimate.price_per_m2)}/m²`
                         )}
@@ -2947,7 +3007,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 {input.area_m2 && (
                   <p className="text-sm text-gray-400 mt-1.5">
                     {hideMarketStatsValues ? (
-                      <LockedValue onClick={openFullAnalysisAuthModal} text={`× ${input.area_m2}m² = €999.999`} />
+                      <LockedValue onClick={openFullAnalysisAuthModal} text={`× ${input.area_m2}m² = €999.999`} showLock={false} />
                     ) : (
                       `× ${input.area_m2}m² = ${formatPrice(estimate.market_rate)}`
                     )}
@@ -3097,5 +3157,6 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         </aside>
       </div>
     </div>
+    </LockedTooltipContext.Provider>
   );
 }

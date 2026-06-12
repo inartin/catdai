@@ -3,7 +3,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export default function Tooltip({ text, children, className = "" }) {
+export default function Tooltip({ text, children, className = "", wrapperClassName = "" }) {
   const triggerRef = useRef(null);
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipPos, setTooltipPos] = useState(null);
@@ -44,7 +44,7 @@ export default function Tooltip({ text, children, className = "" }) {
   }, [showTooltip, updateTooltipPosition]);
 
   return (
-    <span className="relative inline-flex">
+    <span className={`relative inline-flex ${wrapperClassName}`}>
       <span
         ref={triggerRef}
         className={className}

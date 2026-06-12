@@ -76,9 +76,8 @@ export default function FeaturePricingAction({
   };
 
   return (
-    <div className={`rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 text-center ${className}`}>
-      <p className="text-sm font-semibold text-gray-700">{t("payment.featureAccessTitle")}</p>
-      <div className="my-3">
+    <div className={`rounded-2xl border border-gray-200 bg-white p-4 text-center shadow-sm ${className}`}>
+      <div className="mb-3 rounded-xl bg-gray-50 px-4 py-3">
         <p className="text-4xl font-extrabold tracking-tight text-gray-950">
           {formatEuro(offer.price_eur)}
         </p>
@@ -90,7 +89,7 @@ export default function FeaturePricingAction({
         type="button"
         onClick={startCheckout}
         disabled={status === "loading" || status === "redirecting" || !session?.access_token}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-700/15 transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-gray-900/10 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       >
         {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : t("payment.buyAccess")}
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

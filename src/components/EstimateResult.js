@@ -1693,38 +1693,42 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         ) : null}
       </AuthRequiredModal>
       <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
-        <div className="mb-1 flex items-center justify-between gap-3">
-          <p className="text-sm font-medium uppercase tracking-wide text-gray-400">{t("result.rentProfileAnalyzed")}</p>
-          <ResultDateBadge lang={lang} />
-        </div>
-        <h2 className="mt-2 text-2xl font-bold text-gray-900">
-          {t("result.apartment")} {roomsLabel}
-          {input.area_m2 ? ` · ${input.area_m2}m²` : ""}
-        </h2>
-        <p className="mt-1 text-base text-gray-500">
-          {selectedDistrictLabel}{input.city ? `, ${t(`data.city.${input.city}`)}` : ""}
-        </p>
-        <div className={`mt-4 flex flex-wrap gap-2 ${rentYieldCalculation ? "hidden sm:flex" : ""}`}>
-          {input.renovation && (
-            <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
-              {t(`data.renovationType.${input.renovation}`)}
-            </span>
-          )}
-          {buildingTypes.map((buildingType) => (
-            <span key={buildingType} className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
-              {t(`data.buildingType.${buildingType}`)}
-            </span>
-          ))}
-          {input.floor && (
-            <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
-              {t("result.floor", { floor: input.floor })}
-            </span>
-          )}
-          {input.bathrooms_count != null && (
-            <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
-              {input.bathrooms_count === 1 ? t("result.oneBathroom") : t("result.bathrooms", { count: input.bathrooms_count })}
-            </span>
-          )}
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="mb-1 text-sm font-medium uppercase tracking-wide text-gray-400">{t("result.rentProfileAnalyzed")}</p>
+            <h2 className="mt-2 text-2xl font-bold text-gray-900">
+              {t("result.apartment")} {roomsLabel}
+              {input.area_m2 ? ` · ${input.area_m2}m²` : ""}
+            </h2>
+            <p className="mt-1 text-base text-gray-500">
+              {selectedDistrictLabel}{input.city ? `, ${t(`data.city.${input.city}`)}` : ""}
+            </p>
+            <div className={`mt-4 flex flex-wrap gap-2 ${rentYieldCalculation ? "hidden sm:flex" : ""}`}>
+              {input.renovation && (
+                <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+                  {t(`data.renovationType.${input.renovation}`)}
+                </span>
+              )}
+              {buildingTypes.map((buildingType) => (
+                <span key={buildingType} className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+                  {t(`data.buildingType.${buildingType}`)}
+                </span>
+              ))}
+              {input.floor && (
+                <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+                  {t("result.floor", { floor: input.floor })}
+                </span>
+              )}
+              {input.bathrooms_count != null && (
+                <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600">
+                  {input.bathrooms_count === 1 ? t("result.oneBathroom") : t("result.bathrooms", { count: input.bathrooms_count })}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
+            <ResultDateBadge lang={lang} />
+          </div>
         </div>
       </div>
 
@@ -1864,6 +1868,9 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             />
           )}
           <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
+          {purchaseOffer ? (
+            <FeaturePricingAction offer={purchaseOffer} />
+          ) : null}
         </aside>
       </div>
 
@@ -3083,6 +3090,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               {t("result.compare")}
             </button>
             <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
+            {purchaseOffer ? (
+              <FeaturePricingAction offer={purchaseOffer} />
+            ) : null}
           </div>
         </aside>
       </div>

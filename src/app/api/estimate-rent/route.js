@@ -1,14 +1,20 @@
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { resolveAccessTier } from "@/lib/access-tier";
+import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { logCalculatorUsageEvent } from "@/lib/calculator-usage-events";
+import {
+  consumeFreeMonthlyFeatureUsage,
+  FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+  makeMonthlyFeatureUsageKey,
+} from "@/lib/free-monthly-feature-usage";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { DISTRICTS_BY_CITY, matchBuildingType, matchCity, matchDistrict, validateEstimateInput } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
+const RENT_EVALUATION_FEATURE_KEY = "rent_estimate";
 const ESTIMATE_RENT_CACHE_PREFIX = "catdai:estimate-rent:v7:";
 const ESTIMATE_RENT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const ESTIMATE_RENT_CACHE_TTL_SECONDS = 12 * 60 * 60;
@@ -356,6 +362,167 @@ async function enrichRentEstimate(params, data) {
   };
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function buildRentDistrictComparisonPreview(items) {
+  const districts = Array.isArray(items) ? items : [];
+  const medians = districts
+    .map((item) => Number(item?.median_price))
+    .filter((value) => Number.isFinite(value) && value > 0);
+
+  const maxMedian = medians.length > 0 ? Math.max(...medians) : null;
+
+  return districts.map((item) => {
+    const district = item?.district || null;
+    const median = Number(item?.median_price);
+
+    if (!district) return null;
+
+    const relativeWidthPct =
+      Number.isFinite(median) && median > 0 && maxMedian && maxMedian > 0
+        ? clamp((median / maxMedian) * 100, 8, 100)
+        : 8;
+
+    return {
+      district,
+      relative_width_pct: relativeWidthPct,
+    };
+  }).filter(Boolean);
+}
+
+function buildRentEstimatePreview(payload) {
+  return {
+    ...payload,
+    estimate: {
+      ...(payload.estimate || {}),
+      price_per_m2: null,
+      low: null,
+      high: null,
+    },
+    range: {
+      low: null,
+      high: null,
+    },
+    market_stats: {
+      ...(payload.market_stats || {}),
+      avg_price: null,
+      avg_price_per_m2: null,
+      median_price_per_m2: null,
+      min_price_per_m2: null,
+      max_price_per_m2: null,
+    },
+    district_comparison: buildRentDistrictComparisonPreview(payload.district_comparison),
+    rent_level_listings: {},
+    relevant_listings: [],
+    locked_sections: {
+      rent_levels: true,
+      market_stats_values: true,
+      district_comparison_values: true,
+      listing_details: true,
+    },
+  };
+}
+
+function buildRentUsageMetadata({ params, body }) {
+  return {
+    feature: "full_rent_evaluation",
+    params,
+    evaluation_group_id: body.evaluation_group_id || null,
+    log_id: body.log_id || null,
+    language: body.language || null,
+  };
+}
+
+async function resolveRentEstimateAccess(request, body, params) {
+  const access = await resolveAccessTier(request);
+  let hasFullAccess = isPaidAccessTier(access.tier);
+  let accessSource = hasFullAccess ? "paid" : null;
+  let freeMonthlyUsage = null;
+
+  if (!hasFullAccess && access.user_id) {
+    const idempotencyKey = makeMonthlyFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
+    freeMonthlyUsage = await consumeFreeMonthlyFeatureUsage({
+      userId: access.user_id,
+      featureKey: RENT_EVALUATION_FEATURE_KEY,
+      idempotencyKey,
+      metadata: buildRentUsageMetadata({ params, body }),
+      limit: FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+    });
+
+    if (freeMonthlyUsage.allowed) {
+      hasFullAccess = true;
+      accessSource = "free_monthly";
+    }
+  }
+
+  return { access, hasFullAccess, accessSource, freeMonthlyUsage };
+}
+
+function buildRentEstimateAccessPayload(data, estimateAccess) {
+  const usage = estimateAccess.freeMonthlyUsage;
+  if (estimateAccess.hasFullAccess) {
+    return {
+      ...data,
+      access_tier: estimateAccess.access.tier,
+      full_access: true,
+      access_source: estimateAccess.accessSource,
+      free_monthly_usage: usage
+        ? {
+          limit: usage.limit,
+          remaining: usage.remaining_uses,
+          reset_at: usage.reset_at,
+        }
+        : null,
+      locked_sections: {},
+    };
+  }
+
+  return {
+    ...buildRentEstimatePreview(data),
+    access_tier: "free",
+    full_access: false,
+    access_limit: usage?.reason === "free_monthly_limit_reached"
+      ? {
+        reason: usage.reason,
+        limit: usage.limit,
+        remaining: usage.remaining_uses,
+        reset_at: usage.reset_at,
+      }
+      : null,
+  };
+}
+
+/**
+ * Resolves the rent-estimate response payload and the access record used for tracking.
+ *
+ * The rent-yield calculator (requests carrying `calculator_usage`) is a separate paid
+ * product and is never subject to the free monthly evaluare limit — it is always returned
+ * with full access so the preview/blur logic never triggers. The chirie evaluare flow is
+ * gated exactly like the sale evaluare flow.
+ */
+async function resolveRentResponse(request, body, params, rawData) {
+  if (body.calculator_usage) {
+    const access = await resolveAccessTier(request);
+    return {
+      access,
+      payload: {
+        ...rawData,
+        access_tier: access.tier,
+        full_access: true,
+        locked_sections: {},
+      },
+    };
+  }
+
+  const estimateAccess = await resolveRentEstimateAccess(request, body, params);
+  return {
+    access: estimateAccess.access,
+    payload: buildRentEstimateAccessPayload(rawData, estimateAccess),
+  };
+}
+
 export async function POST(request) {
   const ip = getClientIp(request);
   const { allowed, remaining, retryAfter } = limiter.check(ip);
@@ -441,10 +608,19 @@ export async function POST(request) {
   const cacheKey = makeEstimateRentCacheKey(params);
   const cachedData = await getCachedEstimateRent(cacheKey);
   if (cachedData) {
-    const access = await resolveAccessTier(request);
+    let rentResponse;
+    try {
+      rentResponse = await resolveRentResponse(request, body, params, cachedData);
+    } catch (accessError) {
+      console.error("[estimate-rent] free monthly access check failed:", accessError?.message || String(accessError));
+      return NextResponse.json(
+        { error: "free_monthly_limit_check_failed" },
+        { status: 500 }
+      );
+    }
     trackRentEstimate({
       body,
-      access,
+      access: rentResponse.access,
       data: cachedData,
       ip,
       params,
@@ -457,7 +633,7 @@ export async function POST(request) {
       params,
     });
 
-    const res = NextResponse.json(cachedData);
+    const res = NextResponse.json(rentResponse.payload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     res.headers.set("X-Estimate-Cache", "HIT");
     return res;
@@ -485,10 +661,19 @@ export async function POST(request) {
   const enrichedData = await enrichRentEstimate(params, data);
 
   await setCachedEstimateRent(cacheKey, enrichedData);
-  const access = await resolveAccessTier(request);
+  let rentResponse;
+  try {
+    rentResponse = await resolveRentResponse(request, body, params, enrichedData);
+  } catch (accessError) {
+    console.error("[estimate-rent] free monthly access check failed:", accessError?.message || String(accessError));
+    return NextResponse.json(
+      { error: "free_monthly_limit_check_failed" },
+      { status: 500 }
+    );
+  }
   trackRentEstimate({
     body,
-    access,
+    access: rentResponse.access,
     data: enrichedData,
     ip,
     params,
@@ -501,7 +686,7 @@ export async function POST(request) {
     params,
   });
 
-  const res = NextResponse.json(enrichedData);
+  const res = NextResponse.json(rentResponse.payload);
   res.headers.set("X-RateLimit-Remaining", String(remaining));
   res.headers.set("X-Estimate-Cache", "MISS");
   return res;

@@ -7,7 +7,8 @@ Implemented for rent-yield calculations.
 - `/calculator` shows the starting form.
 - Submitting the form keeps the same route and appends `rezultat=1` plus the selected criteria in the query string.
 - Result URLs stay on `/calculator?rezultat=1...`.
-- Result mode calls `/api/estimate-rent` with the property criteria, then applies calculator-only investment fields after the rent estimate returns.
+- Result mode calls `/api/estimate-rent` with the property criteria and `calculator_usage`, then applies calculator-only investment fields after the rent estimate returns.
+- Calculator rent-estimate calls are separate from `/evaluare?type=rent` monetization: they always return `full_access: true` and do not consume the monthly free rent-evaluation allowance.
 
 ## Form
 - Reuses `PropertyForm` with the `rentYieldCalculator` variant.

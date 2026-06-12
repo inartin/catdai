@@ -12,8 +12,8 @@ Implemented and active for apartments.
 - `/evaluare` reads URL params and calls `/api/estimate`; anonymous sale/buy users can submit the form and see only a preview result.
 - `/evaluare` without valuation query params shows the reusable cadastru search form from `/cadastru` instead of redirecting to the homepage.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
-- Anonymous sale/buy results show the main market estimate, while the rest of the detailed result values are blurred and open the shared auth popup.
-- Authenticated free sale/buy users receive 2 full evaluations per UTC month; after that, the result falls back to the blurred preview and shows the monthly-limit message.
+- Anonymous sale/buy and rent evaluation results show the headline estimate, while detailed values are blurred and open the shared auth popup.
+- Authenticated free sale/buy and rent evaluation users receive 2 full evaluations per UTC month; after that, the result falls back to the blurred preview and shows the monthly-limit message.
 - Full sale/buy results support edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Regular `/evaluare` result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
@@ -39,7 +39,8 @@ Implemented and active for apartments.
 - Rent result analysis sections use a flex column on mobile and switch to the two-column grid only on desktop, so cards and sector bars stay constrained to the viewport.
 - `POST /api/estimate-rent` validates the regular property fields plus `districts` / `regions` as an array of one or more sectors and `building_types` as an optional array, calls `estimate_rent`, and returns monthly rent tiers.
 - `/evaluare?type=rent` calls `/api/estimate-rent` and renders a rent-specific result view with the same date badge as the sale result header, monthly rent levels, filters, market stats, district comparison, and relevant rent listings. Sale-only result actions such as seller breakdown and PDF export remain on the sale/buy result.
-- `/calculator?rezultat=1` also calls `/api/estimate-rent`, then uses the estimated monthly rent to calculate rent-yield metrics from the calculator investment fields.
+- `/api/estimate-rent` gates only the `/evaluare?type=rent` flow: paid users get full rent results, authenticated free users consume the `rent_estimate` monthly allowance, and anonymous or limit-reached users receive a preview with rent levels, market-stat values, district values, and listing details locked.
+- `/calculator?rezultat=1` also calls `/api/estimate-rent`, then uses the estimated monthly rent to calculate rent-yield metrics from the calculator investment fields. Calculator requests carry `calculator_usage`, always return `full_access: true`, and do not consume the rent evaluation allowance.
 - Area is used as a comparable filter only when provided.
 - If area is missing, total prices and range come from matching listings' `price_amount` values instead of `price_per_m2 * area`.
 - It computes fast sale, market rate, premium, price per m2, range, confidence, district comparison, relevant listings.
@@ -47,7 +48,7 @@ Implemented and active for apartments.
 - Rent also returns price per m2 per month, range, confidence, district comparison, relevant rent listings, and the comparable listing count used for the result.
 - `/api/estimate` calls the RPC with the server-side Supabase admin client so server valuation work does not inherit the anonymous client timeout.
 - Anonymous `/api/estimate` responses remove locked sale/buy values before returning JSON and mark `locked_sections` for the UI placeholders.
-- Authenticated free `/api/estimate` responses consume the monthly free full-evaluation allowance in `user_feature_usage_events` after a successful cached or fresh estimate. The idempotency key is based on the UTC month and normalized sale/buy estimate params so refreshes do not consume another use.
+- Authenticated free `/api/estimate` and gated `/api/estimate-rent` responses consume the monthly free full-evaluation allowance in `user_feature_usage_events` after a successful cached or fresh estimate. The idempotency key is based on the UTC month and normalized estimate params so refreshes do not consume another use.
 - Backend also runs seller-category estimates for owner vs agency/developer.
 - Seller-category estimates use the same property filters and seller filters, but skip district comparison and relevant listings because the UI only renders their price/range/stats.
 - Seller breakdown shows the comparable listing count for each seller type under the price per m2.

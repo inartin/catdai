@@ -961,8 +961,19 @@ function ListingsPreviewCard({ listing }) {
   );
 }
 
-function RentLevelListingCard({ label, listing, fallbackValue, tone = "emerald", ctaLabel, className = "" }) {
+function RentLevelListingCard({ label, listing, fallbackValue, tone = "emerald", ctaLabel, className = "", locked = false, onLockedClick }) {
   const toneClass = tone === "amber" ? "text-amber-600" : "text-emerald-600";
+
+  if (locked) {
+    return (
+      <div className={`flex min-h-36 flex-col items-center justify-center p-5 text-center sm:min-h-56 sm:p-6 ${className}`}>
+        <p className="mb-1 text-sm text-gray-400">{label}</p>
+        <p className={`text-xl font-bold ${toneClass}`}>
+          <LockedValue onClick={onLockedClick} text="€9.999" className={toneClass} />
+        </p>
+      </div>
+    );
+  }
 
   if (!listing) {
     return (
@@ -1580,6 +1591,40 @@ function RentTaxToggle({ checked, onChange }) {
 
 function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const { t, lang } = useTranslation();
+  const { isAuthenticated, clearAuthError } = useAuth();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalCopyKey, setAuthModalCopyKey] = useState("result.loginToSeeFullAnalysis");
+  const [authModalShowAuthOptions, setAuthModalShowAuthOptions] = useState(true);
+
+  const isPaid = data.full_access === true || data.access_tier === "paid";
+  const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
+  const lockedSections = data.locked_sections || {};
+  const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
+  const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
+  const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
+
+  const openAuthModal = useCallback((copyKey = "result.loginToSeeFullAnalysis", options = {}) => {
+    if (isAuthenticated && !options.force) return;
+    setAuthModalCopyKey(typeof copyKey === "string" ? copyKey : "result.loginToSeeFullAnalysis");
+    setAuthModalShowAuthOptions(options.showAuthOptions !== false);
+    clearAuthError();
+    setIsAuthModalOpen(true);
+  }, [clearAuthError, isAuthenticated]);
+
+  const closeAuthModal = useCallback(() => setIsAuthModalOpen(false), []);
+
+  const openFullAnalysisAuthModal = useCallback(() => {
+    if (freeMonthlyLimitReached) {
+      openAuthModal("result.freeMonthlyLimitReached", {
+        force: true,
+        showAuthOptions: false,
+      });
+      return;
+    }
+
+    openAuthModal("result.loginToSeeFullAnalysis");
+  }, [freeMonthlyLimitReached, openAuthModal]);
+
   const estimate = data.estimate || {};
   const range = data.range || {};
   const stats = data.market_stats || {};
@@ -1635,6 +1680,12 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
 
   return (
     <div className={compactLayout ? "animate-fade-in flex w-full min-w-0 flex-col gap-5" : "animate-fade-in flex w-full min-w-0 flex-col gap-6"}>
+      <AuthRequiredModal
+        open={isAuthModalOpen}
+        copyKey={authModalCopyKey}
+        showAuthOptions={authModalShowAuthOptions}
+        onClose={closeAuthModal}
+      />
       <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-1 flex items-center justify-between gap-3">
           <p className="text-sm font-medium uppercase tracking-wide text-gray-400">{t("result.rentProfileAnalyzed")}</p>
@@ -1687,6 +1738,8 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             tone="emerald"
             ctaLabel={t("result.viewListingCta")}
             className="order-2 border-r border-gray-100 sm:order-1"
+            locked={hideRentLevels}
+            onLockedClick={openFullAnalysisAuthModal}
           />
 
           <div className="order-1 col-span-2 flex min-h-56 flex-col items-center justify-center border-b border-gray-100 p-6 text-center sm:order-2 sm:col-span-1 sm:border-b-0 sm:border-r sm:p-8">
@@ -1706,8 +1759,16 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             tone="amber"
             ctaLabel={t("result.viewListingCta")}
             className="order-3 sm:order-3"
+            locked={hideRentLevels}
+            onLockedClick={openFullAnalysisAuthModal}
           />
         </div>
+      )}
+
+      {!isPaid && !rentYieldCalculation && (
+        <p className="text-sm text-gray-600 px-1">
+          {freeMonthlyLimitReached ? t("result.freeMonthlyLimitReachedLine") : t("result.freeTierUncertaintyLine")}
+        </p>
       )}
 
       <div className="flex w-full min-w-0 flex-col gap-5 lg:grid lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
@@ -1737,6 +1798,8 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             currentDistricts={districts}
             valueKey="median_price"
             buildHref={buildRentDistrictHref}
+            blurValues={hideDistrictComparisonValues}
+            onLockedClick={openFullAnalysisAuthModal}
           />
 
           <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
@@ -1748,20 +1811,40 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
               </div>
               <div>
                 <p className="mb-1 text-sm text-gray-400">{t("result.avgPricePerM2")}</p>
-                <p className="text-xl font-bold text-gray-900">{formatPrice(stats.avg_price_per_m2)}</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {hideMarketStatsValues ? (
+                    <LockedValue onClick={openFullAnalysisAuthModal} text="€999/m²" className="text-gray-900" />
+                  ) : (
+                    formatPrice(stats.avg_price_per_m2)
+                  )}
+                </p>
               </div>
               <div>
                 <p className="mb-1 text-sm text-gray-400">{t("result.medianPricePerM2")}</p>
-                <p className="text-xl font-bold text-gray-900">{formatPrice(stats.median_price_per_m2)}</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {hideMarketStatsValues ? (
+                    <LockedValue onClick={openFullAnalysisAuthModal} text="€999/m²" className="text-gray-900" />
+                  ) : (
+                    formatPrice(stats.median_price_per_m2)
+                  )}
+                </p>
               </div>
               <div>
                 <p className="mb-1 text-sm text-gray-400">{t("result.avgMonthlyRent")}</p>
-                <p className="text-xl font-bold text-gray-900">{formatPrice(stats.avg_price)}</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {hideMarketStatsValues ? (
+                    <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999" className="text-gray-900" />
+                  ) : (
+                    formatPrice(stats.avg_price)
+                  )}
+                </p>
               </div>
             </div>
-            <p className="mt-4 text-sm text-gray-400">
-              {t("result.rentRange", { low: formatPrice(range.low), high: formatPrice(range.high) })}
-            </p>
+            {!hideMarketStatsValues && (
+              <p className="mt-4 text-sm text-gray-400">
+                {t("result.rentRange", { low: formatPrice(range.low), high: formatPrice(range.high) })}
+              </p>
+            )}
           </div>
         </div>
 

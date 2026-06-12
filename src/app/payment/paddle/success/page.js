@@ -3,12 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "@/context/LanguageContext";
 
 const TERMINAL_STATUSES = new Set(["paid", "canceled", "payment_failed", "failed"]);
+const PAYMENT_STATUS_KEYS = {
+  pending: "payment.orderStatusPending",
+  registered: "payment.orderStatusRegistered",
+  paid: "payment.orderStatusPaid",
+  payment_failed: "payment.orderStatusFailed",
+  failed: "payment.orderStatusFailed",
+  canceled: "payment.orderStatusCanceled",
+};
 
 function getInitialParams() {
   if (typeof window === "undefined") {
-    return { orderId: "", transactionId: "", checkout: "", returnTo: "" };
+    return { orderId: "", transactionId: "", checkout: "", returnTo: "", lang: "" };
   }
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -17,6 +26,7 @@ function getInitialParams() {
     transactionId: searchParams.get("transaction_id") || "",
     checkout: searchParams.get("checkout") || "",
     returnTo: searchParams.get("return_to") || "",
+    lang: searchParams.get("lang") || "",
   };
 }
 
@@ -36,15 +46,15 @@ function getDisplayState({ loading, error, order, checkout }) {
   if (loading && !order) {
     return {
       tone: "neutral",
-      title: "Checking payment",
-      message: "Waiting for confirmation...",
+      titleKey: "payment.statusCheckingTitle",
+      messageKey: "payment.statusCheckingMessage",
     };
   }
 
   if (error) {
     return {
       tone: "error",
-      title: "Payment status unavailable",
+      titleKey: "payment.statusUnavailableTitle",
       message: error,
     };
   }
@@ -52,43 +62,44 @@ function getDisplayState({ loading, error, order, checkout }) {
   if (order?.status === "paid") {
     return {
       tone: "success",
-      title: "Payment succeeded",
-      message: "Access was granted.",
+      titleKey: "payment.statusPaidTitle",
+      messageKey: "payment.statusPaidMessage",
     };
   }
 
   if (order?.status === "payment_failed" || order?.status === "failed") {
     return {
       tone: "error",
-      title: "Payment failed",
-      message: "No access was granted.",
+      titleKey: "payment.statusFailedTitle",
+      messageKey: "payment.statusFailedMessage",
     };
   }
 
   if (order?.status === "canceled" || checkout === "closed") {
     return {
       tone: "error",
-      title: "Payment not completed",
-      message: "No access was granted.",
+      titleKey: "payment.statusCanceledTitle",
+      messageKey: "payment.statusFailedMessage",
     };
   }
 
   if (checkout === "completed") {
     return {
       tone: "neutral",
-      title: "Payment completed",
-      message: "Confirming access...",
+      titleKey: "payment.statusCompletedTitle",
+      messageKey: "payment.statusCompletedMessage",
     };
   }
 
   return {
     tone: "neutral",
-    title: "Checking payment",
-    message: "Waiting for confirmation...",
+    titleKey: "payment.statusCheckingTitle",
+    messageKey: "payment.statusCheckingMessage",
   };
 }
 
 export default function PaddlePaymentSuccessPage() {
+  const { lang, setLang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading } = useAuth();
   const params = useMemo(() => getInitialParams(), []);
   const [order, setOrder] = useState(null);
@@ -96,10 +107,16 @@ export default function PaddlePaymentSuccessPage() {
   const [error, setError] = useState("");
   const immediateError =
     !authLoading && (!isAuthenticated || !session?.access_token)
-      ? "Log in to check this payment."
+      ? t("payment.statusLoginRequired")
       : !params.orderId && !params.transactionId
-        ? "Missing payment reference."
+        ? t("payment.statusMissingReference")
         : "";
+
+  useEffect(() => {
+    if ((params.lang === "ro" || params.lang === "ru") && params.lang !== lang) {
+      setLang(params.lang);
+    }
+  }, [lang, params.lang, setLang]);
 
   useEffect(() => {
     if (authLoading || immediateError) return undefined;
@@ -126,7 +143,7 @@ export default function PaddlePaymentSuccessPage() {
         if (!active) return;
 
         if (!response.ok) {
-          setError(payload?.error || "Could not check payment status.");
+          setError(payload?.error || t("payment.statusCheckError"));
           setLoading(false);
           return;
         }
@@ -140,7 +157,7 @@ export default function PaddlePaymentSuccessPage() {
         }
       } catch {
         if (!active) return;
-        setError("Could not check payment status.");
+        setError(t("payment.statusCheckError"));
         setLoading(false);
       }
     }
@@ -151,30 +168,71 @@ export default function PaddlePaymentSuccessPage() {
       active = false;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [authLoading, immediateError, params.orderId, params.transactionId, session?.access_token]);
+  }, [authLoading, immediateError, params.orderId, params.transactionId, session?.access_token, t]);
 
   const display = getDisplayState({ loading: loading && !immediateError, error: immediateError || error, order, checkout: params.checkout });
-  const titleClass = display.tone === "success" ? "text-emerald-700" : display.tone === "error" ? "text-red-700" : "text-gray-900";
+  const accentClass = display.tone === "success" ? "bg-emerald-500" : display.tone === "error" ? "bg-red-500" : "bg-primary";
+  const statusPillClass = display.tone === "success" ? "bg-emerald-50 text-emerald-700" : display.tone === "error" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600";
   const returnHref = normalizeReturnTo(params.returnTo);
+  const displayMessage = display.message || t(display.messageKey);
+  const localizedStatus = order?.status ? t(PAYMENT_STATUS_KEYS[order.status] || "payment.orderStatusUnknown") : "";
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-10 text-gray-900">
-      <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center">
-        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-          <h1 className={`text-2xl font-semibold ${titleClass}`}>{display.title}</h1>
-          <p className="mt-3 text-sm leading-6 text-gray-600">{display.message}</p>
-          {order?.status && (
-            <p className="mt-3 text-sm text-gray-600">
-              Status: <span className="font-medium">{order.status}</span>
-            </p>
-          )}
-          <Link
-            href={returnHref}
-            className="mt-6 inline-flex rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
-          >
-            Back to evaluation
+    <main className="min-h-screen bg-[#f7f8f5] px-4 py-8 text-gray-950 sm:px-6 lg:px-8">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl flex-col">
+        <header className="flex items-center justify-between gap-4">
+          <Link href="/" aria-label={t("nav.homeAriaLabel")} className="inline-flex items-center gap-3">
+            <img src="/icon0.svg" alt="" className="h-12 w-auto object-contain" />
+            <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
           </Link>
-        </div>
+          <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            {t("payment.secureLabel")}
+          </span>
+        </header>
+
+        <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1.1fr_0.9fr]">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-dark">
+              {t("payment.statusEyebrow")}
+            </p>
+            <h1 className="mt-4 max-w-2xl text-4xl font-semibold leading-tight tracking-normal text-gray-950 sm:text-5xl">
+              {t(display.titleKey)}
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-gray-600">
+              {displayMessage}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start gap-4">
+              <span className={`mt-1 h-3 w-3 flex-none rounded-full ${accentClass}`} aria-hidden="true" />
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold text-gray-950">{t("payment.statusPanelTitle")}</h2>
+                <p className="mt-3 text-sm leading-6 text-gray-600">
+                  {display.tone === "success" ? t("payment.statusSuccessNextStep") : t("payment.statusDefaultNextStep")}
+                </p>
+              </div>
+            </div>
+
+            {order?.status && (
+              <div className="mt-6 border-t border-gray-100 pt-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+                  {t("payment.statusLabel")}
+                </p>
+                <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-sm font-semibold ${statusPillClass}`}>
+                  {localizedStatus}
+                </span>
+              </div>
+            )}
+
+            <Link
+              href={returnHref}
+              className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-gray-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+            >
+              {t("payment.backToEvaluation")}
+            </Link>
+          </div>
+        </section>
       </div>
     </main>
   );

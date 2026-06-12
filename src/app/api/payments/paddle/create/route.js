@@ -126,11 +126,12 @@ function isOneTimePaddleTransaction(transaction, product) {
   });
 }
 
-function buildCheckoutUrl(request, orderId, transactionId, returnTo) {
+function buildCheckoutUrl(request, orderId, transactionId, returnTo, lang) {
   const checkoutUrl = getPaddleCheckoutUrl();
   const url = new URL(checkoutUrl || "/payment/paddle/checkout", request.url);
   url.searchParams.set("order_id", orderId);
   url.searchParams.set("_ptxn", transactionId);
+  url.searchParams.set("lang", lang);
   if (returnTo) url.searchParams.set("return_to", returnTo);
   return url.toString();
 }
@@ -222,7 +223,10 @@ export async function POST(request) {
   }
 
   const summary = extractPaddleTransactionSummary(paddleRegistration.transaction);
-  const checkoutUrl = summary.checkoutUrl || buildCheckoutUrl(request, order.id, summary.transactionId, returnTo);
+  const configuredCheckoutUrl = getPaddleCheckoutUrl();
+  const checkoutUrl = configuredCheckoutUrl
+    ? buildCheckoutUrl(request, order.id, summary.transactionId, returnTo, lang)
+    : summary.checkoutUrl || buildCheckoutUrl(request, order.id, summary.transactionId, returnTo, lang);
   const { error: updateError } = await supabaseAdmin
     .from("paddle_payment_orders")
     .update({

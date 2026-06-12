@@ -16,6 +16,7 @@ Preview paywall implemented. Paddle checkout is connected for evaluation limit p
 - `POST /api/payments/paddle/create` and `POST /api/paddle/webhooks` create Paddle transactions and grant credits only after verified `transaction.completed` notifications.
 - The Paddle create route rejects transaction responses that contain recurring items or a `subscription_id`, so subscription-backed checkouts are not accepted.
 - Limit-reached sale and rent evaluation popups show a reusable feature-pricing checkout action.
+- Paddle checkout and status pages use the CatDai-branded RO/RU payment shell and preserve the selected language through the checkout/status redirect.
 - Sale and rent evaluation single-access checkouts use the same Paddle price ID from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE`, display the euro amount from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` plus `≈ MDL` at 20 MDL per EUR, and grant one `sale_estimate` or `rent_estimate` credit after Paddle confirms payment.
 - Authenticated free users consume the monthly free allowance before paid credits; paid credits are used only after the free monthly limit is reached.
 

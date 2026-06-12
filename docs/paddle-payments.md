@@ -18,6 +18,7 @@ Backend Paddle one-time payment flow is prepared. Evaluation limit popups can st
   - creates a Paddle transaction with one configured `price_id`
   - rejects the transaction response if Paddle reports recurring items or a `subscription_id`
   - returns `order_id`, `paddle_transaction_id`, and `checkout.url`
+  - when `PADDLE_CHECKOUT_URL` is configured, returns that CatDai checkout page instead of Paddle's hosted checkout URL
 - `POST /api/paddle/webhooks`
   - public endpoint for Paddle notifications
   - verifies `Paddle-Signature` using the raw request body
@@ -29,11 +30,13 @@ Backend Paddle one-time payment flow is prepared. Evaluation limit popups can st
 - `GET /payment/paddle/checkout`
   - noindex default payment link page for Paddle
   - loads Paddle.js and opens the transaction passed by Paddle as `_ptxn`
-  - preserves an optional local `return_to` path for the status page
+  - preserves optional local `return_to` and `lang` query values for the status page
+  - uses the shared clean checkout shell with CatDai logo, RO/RU copy, and a secure-payment state panel
   - requires `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`
 - `GET /payment/paddle/success`
-  - noindex status page for the temporary Paddle test flow
+  - noindex status page for the Paddle flow
   - polls the status endpoint and shows paid, pending, failed, or canceled state
+  - uses the same checkout shell and localized RO/RU status copy, including internal order states like `registered`
   - links back to the originating evaluation path when checkout started from a limit popup
 - `GET /payment/paddle/test`
   - noindex temporary test page

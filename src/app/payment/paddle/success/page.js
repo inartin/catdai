@@ -8,7 +8,7 @@ const TERMINAL_STATUSES = new Set(["paid", "canceled", "payment_failed", "failed
 
 function getInitialParams() {
   if (typeof window === "undefined") {
-    return { orderId: "", transactionId: "", checkout: "" };
+    return { orderId: "", transactionId: "", checkout: "", returnTo: "" };
   }
 
   const searchParams = new URLSearchParams(window.location.search);
@@ -16,7 +16,20 @@ function getInitialParams() {
     orderId: searchParams.get("order_id") || "",
     transactionId: searchParams.get("transaction_id") || "",
     checkout: searchParams.get("checkout") || "",
+    returnTo: searchParams.get("return_to") || "",
   };
+}
+
+function normalizeReturnTo(value) {
+  const raw = String(value || "").trim();
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/evaluare";
+
+  try {
+    const url = new URL(raw, "https://catdai.local");
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/evaluare";
+  }
 }
 
 function getDisplayState({ loading, error, order, checkout }) {
@@ -142,6 +155,7 @@ export default function PaddlePaymentSuccessPage() {
 
   const display = getDisplayState({ loading: loading && !immediateError, error: immediateError || error, order, checkout: params.checkout });
   const titleClass = display.tone === "success" ? "text-emerald-700" : display.tone === "error" ? "text-red-700" : "text-gray-900";
+  const returnHref = normalizeReturnTo(params.returnTo);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10 text-gray-900">
@@ -155,10 +169,10 @@ export default function PaddlePaymentSuccessPage() {
             </p>
           )}
           <Link
-            href="/payment/paddle/test"
+            href={returnHref}
             className="mt-6 inline-flex rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
           >
-            Back to test page
+            Back to evaluation
           </Link>
         </div>
       </div>

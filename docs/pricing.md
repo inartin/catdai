@@ -27,11 +27,12 @@ Implemented as a reusable UI section. Paddle backend payment routes are prepared
 - Prices are read server-side from env and passed into the client component.
 - If an env value is missing or invalid, the component falls back to the current default price.
 - Paynet is not used whatsoever; old Paynet routes are disabled and must not be wired into pricing checkout.
-- `db/paddle_payments.sql` allows one-time payment product keys for Standard, Pro, and single-feature purchases.
+- `db/paddle_payments.sql` allows one-time payment product keys for Standard, Pro, sale/rent single-evaluation access, and other single-feature purchases.
 - Shared product definitions now live in `src/lib/payment-products.js`.
 - Paddle price IDs are read per product key from env through `src/lib/paddle-products.js`; the backend rejects Paddle transaction responses that contain recurring items or a subscription id.
+- Limit-reached evaluation popups use the reusable `FeaturePricingAction` component and show the shared `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` EUR price plus a rounded `≈ MDL` value at 20 MDL per EUR.
 - `standard_pack` grants 2 uses per paid feature; `pro_pack` grants 10 uses per paid feature.
-- Single-feature products grant 1 use for 999 analysis, cadastru lookup, yield calculator, or PDF report.
+- Single-feature products grant 1 use for sale evaluation, rent evaluation, 999 analysis, cadastru lookup, yield calculator, or PDF report.
 - `extra_pack` is still not checkout-eligible until the product rule is clarified.
 
 ## Env
@@ -42,6 +43,7 @@ CATDAI_PRICE_EXTRA_MDL=499
 PADDLE_PRICE_STANDARD_PACK=
 PADDLE_PRICE_PRO_PACK=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE=
+PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST=
 PADDLE_PRICE_CADASTRU_LOOKUP_SINGLE=
 PADDLE_PRICE_YIELD_CALCULATOR_SINGLE=
 PADDLE_PRICE_PDF_REPORT_SINGLE=
@@ -49,6 +51,7 @@ PADDLE_PRICE_PDF_REPORT_SINGLE=
 
 ## Related Files
 - `src/components/Pricing.js`
+- `src/components/FeaturePricingAction.js`
 - `src/lib/pricing-config.js`
 - `src/lib/free-monthly-feature-usage.js`
 - `src/app/pricing/page.js`

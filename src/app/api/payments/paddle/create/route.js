@@ -36,6 +36,18 @@ function getDebugDetails(error) {
   return message ? message.slice(0, 500) : undefined;
 }
 
+function normalizeReturnTo(value) {
+  const raw = String(value || "").trim();
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "";
+
+  try {
+    const url = new URL(raw, "https://catdai.local");
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "";
+  }
+}
+
 async function getRequestUser(request) {
   const token = getBearerToken(request);
   if (!token) return null;
@@ -46,17 +58,19 @@ async function getRequestUser(request) {
 }
 
 async function createPendingOrder({ userId, product, lang, customer, requestPayload }) {
+  const orderRow = {
+    user_id: userId,
+    product_key: product.key,
+    paddle_price_id: product.priceReference,
+    status: "pending",
+    language: lang,
+    customer_snapshot: customer,
+    request_payload: requestPayload,
+  };
+
   const { data, error } = await supabaseAdmin
     .from("paddle_payment_orders")
-    .insert({
-      user_id: userId,
-      product_key: product.key,
-      paddle_price_id: product.priceId,
-      status: "pending",
-      language: lang,
-      customer_snapshot: customer,
-      request_payload: requestPayload,
-    })
+    .insert(orderRow)
     .select("id")
     .single();
 
@@ -77,15 +91,13 @@ async function markOrderFailed(orderId, errorMessage) {
     .eq("id", orderId);
 }
 
-function buildPaddleTransactionPayload({ order, product, user, customer }) {
+function buildPaddleTransactionPayload({ order, product, user, customer, returnTo }) {
   const payload = {
     collection_mode: "automatic",
-    items: [
-      {
-        price_id: product.priceId,
-        quantity: 1,
-      },
-    ],
+    items: [{
+      price_id: product.priceId,
+      quantity: 1,
+    }],
     custom_data: {
       catdai_order_id: order.id,
       catdai_user_id: user.id,
@@ -95,6 +107,9 @@ function buildPaddleTransactionPayload({ order, product, user, customer }) {
 
   if (customer.email) {
     payload.custom_data.catdai_user_email = customer.email;
+  }
+  if (returnTo) {
+    payload.custom_data.catdai_return_to = returnTo;
   }
 
   return payload;
@@ -106,15 +121,17 @@ function isOneTimePaddleTransaction(transaction, product) {
 
   return transaction.items.every((item) => {
     const price = item?.price || {};
-    return price.id === product.priceId && price.billing_cycle == null;
+    if (price.billing_cycle != null) return false;
+    return price.id === product.priceId;
   });
 }
 
-function buildCheckoutUrl(request, orderId, transactionId) {
+function buildCheckoutUrl(request, orderId, transactionId, returnTo) {
   const checkoutUrl = getPaddleCheckoutUrl();
   const url = new URL(checkoutUrl || "/payment/paddle/checkout", request.url);
   url.searchParams.set("order_id", orderId);
   url.searchParams.set("_ptxn", transactionId);
+  if (returnTo) url.searchParams.set("return_to", returnTo);
   return url.toString();
 }
 
@@ -144,7 +161,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Unknown payment product." }, { status: 400 });
   }
 
-  if (!isValidPaddlePriceId(product.priceId)) {
+  if (!isValidPaddlePriceId(product.priceReference)) {
     return NextResponse.json(
       { error: `Paddle price is not configured for ${product.key}.` },
       { status: 500 }
@@ -152,6 +169,7 @@ export async function POST(request) {
   }
 
   const lang = normalizePaddleLang(body?.lang);
+  const returnTo = normalizeReturnTo(body?.return_to);
   const customer = buildPaddleCustomerSnapshot(user, body?.customer || {});
   let order;
   try {
@@ -162,8 +180,9 @@ export async function POST(request) {
       customer,
       requestPayload: {
         product_key: product.key,
-        paddle_price_id: product.priceId,
+        paddle_price_id: product.priceReference,
         lang,
+        return_to: returnTo || null,
       },
     });
   } catch (error) {
@@ -180,7 +199,7 @@ export async function POST(request) {
   let transactionPayload;
   let paddleRegistration;
   try {
-    transactionPayload = buildPaddleTransactionPayload({ order, product, user, customer });
+    transactionPayload = buildPaddleTransactionPayload({ order, product, user, customer, returnTo });
     paddleRegistration = await createPaddleTransaction(transactionPayload);
   } catch (error) {
     await markOrderFailed(order.id, error.message);
@@ -203,7 +222,7 @@ export async function POST(request) {
   }
 
   const summary = extractPaddleTransactionSummary(paddleRegistration.transaction);
-  const checkoutUrl = summary.checkoutUrl || buildCheckoutUrl(request, order.id, summary.transactionId);
+  const checkoutUrl = summary.checkoutUrl || buildCheckoutUrl(request, order.id, summary.transactionId, returnTo);
   const { error: updateError } = await supabaseAdmin
     .from("paddle_payment_orders")
     .update({

@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
 import CloseIcon from "@/components/icons/CloseIcon";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
+import FeaturePricingAction from "@/components/FeaturePricingAction";
 import ListingAlertConfigurator from "@/components/ListingAlertConfigurator";
 import Tooltip from "@/components/Tooltip";
 import ValuationPdfDialog from "@/components/ValuationPdfDialog";
@@ -1598,6 +1599,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
 
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
+  const purchaseOffer = freeMonthlyLimitReached ? data.access_limit?.purchase : null;
   const lockedSections = data.locked_sections || {};
   const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
   const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
@@ -1685,7 +1687,11 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         copyKey={authModalCopyKey}
         showAuthOptions={authModalShowAuthOptions}
         onClose={closeAuthModal}
-      />
+      >
+        {freeMonthlyLimitReached && authModalCopyKey === "result.freeMonthlyLimitReached" && purchaseOffer ? (
+          <FeaturePricingAction offer={purchaseOffer} />
+        ) : null}
+      </AuthRequiredModal>
       <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-1 flex items-center justify-between gap-3">
           <p className="text-sm font-medium uppercase tracking-wide text-gray-400">{t("result.rentProfileAnalyzed")}</p>
@@ -1900,6 +1906,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
+  const purchaseOffer = freeMonthlyLimitReached ? data.access_limit?.purchase : null;
   const lockedSections = data.locked_sections || {};
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
   const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
@@ -2300,7 +2307,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         copyKey={authModalCopyKey}
         showAuthOptions={authModalShowAuthOptions}
         onClose={closeAuthModal}
-      />
+      >
+        {freeMonthlyLimitReached && authModalCopyKey === "result.freeMonthlyLimitReached" && purchaseOffer ? (
+          <FeaturePricingAction offer={purchaseOffer} />
+        ) : null}
+      </AuthRequiredModal>
       <ValuationPdfDialog
         open={isPdfDialogOpen}
         data={data}

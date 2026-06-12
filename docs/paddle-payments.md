@@ -1,7 +1,7 @@
 # Paddle Payments
 
 ## Stage
-Backend Paddle one-time payment flow is prepared. A minimal standalone Paddle default payment link page exists for test payments, but no pricing-page checkout UI is connected yet.
+Backend Paddle one-time payment flow is prepared. Evaluation limit popups can start a Paddle checkout; pricing cards are not connected to checkout yet.
 
 ## Scope
 - Paddle is added for one-time payments only.
@@ -13,7 +13,7 @@ Backend Paddle one-time payment flow is prepared. A minimal standalone Paddle de
 - `POST /api/payments/paddle/create`
   - requires Supabase bearer token
   - accepts `product_key`, optional `lang`, optional `customer`
-  - validates the configured Paddle price ID format before creating a local order
+  - validates the configured Paddle price ID before creating a local order
   - creates a local pending Paddle order
   - creates a Paddle transaction with one configured `price_id`
   - rejects the transaction response if Paddle reports recurring items or a `subscription_id`
@@ -29,10 +29,12 @@ Backend Paddle one-time payment flow is prepared. A minimal standalone Paddle de
 - `GET /payment/paddle/checkout`
   - noindex default payment link page for Paddle
   - loads Paddle.js and opens the transaction passed by Paddle as `_ptxn`
+  - preserves an optional local `return_to` path for the status page
   - requires `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`
 - `GET /payment/paddle/success`
   - noindex status page for the temporary Paddle test flow
   - polls the status endpoint and shows paid, pending, failed, or canceled state
+  - links back to the originating evaluation path when checkout started from a limit popup
 - `GET /payment/paddle/test`
   - noindex temporary test page
   - creates a `cadastru_lookup_single` Paddle payment through `POST /api/payments/paddle/create`
@@ -43,6 +45,8 @@ Backend Paddle one-time payment flow is prepared. A minimal standalone Paddle de
 - Paddle uses the CatDai one-time product keys:
   - `standard_pack`
   - `pro_pack`
+  - `sale_estimate_single`
+  - `rent_estimate_single`
   - `listing_analysis_single`
   - `cadastru_lookup_single`
   - `yield_calculator_single`
@@ -52,8 +56,7 @@ Backend Paddle one-time payment flow is prepared. A minimal standalone Paddle de
 
 ## Paddle Requirements
 - Each supported product key needs a Paddle `price_id` in env.
-- The app creates Paddle transactions against catalog prices, not ad hoc amounts.
-- The create route verifies the Paddle transaction response has only the configured price ID and no recurring billing cycle.
+- The create route verifies catalog price IDs and no recurring billing cycle.
 - Non-production create-route failures include a short `details` field so the temporary Paddle test page can show the exact Paddle/API/Supabase failure during setup.
 - Webhook access is granted only after a verified `transaction.completed` event.
 - `PADDLE_WEBHOOK_SECRET_KEY` must be the webhook endpoint secret from Paddle, not the `ntfset_...` notification setting id.
@@ -71,11 +74,14 @@ NEXT_PUBLIC_PADDLE_CLIENT_TOKEN=
 PADDLE_PRICE_STANDARD_PACK=
 PADDLE_PRICE_PRO_PACK=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE=
+PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST=
 PADDLE_PRICE_CADASTRU_LOOKUP_SINGLE=
 PADDLE_PRICE_YIELD_CALCULATOR_SINGLE=
 PADDLE_PRICE_PDF_REPORT_SINGLE=
 PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
 ```
+
+`PADDLE_PRICE_LISTING_ANALYSIS_SINGLE` is the shared Paddle price ID for sale/rent single-evaluation checkout. `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` is the numeric EUR amount shown in the UI, plus `≈ MDL` using 20 MDL per EUR.
 
 ## Database
 - `db/paddle_payments.sql` adds:

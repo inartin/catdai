@@ -14,6 +14,8 @@ Implemented and active for apartments.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
 - Anonymous sale/buy and rent evaluation results show the headline estimate, while detailed values are blurred and open the shared auth popup.
 - Authenticated free sale/buy and rent evaluation users receive 2 full evaluations per UTC month; after that, the result falls back to the blurred preview and shows the monthly-limit message.
+- When the monthly limit is hit, the popup includes a reusable feature-price block with the sale/rent single-access price in EUR and the rounded MDL equivalent, plus a checkout button.
+- The sale and rent purchase flow both use `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE` as the Paddle price ID, show `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` in the UI, and grant one paid evaluation credit after Paddle confirms payment.
 - Full sale/buy results support edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Regular `/evaluare` result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.

@@ -10,6 +10,20 @@ export const PAYMENT_FEATURE_KEYS = [
 ];
 
 const SINGLE_PRODUCTS = {
+  sale_estimate_single: {
+    title: "Evaluare completa",
+    description: "One full sale or buy valuation",
+    amountEur: null,
+    useSharedEvaluationPrice: true,
+    grants: { sale_estimate: 1 },
+  },
+  rent_estimate_single: {
+    title: "Evaluare chirie completa",
+    description: "One full rent valuation",
+    amountEur: null,
+    useSharedEvaluationPrice: true,
+    grants: { rent_estimate: 1 },
+  },
   listing_analysis_single: {
     title: "Analiza anunt 999",
     description: "One 999.md listing analysis",
@@ -38,6 +52,15 @@ const SINGLE_PRODUCTS = {
 
 function toMinorUnits(mdl) {
   return Math.round(Number(mdl || 0) * 100);
+}
+
+export function readEuroAmount(value) {
+  const amount = Number.parseFloat(String(value || "").replace(",", "."));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+export function getListingAnalysisSinglePriceEur() {
+  return readEuroAmount(process.env.PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST);
 }
 
 function grantAllFeatures(count) {
@@ -69,13 +92,40 @@ export function getPaymentProduct(productKey) {
   const product = getPaymentProducts()[key];
   if (!product) return null;
 
-  const amountMinor = toMinorUnits(product.amountMdl);
+  const sharedListingAnalysisPriceEur = getListingAnalysisSinglePriceEur();
+  const amountEur = product.useSharedEvaluationPrice
+    ? sharedListingAnalysisPriceEur
+    : product.amountEur;
+  const amountMdl = product.amountMdl ?? (amountEur != null ? Math.round(amountEur * 20) : null);
+  const amountMinor = toMinorUnits(amountMdl);
   if (!Number.isSafeInteger(amountMinor) || amountMinor <= 0) return null;
 
   return {
     key,
     ...product,
+    amountEur,
+    amountMdl,
     amountMinor,
+  };
+}
+
+export function getEvaluationPurchaseOffer(featureKey) {
+  const normalizedFeatureKey = String(featureKey || "").trim();
+  const productKey = normalizedFeatureKey === "rent_estimate"
+    ? "rent_estimate_single"
+    : normalizedFeatureKey === "sale_estimate"
+      ? "sale_estimate_single"
+      : null;
+  if (!productKey) return null;
+
+  const product = getPaymentProduct(productKey);
+  if (!product?.amountEur || !product?.amountMdl) return null;
+
+  return {
+    product_key: product.key,
+    price_eur: product.amountEur,
+    price_mdl: product.amountMdl,
+    exchange_rate_mdl_per_eur: 20,
   };
 }
 

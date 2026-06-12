@@ -10,6 +10,7 @@ export default function AuthRequiredModal({
   open,
   copyKey = "result.comingSoon",
   showAuthOptions = true,
+  children = null,
   onClose,
 }) {
   const { t } = useTranslation();
@@ -54,9 +55,15 @@ export default function AuthRequiredModal({
           <CloseIcon size={18} />
         </button>
 
-        <p className={`text-center text-base font-medium text-gray-800 px-8 ${showAuthOptions ? "mb-4" : "mb-0"}`}>
+        <p className={`text-center text-base font-medium text-gray-800 px-8 ${showAuthOptions || children ? "mb-4" : "mb-0"}`}>
           {t(copyKey)}
         </p>
+
+        {children && (
+          <div className={showAuthOptions ? "mb-4" : ""}>
+            {children}
+          </div>
+        )}
 
         {showAuthOptions && <AuthOptions />}
       </div>

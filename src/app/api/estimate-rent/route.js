@@ -8,6 +8,8 @@ import {
   FREE_MONTHLY_FULL_EVALUATION_LIMIT,
   makeMonthlyFeatureUsageKey,
 } from "@/lib/free-monthly-feature-usage";
+import { consumePaidFeatureCredit } from "@/lib/paid-feature-usage";
+import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { DISTRICTS_BY_CITY, matchBuildingType, matchCity, matchDistrict, validateEstimateInput } from "@/lib/validation";
@@ -440,6 +442,7 @@ async function resolveRentEstimateAccess(request, body, params) {
   let hasFullAccess = isPaidAccessTier(access.tier);
   let accessSource = hasFullAccess ? "paid" : null;
   let freeMonthlyUsage = null;
+  let paidCreditUsage = null;
 
   if (!hasFullAccess && access.user_id) {
     const idempotencyKey = makeMonthlyFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
@@ -453,11 +456,26 @@ async function resolveRentEstimateAccess(request, body, params) {
 
     if (freeMonthlyUsage.allowed) {
       hasFullAccess = true;
-      accessSource = "free_monthly";
+      accessSource = freeMonthlyUsage.source || "free_monthly";
     }
   }
 
-  return { access, hasFullAccess, accessSource, freeMonthlyUsage };
+  if (!hasFullAccess && access.user_id && freeMonthlyUsage?.reason === "free_monthly_limit_reached") {
+    const idempotencyKey = makeMonthlyFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
+    paidCreditUsage = await consumePaidFeatureCredit({
+      userId: access.user_id,
+      featureKey: RENT_EVALUATION_FEATURE_KEY,
+      idempotencyKey,
+      metadata: buildRentUsageMetadata({ params, body }),
+    });
+
+    if (paidCreditUsage.allowed) {
+      hasFullAccess = true;
+      accessSource = "paid_credit";
+    }
+  }
+
+  return { access, hasFullAccess, accessSource, freeMonthlyUsage, paidCreditUsage };
 }
 
 function buildRentEstimateAccessPayload(data, estimateAccess) {
@@ -475,6 +493,11 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
           reset_at: usage.reset_at,
         }
         : null,
+      paid_credit_usage: estimateAccess.paidCreditUsage
+        ? {
+          remaining: estimateAccess.paidCreditUsage.remaining_uses,
+        }
+        : null,
       locked_sections: {},
     };
   }
@@ -489,6 +512,7 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
         limit: usage.limit,
         remaining: usage.remaining_uses,
         reset_at: usage.reset_at,
+        purchase: getEvaluationPurchaseOffer(RENT_EVALUATION_FEATURE_KEY),
       }
       : null,
   };

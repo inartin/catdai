@@ -41,6 +41,8 @@ create table if not exists public.paddle_payment_orders (
     check (product_key in (
       'standard_pack',
       'pro_pack',
+      'sale_estimate_single',
+      'rent_estimate_single',
       'listing_analysis_single',
       'cadastru_lookup_single',
       'yield_calculator_single',
@@ -55,7 +57,9 @@ create table if not exists public.paddle_payment_orders (
   constraint paddle_payment_orders_language_check
     check (language is null or language in ('ro', 'ru', 'en')),
   constraint paddle_payment_orders_price_check
-    check (paddle_price_id ~ '^pri_[A-Za-z0-9]+$'),
+    check (
+      paddle_price_id ~ '^pri_[A-Za-z0-9]+$'
+    ),
   constraint paddle_payment_orders_transaction_check
     check (paddle_transaction_id is null or paddle_transaction_id ~ '^txn_[A-Za-z0-9]+$')
 );
@@ -68,6 +72,35 @@ create index if not exists idx_paddle_payment_orders_status_created
 
 create index if not exists idx_paddle_payment_orders_transaction
   on public.paddle_payment_orders (paddle_transaction_id);
+
+do $$
+begin
+  alter table public.paddle_payment_orders
+    drop constraint if exists paddle_payment_orders_product_check;
+  alter table public.paddle_payment_orders
+    add constraint paddle_payment_orders_product_check
+    check (product_key in (
+      'standard_pack',
+      'pro_pack',
+      'sale_estimate_single',
+      'rent_estimate_single',
+      'listing_analysis_single',
+      'cadastru_lookup_single',
+      'yield_calculator_single',
+      'pdf_report_single'
+    ));
+end $$;
+
+do $$
+begin
+  alter table public.paddle_payment_orders
+    drop constraint if exists paddle_payment_orders_price_check;
+  alter table public.paddle_payment_orders
+    add constraint paddle_payment_orders_price_check
+    check (
+      paddle_price_id ~ '^pri_[A-Za-z0-9]+$'
+    );
+end $$;
 
 drop trigger if exists trg_paddle_payment_orders_updated_at on public.paddle_payment_orders;
 create trigger trg_paddle_payment_orders_updated_at

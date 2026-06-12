@@ -26,16 +26,29 @@ function loadPaddleScript() {
   });
 }
 
+function normalizeReturnTo(value) {
+  const raw = String(value || "").trim();
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/evaluare";
+
+  try {
+    const url = new URL(raw, "https://catdai.local");
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return "/evaluare";
+  }
+}
+
 export default function PaddleCheckoutPage() {
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("Loading checkout...");
 
   const params = useMemo(() => {
-    if (typeof window === "undefined") return { transactionId: "", orderId: "" };
+    if (typeof window === "undefined") return { transactionId: "", orderId: "", returnTo: "" };
     const searchParams = new URLSearchParams(window.location.search);
     return {
       transactionId: searchParams.get("_ptxn") || "",
       orderId: searchParams.get("order_id") || "",
+      returnTo: searchParams.get("return_to") || "",
     };
   }, []);
 
@@ -51,6 +64,7 @@ export default function PaddleCheckoutPage() {
       if (params.orderId) url.searchParams.set("order_id", params.orderId);
       url.searchParams.set("transaction_id", eventTransactionId || params.transactionId);
       url.searchParams.set("checkout", result);
+      if (params.returnTo) url.searchParams.set("return_to", params.returnTo);
       window.location.href = url.toString();
     }
 
@@ -115,7 +129,9 @@ export default function PaddleCheckoutPage() {
     return () => {
       canceled = true;
     };
-  }, [params.orderId, params.transactionId]);
+  }, [params.orderId, params.returnTo, params.transactionId]);
+
+  const returnHref = normalizeReturnTo(params.returnTo);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-10 text-gray-900">
@@ -128,10 +144,10 @@ export default function PaddleCheckoutPage() {
           <p className="mt-3 text-sm leading-6 text-gray-600">{message}</p>
           {status === "error" && (
             <Link
-              href="/payment/paddle/test"
+              href={returnHref}
               className="mt-6 inline-flex rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white"
             >
-              Back to test page
+              Back to evaluation
             </Link>
           )}
         </div>

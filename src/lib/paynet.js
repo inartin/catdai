@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+// Dormant: CatDai uses Paddle only. Do not import this in active checkout code.
 const DEFAULT_PAYNET_API_BASE_URL = "https://api-merchant.test.paynet.md";
 const DEFAULT_PAYNET_ACQUIRING_BASE_URL = "https://test.paynet.md";
 const DEFAULT_PAYMENT_EXPIRY_HOURS = 4;

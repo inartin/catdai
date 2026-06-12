@@ -78,7 +78,7 @@ const sections = [
     title: "10. Conturi, produse plătite și plată",
     paragraphs: [
       "Anumite funcții CatDai pot fi disponibile gratuit, iar altele pot necesita autentificare și plată. Produsele plătite sunt cumpărate ca acces sau credite de utilizare unică pentru funcțiile indicate pe pagina de prețuri sau în ecranul de plată.",
-      "Prețul, moneda, produsul ales și beneficiile incluse sunt afișate înainte de inițierea plății. Plata este procesată prin Paynet sau prin alt procesator de plăți indicat în interfață.",
+      "Prețul, moneda, produsul ales și beneficiile incluse sunt afișate înainte de inițierea plății. Plata este procesată prin Paddle.",
       "CatDai nu colectează și nu stochează datele cardului bancar. Datele de card și autorizarea plății sunt gestionate de procesatorul de plăți.",
       "Accesul plătit sau creditele sunt activate numai după confirmarea plății de către procesatorul de plăți și verificarea tranzacției de către sistemele CatDai.",
       "Înainte de plată, utilizatorul trebuie să confirme că acceptă acești Termeni și Condiții și că a verificat produsul, prețul și datele afișate în ecranul de confirmare.",

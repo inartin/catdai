@@ -49,13 +49,6 @@ const socialLinks = [
 
 const paymentLogos = [
   {
-    src: "/brands/logo_paynet.svg",
-    alt: "Paynet",
-    width: 181,
-    height: 93,
-    className: "h-6 sm:h-7 max-w-[70px]",
-  },
-  {
     src: "/brands/mastercard.svg",
     alt: "Mastercard",
     width: 152,

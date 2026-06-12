@@ -257,6 +257,7 @@ export async function POST(request) {
     });
     if (shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", {
+        city,
         cadastralNumber: cached.payload?.cadastral_number,
         district: resolvePayloadDistrict(cached.payload),
         resultType: classifyAddressPayload(cached.payload),
@@ -284,6 +285,7 @@ export async function POST(request) {
     });
     if (shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", {
+        city,
         cadastralNumber: payload?.cadastral_number,
         district: resolvePayloadDistrict(payload),
         resultType: stored.resultType || classifyAddressPayload(payload),
@@ -318,6 +320,7 @@ export async function POST(request) {
     });
     if (shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", {
+        city,
         cadastralNumber: payload?.cadastral_number,
         district: resolvePayloadDistrict(payload),
         resultType: classifyAddressPayload(payload),
@@ -339,7 +342,7 @@ export async function POST(request) {
       console.error("[cadastru/address] external cadastru API failed:", details);
       if (error?.status === 404 || error?.code === "not_found") {
         if (shouldTrackCadastruSearch) {
-          await logCadastruSearchEvent(request, "address", { resultType: "no_data", lookupSource: "api" });
+          await logCadastruSearchEvent(request, "address", { city, resultType: "no_data", lookupSource: "api" });
         }
         return NextResponse.json(
           {
@@ -379,6 +382,7 @@ export async function POST(request) {
     });
     if (shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", {
+        city,
         cadastralNumber: payload?.cadastral_number,
         district: resolvePayloadDistrict(payload),
         resultType: classifyAddressPayload(payload),
@@ -395,7 +399,7 @@ export async function POST(request) {
     });
 
     if (shouldTrackCadastruSearch) {
-      await logCadastruSearchEvent(request, "address", { resultType: "no_data", lookupSource: "local" });
+      await logCadastruSearchEvent(request, "address", { city, resultType: "no_data", lookupSource: "local" });
     }
 
     const isTimeout = error?.name === "TimeoutError" || error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT";

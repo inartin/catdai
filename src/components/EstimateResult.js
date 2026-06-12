@@ -1806,6 +1806,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const [showLoginTooltip, setShowLoginTooltip] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("result.comingSoon");
+  const [authModalShowAuthOptions, setAuthModalShowAuthOptions] = useState(true);
   const [showListingsView, setShowListingsView] = useState(false);
   const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false);
   const favoriteChecked = useRef(false);
@@ -1814,7 +1815,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const { session, isAuthenticated, clearAuthError } = useAuth();
   const isRentEstimate = data.estimate_type === "rent";
 
-  const isPaid = data.access_tier === "paid";
+  const isPaid = data.full_access === true || data.access_tier === "paid";
+  const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const lockedSections = data.locked_sections || {};
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
   const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
@@ -1846,9 +1848,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       .catch(() => { });
   }, [session?.access_token]);
 
-  const openAuthModal = useCallback((copyKey = "result.comingSoon") => {
-    if (isAuthenticated) return;
+  const openAuthModal = useCallback((copyKey = "result.comingSoon", options = {}) => {
+    if (isAuthenticated && !options.force) return;
     setAuthModalCopyKey(typeof copyKey === "string" ? copyKey : "result.comingSoon");
+    setAuthModalShowAuthOptions(options.showAuthOptions !== false);
     clearAuthError();
     setIsAuthModalOpen(true);
   }, [clearAuthError, isAuthenticated]);
@@ -1859,8 +1862,16 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   }, [openAuthModal]);
 
   const openFullAnalysisAuthModal = useCallback(() => {
+    if (freeMonthlyLimitReached) {
+      openAuthModal("result.freeMonthlyLimitReached", {
+        force: true,
+        showAuthOptions: false,
+      });
+      return;
+    }
+
     openAuthModal("result.loginToSeeFullAnalysis");
-  }, [openAuthModal]);
+  }, [freeMonthlyLimitReached, openAuthModal]);
 
   useEffect(() => {
     if (!isAuthenticated || typeof window === "undefined") return;
@@ -2204,6 +2215,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       <AuthRequiredModal
         open={isAuthModalOpen}
         copyKey={authModalCopyKey}
+        showAuthOptions={authModalShowAuthOptions}
         onClose={closeAuthModal}
       />
       <ValuationPdfDialog
@@ -2540,7 +2552,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
       {!isPaid && (
         <p className={`${compactLayout ? "" : "order-3"} text-sm text-gray-600 px-1`}>
-          {t("result.freeTierUncertaintyLine")}
+          {freeMonthlyLimitReached ? t("result.freeMonthlyLimitReachedLine") : t("result.freeTierUncertaintyLine")}
         </p>
       )}
 

@@ -38,6 +38,12 @@ function cleanDistrict(value) {
   return trimmed ? trimmed.slice(0, 80) : null;
 }
 
+function cleanCity(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, 80) : null;
+}
+
 function cleanCadastralNumber(value) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -91,6 +97,7 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
     const row = {
       search_type: normalizedType,
       user_id: userId,
+      city: cleanCity(options.city),
       district: normalizedType === "address" ? cleanDistrict(options.district) : null,
       cadastral_number: cleanCadastralNumber(options.cadastralNumber),
       result_type: normalizeResultType(options.resultType),
@@ -99,8 +106,8 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
 
     let { error } = await supabaseAdmin.from("cadastru_search_events").insert(row);
 
-    for (let attempt = 0; attempt < 3 && error; attempt++) {
-      const missingColumn = ["district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
+    for (let attempt = 0; attempt < 5 && error; attempt++) {
+      const missingColumn = ["city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
         column in row && isMissingColumnError(error, column)
       );
       if (!missingColumn) break;

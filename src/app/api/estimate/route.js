@@ -2,6 +2,11 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
+import {
+  consumeFreeMonthlyFeatureUsage,
+  FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+  makeMonthlyFeatureUsageKey,
+} from "@/lib/free-monthly-feature-usage";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { validateEstimateInput } from "@/lib/validation";
@@ -227,6 +232,7 @@ const ESTIMATE_CACHE_TTL_MS = 30 * 60 * 1000;
 const ESTIMATE_CACHE_TTL_SECONDS = 30 * 60;
 const ESTIMATE_CACHE_MAX_ENTRIES = 250;
 const ESTIMATE_CACHE_PREFIX = "catdai:estimate:v1:";
+const FULL_EVALUATION_FEATURE_KEY = "sale_estimate";
 
 let estimateCache = new Map();
 
@@ -356,23 +362,86 @@ function trackEstimate({
   });
 }
 
-async function resolveEstimateAccess(request, body) {
+function buildUsageMetadata({ params, body }) {
+  return {
+    feature: "full_sale_evaluation",
+    params,
+    evaluation_group_id: body.evaluation_group_id || null,
+    log_id: body.log_id || null,
+    language: body.language || null,
+  };
+}
+
+async function resolveEstimateAccess(request, body, params) {
   const access = await resolveAccessTier(request);
-  let isPaid = isPaidAccessTier(access.tier);
+  let hasFullAccess = isPaidAccessTier(access.tier);
+  let accessSource = hasFullAccess ? "paid" : null;
+  let freeMonthlyUsage = null;
 
   // If a share_slug is provided, verify server-side if the sharer was paid
-  if (!isPaid && body.share_slug) {
+  if (!hasFullAccess && body.share_slug) {
     const { data: shareData } = await supabaseAdmin
       .from("shared_links")
       .select("sharer_is_paid")
       .eq("slug", String(body.share_slug))
       .maybeSingle();
     if (shareData?.sharer_is_paid) {
-      isPaid = true;
+      hasFullAccess = true;
+      accessSource = "shared_paid";
     }
   }
 
-  return { access, isPaid };
+  if (!hasFullAccess && access.user_id) {
+    const idempotencyKey = makeMonthlyFeatureUsageKey(FULL_EVALUATION_FEATURE_KEY, params);
+    freeMonthlyUsage = await consumeFreeMonthlyFeatureUsage({
+      userId: access.user_id,
+      featureKey: FULL_EVALUATION_FEATURE_KEY,
+      idempotencyKey,
+      metadata: buildUsageMetadata({ params, body }),
+      limit: FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+    });
+
+    if (freeMonthlyUsage.allowed) {
+      hasFullAccess = true;
+      accessSource = "free_monthly";
+    }
+  }
+
+  return { access, hasFullAccess, accessSource, freeMonthlyUsage };
+}
+
+function buildEstimateAccessPayload(data, estimateAccess) {
+  const usage = estimateAccess.freeMonthlyUsage;
+  if (estimateAccess.hasFullAccess) {
+    return {
+      ...data,
+      access_tier: estimateAccess.access.tier,
+      full_access: true,
+      access_source: estimateAccess.accessSource,
+      free_monthly_usage: usage
+        ? {
+          limit: usage.limit,
+          remaining: usage.remaining_uses,
+          reset_at: usage.reset_at,
+        }
+        : null,
+      locked_sections: {},
+    };
+  }
+
+  return {
+    ...buildEstimatePreview(data),
+    access_tier: "free",
+    full_access: false,
+    access_limit: usage?.reason === "free_monthly_limit_reached"
+      ? {
+        reason: usage.reason,
+        limit: usage.limit,
+        remaining: usage.remaining_uses,
+        reset_at: usage.reset_at,
+      }
+      : null,
+  };
 }
 
 function getClientIp(request) {
@@ -664,11 +733,20 @@ export async function POST(request) {
   const cachedData = await getCachedEstimate(cacheKey);
 
   if (cachedData) {
-    const { access, isPaid } = await resolveEstimateAccess(request, body);
+    let estimateAccess;
+    try {
+      estimateAccess = await resolveEstimateAccess(request, body, params);
+    } catch (error) {
+      console.error("[estimate] free monthly access check failed:", error?.message || String(error));
+      return NextResponse.json(
+        { error: "free_monthly_limit_check_failed" },
+        { status: 500 }
+      );
+    }
     const responseTimeMs = Date.now() - requestStart;
     trackEstimate({
       body,
-      access,
+      access: estimateAccess.access,
       data: cachedData,
       ip,
       params,
@@ -676,9 +754,7 @@ export async function POST(request) {
       validationData: v,
     });
 
-    const responsePayload = isPaid
-      ? { ...cachedData, access_tier: "paid", locked_sections: {} }
-      : { ...buildEstimatePreview(cachedData), access_tier: "free" };
+    const responsePayload = buildEstimateAccessPayload(cachedData, estimateAccess);
     const res = NextResponse.json(responsePayload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     res.headers.set("X-Estimate-Cache", "HIT");
@@ -774,15 +850,22 @@ export async function POST(request) {
   }
 
   await setCachedEstimate(cacheKey, data);
-  const { access, isPaid } = await resolveEstimateAccess(request, body);
+  let estimateAccess;
+  try {
+    estimateAccess = await resolveEstimateAccess(request, body, params);
+  } catch (error) {
+    console.error("[estimate] free monthly access check failed:", error?.message || String(error));
+    return NextResponse.json(
+      { error: "free_monthly_limit_check_failed" },
+      { status: 500 }
+    );
+  }
 
-  const responsePayload = isPaid
-    ? { ...data, access_tier: "paid", locked_sections: {} }
-    : { ...buildEstimatePreview(data), access_tier: "free" };
+  const responsePayload = buildEstimateAccessPayload(data, estimateAccess);
 
   trackEstimate({
     body,
-    access,
+    access: estimateAccess.access,
     data,
     ip,
     params,

@@ -7,12 +7,16 @@ create table if not exists cadastru_search_events (
   id               bigserial primary key,
   search_type      text not null check (search_type in ('address', 'number')),
   user_id          uuid references auth.users(id) on delete set null,
+  city             text,
   district         text,
   cadastral_number text,
   result_type      text check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
   lookup_source    text check (lookup_source in ('api', 'local')),
   created_at       timestamptz not null default now()
 );
+
+alter table if exists cadastru_search_events
+  add column if not exists city text;
 
 alter table if exists cadastru_search_events
   add column if not exists district text;
@@ -52,6 +56,9 @@ create index if not exists idx_cadastru_search_events_type_created
 
 create index if not exists idx_cadastru_search_events_user_created
   on cadastru_search_events (user_id, created_at desc);
+
+create index if not exists idx_cadastru_search_events_city_created
+  on cadastru_search_events (city, created_at desc);
 
 create index if not exists idx_cadastru_search_events_district_created
   on cadastru_search_events (district, created_at desc);

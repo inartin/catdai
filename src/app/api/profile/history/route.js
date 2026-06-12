@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 const DEFAULT_HISTORY_LIMIT = 10;
 const MAX_HISTORY_LIMIT = 30;
 const ESTIMATE_COLUMNS = "id, estimate_type, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at";
-const CADASTRU_COLUMNS = "id, search_type, district, cadastral_number, result_type, lookup_source, created_at";
+const CADASTRU_COLUMNS = "id, search_type, city, district, cadastral_number, result_type, lookup_source, created_at";
 
 function isMissingEstimateTypeError(error) {
   const code = String(error?.code || "");
@@ -44,6 +44,7 @@ function normalizeCadastruRow(row) {
     id: `cadastru-${row.id}`,
     type: "cadastru",
     searchType: row.search_type,
+    city: row.city,
     district: row.district,
     cadastralNumber: row.cadastral_number,
     resultType: row.result_type,
@@ -124,6 +125,18 @@ async function fetchCadastruHistory(userId, cursor, pageSize) {
       .limit(pageSize + 1),
     cursor
   );
+
+  if (res.error && isMissingSchemaError(res.error) && String(res.error?.message || "").includes("city")) {
+    return applyCursor(
+      supabaseAdmin
+        .from("cadastru_search_events")
+        .select(CADASTRU_COLUMNS.replace("city, ", ""))
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(pageSize + 1),
+      cursor
+    );
+  }
 
   if (res.error && isMissingSchemaError(res.error)) {
     return { data: [], error: null };

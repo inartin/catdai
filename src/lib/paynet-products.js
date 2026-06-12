@@ -6,6 +6,7 @@ import {
   mapPaymentProductGrants,
 } from "@/lib/payment-products";
 
+// Dormant: CatDai uses Paddle only. Do not import this in active checkout code.
 export const PAYNET_FEATURE_KEYS = PAYMENT_FEATURE_KEYS;
 
 export function getPaynetProducts() {

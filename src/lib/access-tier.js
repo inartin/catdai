@@ -1,7 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const PAID_TIERS = new Set(["paid", "premium", "pro", "business"]);
-
 function getBearerToken(request) {
   const authorization = request.headers.get("authorization");
   if (!authorization) return null;
@@ -9,13 +7,6 @@ function getBearerToken(request) {
   if (!scheme || !token) return null;
   if (scheme.toLowerCase() !== "bearer") return null;
   return token.trim();
-}
-
-function isExpired(expiresAt) {
-  if (!expiresAt) return false;
-  const ts = Date.parse(expiresAt);
-  if (Number.isNaN(ts)) return false;
-  return ts <= Date.now();
 }
 
 export function isPaidAccessTier(tier) {
@@ -31,6 +22,5 @@ export async function resolveAccessTier(request) {
     return { tier: "free", user_id: null };
   }
 
-  // Temporary: all authenticated users get paid access until payments are implemented.
-  return { tier: "paid", user_id: authData.user.id };
+  return { tier: "free", user_id: authData.user.id };
 }

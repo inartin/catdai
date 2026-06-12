@@ -1,7 +1,7 @@
 # Pricing
 
 ## Stage
-Implemented as a reusable UI section. Paynet and Paddle backend payment routes are prepared, but pricing cards are not connected to checkout yet.
+Implemented as a reusable UI section. Paddle backend payment routes are prepared, but pricing cards are not connected to checkout yet.
 
 ## Routes
 - Landing page shows pricing near the bottom, before the FAQ preview.
@@ -16,18 +16,18 @@ Implemented as a reusable UI section. Paynet and Paddle backend payment routes a
 - Pricing cards use a fixed-height header area so feature rows start at the same vertical position even when descriptions wrap to different line counts.
 - Standard and Pro are fixed action packages with no time limit.
 - Extra includes 50 actions per feature.
-- The first Paynet DB migration does not include `extra_pack` as a checkout-eligible product key until the product rule is clarified because current copy also says `1 lună` / one month.
+- `extra_pack` is not checkout-eligible until the product rule is clarified because current copy also says `1 lună` / one month.
 - Each card enumerates usage per feature: sale estimate, rent estimate, 999 analysis, cadastru lookup, yield calculator, and PDF report.
 - Free shows `0 lei*`; sale/rent rows keep the `2/lună` monthly limit and show `0 lei` under the limit badge.
+- The sale/buy full-evaluation free monthly limit is enforced in `/api/estimate` for authenticated free users.
 - Free one-off features show per-use prices instead of usage counts: 999 analysis 29 lei, cadastru 19 lei, yield calculator 29 lei, and PDF report 29 lei.
 - Free card note explains the asterisk as per-use pricing.
 - Feature count badges show the included usage or one-off price for each feature.
 - Feature rows use a fixed height so the same feature lines align across pricing cards.
 - Prices are read server-side from env and passed into the client component.
 - If an env value is missing or invalid, the component falls back to the current default price.
-- `db/paynet_payments.sql` allows MVP one-time payment product keys for Standard, Pro, and single-feature purchases.
-- `db/paddle_payments.sql` mirrors the same allowed one-time product keys for Paddle.
-- Paynet product prices and product-to-credit mapping live in `src/lib/paynet-products.js` for now.
+- Paynet is not used whatsoever; old Paynet routes are disabled and must not be wired into pricing checkout.
+- `db/paddle_payments.sql` allows one-time payment product keys for Standard, Pro, and single-feature purchases.
 - Shared product definitions now live in `src/lib/payment-products.js`.
 - Paddle price IDs are read per product key from env through `src/lib/paddle-products.js`; the backend rejects Paddle transaction responses that contain recurring items or a subscription id.
 - `standard_pack` grants 2 uses per paid feature; `pro_pack` grants 10 uses per paid feature.
@@ -50,6 +50,7 @@ PADDLE_PRICE_PDF_REPORT_SINGLE=
 ## Related Files
 - `src/components/Pricing.js`
 - `src/lib/pricing-config.js`
+- `src/lib/free-monthly-feature-usage.js`
 - `src/app/pricing/page.js`
 - `src/app/pricing/layout.js`
 - `src/components/HomeContent.js`
@@ -59,9 +60,7 @@ PADDLE_PRICE_PDF_REPORT_SINGLE=
 - `db/paynet_payments.sql`
 - `db/paddle_payments.sql`
 - `src/lib/payment-products.js`
-- `src/lib/paynet-products.js`
 - `src/lib/paddle-products.js`
-- `src/app/api/payments/paynet/create/route.js`
 - `src/app/api/payments/paddle/create/route.js`
 - `src/app/payment/paddle/checkout/page.js`
 - `src/app/payment/paddle/success/page.js`

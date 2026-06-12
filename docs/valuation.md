@@ -13,7 +13,8 @@ Implemented and active for apartments.
 - `/evaluare` without valuation query params shows the reusable cadastru search form from `/cadastru` instead of redirecting to the homepage.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
 - Anonymous sale/buy results show the main market estimate, while the rest of the detailed result values are blurred and open the shared auth popup.
-- Authenticated sale/buy results support edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
+- Authenticated free sale/buy users receive 2 full evaluations per UTC month; after that, the result falls back to the blurred preview and shows the monthly-limit message.
+- Full sale/buy results support edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Regular `/evaluare` result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
 - Sale and rent result pages share the same criteria-edit action button, including the edit icon and secondary button styling.
@@ -46,6 +47,7 @@ Implemented and active for apartments.
 - Rent also returns price per m2 per month, range, confidence, district comparison, relevant rent listings, and the comparable listing count used for the result.
 - `/api/estimate` calls the RPC with the server-side Supabase admin client so server valuation work does not inherit the anonymous client timeout.
 - Anonymous `/api/estimate` responses remove locked sale/buy values before returning JSON and mark `locked_sections` for the UI placeholders.
+- Authenticated free `/api/estimate` responses consume the monthly free full-evaluation allowance in `user_feature_usage_events` after a successful cached or fresh estimate. The idempotency key is based on the UTC month and normalized sale/buy estimate params so refreshes do not consume another use.
 - Backend also runs seller-category estimates for owner vs agency/developer.
 - Seller-category estimates use the same property filters and seller filters, but skip district comparison and relevant listings because the UI only renders their price/range/stats.
 - Seller breakdown shows the comparable listing count for each seller type under the price per m2.
@@ -57,7 +59,7 @@ Implemented and active for apartments.
 - Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again, after `/api/pdf-generation-authorizations` validates the bearer token.
 - Successful authenticated PDF generation events are logged to `pdf_generation_events` with user id, device/session ids, optional estimate log id, and whether cadastral data was included.
 - Successful sale and rent estimation requests are logged to `estimate_log` with `estimate_type = 'sale'` or `estimate_type = 'rent'` for separate admin statistics. Rent requests require a client log or device id so duplicate untracked fetches do not create extra rows.
-- Estimate and PDF event DB writes are skipped outside `NODE_ENV=production`; local development still returns normal API responses without creating analytics rows.
+- Estimate and PDF event DB writes use `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`; otherwise local development still returns normal API responses without creating analytics rows.
 - The PDF dialog links to the static demo report at `/samples/demo-evaluare-catdai.md.pdf`.
 - PDF report layout uses explicit canvas coordinates for pills, seller cards, notes, and text blocks instead of HTML rasterization.
 - PDF report header reuses the product logo and displays `catdai.md` as the report brand.
@@ -91,6 +93,7 @@ Applied after RPC in `/api/estimate`.
 - `src/app/anunt/page.js`
 - `src/components/EvaluationResultPage.js`
 - `src/app/api/estimate/route.js`
+- `src/lib/free-monthly-feature-usage.js`
 - `src/app/api/listing-price-history/route.js`
 - `src/app/api/listing-duplicates/route.js`
 - `src/app/api/estimate-rent/route.js`

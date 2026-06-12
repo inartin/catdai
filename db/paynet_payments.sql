@@ -494,6 +494,122 @@ begin
 end;
 $$;
 
+create or replace function public.consume_free_monthly_feature_usage(
+  p_user_id uuid,
+  p_feature_key text,
+  p_idempotency_key text,
+  p_month_start timestamptz,
+  p_month_end timestamptz,
+  p_limit integer default 2,
+  p_metadata jsonb default '{}'::jsonb
+)
+returns table (
+  allowed boolean,
+  usage_event_id uuid,
+  source text,
+  used_count integer,
+  remaining_uses integer,
+  reason text
+)
+language plpgsql
+as $$
+declare
+  v_existing public.user_feature_usage_events%rowtype;
+  v_usage_id uuid;
+  v_used_count integer;
+  v_has_existing boolean := false;
+begin
+  if p_user_id is null then
+    raise exception 'p_user_id is required';
+  end if;
+
+  if p_feature_key not in ('sale_estimate', 'rent_estimate') then
+    raise exception 'free monthly usage is not supported for feature key: %', p_feature_key;
+  end if;
+
+  if length(trim(coalesce(p_idempotency_key, ''))) = 0 then
+    raise exception 'p_idempotency_key is required';
+  end if;
+
+  if p_month_start is null or p_month_end is null or p_month_end <= p_month_start then
+    raise exception 'valid monthly window is required';
+  end if;
+
+  if p_limit <= 0 then
+    raise exception 'p_limit must be positive';
+  end if;
+
+  perform pg_advisory_xact_lock(
+    hashtext(p_user_id::text),
+    hashtext(p_feature_key || ':' || p_month_start::text)
+  );
+
+  select *
+    into v_existing
+  from public.user_feature_usage_events usage_events
+  where usage_events.user_id = p_user_id
+    and usage_events.feature_key = p_feature_key
+    and usage_events.idempotency_key = p_idempotency_key;
+  if found then
+    v_has_existing := true;
+  end if;
+
+  select count(*)::integer
+    into v_used_count
+  from public.user_feature_usage_events usage_events
+  where usage_events.user_id = p_user_id
+    and usage_events.feature_key = p_feature_key
+    and usage_events.source = 'free_monthly'
+    and usage_events.created_at >= p_month_start
+    and usage_events.created_at < p_month_end;
+
+  if v_has_existing then
+    allowed := true;
+    usage_event_id := v_existing.id;
+    source := v_existing.source;
+    used_count := v_used_count;
+    remaining_uses := greatest(p_limit - v_used_count, 0);
+    reason := 'already_consumed';
+    return next;
+    return;
+  end if;
+
+  if v_used_count >= p_limit then
+    allowed := false;
+    usage_event_id := null;
+    source := null;
+    used_count := v_used_count;
+    remaining_uses := 0;
+    reason := 'free_monthly_limit_reached';
+    return next;
+    return;
+  end if;
+
+  insert into public.user_feature_usage_events (
+    user_id,
+    feature_key,
+    source,
+    idempotency_key,
+    metadata
+  ) values (
+    p_user_id,
+    p_feature_key,
+    'free_monthly',
+    p_idempotency_key,
+    coalesce(p_metadata, '{}'::jsonb)
+  )
+  returning id into v_usage_id;
+
+  allowed := true;
+  usage_event_id := v_usage_id;
+  source := 'free_monthly';
+  used_count := v_used_count + 1;
+  remaining_uses := greatest(p_limit - v_used_count - 1, 0);
+  reason := 'consumed';
+  return next;
+end;
+$$;
+
 -- ============================================================
 -- Access: payment and credit tables are server-owned for now.
 -- API routes should use SUPABASE_SERVICE_KEY and enforce user auth.
@@ -520,8 +636,10 @@ revoke execute on function public.grant_user_feature_credits(uuid, text, integer
 revoke execute on function public.grant_payment_order_feature_credits(uuid, text, integer) from public;
 revoke execute on function public.complete_paynet_payment(bigint, bigint, integer, integer, jsonb, timestamptz) from public;
 revoke execute on function public.consume_user_feature_credit(uuid, text, text, jsonb) from public;
+revoke execute on function public.consume_free_monthly_feature_usage(uuid, text, text, timestamptz, timestamptz, integer, jsonb) from public;
 
 grant execute on function public.grant_user_feature_credits(uuid, text, integer) to service_role;
 grant execute on function public.grant_payment_order_feature_credits(uuid, text, integer) to service_role;
 grant execute on function public.complete_paynet_payment(bigint, bigint, integer, integer, jsonb, timestamptz) to service_role;
 grant execute on function public.consume_user_feature_credit(uuid, text, text, jsonb) to service_role;
+grant execute on function public.consume_free_monthly_feature_usage(uuid, text, text, timestamptz, timestamptz, integer, jsonb) to service_role;

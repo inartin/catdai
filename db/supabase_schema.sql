@@ -189,6 +189,7 @@ create table cadastru_search_events (
   id               bigserial primary key,
   search_type      text not null check (search_type in ('address', 'number')),
   user_id          uuid references auth.users(id) on delete set null,
+  city             text,
   district         text,
   cadastral_number text,
   result_type      text check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
@@ -199,6 +200,7 @@ create table cadastru_search_events (
 create index idx_cadastru_search_events_created      on cadastru_search_events (created_at desc);
 create index idx_cadastru_search_events_type_created on cadastru_search_events (search_type, created_at desc);
 create index idx_cadastru_search_events_user_created on cadastru_search_events (user_id, created_at desc);
+create index idx_cadastru_search_events_city_created on cadastru_search_events (city, created_at desc);
 create index idx_cadastru_search_events_district_created on cadastru_search_events (district, created_at desc);
 create index idx_cadastru_search_events_number_created on cadastru_search_events (cadastral_number, created_at desc);
 create index idx_cadastru_search_events_result_created on cadastru_search_events (result_type, created_at desc);

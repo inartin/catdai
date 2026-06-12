@@ -6,7 +6,8 @@ Backend Paddle one-time payment flow is prepared. A minimal standalone Paddle de
 ## Scope
 - Paddle is added for one-time payments only.
 - Subscriptions are intentionally not used.
-- Paynet stays in the codebase and is not removed.
+- Paddle is the only payment processor CatDai uses for now.
+- Paynet is not used whatsoever. Any old Paynet code is dormant compatibility code and must not be wired into checkout.
 
 ## Routes
 - `POST /api/payments/paddle/create`
@@ -39,7 +40,7 @@ Backend Paddle one-time payment flow is prepared. A minimal standalone Paddle de
   - not linked from pricing or public navigation
 
 ## Product Model
-- Paddle uses the same CatDai one-time product keys as Paynet:
+- Paddle uses the CatDai one-time product keys:
   - `standard_pack`
   - `pro_pack`
   - `listing_analysis_single`
@@ -83,7 +84,7 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
   - `grant_paddle_payment_order_feature_credits(...)`
   - `complete_paddle_payment(...)`
 - Paddle grants write into the existing shared `user_feature_credits` table.
-- Run the shared credit schema from `db/paynet_payments.sql` before `db/paddle_payments.sql`, because Paddle grants reuse `user_feature_credits` and `grant_user_feature_credits(...)`.
+- Run the shared credit schema from `db/paynet_payments.sql` before `db/paddle_payments.sql`, because that file still defines shared credit tables and helpers used by Paddle. Do not use the Paynet order/notification tables for checkout.
 
 ## Related Files
 - `src/lib/payment-products.js`

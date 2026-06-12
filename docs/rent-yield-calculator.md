@@ -51,7 +51,7 @@ Implemented for rent-yield calculations.
 
 ## Analytics
 - `/calculator?rezultat=1` sends a calculator usage payload with device/session ids, selected investment fields, tax selection, and language to `/api/estimate-rent`.
-- Calculator usage is stored in `calculator_usage_events` only when `NODE_ENV=production`.
+- Calculator usage is stored in `calculator_usage_events` when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`.
 - Logged rows include anonymous or authenticated user id, property filters, investment totals, estimated monthly rent, gross/effective yield, payback period, and timestamp.
 - A stable per-result `event_id` prevents duplicate rows for the same browser session/result URL.
 - Admin dashboard shows calculator usage totals, recent rows, period totals, registered/anonymous split, tax-enabled count, and average investment/rent/yield.

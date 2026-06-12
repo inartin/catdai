@@ -35,7 +35,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - External 999 worker usage does not change analytics ownership; the main app still writes all listing-link analysis events.
 - Successful and failed external worker calls are counted in `external_api_usage_daily` through a fire-and-forget stats write after the worker response or failure.
 - The admin dashboard shows total link analyses, analyzed/rejected/failed splits, period totals, and recent rows.
-- 999.md link-analysis events are written only when `NODE_ENV=production`.
+- 999.md link-analysis events are written when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`.
 
 ## Comparison UI (`src/components/EstimateResult.js`)
 - Only compared when the listing is in **EUR** (avoids cross-currency math).

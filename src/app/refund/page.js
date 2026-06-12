@@ -6,7 +6,7 @@ const sections = [
     title: "1. Domeniu",
     paragraphs: [
       "Aceasta Politica de Rambursare se aplica produselor digitale CatDai, inclusiv accesului platit, creditelor de utilizare si rapoartelor sau analizelor generate in platforma.",
-      "Platile pot fi procesate prin Paddle sau prin alt procesator de plati indicat in ecranul de plata.",
+      "Platile sunt procesate prin Paddle.",
     ],
   },
   {

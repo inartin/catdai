@@ -300,6 +300,14 @@ function resolveDistrictFromPayload(payload) {
   return resolveDistrictFromSuburb(payload?.location?.suburb);
 }
 
+function resolveCityFromPayload(payload) {
+  if (payload?.form_fields?.city) return payload.form_fields.city;
+  const address = payload?.apartment?.address || payload?.building?.address || payload?.matched_address;
+  const city = resolveCity(address);
+  if (city) return city;
+  return resolveCityFromNominatim(payload?.location || {});
+}
+
 function resolveSearchContext(body) {
   if (body?.search_context !== "cadastru") return null;
   return body.search_type === "address" ? "address" : "number";
@@ -464,6 +472,7 @@ export async function POST(request) {
     if (!cadastruSearchType) return;
     await logCadastruSearchEvent(request, cadastruSearchType, {
       cadastralNumber: payload?.cadastral_number || trimmed,
+      city: resolveCityFromPayload(payload),
       district: cadastruSearchType === "address" ? resolveDistrictFromPayload(payload) : null,
       resultType: resultType || classifyCadastralResult(payload),
       lookupSource,

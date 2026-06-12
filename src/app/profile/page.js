@@ -66,7 +66,7 @@ function formatHistoryPropertyDetails(row, t) {
     return [
       row.searchType ? t(`profile.historyCadastruSearchType.${row.searchType}`) : null,
       row.resultType ? t(`profile.historyCadastruResultType.${row.resultType}`) : null,
-      row.lookupSource ? t(`profile.historyCadastruSource.${row.lookupSource}`) : null,
+      translateDataValue("data.city", row.city, t),
       translateDataValue("data.district", row.district, t),
     ].filter(Boolean).join(" · ") || "—";
   }

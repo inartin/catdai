@@ -38,7 +38,7 @@ function AdminLoginForm() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
+    <div className="admin-dark fixed inset-0 z-50 flex items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           <h1 className="text-xl font-bold text-gray-900 mb-1">Admin Login</h1>

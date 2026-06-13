@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Tooltip from "@/components/Tooltip";
 import ProfileCreditBalances from "@/components/ProfileCreditBalances";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
@@ -322,6 +322,7 @@ export default function AdminDashboard() {
   const [showListingLinkAnalysesList, setShowListingLinkAnalysesList] = useState(false);
   const [showExternalApiUsageList, setShowExternalApiUsageList] = useState(false);
   const [showCalculatorUsageList, setShowCalculatorUsageList] = useState(false);
+  const selectedUserPopupRef = useRef(null);
 
   const loadStats = useCallback(async ({ fresh = false } = {}) => {
     if (fresh) setStatsRefreshing(true);
@@ -377,6 +378,23 @@ export default function AdminDashboard() {
       cancelled = true;
     };
   }, [selectedUser?.id]);
+
+  useEffect(() => {
+    if (!selectedUser) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (selectedUserPopupRef.current?.contains(event.target)) return;
+      setSelectedUser(null);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [selectedUser]);
 
   const loadUsers = async () => {
     setUsersLoading(true);
@@ -467,7 +485,7 @@ export default function AdminDashboard() {
     <div className="space-y-8">
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-          <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
+          <div ref={selectedUserPopupRef} className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{selectedUser.name || "\u2014"}</h2>
@@ -491,6 +509,7 @@ export default function AdminDashboard() {
               <ProfileCreditBalances
                 credits={selectedUser.credits || []}
                 freeMonthlyCredits={selectedUser.freeMonthlyCredits || []}
+                isDarkMode
               />
               <div className="mt-5">
                 <h3 className="mb-3 text-base font-semibold text-gray-900">Plăți</h3>
@@ -504,6 +523,7 @@ export default function AdminDashboard() {
                     lang="ro"
                     formatProduct={(productKey) => PAYMENT_PRODUCT_LABELS_RO[productKey] || productKey || "—"}
                     formatStatus={(status) => PAYMENT_STATUS_LABELS_RO[status] || status || "—"}
+                    isDarkMode
                   />
                 )}
               </div>

@@ -51,6 +51,219 @@ body {
   color: var(--foreground);
 }
 
+.admin-dark {
+  --admin-accent: #6366f1;
+  --admin-success: #10b981;
+  --admin-warning: #f59e0b;
+  --admin-danger: #ef4444;
+  --admin-text: #e2e8f0;
+  --admin-muted: #9ca3af;
+  --admin-disabled: #4b5563;
+  --admin-deep: #0e1117;
+  --admin-nav: #141720;
+  --admin-bg: #1a1d23;
+  --admin-panel: #22263a;
+  --admin-hover: #2a2f42;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+}
+
+.admin-dark :is(.bg-gray-50, .bg-white) {
+  background-color: var(--admin-bg);
+}
+
+.admin-dark :is(.bg-gray-100, .bg-primary-light, .bg-cyan-100, .bg-purple-100) {
+  background-color: var(--admin-hover);
+}
+
+.admin-dark :is(.bg-green-50, .bg-green-100, .bg-emerald-50) {
+  background-color: color-mix(in srgb, var(--admin-success) 16%, transparent);
+}
+
+.admin-dark :is(.bg-blue-50) {
+  background-color: color-mix(in srgb, var(--admin-accent) 16%, transparent);
+}
+
+.admin-dark :is(.bg-red-50, .bg-red-100) {
+  background-color: color-mix(in srgb, var(--admin-danger) 14%, transparent);
+}
+
+.admin-dark :is(.bg-amber-50, .bg-yellow-50) {
+  background-color: color-mix(in srgb, var(--admin-warning) 14%, transparent);
+}
+
+.admin-dark .bg-primary,
+.admin-dark .hover\:bg-primary-dark:hover {
+  background-color: var(--admin-accent);
+}
+
+.admin-dark .hover\:bg-gray-50:hover,
+.admin-dark .hover\:bg-gray-100:hover,
+.admin-dark .hover\:bg-white:hover {
+  background-color: var(--admin-hover);
+}
+
+.admin-dark :is(.text-gray-900, .text-gray-800, .text-gray-700, .text-primary-dark) {
+  color: var(--admin-text);
+}
+
+.admin-dark :is(.text-gray-600, .text-gray-500, .text-gray-400) {
+  color: var(--admin-muted);
+}
+
+.admin-dark :is(.text-primary, .hover\:text-primary:hover, .hover\:text-primary-dark:hover) {
+  color: var(--admin-accent);
+}
+
+.admin-dark :is(.text-green-600, .text-green-700, .text-green-800, .text-emerald-700, .text-cyan-800, .text-blue-700) {
+  color: var(--admin-success);
+}
+
+.admin-dark :is(.text-purple-800) {
+  color: var(--admin-accent);
+}
+
+.admin-dark :is(.text-amber-800, .text-yellow-700) {
+  color: var(--admin-warning);
+}
+
+.admin-dark :is(.text-red-500, .text-red-600, .text-red-700, .hover\:text-red-500:hover) {
+  color: var(--admin-danger);
+}
+
+.admin-dark :is(.disabled\:text-gray-400:disabled, .disabled\:text-gray-300:disabled) {
+  color: var(--admin-disabled);
+}
+
+.admin-dark :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-red-100, .border-red-200, .border-amber-200, .border-green-200, .border-emerald-200) {
+  border-color: var(--admin-hover);
+}
+
+.admin-dark :is(.divide-gray-100) > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--admin-hover) !important;
+  border-top-color: var(--admin-hover) !important;
+  border-bottom-color: var(--admin-hover) !important;
+}
+
+.admin-dark :is(.ring-primary\/20, .ring-primary\/30, .ring-cyan-200, .ring-purple-200, .ring-green-200, .ring-gray-200) {
+  --tw-ring-color: color-mix(in srgb, var(--admin-accent) 28%, transparent);
+}
+
+.admin-dark :is(.border-primary\/40, .hover\:border-primary\/40:hover) {
+  border-color: color-mix(in srgb, var(--admin-accent) 55%, transparent);
+}
+
+.admin-dark :is(input, select, textarea) {
+  background-color: var(--admin-hover);
+  border-color: var(--admin-hover);
+  color: var(--admin-text);
+}
+
+.admin-dark :is(input, select, textarea)::placeholder {
+  color: var(--admin-disabled);
+}
+
+.admin-dark :is(input, select, textarea):focus {
+  border-color: var(--admin-accent);
+  --tw-ring-color: color-mix(in srgb, var(--admin-accent) 36%, transparent);
+}
+
+.admin-dark :is(button:disabled, input:disabled, select:disabled, textarea:disabled) {
+  color: var(--admin-disabled);
+}
+
+.admin-dark :is(.disabled\:bg-gray-300:disabled, .disabled\:bg-gray-400:disabled) {
+  background-color: var(--admin-disabled);
+}
+
+.admin-dark aside {
+  background-color: var(--admin-deep);
+  border-color: var(--admin-hover);
+}
+
+.admin-dark aside > div:first-child,
+.admin-dark aside > div:last-child {
+  background-color: var(--admin-nav);
+  border-color: var(--admin-hover);
+}
+
+.admin-dark aside a.bg-primary-light {
+  background-color: color-mix(in srgb, var(--admin-accent) 18%, transparent);
+  color: var(--admin-text);
+}
+
+.admin-dark main {
+  background-color: var(--admin-bg);
+}
+
+.admin-dark :is(.rounded-xl, .rounded-2xl).bg-white,
+.admin-dark form.bg-white,
+.admin-dark .shadow-sm.bg-white,
+.admin-dark .shadow-xl.bg-white {
+  background-color: var(--admin-panel);
+  border-color: var(--admin-hover);
+}
+
+.admin-dark thead .bg-gray-50,
+.admin-dark tr.bg-gray-50 {
+  background-color: var(--admin-nav);
+}
+
+.admin-dark table :is(th, td) {
+  border-color: var(--admin-hover);
+}
+
+.admin-dark tbody.divide-y > tr,
+.admin-dark tbody.divide-y > tr > td,
+.admin-dark tbody.divide-y > :not([hidden]) ~ :not([hidden]),
+.admin-dark tbody.divide-y > :not([hidden]) ~ :not([hidden]) > td,
+.admin-dark tbody.divide-y > :not(:last-child),
+.admin-dark tbody.divide-y > :not(:last-child) > td {
+  border-color: var(--admin-hover) !important;
+  border-top-color: var(--admin-hover) !important;
+  border-bottom-color: var(--admin-hover) !important;
+}
+
+.admin-dark thead {
+  border-bottom: 1px solid var(--admin-hover);
+}
+
+.admin-dark tbody tr:hover {
+  background-color: var(--admin-hover);
+}
+
+.admin-dark .news-content :is(h1, h2, h3) {
+  color: var(--admin-text);
+}
+
+.admin-dark .ProseMirror {
+  background-color: var(--admin-panel);
+  color: var(--admin-text);
+}
+
+.admin-dark .ProseMirror img {
+  border-color: var(--admin-hover);
+  background-color: var(--admin-bg);
+}
+
+.admin-dark svg :is(.fill-gray-400, .fill-gray-500) {
+  fill: var(--admin-muted);
+}
+
+.admin-dark svg [stroke="#e5e7eb"] {
+  stroke: var(--admin-hover);
+}
+
+.admin-dark svg [stroke="#16a34a"],
+.admin-dark svg [stroke="#15803d"] {
+  stroke: var(--admin-success);
+}
+
+.admin-dark svg [fill="#16a34a"],
+.admin-dark svg [fill="#15803d"] {
+  fill: var(--admin-success);
+}
+
 .news-content > * + * {
   margin-top: 1rem;
 }

@@ -421,6 +421,7 @@ export default function ProfilePage() {
                 }}
                 formatValue={(value) => formatNumber(value, lang, { maximumFractionDigits: 0 })}
                 className="mb-6"
+                isDarkMode={false}
               />
               <button
                 type="button"

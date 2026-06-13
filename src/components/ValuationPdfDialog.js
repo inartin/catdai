@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import QRCode from "qrcode";
 import CloseIcon from "@/components/icons/CloseIcon";
+import FeaturePricingAction from "@/components/FeaturePricingAction";
 import { useTranslation } from "@/context/LanguageContext";
 import { validateCadastralNumber } from "@/lib/validation";
 import { getDeviceId, getSessionId } from "@/lib/tracking";
@@ -261,7 +262,7 @@ function buildPdfReportKey({ data, options, addedCadastralNumber }) {
 }
 
 async function authorizePdfGeneration(accessToken, reportKey) {
-  if (!accessToken) return false;
+  if (!accessToken) return { authorized: false, reason: "auth" };
 
   const res = await fetch("/api/pdf-generation-authorizations", {
     method: "POST",
@@ -272,12 +273,17 @@ async function authorizePdfGeneration(accessToken, reportKey) {
     body: JSON.stringify({ report_key: reportKey }),
   });
 
-  if (res.status === 401) return false;
+  const payload = await res.json().catch(() => ({}));
+
+  if (res.status === 401) return { authorized: false, reason: "auth" };
+  if (res.status === 402 && payload?.error === "feature_credit_required") {
+    return { authorized: false, reason: "credit", purchase: payload.purchase || null };
+  }
   if (!res.ok) {
     throw new Error(`PDF authorization failed with ${res.status}`);
   }
 
-  return true;
+  return { authorized: true, payload };
 }
 
 async function buildReportCanvases({ data, options, t, lang, qrUrl }) {
@@ -709,6 +715,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
   const [options, setOptions] = useState(() => createInitialOptions(data));
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [purchaseOffer, setPurchaseOffer] = useState(null);
   const [showCadastralInput, setShowCadastralInput] = useState(false);
   const [cadastralInput, setCadastralInput] = useState("");
   const [cadastralLoading, setCadastralLoading] = useState(false);
@@ -725,6 +732,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
     if (!open) return;
     setOptions(createInitialOptions(data));
     setError("");
+    setPurchaseOffer(null);
     setShowCadastralInput(false);
     setCadastralInput("");
     setCadastralLoading(false);
@@ -829,15 +837,20 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
     if (isGenerating) return;
     setIsGenerating(true);
     setError("");
+    setPurchaseOffer(null);
 
     try {
-      const authorized = await authorizePdfGeneration(
+      const authorization = await authorizePdfGeneration(
         accessToken,
         buildPdfReportKey({ data: reportData, options, addedCadastralNumber })
       );
-      if (!authorized) {
+      if (!authorization.authorized && authorization.reason === "auth") {
         setError(t("result.loginToGeneratePdf"));
         onAuthRequired?.();
+        return;
+      }
+      if (!authorization.authorized && authorization.reason === "credit") {
+        setPurchaseOffer(authorization.purchase || { product_key: "standard_pack" });
         return;
       }
 
@@ -949,6 +962,9 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
           <p className="mt-4 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-600">
             {error}
           </p>
+        )}
+        {purchaseOffer && (
+          <FeaturePricingAction offer={purchaseOffer} className="mt-4" />
         )}
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

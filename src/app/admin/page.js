@@ -70,6 +70,13 @@ function userPackageClassName(user) {
   return "bg-gray-100 text-gray-700 ring-gray-200";
 }
 
+const USER_PACKAGE_OPTIONS = [
+  { key: "free", label: "Start" },
+  { key: "standard_pack", label: "Standard" },
+  { key: "pro_pack", label: "Pro" },
+  { key: "extra_pack", label: "Extra" },
+];
+
 const PAYMENT_PRODUCT_LABELS_RO = {
   standard_pack: "Pachet Standard",
   pro_pack: "Pachet Pro",
@@ -312,6 +319,13 @@ export default function AdminDashboard() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedUserTransactions, setSelectedUserTransactions] = useState([]);
   const [selectedUserTransactionsLoading, setSelectedUserTransactionsLoading] = useState(false);
+  const [selectedUserPackageMenuOpen, setSelectedUserPackageMenuOpen] = useState(false);
+  const [selectedUserPackageDraft, setSelectedUserPackageDraft] = useState("");
+  const [selectedUserPackageSaving, setSelectedUserPackageSaving] = useState(false);
+  const [selectedUserPackageError, setSelectedUserPackageError] = useState(null);
+  const [selectedUserCreditResetConfirming, setSelectedUserCreditResetConfirming] = useState(false);
+  const [selectedUserCreditResetSaving, setSelectedUserCreditResetSaving] = useState(false);
+  const [selectedUserCreditResetError, setSelectedUserCreditResetError] = useState(null);
   const [activeEstimationsType, setActiveEstimationsType] = useState(null);
   const [estimations, setEstimations] = useState([]);
   const [estimationsLoading, setEstimationsLoading] = useState(false);
@@ -380,6 +394,16 @@ export default function AdminDashboard() {
   }, [selectedUser?.id]);
 
   useEffect(() => {
+    setSelectedUserPackageDraft(selectedUser?.packageKey || "");
+    setSelectedUserPackageMenuOpen(false);
+    setSelectedUserPackageError(null);
+    setSelectedUserPackageSaving(false);
+    setSelectedUserCreditResetConfirming(false);
+    setSelectedUserCreditResetSaving(false);
+    setSelectedUserCreditResetError(null);
+  }, [selectedUser?.id, selectedUser?.packageKey]);
+
+  useEffect(() => {
     if (!selectedUser) return undefined;
 
     const handlePointerDown = (event) => {
@@ -400,7 +424,7 @@ export default function AdminDashboard() {
     setUsersLoading(true);
     setUsersError(null);
     try {
-      const res = await fetch("/api/admin/users");
+      const res = await fetch("/api/admin/users?fresh=1");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setUsers(Array.isArray(data.users) ? data.users : []);
@@ -416,6 +440,73 @@ export default function AdminDashboard() {
     setShowUsersList(next);
     if (next && users.length === 0 && !usersLoading) {
       loadUsers();
+    }
+  };
+
+  const saveSelectedUserPackage = async () => {
+    if (!selectedUser?.id || !selectedUserPackageDraft || selectedUserPackageDraft === selectedUser.packageKey) return;
+
+    setSelectedUserPackageSaving(true);
+    setSelectedUserPackageError(null);
+
+    try {
+      const res = await fetch(`/api/admin/users/${selectedUser.id}/package`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageKey: selectedUserPackageDraft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      const updatedUser = {
+        ...selectedUser,
+        packageKey: data.packageKey,
+        packageSource: "admin",
+        credits: Array.isArray(data.credits) ? data.credits : selectedUser.credits,
+        freeMonthlyCredits: data.packageKey === "free" ? selectedUser.freeMonthlyCredits : [],
+      };
+
+      setSelectedUser(updatedUser);
+      setUsers((items) => items.map((item) => item.id === updatedUser.id ? updatedUser : item));
+      setSelectedUserPackageMenuOpen(false);
+      setSelectedUserPackageDraft(data.packageKey);
+    } catch (err) {
+      setSelectedUserPackageError(err.message || "Nu s-a putut salva pachetul");
+    } finally {
+      setSelectedUserPackageSaving(false);
+    }
+  };
+
+  const resetSelectedUserCredits = async () => {
+    if (!selectedUser?.id || !selectedUser.packageKey) return;
+
+    setSelectedUserCreditResetSaving(true);
+    setSelectedUserCreditResetError(null);
+
+    try {
+      const res = await fetch(`/api/admin/users/${selectedUser.id}/package`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packageKey: selectedUser.packageKey }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      const updatedUser = {
+        ...selectedUser,
+        packageKey: data.packageKey,
+        packageSource: "admin",
+        credits: Array.isArray(data.credits) ? data.credits : selectedUser.credits,
+        freeMonthlyCredits: data.packageKey === "free" ? selectedUser.freeMonthlyCredits : [],
+      };
+
+      setSelectedUser(updatedUser);
+      setUsers((items) => items.map((item) => item.id === updatedUser.id ? updatedUser : item));
+      setSelectedUserCreditResetConfirming(false);
+    } catch (err) {
+      setSelectedUserCreditResetError(err.message || "Nu s-a putut reseta accesul");
+    } finally {
+      setSelectedUserCreditResetSaving(false);
     }
   };
 
@@ -492,9 +583,100 @@ export default function AdminDashboard() {
                 {selectedUser.email && <p className="mt-0.5 text-sm text-gray-500">{selectedUser.email}</p>}
               </div>
               <div className="flex items-center gap-3">
-                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(selectedUser)}`}>
-                  {fmtUserPackage(selectedUser.packageKey)}
-                </span>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUserPackageMenuOpen((value) => !value);
+                      setSelectedUserCreditResetConfirming(false);
+                    }}
+                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(selectedUser)}`}
+                  >
+                    {fmtUserPackage(selectedUser.packageKey)}
+                  </button>
+                  {selectedUserPackageMenuOpen && (
+                    <div className="absolute right-0 top-full z-10 mt-2 w-48 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+                      <select
+                        value={selectedUserPackageDraft}
+                        onChange={(event) => setSelectedUserPackageDraft(event.target.value)}
+                        className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm text-gray-800 outline-none focus:border-primary"
+                      >
+                        {USER_PACKAGE_OPTIONS.map((option) => (
+                          <option key={option.key} value={option.key}>{option.label}</option>
+                        ))}
+                      </select>
+                      {selectedUserPackageDraft && selectedUserPackageDraft !== selectedUser.packageKey && (
+                        <div className="mt-2 flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedUserPackageDraft(selectedUser.packageKey);
+                              setSelectedUserPackageMenuOpen(false);
+                              setSelectedUserPackageError(null);
+                            }}
+                            disabled={selectedUserPackageSaving}
+                            className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:text-gray-400"
+                          >
+                            Anulează
+                          </button>
+                          <button
+                            type="button"
+                            onClick={saveSelectedUserPackage}
+                            disabled={selectedUserPackageSaving}
+                            className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white hover:bg-primary-dark disabled:bg-gray-300"
+                          >
+                            {selectedUserPackageSaving ? "Salvare..." : "Salvează"}
+                          </button>
+                        </div>
+                      )}
+                      {selectedUserPackageError && (
+                        <p className="mt-2 text-xs font-medium text-red-500">{selectedUserPackageError}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUserCreditResetConfirming((value) => !value);
+                      setSelectedUserCreditResetError(null);
+                      setSelectedUserPackageMenuOpen(false);
+                    }}
+                    className="rounded-full border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                  >
+                    Reset
+                  </button>
+                  {selectedUserCreditResetConfirming && (
+                    <div className="absolute right-0 top-full z-10 mt-2 w-52 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+                      <p className="text-xs font-medium text-gray-700">Resetezi utilizările pentru pachetul curent?</p>
+                      <div className="mt-2 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedUserCreditResetConfirming(false);
+                            setSelectedUserCreditResetError(null);
+                          }}
+                          disabled={selectedUserCreditResetSaving}
+                          className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:text-gray-400"
+                        >
+                          Anulează
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetSelectedUserCredits}
+                          disabled={selectedUserCreditResetSaving}
+                          className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white hover:bg-primary-dark disabled:bg-gray-300"
+                        >
+                          {selectedUserCreditResetSaving ? "Resetare..." : "Confirmă"}
+                        </button>
+                      </div>
+                      {selectedUserCreditResetError && (
+                        <p className="mt-2 text-xs font-medium text-red-500">{selectedUserCreditResetError}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setSelectedUser(null)}

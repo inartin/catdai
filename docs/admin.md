@@ -1,7 +1,7 @@
 # Admin
 
 ## Stage
-Implemented as read-only admin dashboard.
+Implemented as admin dashboard with direct registered-user package adjustment.
 
 ## Access
 - `/admin/login?key=...` requires `ADMIN_LOGIN_KEY`.
@@ -15,11 +15,15 @@ Implemented as read-only admin dashboard.
 ## Dashboard
 Shows:
 - registered users with package badge, login provider type such as Telegram or Gmail, registration date, last visit, estimation count, cadastru search count, calculator usage count, PDF report count, 999 link count, shared links, and favorites; clicking a user name opens a Romanian access popup with the same package badge and remaining-access balances, and clicking outside that popup closes it
+- In the user popup, clicking the package badge opens a package dropdown. Selecting a different Start, Standard, Pro, or Extra package shows save/cancel actions. Saving updates the user's active admin package directly, resets all paid feature-credit balances to the selected package grants, and does not create or require a payment.
+- The reset button next to the popup package badge asks for confirm/cancel and then resets the current package's paid feature credits back to full unused counts.
 - Registered users table uses vertical column dividers for scanability.
 - Registered users package is based on the pricing page package names: free users show Start with the gray badge, paid Standard is green, Pro is cyan, and Extra is purple.
+- Admin package changes are stored in Supabase auth `app_metadata.catdai_admin_package_key`, which overrides the latest paid package for admin display.
 - Registered type cells show the user's email in the shared tooltip component when Supabase has an email for that user.
 - The user admin API includes a response version in its short cache so table schema changes do not reuse stale in-memory rows.
 - `/api/admin/users` includes paid feature credits and current-month free sale/rent balances for the user detail popup.
+- `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, and upserts `user_feature_credits` with `remaining_uses = total_granted` and `total_used = 0` for each paid feature.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows

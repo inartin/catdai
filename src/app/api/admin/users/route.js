@@ -10,7 +10,7 @@ import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 60 * 1000;
-const CACHE_VERSION = 10;
+const CACHE_VERSION = 11;
 const PACKAGE_PRODUCT_KEYS = new Set(["standard_pack", "pro_pack", "extra_pack"]);
 let cache = { data: null, ts: 0 };
 
@@ -328,7 +328,9 @@ export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
 
-  if (cache.data?.version === CACHE_VERSION && Date.now() - cache.ts < CACHE_TTL_MS) {
+  const fresh = request.nextUrl?.searchParams?.get("fresh") === "1";
+
+  if (!fresh && cache.data?.version === CACHE_VERSION && Date.now() - cache.ts < CACHE_TTL_MS) {
     return NextResponse.json(cache.data);
   }
 
@@ -365,14 +367,20 @@ export async function GET(request) {
       users: users.map((user) => {
         const paidPackage = packageByUser.get(user.id);
         const userCredits = creditsByUser.get(user.id) || [];
+        const adminPackageKey = user?.app_metadata?.catdai_admin_package_key;
+        const packageKey = PACKAGE_PRODUCT_KEYS.has(adminPackageKey)
+          ? adminPackageKey
+          : adminPackageKey === "free"
+            ? "free"
+            : paidPackage?.key || "free";
 
         return {
           id: user.id,
           name: userDisplayName(user),
           email: user.email || null,
           authProvider: userAuthProvider(user),
-          packageKey: paidPackage?.key || "free",
-          packageSource: paidPackage ? "paid" : "free",
+          packageKey,
+          packageSource: adminPackageKey ? "admin" : paidPackage ? "paid" : "free",
           packagePaidAt: paidPackage?.paidAt || null,
           credits: normalizeCreditRows(userCredits),
           freeMonthlyCredits: normalizeFreeMonthlyRows({

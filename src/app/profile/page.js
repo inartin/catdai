@@ -9,6 +9,8 @@ import Footer from "@/components/Footer";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
 import HistoryIcon from "@/components/icons/HistoryIcon";
 import Tooltip from "@/components/Tooltip";
+import ProfileCreditBalances from "@/components/ProfileCreditBalances";
+import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 
 const HISTORY_PAGE_SIZE = 10;
 const TRANSACTIONS_PAGE_SIZE = 10;
@@ -21,7 +23,6 @@ const CREDIT_FEATURE_LABEL_KEYS = {
   yield_calculator: "pricing.featureYield",
   pdf_report: "pricing.featurePdf",
 };
-
 function formatNumber(value, lang, options = {}) {
   const number = Number(value);
   if (!Number.isFinite(number)) return value;
@@ -47,16 +48,6 @@ function formatHistoryDate(value, lang) {
 function formatHistoryPrice(amount, lang) {
   if (amount == null) return "—";
   return `${formatNumber(amount, lang, { maximumFractionDigits: 0 })} €`;
-}
-
-function formatPaymentAmount(amountMinor, currencyCode, lang) {
-  const amount = Number(amountMinor);
-  if (!Number.isFinite(amount)) return "—";
-
-  return new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-RO", {
-    style: "currency",
-    currency: currencyCode || "MDL",
-  }).format(amount / 100);
 }
 
 function formatRoomValue(value, t) {
@@ -416,53 +407,21 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="mt-8 border-t border-gray-100 pt-6">
-              <div className="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-gray-900">{t("profile.creditBalances")}</h3>
-                    <p className="mt-0.5 text-xs text-gray-500">{t("profile.creditBalanceDesc")}</p>
-                  </div>
-                </div>
-                {creditsLoading ? (
-                  <div className="flex justify-center py-5">
-                    <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-gray-400" />
-                  </div>
-                ) : (
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {[
-                      ...freeMonthlyCredits.filter((row) => row.eligible !== false),
-                      ...credits.map((row) => ({ ...row, source: "paid_credit" })),
-                    ].map((row) => (
-                      <div key={`${row.source}-${row.featureKey}`} className="rounded-xl border border-gray-100 bg-white px-3 py-3">
-                        <div className="flex min-h-10 items-start justify-between gap-2">
-                          <p className="text-sm font-semibold leading-5 text-gray-900">
-                            {formatCreditFeature(row.featureKey, t)}
-                          </p>
-                          {row.source === "free_monthly" && (
-                            <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-                              {t("profile.creditBadgeFree")}
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-2 flex items-end justify-between gap-2">
-                          <div>
-                            <p className="text-[11px] font-medium uppercase text-gray-400">{t("profile.creditRemaining")}</p>
-                            <p className="text-lg font-bold text-primary">
-                              {formatNumber(row.remainingUses, lang, { maximumFractionDigits: 0 })}
-                            </p>
-                          </div>
-                          <p className="text-xs font-medium text-gray-500">
-                            {t("profile.creditUsed", {
-                              used: formatNumber(row.totalUsed, lang, { maximumFractionDigits: 0 }),
-                              total: formatNumber(row.totalGranted, lang, { maximumFractionDigits: 0 }),
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <ProfileCreditBalances
+                credits={credits}
+                freeMonthlyCredits={freeMonthlyCredits}
+                loading={creditsLoading}
+                labels={{
+                  title: t("profile.creditBalances"),
+                  description: t("profile.creditBalanceDesc"),
+                  remaining: t("profile.creditRemaining"),
+                  freeBadge: t("profile.creditBadgeFree"),
+                  used: ({ used, total }) => t("profile.creditUsed", { used, total }),
+                  feature: (featureKey) => formatCreditFeature(featureKey, t),
+                }}
+                formatValue={(value) => formatNumber(value, lang, { maximumFractionDigits: 0 })}
+                className="mb-6"
+              />
               <button
                 type="button"
                 className="flex w-full items-center justify-between gap-3 rounded-lg px-1 py-2 text-left text-lg font-medium text-gray-900 transition-colors hover:text-primary"
@@ -665,60 +624,27 @@ export default function ProfilePage() {
                   <div className="flex justify-center py-8">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400" />
                   </div>
-                ) : transactions.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-gray-400">{t("profile.noTransactions")}</p>
                 ) : (
-                  <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[760px] text-sm">
-                        <thead>
-                          <tr className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
-                            <th className="px-4 py-3">{t("profile.paymentDate")}</th>
-                            <th className="px-4 py-3">{t("profile.paymentProduct")}</th>
-                            <th className="px-4 py-3">{t("profile.paymentStatus")}</th>
-                            <th className="px-4 py-3 text-right">{t("profile.paymentAmount")}</th>
-                            <th className="px-4 py-3">{t("profile.paymentTransactionId")}</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {transactions.map((row) => (
-                            <tr key={row.id} className="hover:bg-gray-50">
-                              <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                                {formatHistoryDate(row.paidAt || row.createdAt, lang)}
-                              </td>
-                              <td className="px-4 py-3 font-medium text-gray-900">
-                                <div>{formatPaymentProduct(row.productKey, t)}</div>
-                                <div className="mt-0.5 text-xs font-normal text-gray-500">
-                                  {t("profile.paymentOrderId")}: {row.id}
-                                </div>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-gray-700">
-                                {formatPaymentStatus(row.status, t)}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
-                                {formatPaymentAmount(row.amountMinor, row.currencyCode, lang)}
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-gray-600">
-                                {row.transactionId || "—"}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {transactionsNextCursor && (
-                      <div className="border-t border-gray-100 px-4 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => fetchTransactionsPage({ cursor: transactionsNextCursor, append: true })}
-                          disabled={transactionsLoadingMore}
-                          className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-400"
-                        >
-                          {transactionsLoadingMore ? t("profile.historyLoadingMore") : t("profile.historyLoadMore")}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <ProfileTransactionsTable
+                    transactions={transactions}
+                    lang={lang}
+                    labels={{
+                      empty: t("profile.noTransactions"),
+                      paymentDate: t("profile.paymentDate"),
+                      paymentProduct: t("profile.paymentProduct"),
+                      paymentStatus: t("profile.paymentStatus"),
+                      paymentAmount: t("profile.paymentAmount"),
+                      paymentTransactionId: t("profile.paymentTransactionId"),
+                      paymentOrderId: t("profile.paymentOrderId"),
+                      loadMore: t("profile.historyLoadMore"),
+                      loadingMore: t("profile.historyLoadingMore"),
+                    }}
+                    formatProduct={(productKey) => formatPaymentProduct(productKey, t)}
+                    formatStatus={(status) => formatPaymentStatus(status, t)}
+                    nextCursor={transactionsNextCursor}
+                    loadingMore={transactionsLoadingMore}
+                    onLoadMore={(cursor) => fetchTransactionsPage({ cursor, append: true })}
+                  />
                 )}
               </section>
             )}

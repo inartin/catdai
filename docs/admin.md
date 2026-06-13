@@ -14,11 +14,12 @@ Implemented as read-only admin dashboard.
 
 ## Dashboard
 Shows:
-- registered users with package badge, login provider type such as Telegram or Gmail, registration date, last visit, estimation count, cadastru search count, calculator usage count, PDF report count, 999 link count, shared links, and favorites
+- registered users with package badge, login provider type such as Telegram or Gmail, registration date, last visit, estimation count, cadastru search count, calculator usage count, PDF report count, 999 link count, shared links, and favorites; clicking a user name opens a Romanian access popup with the same package badge and remaining-access balances
 - Registered users table uses vertical column dividers for scanability.
 - Registered users package is based on the pricing page package names: free users show Start with the gray badge, paid Standard is green, Pro is cyan, and Extra is purple.
 - Registered type cells show the user's email in the shared tooltip component when Supabase has an email for that user.
 - The user admin API includes a response version in its short cache so table schema changes do not reuse stale in-memory rows.
+- `/api/admin/users` includes paid feature credits and current-month free sale/rent balances for the user detail popup.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows

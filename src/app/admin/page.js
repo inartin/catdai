@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Tooltip from "@/components/Tooltip";
+import ProfileCreditBalances from "@/components/ProfileCreditBalances";
+import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 
 function fmtNum(n) {
   if (n == null) return "\u2014";
@@ -67,6 +69,28 @@ function userPackageClassName(user) {
   }
   return "bg-gray-100 text-gray-700 ring-gray-200";
 }
+
+const PAYMENT_PRODUCT_LABELS_RO = {
+  standard_pack: "Pachet Standard",
+  pro_pack: "Pachet Pro",
+  extra_pack: "Pachet Extra",
+  sale_estimate_single: "Evaluare completă",
+  rent_estimate_single: "Evaluare chirie completă",
+  listing_analysis_single: "Analiză anunț 999",
+  cadastru_lookup_single: "Date cadastrale",
+  yield_calculator_single: "Calculator randament",
+  pdf_report_single: "Raport PDF",
+};
+
+const PAYMENT_STATUS_LABELS_RO = {
+  pending: "În așteptare",
+  registered: "În procesare",
+  checkout_closed: "Checkout închis",
+  paid: "Achitat",
+  canceled: "Anulat",
+  payment_failed: "Eșuat",
+  failed: "Eșuat",
+};
 
 function fmtCadastruSearchType(type) {
   if (type === "address") return "Address";
@@ -285,6 +309,9 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUserTransactions, setSelectedUserTransactions] = useState([]);
+  const [selectedUserTransactionsLoading, setSelectedUserTransactionsLoading] = useState(false);
   const [activeEstimationsType, setActiveEstimationsType] = useState(null);
   const [estimations, setEstimations] = useState([]);
   const [estimationsLoading, setEstimationsLoading] = useState(false);
@@ -317,6 +344,39 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadStats();
   }, [loadStats]);
+
+  useEffect(() => {
+    if (!selectedUser?.id) {
+      setSelectedUserTransactions([]);
+      setSelectedUserTransactionsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSelectedUserTransactionsLoading(true);
+
+    fetch(`/api/admin/users/${selectedUser.id}/transactions`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setSelectedUserTransactions(Array.isArray(data.transactions) ? data.transactions : []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSelectedUserTransactions([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setSelectedUserTransactionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUser?.id]);
 
   const loadUsers = async () => {
     setUsersLoading(true);
@@ -405,6 +465,52 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
+      {selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+          <div className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">{selectedUser.name || "\u2014"}</h2>
+                {selectedUser.email && <p className="mt-0.5 text-sm text-gray-500">{selectedUser.email}</p>}
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(selectedUser)}`}>
+                  {fmtUserPackage(selectedUser.packageKey)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUser(null)}
+                  className="rounded-full border border-gray-200 px-2.5 py-1 text-sm font-medium text-gray-500 hover:bg-gray-50"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[75vh] overflow-y-auto p-5">
+              <ProfileCreditBalances
+                credits={selectedUser.credits || []}
+                freeMonthlyCredits={selectedUser.freeMonthlyCredits || []}
+              />
+              <div className="mt-5">
+                <h3 className="mb-3 text-base font-semibold text-gray-900">Plăți</h3>
+                {selectedUserTransactionsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-gray-400" />
+                  </div>
+                ) : (
+                  <ProfileTransactionsTable
+                    transactions={selectedUserTransactions}
+                    lang="ro"
+                    formatProduct={(productKey) => PAYMENT_PRODUCT_LABELS_RO[productKey] || productKey || "—"}
+                    formatStatus={(status) => PAYMENT_STATUS_LABELS_RO[status] || status || "—"}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <button
@@ -533,7 +639,13 @@ export default function AdminDashboard() {
                     {users.map((u) => (
                       <tr key={u.id} className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
                         <td className="px-4 py-3 text-gray-900 font-medium">
-                          {u.name || "\u2014"}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedUser(u)}
+                            className="text-left font-medium text-primary hover:underline"
+                          >
+                            {u.name || "\u2014"}
+                          </button>
                         </td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(u)}`}>

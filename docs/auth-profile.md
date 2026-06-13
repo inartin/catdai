@@ -22,7 +22,7 @@ Implemented and active.
 - free monthly sale/rent allowance balances plus purchased feature-credit balances, including remaining, used, and granted counts per feature, shown in the top profile card above `Setări`; free allowance cards use a separate free badge
 - favorites
 - paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus search type, result type, city, and district when available
-- paid sale/rent evaluation usage rows are also shown in history when a saved paid snapshot exists; those rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation
+- paid sale/rent evaluation usage rows are shown in history when a saved paid snapshot exists; if the same action also has an `estimate_log` row, history hides the ordinary row and keeps only the paid snapshot row. Paid rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation
 - paginated transactions tab for the authenticated user's own rows from `paddle_payment_orders`; it shows product, status, amount, Paddle transaction id when available, and the internal order id for support lookup
 - closed `Setări` panel with account deletion
 - localized browser title from `nav.profile`

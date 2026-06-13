@@ -59,6 +59,7 @@ function normalizePaidSnapshotRow(row) {
   const snapshot = normalizePaidEvaluationSnapshot(row);
   if (!snapshot) return null;
 
+  const metadata = row?.metadata && typeof row.metadata === "object" ? row.metadata : {};
   const input = snapshot.result.input || {};
   const estimate = snapshot.result.estimate || {};
   return {
@@ -83,6 +84,7 @@ function normalizePaidSnapshotRow(row) {
     estimatedPrice: estimate.market_rate,
     pricePerM2: estimate.price_per_m2,
     createdAt: snapshot.createdAt || row.created_at,
+    sourceLogId: metadata.log_id || null,
   };
 }
 
@@ -231,10 +233,20 @@ export async function GET(request) {
     return NextResponse.json({ history: [], nextCursor: null });
   }
 
+  const paidSnapshotRows = paidSnapshotRes.data || [];
+  const paidSnapshotLogIds = new Set(
+    paidSnapshotRows
+      .map((paidRow) => paidRow.sourceLogId)
+      .filter(Boolean)
+      .map(String)
+  );
+
   const rows = [
-    ...(estimateRes.data || []).map(normalizeEstimateRow),
+    ...(estimateRes.data || [])
+      .filter((row) => !paidSnapshotLogIds.has(String(row.id || "")))
+      .map(normalizeEstimateRow),
     ...(cadastruRes.data || []).map(normalizeCadastruRow),
-    ...(paidSnapshotRes.data || []),
+    ...paidSnapshotRows.map(({ sourceLogId, ...row }) => row),
   ].sort((a, b) => {
     const dateDiff = Date.parse(b.createdAt || "") - Date.parse(a.createdAt || "");
     if (dateDiff) return dateDiff;

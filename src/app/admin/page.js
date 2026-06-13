@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Tooltip from "@/components/Tooltip";
 
 function fmtNum(n) {
   if (n == null) return "\u2014";
@@ -44,6 +45,27 @@ function fmtDate(d) {
 
 function fmtBool(value) {
   return value ? "Yes" : "No";
+}
+
+function fmtUserPackage(packageKey) {
+  if (packageKey === "free") return "Start";
+  if (packageKey === "standard_pack") return "Standard";
+  if (packageKey === "pro_pack") return "Pro";
+  if (packageKey === "extra_pack") return "Extra";
+  return "Start";
+}
+
+function userPackageClassName(user) {
+  if (user?.packageKey === "extra_pack") {
+    return "bg-purple-100 text-purple-800 ring-purple-200";
+  }
+  if (user?.packageKey === "pro_pack") {
+    return "bg-cyan-100 text-cyan-800 ring-cyan-200";
+  }
+  if (user?.packageKey === "standard_pack") {
+    return "bg-green-100 text-green-800 ring-green-200";
+  }
+  return "bg-gray-100 text-gray-700 ring-gray-200";
 }
 
 function fmtCadastruSearchType(type) {
@@ -494,6 +516,7 @@ export default function AdminDashboard() {
                   <thead className="sticky top-0">
                     <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase [&>*+*]:border-l [&>*+*]:border-gray-100">
                       <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Package</th>
                       <th className="px-4 py-3">Registered Type</th>
                       <th className="px-4 py-3">Registered Date</th>
                       <th className="px-4 py-3">Last Visit</th>
@@ -512,8 +535,19 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-gray-900 font-medium">
                           {u.name || "\u2014"}
                         </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(u)}`}>
+                            {fmtUserPackage(u.packageKey)}
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-gray-600">
-                          {u.authProvider || "\u2014"}
+                          {u.email ? (
+                            <Tooltip text={u.email}>
+                              <span className="cursor-help">{u.authProvider || "\u2014"}</span>
+                            </Tooltip>
+                          ) : (
+                            u.authProvider || "\u2014"
+                          )}
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                           {fmtDate(u.registeredAt)}

@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 60 * 1000;
-const CACHE_VERSION = 6;
+const CACHE_VERSION = 9;
+const PACKAGE_PRODUCT_KEYS = new Set(["standard_pack", "pro_pack", "extra_pack"]);
 let cache = { data: null, ts: 0 };
 
 function isMissingSchemaError(error) {
@@ -70,6 +71,34 @@ async function fetchActivityRows() {
     if (error) {
       if (isMissingSchemaError(error)) return [];
       throw new Error(`user_activity query failed: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) break;
+    rows = rows.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+
+  return rows;
+}
+
+async function fetchPaidPackageRows() {
+  let rows = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from("paddle_payment_orders")
+      .select("user_id, product_key, paid_at, created_at")
+      .eq("status", "paid")
+      .in("product_key", Array.from(PACKAGE_PRODUCT_KEYS))
+      .not("user_id", "is", null)
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      if (isMissingSchemaError(error)) return [];
+      throw new Error(`paddle_payment_orders package query failed: ${error.message}`);
     }
 
     if (!data || data.length === 0) break;
@@ -161,6 +190,31 @@ function userRegisteredAt(user) {
   );
 }
 
+function toLatestPackageMap(rows) {
+  const map = new Map();
+
+  for (const row of rows || []) {
+    const id = row?.user_id;
+    const productKey = row?.product_key;
+    if (!id || !PACKAGE_PRODUCT_KEYS.has(productKey)) continue;
+
+    const rowTs = Date.parse(row.paid_at || row.created_at);
+    if (Number.isNaN(rowTs)) continue;
+
+    const prev = map.get(id);
+    const prevTs = prev ? Date.parse(prev.paidAt || prev.createdAt) : Number.NaN;
+    if (!prev || Number.isNaN(prevTs) || rowTs > prevTs) {
+      map.set(id, {
+        key: productKey,
+        paidAt: row.paid_at || null,
+        createdAt: row.created_at || null,
+      });
+    }
+  }
+
+  return map;
+}
+
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
@@ -170,7 +224,7 @@ export async function GET(request) {
   }
 
   try {
-    const [users, estimationRows, sharedRows, favoriteRows, activityRows, cadastruSearchRows, calculatorUsageRows, pdfReportRows, listingLinkRows] = await Promise.all([
+    const [users, estimationRows, sharedRows, favoriteRows, activityRows, cadastruSearchRows, calculatorUsageRows, pdfReportRows, listingLinkRows, packageRows] = await Promise.all([
       listAllUsers(),
       fetchUserIdRows("estimate_log", "user_id"),
       fetchUserIdRows("shared_links", "sharer_user_id"),
@@ -180,6 +234,7 @@ export async function GET(request) {
       fetchUserIdRows("calculator_usage_events", "user_id"),
       fetchUserIdRows("pdf_generation_events", "user_id"),
       fetchUserIdRows("listing_link_analysis_events", "user_id"),
+      fetchPaidPackageRows(),
     ]);
 
     const estimationsByUser = toCountMap(estimationRows, "user_id");
@@ -190,23 +245,32 @@ export async function GET(request) {
     const calculatorUsageByUser = toCountMap(calculatorUsageRows, "user_id");
     const pdfReportsByUser = toCountMap(pdfReportRows, "user_id");
     const listingLinksByUser = toCountMap(listingLinkRows, "user_id");
+    const packageByUser = toLatestPackageMap(packageRows);
 
     const data = {
       version: CACHE_VERSION,
-      users: users.map((user) => ({
-        id: user.id,
-        name: userDisplayName(user),
-        authProvider: userAuthProvider(user),
-        registeredAt: userRegisteredAt(user),
-        totalEstimations: estimationsByUser.get(user.id) || 0,
-        cadastruSearches: cadastruSearchesByUser.get(user.id) || 0,
-        calculatorUsage: calculatorUsageByUser.get(user.id) || 0,
-        pdfReports: pdfReportsByUser.get(user.id) || 0,
-        listingLinks: listingLinksByUser.get(user.id) || 0,
-        sharedLinks: sharedByUser.get(user.id) || 0,
-        favorites: favoritesByUser.get(user.id) || 0,
-        lastVisitAt: lastVisitByUser.get(user.id) || null,
-      })),
+      users: users.map((user) => {
+        const paidPackage = packageByUser.get(user.id);
+
+        return {
+          id: user.id,
+          name: userDisplayName(user),
+          email: user.email || null,
+          authProvider: userAuthProvider(user),
+          packageKey: paidPackage?.key || "free",
+          packageSource: paidPackage ? "paid" : "free",
+          packagePaidAt: paidPackage?.paidAt || null,
+          registeredAt: userRegisteredAt(user),
+          totalEstimations: estimationsByUser.get(user.id) || 0,
+          cadastruSearches: cadastruSearchesByUser.get(user.id) || 0,
+          calculatorUsage: calculatorUsageByUser.get(user.id) || 0,
+          pdfReports: pdfReportsByUser.get(user.id) || 0,
+          listingLinks: listingLinksByUser.get(user.id) || 0,
+          sharedLinks: sharedByUser.get(user.id) || 0,
+          favorites: favoritesByUser.get(user.id) || 0,
+          lastVisitAt: lastVisitByUser.get(user.id) || null,
+        };
+      }),
     };
 
     cache = { data, ts: Date.now() };

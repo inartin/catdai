@@ -222,6 +222,14 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
         }
 
         const v = validation.data;
+        const listingAnalysis = isPrimary && isListingAnalysisPage && pRaw.get("listing_id")
+          ? {
+            external_id: pRaw.get("listing_id"),
+            listing_price: pRaw.get("listing_price") || null,
+            listing_currency: pRaw.get("listing_currency") || null,
+            listing_address: pRaw.get("listing_address") || null,
+          }
+          : null;
 
         const cNum = pRaw.get(pFx + "cadastral_number");
         if (cNum) {
@@ -271,6 +279,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
             bathrooms_count: v.bathrooms_count ?? null,
             balconies_count: v.balconies_count ?? null,
             ...(isPrimary && shareSlug ? { share_slug: shareSlug } : {}),
+            ...(listingAnalysis ? { listing_analysis: listingAnalysis } : {}),
             ...trackingData,
           };
 

@@ -1,0 +1,46 @@
+import { NextResponse } from "next/server";
+import { resolveAccessTier } from "@/lib/access-tier";
+import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
+import { supabaseAdmin } from "@/lib/supabase-admin";
+
+function isMissingSchemaError(error) {
+  const code = String(error?.code || "");
+  return code === "42P01" || code === "42703" || code === "PGRST204";
+}
+
+function normalizeCreditRows(rows) {
+  const byFeature = new Map((rows || []).map((row) => [row.feature_key, row]));
+
+  return PAYMENT_FEATURE_KEYS.map((featureKey) => {
+    const row = byFeature.get(featureKey) || {};
+    return {
+      featureKey,
+      remainingUses: Math.max(Number(row.remaining_uses) || 0, 0),
+      totalGranted: Math.max(Number(row.total_granted) || 0, 0),
+      totalUsed: Math.max(Number(row.total_used) || 0, 0),
+    };
+  });
+}
+
+export async function GET(request) {
+  const access = await resolveAccessTier(request);
+  if (!access.user_id) {
+    return NextResponse.json({ credits: [] });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("user_feature_credits")
+    .select("feature_key, remaining_uses, total_granted, total_used")
+    .eq("user_id", access.user_id);
+
+  if (error) {
+    if (isMissingSchemaError(error)) {
+      return NextResponse.json({ credits: normalizeCreditRows([]) });
+    }
+
+    console.error("[profile-credits] credits failed:", error.message);
+    return NextResponse.json({ credits: normalizeCreditRows([]) });
+  }
+
+  return NextResponse.json({ credits: normalizeCreditRows(data || []) });
+}

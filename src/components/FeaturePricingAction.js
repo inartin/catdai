@@ -48,6 +48,7 @@ export default function FeaturePricingAction({
     t("pricing.featureRent"),
     t("pricing.feature999"),
     t("pricing.featureCadastru"),
+    t("pricing.featureYield"),
     t("pricing.featurePdf"),
   ];
 

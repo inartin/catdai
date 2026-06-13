@@ -62,7 +62,8 @@ Implemented and active, with partial fallback.
 - Cadastral lookup is available only to authenticated Supabase users.
 - Anonymous users see the shared auth popup before lookup from `/cadastru`, `/cadastru/rezultat`, the valuation form cadastral shortcut, or the PDF dialog cadastral add-on.
 - `/api/cadastral` and `/api/cadastru/address` return `401 unauthorized` without a valid bearer token.
-- Authenticated users receive full extracted apartment and building details without paid redaction.
+- Authenticated users also need a remaining `cadastru_lookup` credit from a package or single-feature purchase.
+- Address search and the follow-up cadastral-number result share the cadastral-number paid idempotency key when possible, so the same lookup is not charged twice.
 
 ## Limits
 - Rate limited to 15 requests/minute per IP.

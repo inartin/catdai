@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 
 function CheckIcon({ className = "h-4 w-4" }) {
@@ -59,8 +61,15 @@ function FeatureRow({ feature, featured }) {
   );
 }
 
-function PriceCard({ plan, featured = false }) {
+function getReturnPath() {
+  if (typeof window === "undefined") return null;
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
   const priceLabel = plan.price === 0 ? plan.priceLabel : formatPrice(plan.price);
+  const isBusy = checkoutState.productKey === plan.productKey
+    && (checkoutState.status === "loading" || checkoutState.status === "redirecting");
 
   return (
     <article
@@ -111,12 +120,38 @@ function PriceCard({ plan, featured = false }) {
       >
         {plan.note}
       </p>
+
+      {plan.productKey && (
+        <>
+          <button
+            type="button"
+            onClick={() => onCheckout(plan.productKey)}
+            disabled={isBusy}
+            className={`mt-4 inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:bg-gray-300 ${
+              featured
+                ? "bg-primary text-white hover:bg-primary-dark"
+                : "bg-gray-950 text-white hover:bg-gray-800"
+            }`}
+          >
+            {isBusy ? plan.loadingLabel : plan.actionLabel}
+          </button>
+          {checkoutState.productKey === plan.productKey && checkoutState.message && (
+            <p className="mt-2 text-xs font-medium text-red-600">{checkoutState.message}</p>
+          )}
+        </>
+      )}
     </article>
   );
 }
 
 export default function Pricing({ prices, compact = false }) {
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
+  const { session } = useAuth();
+  const [checkoutState, setCheckoutState] = useState({
+    status: "idle",
+    productKey: null,
+    message: "",
+  });
 
   const featureLabels = {
     sale: t("pricing.featureSale"),
@@ -176,32 +211,86 @@ export default function Pricing({ prices, compact = false }) {
     },
     {
       key: "standard",
+      productKey: "standard_pack",
       price: prices.standard,
       title: t("pricing.standardTitle"),
       description: t("pricing.standardDesc"),
       badge: t("pricing.standardBadge"),
       note: t("pricing.noTimeLimit"),
       features: makeFeatures("2"),
+      actionLabel: t("pricing.choosePlan"),
+      loadingLabel: t("payment.checkoutLoading"),
     },
     {
       key: "pro",
+      productKey: "pro_pack",
       price: prices.pro,
       title: t("pricing.proTitle"),
       description: t("pricing.proDesc"),
       badge: t("pricing.proBadge"),
       note: t("pricing.noTimeLimit"),
       features: makeFeatures("10"),
+      actionLabel: t("pricing.choosePlan"),
+      loadingLabel: t("payment.checkoutLoading"),
     },
     {
       key: "extra",
+      productKey: "extra_pack",
       price: prices.extra,
       title: t("pricing.extraTitle"),
       description: t("pricing.extraDesc"),
       badge: t("pricing.extraBadge"),
       note: t("pricing.extraNote"),
       features: makeFeatures("50"),
+      actionLabel: t("pricing.choosePlan"),
+      loadingLabel: t("payment.checkoutLoading"),
     },
   ];
+
+  const startCheckout = async (productKey) => {
+    if (!session?.access_token) {
+      setCheckoutState({
+        status: "error",
+        productKey,
+        message: t("payment.loginRequiredForCheckout"),
+      });
+      return;
+    }
+
+    setCheckoutState({ status: "loading", productKey, message: "" });
+
+    try {
+      const response = await fetch("/api/payments/paddle/create", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product_key: productKey,
+          lang,
+          return_to: getReturnPath(),
+        }),
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || t("payment.checkoutError"));
+      }
+
+      const checkoutUrl = payload?.checkout?.url;
+      if (!checkoutUrl) throw new Error(t("payment.checkoutError"));
+
+      setCheckoutState({ status: "redirecting", productKey, message: "" });
+      window.location.href = checkoutUrl;
+    } catch (error) {
+      setCheckoutState({
+        status: "error",
+        productKey,
+        message: error?.message || t("payment.checkoutError"),
+      });
+    }
+  };
 
   return (
     <section className={compact ? "px-4 pb-16" : "px-4 py-12 sm:py-16"}>
@@ -220,7 +309,13 @@ export default function Pricing({ prices, compact = false }) {
 
         <div className="mt-10 grid items-stretch gap-4 gap-y-6 md:grid-cols-2 xl:grid-cols-4">
           {plans.map((plan) => (
-            <PriceCard key={plan.key} plan={plan} featured={plan.key === "pro"} />
+            <PriceCard
+              key={plan.key}
+              plan={plan}
+              featured={plan.key === "pro"}
+              checkoutState={checkoutState}
+              onCheckout={startCheckout}
+            />
           ))}
         </div>
       </div>

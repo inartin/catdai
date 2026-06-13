@@ -9,7 +9,12 @@ import {
   makeMonthlyFeatureUsageKey,
 } from "@/lib/free-monthly-feature-usage";
 import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
-import { consumePaidFeatureCredit } from "@/lib/paid-feature-usage";
+import {
+  buildFeatureCreditRequiredPayload,
+  checkPaidFeatureAccess,
+  consumePaidFeatureCredit,
+  makePaidFeatureUsageKey,
+} from "@/lib/paid-feature-usage";
 import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
@@ -18,6 +23,7 @@ import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const RENT_EVALUATION_FEATURE_KEY = "rent_estimate";
+const YIELD_CALCULATOR_FEATURE_KEY = "yield_calculator";
 const ESTIMATE_RENT_CACHE_PREFIX = "catdai:estimate-rent:v7:";
 const ESTIMATE_RENT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const ESTIMATE_RENT_CACHE_TTL_SECONDS = 12 * 60 * 60;
@@ -438,6 +444,65 @@ function buildRentUsageMetadata({ params, body }) {
   };
 }
 
+function makeYieldCalculatorUsageKey(body, params) {
+  if (!body.calculator_usage) return null;
+
+  return makePaidFeatureUsageKey(YIELD_CALCULATOR_FEATURE_KEY, {
+    params,
+    calculator: {
+      apartment_price: body.calculator_usage.apartment_price ?? null,
+      additional_investments: body.calculator_usage.additional_investments ?? null,
+      include_rent_tax: body.calculator_usage.include_rent_tax === true,
+    },
+  });
+}
+
+function buildYieldCalculatorUsageMetadata({ params, body }) {
+  return {
+    feature: "yield_calculator",
+    params,
+    calculator_usage: body.calculator_usage || {},
+  };
+}
+
+function featureCreditRequiredResponse(featureKey, reason) {
+  return NextResponse.json(
+    buildFeatureCreditRequiredPayload(featureKey, reason),
+    { status: reason === "unauthorized" ? 401 : 402 }
+  );
+}
+
+async function precheckYieldCalculatorAccess(request, body, params) {
+  const idempotencyKey = makeYieldCalculatorUsageKey(body, params);
+  if (!idempotencyKey) return null;
+
+  const access = await resolveAccessTier(request);
+  const check = await checkPaidFeatureAccess({
+    userId: access.user_id,
+    featureKey: YIELD_CALCULATOR_FEATURE_KEY,
+    idempotencyKey,
+  });
+
+  if (!check.allowed) {
+    return {
+      blockedResponse: featureCreditRequiredResponse(YIELD_CALCULATOR_FEATURE_KEY, check.reason),
+    };
+  }
+
+  return { access, idempotencyKey };
+}
+
+async function consumeYieldCalculatorCredit(calculatorAccess, body, params) {
+  if (!calculatorAccess) return null;
+
+  return consumePaidFeatureCredit({
+    userId: calculatorAccess.access.user_id,
+    featureKey: YIELD_CALCULATOR_FEATURE_KEY,
+    idempotencyKey: calculatorAccess.idempotencyKey,
+    metadata: buildYieldCalculatorUsageMetadata({ params, body }),
+  });
+}
+
 async function resolveRentEstimateAccess(request, body, params) {
   const access = await resolveAccessTier(request);
   let hasFullAccess = isPaidAccessTier(access.tier);
@@ -462,7 +527,7 @@ async function resolveRentEstimateAccess(request, body, params) {
   }
 
   if (!hasFullAccess && access.user_id && freeMonthlyUsage?.reason === "free_monthly_limit_reached") {
-    const idempotencyKey = makeMonthlyFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
+    const idempotencyKey = makePaidFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
     paidCreditUsage = await consumePaidFeatureCredit({
       userId: access.user_id,
       featureKey: RENT_EVALUATION_FEATURE_KEY,
@@ -527,15 +592,25 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
  * with full access so the preview/blur logic never triggers. The chirie evaluare flow is
  * gated exactly like the sale evaluare flow.
  */
-async function resolveRentResponse(request, body, params, rawData) {
+async function resolveRentResponse(request, body, params, rawData, calculatorAccess = null) {
   if (body.calculator_usage) {
-    const access = await resolveAccessTier(request);
+    const paidCreditUsage = await consumeYieldCalculatorCredit(calculatorAccess, body, params);
+    if (!paidCreditUsage?.allowed) {
+      return {
+        blockedResponse: featureCreditRequiredResponse(YIELD_CALCULATOR_FEATURE_KEY, paidCreditUsage?.reason || "no_credit"),
+      };
+    }
+
     return {
-      access,
+      access: calculatorAccess.access,
       payload: {
         ...rawData,
-        access_tier: access.tier,
+        access_tier: calculatorAccess.access.tier,
         full_access: true,
+        access_source: "paid_credit",
+        paid_credit_usage: {
+          remaining: paidCreditUsage.remaining_uses,
+        },
         locked_sections: {},
       },
     };
@@ -650,13 +725,28 @@ export async function POST(request) {
     p_balconies_count: v.balconies_count ?? null,
   };
 
+  let calculatorAccess = null;
+  try {
+    calculatorAccess = await precheckYieldCalculatorAccess(request, body, params);
+  } catch (error) {
+    console.error("[estimate-rent] calculator access check failed:", error?.message || String(error));
+    return NextResponse.json(
+      { error: "feature_credit_check_failed" },
+      { status: 500 }
+    );
+  }
+
+  if (calculatorAccess?.blockedResponse) {
+    return calculatorAccess.blockedResponse;
+  }
+
   const requestStart = Date.now();
   const cacheKey = makeEstimateRentCacheKey(params);
   const cachedData = await getCachedEstimateRent(cacheKey);
   if (cachedData) {
     let rentResponse;
     try {
-      rentResponse = await resolveRentResponse(request, body, params, cachedData);
+      rentResponse = await resolveRentResponse(request, body, params, cachedData, calculatorAccess);
     } catch (accessError) {
       console.error("[estimate-rent] free monthly access check failed:", accessError?.message || String(accessError));
       return NextResponse.json(
@@ -664,6 +754,7 @@ export async function POST(request) {
         { status: 500 }
       );
     }
+    if (rentResponse.blockedResponse) return rentResponse.blockedResponse;
     trackRentEstimate({
       body,
       access: rentResponse.access,
@@ -710,7 +801,7 @@ export async function POST(request) {
   await setCachedEstimateRent(cacheKey, enrichedData);
   let rentResponse;
   try {
-    rentResponse = await resolveRentResponse(request, body, params, enrichedData);
+    rentResponse = await resolveRentResponse(request, body, params, enrichedData, calculatorAccess);
   } catch (accessError) {
     console.error("[estimate-rent] free monthly access check failed:", accessError?.message || String(accessError));
     return NextResponse.json(
@@ -718,6 +809,7 @@ export async function POST(request) {
       { status: 500 }
     );
   }
+  if (rentResponse.blockedResponse) return rentResponse.blockedResponse;
   trackRentEstimate({
     body,
     access: rentResponse.access,

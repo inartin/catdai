@@ -1,7 +1,7 @@
 # Pricing
 
 ## Stage
-Implemented as a reusable UI section. Paddle backend payment routes are prepared, but pricing cards are not connected to checkout yet.
+Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards start Paddle checkout.
 
 ## Routes
 - Landing page shows pricing near the bottom, before the FAQ preview.
@@ -15,8 +15,7 @@ Implemented as a reusable UI section. Paddle backend payment routes are prepared
 - The main pricing grid has four equal-height cards: Free, Standard, Pro, and Extra.
 - Pricing cards use a fixed-height header area so feature rows start at the same vertical position even when descriptions wrap to different line counts.
 - Standard and Pro are fixed action packages with no time limit.
-- Extra includes 50 actions per feature.
-- `extra_pack` is not checkout-eligible until the product rule is clarified because current copy also says `1 lună` / one month.
+- Extra includes 50 actions per feature, has no time limit, and is presented without the old one-month rule.
 - Each card enumerates usage per feature: sale estimate, rent estimate, 999 analysis, cadastru lookup, yield calculator, and PDF report.
 - Free shows `0 lei*`; sale/rent rows keep the `2/lună` monthly limit and show `0 lei` under the limit badge.
 - The sale/buy full-evaluation free monthly limit is enforced in `/api/estimate` for authenticated free users.
@@ -27,14 +26,14 @@ Implemented as a reusable UI section. Paddle backend payment routes are prepared
 - Prices are read server-side from env and passed into the client component.
 - If an env value is missing or invalid, the component falls back to the current default price.
 - Paynet is not used whatsoever; old Paynet routes are disabled and must not be wired into pricing checkout.
-- `db/paddle_payments.sql` allows one-time payment product keys for Standard, Pro, sale/rent single-evaluation access, and other single-feature purchases.
+- `db/paddle_payments.sql` allows one-time payment product keys for Standard, Pro, Extra, sale/rent single-evaluation access, and other single-feature purchases.
 - Shared product definitions now live in `src/lib/payment-products.js`.
 - Paddle price IDs are read per product key from env through `src/lib/paddle-products.js`; the backend rejects Paddle transaction responses that contain recurring items or a subscription id.
 - `PADDLE_PRICE_STANDARD_PACK` may be a Paddle price id (`pri_...`) or a product id (`pro_...`); product ids are resolved to the first active one-time price before checkout.
 - Limit-reached evaluation popups use the reusable `FeaturePricingAction` component and present Standard as the default package with MDL price from `NEXT_PUBLIC_PRICE_STANDARD_PACK_MDL_COST`, approximate EUR equivalent from `NEXT_PUBLIC_PRICE_STANDARD_PACK_COST`, pricing-style included-feature rows, a primary checkout action, and a secondary `/pricing` link.
-- `standard_pack` grants 2 uses per paid feature; `pro_pack` grants 10 uses per paid feature.
+- `standard_pack`, `pro_pack`, and `extra_pack` grant 2, 10, and 50 uses per paid feature.
 - Single-feature products grant 1 use for sale evaluation, rent evaluation, 999 analysis, cadastru lookup, yield calculator, or PDF report.
-- `extra_pack` is still not checkout-eligible until the product rule is clarified.
+- Profile payments show the remaining and used purchased credits per feature.
 
 ## Env
 ```env
@@ -45,6 +44,7 @@ NEXT_PUBLIC_PRICE_STANDARD_PACK_COST=5
 NEXT_PUBLIC_PRICE_STANDARD_PACK_MDL_COST=99
 PADDLE_PRICE_STANDARD_PACK=
 PADDLE_PRICE_PRO_PACK=
+PADDLE_PRICE_EXTRA_PACK=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST=
 PADDLE_PRICE_CADASTRU_LOOKUP_SINGLE=

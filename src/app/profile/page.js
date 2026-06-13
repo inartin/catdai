@@ -6,13 +6,21 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import ConfigIcon from "@/components/icons/ConfigIcon";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
 import HistoryIcon from "@/components/icons/HistoryIcon";
 import Tooltip from "@/components/Tooltip";
 
 const HISTORY_PAGE_SIZE = 10;
 const TRANSACTIONS_PAGE_SIZE = 10;
+const PACKAGE_PRODUCT_KEYS = ["extra_pack", "pro_pack", "standard_pack"];
+const CREDIT_FEATURE_LABEL_KEYS = {
+  sale_estimate: "pricing.featureSale",
+  rent_estimate: "pricing.featureRent",
+  listing_analysis: "pricing.feature999",
+  cadastru_lookup: "pricing.featureCadastru",
+  yield_calculator: "pricing.featureYield",
+  pdf_report: "pricing.featurePdf",
+};
 
 function formatNumber(value, lang, options = {}) {
   const number = Number(value);
@@ -122,6 +130,31 @@ function formatPaymentStatus(status, t) {
   return translated === key ? t("payment.orderStatusUnknown") : translated;
 }
 
+function formatCreditFeature(featureKey, t) {
+  const key = CREDIT_FEATURE_LABEL_KEYS[featureKey];
+  return key ? t(key) : featureKey || "—";
+}
+
+function getProfileAccessBadge({ transactions, credits, creditsLoading, t }) {
+  if (creditsLoading) {
+    return { label: t("profile.accessChecking"), tone: "neutral" };
+  }
+
+  const paidPackage = (transactions || []).find((row) =>
+    row.status === "paid" && PACKAGE_PRODUCT_KEYS.includes(row.productKey)
+  );
+  if (paidPackage) {
+    return { label: formatPaymentProduct(paidPackage.productKey, t), tone: "paid" };
+  }
+
+  const hasPaidCredit = (credits || []).some((row) => Number(row.remainingUses) > 0);
+  if (hasPaidCredit) {
+    return { label: t("profile.accessPaid"), tone: "paid" };
+  }
+
+  return { label: t("profile.accessFree"), tone: "free" };
+}
+
 function isManagedTelegramEmail(email) {
   return /^telegram-\d+@auth\.catdai\.md$/i.test(String(email || ""));
 }
@@ -159,8 +192,11 @@ export default function ProfilePage() {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [transactionsLoadingMore, setTransactionsLoadingMore] = useState(false);
   const [transactionsNextCursor, setTransactionsNextCursor] = useState(null);
+  const [credits, setCredits] = useState([]);
+  const [creditsLoading, setCreditsLoading] = useState(true);
   const profileName = getProfileName(user);
   const profileSubtitle = getProfileSubtitle(user);
+  const accessBadge = getProfileAccessBadge({ transactions, credits, creditsLoading, t });
 
   useEffect(() => {
     document.title = `${t("nav.profile")} | Catdai`;
@@ -277,14 +313,16 @@ export default function ProfilePage() {
       fetch("/api/favorites", { headers }).then((res) => res.json()),
       fetch(`/api/profile/history?limit=${HISTORY_PAGE_SIZE}`, { headers }).then((res) => res.json()),
       fetch(`/api/profile/transactions?limit=${TRANSACTIONS_PAGE_SIZE}`, { headers }).then((res) => res.json()),
+      fetch("/api/profile/credits", { headers }).then((res) => res.json()),
     ])
-      .then(([favoritesData, historyData, transactionsData]) => {
+      .then(([favoritesData, historyData, transactionsData, creditsData]) => {
         if (cancelled) return;
         setFavorites(favoritesData.favorites || []);
         setHistory(historyData.history || []);
         setHistoryNextCursor(historyData.nextCursor || null);
         setTransactions(transactionsData.transactions || []);
         setTransactionsNextCursor(transactionsData.nextCursor || null);
+        setCredits(creditsData.credits || []);
       })
       .catch(() => {})
       .finally(() => {
@@ -292,6 +330,7 @@ export default function ProfilePage() {
         setFavoritesLoading(false);
         setHistoryLoading(false);
         setTransactionsLoading(false);
+        setCreditsLoading(false);
       });
 
     return () => {
@@ -335,8 +374,12 @@ export default function ProfilePage() {
         <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 min-h-[60vh]">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">{t("nav.profile")}</h1>
           <div className="bg-white shadow rounded-lg p-8 border border-gray-100 relative">
-            <div className="absolute top-6 right-6 text-gray-400">
-              <ConfigIcon size={24} />
+            <div className={`absolute right-6 top-6 rounded-full border px-3 py-1 text-xs font-bold ${
+              accessBadge.tone === "paid"
+                ? "border-primary/20 bg-primary/10 text-primary-dark"
+                : "border-gray-200 bg-gray-50 text-gray-600"
+            }`}>
+              {accessBadge.label}
             </div>
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {user?.user_metadata?.avatar_url || user?.user_metadata?.picture ? (
@@ -367,6 +410,43 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="mt-8 border-t border-gray-100 pt-6">
+              <div className="mb-6 rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900">{t("profile.creditBalances")}</h3>
+                    <p className="mt-0.5 text-xs text-gray-500">{t("profile.creditBalanceDesc")}</p>
+                  </div>
+                </div>
+                {creditsLoading ? (
+                  <div className="flex justify-center py-5">
+                    <div className="h-5 w-5 animate-spin rounded-full border-b-2 border-gray-400" />
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {credits.map((row) => (
+                      <div key={row.featureKey} className="rounded-xl border border-gray-100 bg-white px-3 py-3">
+                        <p className="min-h-10 text-sm font-semibold leading-5 text-gray-900">
+                          {formatCreditFeature(row.featureKey, t)}
+                        </p>
+                        <div className="mt-2 flex items-end justify-between gap-2">
+                          <div>
+                            <p className="text-[11px] font-medium uppercase text-gray-400">{t("profile.creditRemaining")}</p>
+                            <p className="text-lg font-bold text-primary">
+                              {formatNumber(row.remainingUses, lang, { maximumFractionDigits: 0 })}
+                            </p>
+                          </div>
+                          <p className="text-xs font-medium text-gray-500">
+                            {t("profile.creditUsed", {
+                              used: formatNumber(row.totalUsed, lang, { maximumFractionDigits: 0 }),
+                              total: formatNumber(row.totalGranted, lang, { maximumFractionDigits: 0 }),
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button
                 type="button"
                 className="flex w-full items-center justify-between gap-3 rounded-lg px-1 py-2 text-left text-lg font-medium text-gray-900 transition-colors hover:text-primary"

@@ -9,6 +9,15 @@ export const PAYMENT_FEATURE_KEYS = [
   "pdf_report",
 ];
 
+const SINGLE_PRODUCT_BY_FEATURE = {
+  sale_estimate: "sale_estimate_single",
+  rent_estimate: "rent_estimate_single",
+  listing_analysis: "listing_analysis_single",
+  cadastru_lookup: "cadastru_lookup_single",
+  yield_calculator: "yield_calculator_single",
+  pdf_report: "pdf_report_single",
+};
+
 const SINGLE_PRODUCTS = {
   sale_estimate_single: {
     title: "Evaluare completa",
@@ -83,6 +92,12 @@ export function getPaymentProducts() {
       amountMdl: prices.pro,
       grants: grantAllFeatures(10),
     },
+    extra_pack: {
+      title: "Extra",
+      description: "50 uses per paid feature",
+      amountMdl: prices.extra,
+      grants: grantAllFeatures(50),
+    },
     ...SINGLE_PRODUCTS,
   };
 }
@@ -112,9 +127,9 @@ export function getPaymentProduct(productKey) {
 export function getEvaluationPurchaseOffer(featureKey) {
   const normalizedFeatureKey = String(featureKey || "").trim();
   const productKey = normalizedFeatureKey === "rent_estimate"
-    ? "rent_estimate_single"
+    ? SINGLE_PRODUCT_BY_FEATURE.rent_estimate
     : normalizedFeatureKey === "sale_estimate"
-      ? "sale_estimate_single"
+      ? SINGLE_PRODUCT_BY_FEATURE.sale_estimate
       : null;
   if (!productKey) return null;
 
@@ -126,6 +141,22 @@ export function getEvaluationPurchaseOffer(featureKey) {
     price_eur: product.amountEur,
     price_mdl: product.amountMdl,
     exchange_rate_mdl_per_eur: 20,
+  };
+}
+
+export function getFeaturePurchaseOffer(featureKey) {
+  const normalizedFeatureKey = String(featureKey || "").trim();
+  const productKey = SINGLE_PRODUCT_BY_FEATURE[normalizedFeatureKey];
+  if (!productKey) return null;
+
+  const product = getPaymentProduct(productKey);
+  if (!product?.amountMdl) return null;
+
+  return {
+    product_key: product.key,
+    price_eur: product.amountEur || null,
+    price_mdl: product.amountMdl,
+    exchange_rate_mdl_per_eur: product.amountEur ? 20 : null,
   };
 }
 

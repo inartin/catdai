@@ -1,12 +1,15 @@
 # Access And Paywall
 
 ## Stage
-Preview paywall implemented. Paddle checkout is connected for evaluation limit popups.
+Preview paywall implemented. Paddle checkout is connected for packages, evaluation limit popups, and paid feature credits.
 
 ## Current Access Rule
 - Anonymous users are `free`.
 - Authenticated Supabase users are `free` by default; authentication and paid access are separate.
 - Sale/buy full evaluation access for free authenticated users is limited to 2 unique evaluations per UTC month.
+- Paid package and single-feature access is tracked as non-expiring per-feature credits in `user_feature_credits`.
+- Standard, Pro, and Extra grant 2, 10, and 50 uses for each paid feature.
+- Paid-only features require a remaining feature credit: 999 analysis, cadastru lookup, yield calculator, and PDF report.
 - `/api/estimate` records free full-evaluation usage in `user_feature_usage_events` with `source = 'free_monthly'`; repeated loads of the same normalized sale/buy criteria in the same month reuse the same idempotency key.
 - Runtime usage persistence runs when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`; local dev can use the live Supabase dataset when this flag is enabled.
 - `user_entitlements` schema exists, but `resolveAccessTier()` does not read it yet.
@@ -21,6 +24,7 @@ Preview paywall implemented. Paddle checkout is connected for evaluation limit p
 - Sale and rent evaluation single-access checkouts use the same Paddle price ID from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE`, display the euro amount from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` plus `≈ MDL` at 20 MDL per EUR, and grant one `sale_estimate` or `rent_estimate` credit after Paddle confirms payment.
 - Authenticated free users consume the monthly free allowance before paid credits; paid credits are used only after the free monthly limit is reached.
 - When a paid sale/rent credit is used, `user_feature_usage_events.metadata.evaluation_snapshot` stores the immutable full result for profile history replay by `snapshot_id`.
+- Repeated loads of the same paid feature result reuse stable paid idempotency keys so refreshes do not consume another credit.
 
 ## Result Payload
 Sale/buy estimate results return a preview for anonymous users:
@@ -36,8 +40,10 @@ The sale/buy preview still shows the sector/city trend card title and period, bu
 ## Full Payload
 Authenticated free users receive the full sale/buy estimate response while they have monthly free allowance remaining. After the monthly allowance is exhausted, `/api/estimate` returns the same preview payload shape used for anonymous users plus `access_limit.reason = free_monthly_limit_reached`.
 Rent evaluation uses the same limit and purchase flow through `/api/estimate-rent` with `rent_estimate` credits.
-Cadastral lookup is login-gated: authenticated users receive full extracted apartment/building details, while anonymous users get the shared auth popup in the UI and `401 unauthorized` from the cadastral APIs.
-PDF export dialogs are visible to anonymous users, but downloading a PDF requires a valid authenticated Supabase bearer token checked by `/api/pdf-generation-authorizations`.
+Cadastral lookup is login-gated and credit-gated with `cadastru_lookup` credits.
+999 listing analysis is credit-gated with `listing_analysis` credits and does not consume sale-estimate credits.
+Rent-yield calculator results are credit-gated with `yield_calculator` credits and do not consume rent-estimate credits.
+PDF export dialogs are visible to anonymous users, but downloading a PDF requires a valid authenticated Supabase bearer token and a `pdf_report` credit checked by `/api/pdf-generation-authorizations`.
 
 ## Share Exception
 If a shared link was created by a paid user, `/api/estimate` allows full result access through `share_slug`.
@@ -45,8 +51,13 @@ If a shared link was created by a paid user, `/api/estimate` allows full result 
 ## Related Files
 - `src/lib/access-tier.js`
 - `src/lib/free-monthly-feature-usage.js`
+- `src/lib/paid-feature-usage.js`
 - `src/app/api/estimate/route.js`
+- `src/app/api/estimate-rent/route.js`
+- `src/app/api/analyze-link/route.js`
 - `src/app/api/cadastral/route.js`
+- `src/app/api/cadastru/address/route.js`
+- `src/app/api/profile/credits/route.js`
 - `src/components/EstimateResult.js`
 - `src/components/FeaturePricingAction.js`
 - `src/components/BlurWall.js`

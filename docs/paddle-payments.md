@@ -1,7 +1,7 @@
 # Paddle Payments
 
 ## Stage
-Backend Paddle one-time payment flow is prepared. Evaluation limit popups can start a Paddle checkout; pricing cards are not connected to checkout yet.
+Paddle one-time payment flow is connected for packages, evaluation limit popups, and single-feature products.
 
 ## Scope
 - Paddle is added for one-time payments only.
@@ -57,6 +57,7 @@ Backend Paddle one-time payment flow is prepared. Evaluation limit popups can st
 - Paddle uses the CatDai one-time product keys:
   - `standard_pack`
   - `pro_pack`
+  - `extra_pack`
   - `sale_estimate_single`
   - `rent_estimate_single`
   - `listing_analysis_single`
@@ -64,7 +65,8 @@ Backend Paddle one-time payment flow is prepared. Evaluation limit popups can st
   - `yield_calculator_single`
   - `pdf_report_single`
 - Product grants are shared in app code through `src/lib/payment-products.js`.
-- `extra_pack` is still excluded until its business rule is clarified.
+- Standard, Pro, and Extra grant 2, 10, and 50 uses respectively for every paid feature, with no time expiry.
+- Single-feature products grant one use for their feature and stack onto existing package credits.
 
 ## Paddle Requirements
 - Each supported product key needs a Paddle `price_id` in env.
@@ -87,6 +89,7 @@ NEXT_PUBLIC_PADDLE_ENVIRONMENT=sandbox
 NEXT_PUBLIC_PADDLE_CLIENT_TOKEN=
 PADDLE_PRICE_STANDARD_PACK=
 PADDLE_PRICE_PRO_PACK=
+PADDLE_PRICE_EXTRA_PACK=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST=
 PADDLE_PRICE_CADASTRU_LOOKUP_SINGLE=
@@ -95,7 +98,7 @@ PADDLE_PRICE_PDF_REPORT_SINGLE=
 PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
 ```
 
-`PADDLE_PRICE_LISTING_ANALYSIS_SINGLE` is the shared Paddle price ID for sale/rent single-evaluation checkout. `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` is the numeric EUR amount shown in the UI, plus `≈ MDL` using 20 MDL per EUR.
+`PADDLE_PRICE_LISTING_ANALYSIS_SINGLE` is the shared Paddle price ID for sale/rent single-evaluation checkout and 999 listing analysis. `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` is the numeric EUR amount shown in the UI, plus `≈ MDL` using 20 MDL per EUR.
 
 ## Database
 - `db/paddle_payments.sql` adds:
@@ -104,6 +107,7 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
   - `grant_paddle_payment_order_feature_credits(...)`
   - `complete_paddle_payment(...)`
 - Paddle grants write into the existing shared `user_feature_credits` table.
+- Paid uses are logged in `user_feature_usage_events`; `user_feature_credits.remaining_uses` and `total_used` drive the profile balance display.
 - `paddle_payment_orders.status` includes `checkout_closed` for a user-closed overlay checkout that has not received a final Paddle payment outcome.
 - Run the shared credit schema from `db/paynet_payments.sql` before `db/paddle_payments.sql`, because that file still defines shared credit tables and helpers used by Paddle. Do not use the Paynet order/notification tables for checkout.
 

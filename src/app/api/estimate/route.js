@@ -8,7 +8,12 @@ import {
   makeMonthlyFeatureUsageKey,
 } from "@/lib/free-monthly-feature-usage";
 import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
-import { consumePaidFeatureCredit } from "@/lib/paid-feature-usage";
+import {
+  buildFeatureCreditRequiredPayload,
+  checkPaidFeatureAccess,
+  consumePaidFeatureCredit,
+  makePaidFeatureUsageKey,
+} from "@/lib/paid-feature-usage";
 import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
@@ -236,6 +241,7 @@ const ESTIMATE_CACHE_TTL_SECONDS = 30 * 60;
 const ESTIMATE_CACHE_MAX_ENTRIES = 250;
 const ESTIMATE_CACHE_PREFIX = "catdai:estimate:v1:";
 const FULL_EVALUATION_FEATURE_KEY = "sale_estimate";
+const LISTING_ANALYSIS_FEATURE_KEY = "listing_analysis";
 
 let estimateCache = new Map();
 
@@ -375,6 +381,82 @@ function buildUsageMetadata({ params, body }) {
   };
 }
 
+function getListingAnalysisExternalId(body) {
+  const externalId = String(body?.listing_analysis?.external_id || "").trim();
+  return externalId || null;
+}
+
+function makeListingAnalysisUsageKey(body) {
+  const externalId = getListingAnalysisExternalId(body);
+  return externalId
+    ? makePaidFeatureUsageKey(LISTING_ANALYSIS_FEATURE_KEY, { external_id: externalId })
+    : null;
+}
+
+function buildListingAnalysisUsageMetadata({ params, body }) {
+  return {
+    feature: "listing_analysis",
+    listing_analysis: body.listing_analysis || {},
+    params,
+    evaluation_group_id: body.evaluation_group_id || null,
+    log_id: body.log_id || null,
+    language: body.language || null,
+  };
+}
+
+function featureCreditRequiredResponse(featureKey, reason) {
+  return NextResponse.json(
+    buildFeatureCreditRequiredPayload(featureKey, reason),
+    { status: reason === "unauthorized" ? 401 : 402 }
+  );
+}
+
+async function precheckListingAnalysisAccess(request, body) {
+  const idempotencyKey = makeListingAnalysisUsageKey(body);
+  if (!idempotencyKey) return null;
+
+  const access = await resolveAccessTier(request);
+  const check = await checkPaidFeatureAccess({
+    userId: access.user_id,
+    featureKey: LISTING_ANALYSIS_FEATURE_KEY,
+    idempotencyKey,
+  });
+
+  if (!check.allowed) {
+    return {
+      blockedResponse: featureCreditRequiredResponse(LISTING_ANALYSIS_FEATURE_KEY, check.reason),
+    };
+  }
+
+  return { access, idempotencyKey };
+}
+
+async function consumeListingAnalysisCredit(listingAccess, body, params) {
+  if (!listingAccess) return null;
+
+  return consumePaidFeatureCredit({
+    userId: listingAccess.access.user_id,
+    featureKey: LISTING_ANALYSIS_FEATURE_KEY,
+    idempotencyKey: listingAccess.idempotencyKey,
+    metadata: buildListingAnalysisUsageMetadata({ params, body }),
+  });
+}
+
+function buildListingAnalysisAccessPayload(data, listingAccess, paidCreditUsage) {
+  return {
+    ...data,
+    access_tier: listingAccess.access.tier,
+    full_access: true,
+    access_source: "paid_credit",
+    paid_credit_usage: paidCreditUsage
+      ? {
+        remaining: paidCreditUsage.remaining_uses,
+      }
+      : null,
+    locked_sections: {},
+  };
+}
+
 async function resolveEstimateAccess(request, body, params) {
   const access = await resolveAccessTier(request);
   let hasFullAccess = isPaidAccessTier(access.tier);
@@ -412,7 +494,7 @@ async function resolveEstimateAccess(request, body, params) {
   }
 
   if (!hasFullAccess && access.user_id && freeMonthlyUsage?.reason === "free_monthly_limit_reached") {
-    const idempotencyKey = makeMonthlyFeatureUsageKey(FULL_EVALUATION_FEATURE_KEY, params);
+    const idempotencyKey = makePaidFeatureUsageKey(FULL_EVALUATION_FEATURE_KEY, params);
     paidCreditUsage = await consumePaidFeatureCredit({
       userId: access.user_id,
       featureKey: FULL_EVALUATION_FEATURE_KEY,
@@ -818,25 +900,56 @@ export async function POST(request) {
     p_balconies_count: v.balconies_count ?? null,
   };
 
+  let listingAnalysisAccess = null;
+  try {
+    listingAnalysisAccess = await precheckListingAnalysisAccess(request, body);
+  } catch (error) {
+    console.error("[estimate] listing analysis access check failed:", error?.message || String(error));
+    return NextResponse.json(
+      { error: "feature_credit_check_failed" },
+      { status: 500 }
+    );
+  }
+
+  if (listingAnalysisAccess?.blockedResponse) {
+    return listingAnalysisAccess.blockedResponse;
+  }
+
   const requestStart = Date.now();
   const cacheKey = makeEstimateCacheKey(params, body.language);
   const cachedData = await getCachedEstimate(cacheKey);
 
   if (cachedData) {
-    let estimateAccess;
-    try {
-      estimateAccess = await resolveEstimateAccess(request, body, params);
-    } catch (error) {
-      console.error("[estimate] free monthly access check failed:", error?.message || String(error));
-      return NextResponse.json(
-        { error: "free_monthly_limit_check_failed" },
-        { status: 500 }
-      );
+    let responsePayload;
+    let trackingAccess;
+
+    if (listingAnalysisAccess) {
+      const paidCreditUsage = await consumeListingAnalysisCredit(listingAnalysisAccess, body, params);
+      if (!paidCreditUsage?.allowed) {
+        return featureCreditRequiredResponse(LISTING_ANALYSIS_FEATURE_KEY, paidCreditUsage?.reason || "no_credit");
+      }
+      responsePayload = buildListingAnalysisAccessPayload(cachedData, listingAnalysisAccess, paidCreditUsage);
+      trackingAccess = listingAnalysisAccess.access;
+    } else {
+      let estimateAccess;
+      try {
+        estimateAccess = await resolveEstimateAccess(request, body, params);
+      } catch (error) {
+        console.error("[estimate] free monthly access check failed:", error?.message || String(error));
+        return NextResponse.json(
+          { error: "free_monthly_limit_check_failed" },
+          { status: 500 }
+        );
+      }
+      responsePayload = buildEstimateAccessPayload(cachedData, estimateAccess);
+      trackingAccess = estimateAccess.access;
+      await persistSaleEvaluationSnapshot(estimateAccess, params, responsePayload);
     }
+
     const responseTimeMs = Date.now() - requestStart;
     trackEstimate({
       body,
-      access: estimateAccess.access,
+      access: trackingAccess,
       data: cachedData,
       ip,
       params,
@@ -844,8 +957,6 @@ export async function POST(request) {
       validationData: v,
     });
 
-    const responsePayload = buildEstimateAccessPayload(cachedData, estimateAccess);
-    await persistSaleEvaluationSnapshot(estimateAccess, params, responsePayload);
     const res = NextResponse.json(responsePayload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     res.headers.set("X-Estimate-Cache", "HIT");
@@ -941,23 +1052,35 @@ export async function POST(request) {
   }
 
   await setCachedEstimate(cacheKey, data);
-  let estimateAccess;
-  try {
-    estimateAccess = await resolveEstimateAccess(request, body, params);
-  } catch (error) {
-    console.error("[estimate] free monthly access check failed:", error?.message || String(error));
-    return NextResponse.json(
-      { error: "free_monthly_limit_check_failed" },
-      { status: 500 }
-    );
-  }
+  let responsePayload;
+  let trackingAccess;
 
-  const responsePayload = buildEstimateAccessPayload(data, estimateAccess);
-  await persistSaleEvaluationSnapshot(estimateAccess, params, responsePayload);
+  if (listingAnalysisAccess) {
+    const paidCreditUsage = await consumeListingAnalysisCredit(listingAnalysisAccess, body, params);
+    if (!paidCreditUsage?.allowed) {
+      return featureCreditRequiredResponse(LISTING_ANALYSIS_FEATURE_KEY, paidCreditUsage?.reason || "no_credit");
+    }
+    responsePayload = buildListingAnalysisAccessPayload(data, listingAnalysisAccess, paidCreditUsage);
+    trackingAccess = listingAnalysisAccess.access;
+  } else {
+    let estimateAccess;
+    try {
+      estimateAccess = await resolveEstimateAccess(request, body, params);
+    } catch (error) {
+      console.error("[estimate] free monthly access check failed:", error?.message || String(error));
+      return NextResponse.json(
+        { error: "free_monthly_limit_check_failed" },
+        { status: 500 }
+      );
+    }
+    responsePayload = buildEstimateAccessPayload(data, estimateAccess);
+    trackingAccess = estimateAccess.access;
+    await persistSaleEvaluationSnapshot(estimateAccess, params, responsePayload);
+  }
 
   trackEstimate({
     body,
-    access: estimateAccess.access,
+    access: trackingAccess,
     data,
     ip,
     params,

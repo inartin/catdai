@@ -10,10 +10,17 @@ import {
 import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
+import {
+  buildFeatureCreditRequiredPayload,
+  checkPaidFeatureAccess,
+  consumePaidFeatureCredit,
+  makePaidFeatureUsageKey,
+} from "@/lib/paid-feature-usage";
 import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
+const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 const GEODATA_TIMEOUT_MS = 10_000;
 const NOMINATIM_TIMEOUT_MS = 5_000;
 const CADASTRAL_CACHE_PREFIX = "catdai:cadastral:v1:";
@@ -347,6 +354,19 @@ function makeCadastralCacheKey(cadastralNumber) {
   return `${CADASTRAL_CACHE_PREFIX}${hash}`;
 }
 
+function makeCadastruLookupUsageKey(cadastralNumber) {
+  return makePaidFeatureUsageKey(CADASTRU_LOOKUP_FEATURE_KEY, {
+    cadastral_number: String(cadastralNumber || "").trim(),
+  });
+}
+
+function featureCreditRequiredResponse(reason) {
+  return NextResponse.json(
+    buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
+    { status: reason === "unauthorized" ? 401 : 402 }
+  );
+}
+
 function normalizeLookupSource(value) {
   return value === "api" || value === "local" ? value : null;
 }
@@ -467,6 +487,16 @@ export async function POST(request) {
     }
   }
 
+  const creditIdempotencyKey = makeCadastruLookupUsageKey(trimmed);
+  const creditCheck = await checkPaidFeatureAccess({
+    userId: access.user_id,
+    featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
+    idempotencyKey: creditIdempotencyKey,
+  });
+  if (!creditCheck.allowed) {
+    return featureCreditRequiredResponse(creditCheck.reason);
+  }
+
   let lookupSource = null;
   const recordCadastruSearch = async (payload, resultType = null) => {
     if (!cadastruSearchType) return;
@@ -479,6 +509,21 @@ export async function POST(request) {
     });
   };
   const respondWithCadastralPayload = async (payload, options = {}) => {
+    const creditUsage = await consumePaidFeatureCredit({
+      userId: access.user_id,
+      featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
+      idempotencyKey: creditIdempotencyKey,
+      metadata: {
+        feature: "cadastru_lookup",
+        cadastral_number: trimmed,
+        search_context: cadastruSearchType,
+        lookup_source: lookupSource,
+      },
+    });
+    if (!creditUsage.allowed) {
+      return featureCreditRequiredResponse(creditUsage.reason || "no_credit");
+    }
+
     await setCachedCadastralPayload(trimmed, payload, lookupSource);
     await persistCadastruRecord(payload, {
       cadastralNumber: trimmed,

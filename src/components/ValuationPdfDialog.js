@@ -250,12 +250,26 @@ async function trackPdfGeneration({ accessToken, estimateLogId, includedCadastra
   }
 }
 
-async function authorizePdfGeneration(accessToken) {
+function buildPdfReportKey({ data, options, addedCadastralNumber }) {
+  return {
+    estimate_log_id: data?.tracking?.estimate_log_id || null,
+    estimate_type: data?.estimate_type || "sale",
+    input: data?.input || {},
+    options,
+    cadastral_number: addedCadastralNumber || data?.cadastral?.cadastral_number || null,
+  };
+}
+
+async function authorizePdfGeneration(accessToken, reportKey) {
   if (!accessToken) return false;
 
   const res = await fetch("/api/pdf-generation-authorizations", {
     method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ report_key: reportKey }),
   });
 
   if (res.status === 401) return false;
@@ -817,7 +831,10 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
     setError("");
 
     try {
-      const authorized = await authorizePdfGeneration(accessToken);
+      const authorized = await authorizePdfGeneration(
+        accessToken,
+        buildPdfReportKey({ data: reportData, options, addedCadastralNumber })
+      );
       if (!authorized) {
         setError(t("result.loginToGeneratePdf"));
         onAuthRequired?.();

@@ -11,8 +11,15 @@ import {
 import { getCadastruRecordByAddress, persistCadastruRecord } from "@/lib/cadastru-records";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
+import {
+  buildFeatureCreditRequiredPayload,
+  checkPaidFeatureAccess,
+  consumePaidFeatureCredit,
+  makePaidFeatureUsageKey,
+} from "@/lib/paid-feature-usage";
 
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
+const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 const STREET_MAX_LENGTH = 80;
 const HOUSE_NUMBER_MAX_LENGTH = 10;
 const APARTMENT_NUMBER_MAX_LENGTH = 4;
@@ -75,6 +82,25 @@ function makeCadastruAddressCacheKey(rawAddress) {
     .slice(0, 32);
 
   return `${CADASTRU_ADDRESS_CACHE_PREFIX}${hash}`;
+}
+
+function makeCadastruAddressUsageKey(rawAddress) {
+  return makePaidFeatureUsageKey(CADASTRU_LOOKUP_FEATURE_KEY, {
+    address: normalizeSpaces(rawAddress).toLowerCase(),
+  });
+}
+
+function makeCadastruNumberUsageKey(cadastralNumber) {
+  return makePaidFeatureUsageKey(CADASTRU_LOOKUP_FEATURE_KEY, {
+    cadastral_number: String(cadastralNumber || "").trim(),
+  });
+}
+
+function featureCreditRequiredResponse(reason) {
+  return NextResponse.json(
+    buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
+    { status: reason === "unauthorized" ? 401 : 402 }
+  );
 }
 
 async function getCachedCadastruAddress(rawAddress) {
@@ -247,8 +273,30 @@ export async function POST(request) {
     houseNumber,
     apartmentNumber,
   });
+  const consumeCadastruCredit = async (payload, lookupSource) => {
+    const idempotencyKey = payload?.cadastral_number
+      ? makeCadastruNumberUsageKey(payload.cadastral_number)
+      : makeCadastruAddressUsageKey(rawAddress);
+    const creditUsage = await consumePaidFeatureCredit({
+      userId: access.user_id,
+      featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
+      idempotencyKey,
+      metadata: {
+        feature: "cadastru_lookup",
+        search_type: "address",
+        raw_address: rawAddress,
+        cadastral_number: payload?.cadastral_number || null,
+        lookup_source: lookupSource || null,
+      },
+    });
+    return creditUsage.allowed ? null : featureCreditRequiredResponse(creditUsage.reason || "no_credit");
+  };
+
   const cached = await getCachedCadastruAddress(rawAddress);
   if (cached) {
+    const creditResponse = await consumeCadastruCredit(cached.payload, cached.lookupSource);
+    if (creditResponse) return creditResponse;
+
     await persistAddressResult(cached.payload, {
       rawAddress,
       structuredAddress,
@@ -276,6 +324,9 @@ export async function POST(request) {
       method: "address",
       request_address: rawAddress,
     };
+    const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource);
+    if (creditResponse) return creditResponse;
+
     await setCachedCadastruAddress(rawAddress, payload, stored.lookupSource);
     await persistAddressResult(payload, {
       rawAddress,
@@ -297,6 +348,15 @@ export async function POST(request) {
     return response;
   }
 
+  const addressCreditCheck = await checkPaidFeatureAccess({
+    userId: access.user_id,
+    featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
+    idempotencyKey: makeCadastruAddressUsageKey(rawAddress),
+  });
+  if (!addressCreditCheck.allowed) {
+    return featureCreditRequiredResponse(addressCreditCheck.reason);
+  }
+
   try {
     const externalResult = await fetchExternalCadastruAddressData({
       city,
@@ -310,6 +370,9 @@ export async function POST(request) {
       method: "address",
       request_address: rawAddress,
     };
+    const creditResponse = await consumeCadastruCredit(payload, "api");
+    if (creditResponse) return creditResponse;
+
     await setCachedCadastruAddress(rawAddress, payload, "api");
     await persistAddressResult(payload, {
       rawAddress,
@@ -372,6 +435,9 @@ export async function POST(request) {
       method: "address",
       request_address: rawAddress,
     };
+    const creditResponse = await consumeCadastruCredit(payload, "local");
+    if (creditResponse) return creditResponse;
+
     await setCachedCadastruAddress(rawAddress, payload, "local");
     await persistAddressResult(payload, {
       rawAddress,

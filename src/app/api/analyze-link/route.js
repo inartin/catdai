@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
+import { resolveAccessTier } from "@/lib/access-tier";
 import { getCachedListing, setCachedListing } from "@/lib/listing-cache";
 import { fetchExternal999Listing } from "@/lib/listing999-external-api";
 import { logListingLinkAnalysisEvent } from "@/lib/listing-link-analysis-events";
+import {
+  buildFeatureCreditRequiredPayload,
+  checkPaidFeatureAccess,
+  consumePaidFeatureCredit,
+  makePaidFeatureUsageKey,
+} from "@/lib/paid-feature-usage";
 import {
   build999ListingUrl,
   extractListingIdFromUrl,
@@ -23,6 +30,7 @@ const FETCH_TIMEOUT_MS = 8_000;
 const MAX_FETCH_ATTEMPTS = 3;
 const BACKOFF_BASE_MS = 600;
 const MAX_BACKOFF_MS = 4_000;
+const LISTING_ANALYSIS_FEATURE_KEY = "listing_analysis";
 
 const REQUEST_HEADERS = {
   "User-Agent":
@@ -247,6 +255,13 @@ function buildFallbackCachedPayload(externalId, parsed) {
   return { parsed, params: mapped.params, payload: buildSuccessPayload(externalId, parsed, mapped.params) };
 }
 
+function featureCreditRequiredResponse(reason) {
+  return NextResponse.json(
+    buildFeatureCreditRequiredPayload(LISTING_ANALYSIS_FEATURE_KEY, reason),
+    { status: reason === "unauthorized" ? 401 : 402 }
+  );
+}
+
 async function fetchAndParseListing(externalId, listingUrl) {
   try {
     const parsed = await fetchExternal999Listing(externalId);
@@ -290,6 +305,37 @@ export async function POST(request) {
   const listingUrl = build999ListingUrl(externalId, "ro");
   const logEvent = (event) =>
     logListingLinkAnalysisEvent(request, { externalId, listingUrl, ...event });
+  const idempotencyKey = makePaidFeatureUsageKey(LISTING_ANALYSIS_FEATURE_KEY, { external_id: externalId });
+  const access = await resolveAccessTier(request);
+  const creditCheck = await checkPaidFeatureAccess({
+    userId: access.user_id,
+    featureKey: LISTING_ANALYSIS_FEATURE_KEY,
+    idempotencyKey,
+  });
+  if (!creditCheck.allowed) {
+    return featureCreditRequiredResponse(creditCheck.reason);
+  }
+
+  const respondWithSuccess = async ({ parsed, params, payload }) => {
+    const creditUsage = await consumePaidFeatureCredit({
+      userId: access.user_id,
+      featureKey: LISTING_ANALYSIS_FEATURE_KEY,
+      idempotencyKey,
+      metadata: {
+        feature: "listing_analysis",
+        external_id: externalId,
+        listing_url: listingUrl,
+        params,
+      },
+    });
+
+    if (!creditUsage.allowed) {
+      return featureCreditRequiredResponse(creditUsage.reason || "no_credit");
+    }
+
+    await logEvent({ status: "success", parsed, params });
+    return NextResponse.json(payload);
+  };
 
   let parsed = await getCachedListing(externalId);
   if (!parsed || !hasExactListingAddress(getParsedListingAddress(parsed))) {
@@ -297,8 +343,7 @@ export async function POST(request) {
     if (result.error === "blocked") {
       const fallback = buildFallbackCachedPayload(externalId, parsed);
       if (fallback) {
-        await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
-        return NextResponse.json(fallback.payload);
+        return respondWithSuccess(fallback);
       }
       await logEvent({ status: "upstream_blocked" });
       return NextResponse.json({ error: "upstream_blocked" }, { status: 503 });
@@ -306,8 +351,7 @@ export async function POST(request) {
     if (result.error === "upstream_blocked") {
       const fallback = buildFallbackCachedPayload(externalId, parsed);
       if (fallback) {
-        await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
-        return NextResponse.json(fallback.payload);
+        return respondWithSuccess(fallback);
       }
       await logEvent({ status: "upstream_blocked" });
       return NextResponse.json({ error: "upstream_blocked" }, { status: 503 });
@@ -315,8 +359,7 @@ export async function POST(request) {
     if (result.error === "not_a_listing") {
       const fallback = buildFallbackCachedPayload(externalId, parsed);
       if (fallback) {
-        await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
-        return NextResponse.json(fallback.payload);
+        return respondWithSuccess(fallback);
       }
       await logEvent({ status: "not_a_listing" });
       return NextResponse.json({ error: "not_a_listing" }, { status: 422 });
@@ -324,8 +367,7 @@ export async function POST(request) {
     if (result.error) {
       const fallback = buildFallbackCachedPayload(externalId, parsed);
       if (fallback) {
-        await logEvent({ status: "success", parsed: fallback.parsed, params: fallback.params });
-        return NextResponse.json(fallback.payload);
+        return respondWithSuccess(fallback);
       }
       await logEvent({ status: "fetch_failed" });
       return NextResponse.json({ error: "fetch_failed" }, { status: 502 });
@@ -340,7 +382,9 @@ export async function POST(request) {
     return NextResponse.json({ error: mapped.error }, { status: 422 });
   }
 
-  await logEvent({ status: "success", parsed, params: mapped.params });
-
-  return NextResponse.json(buildSuccessPayload(externalId, parsed, mapped.params));
+  return respondWithSuccess({
+    parsed,
+    params: mapped.params,
+    payload: buildSuccessPayload(externalId, parsed, mapped.params),
+  });
 }

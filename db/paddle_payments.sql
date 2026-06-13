@@ -41,6 +41,7 @@ create table if not exists public.paddle_payment_orders (
     check (product_key in (
       'standard_pack',
       'pro_pack',
+      'extra_pack',
       'sale_estimate_single',
       'rent_estimate_single',
       'listing_analysis_single',
@@ -82,6 +83,7 @@ begin
     check (product_key in (
       'standard_pack',
       'pro_pack',
+      'extra_pack',
       'sale_estimate_single',
       'rent_estimate_single',
       'listing_analysis_single',

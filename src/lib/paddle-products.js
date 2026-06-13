@@ -4,6 +4,7 @@ import { isPaddleOneTimePrice, listPaddlePricesForProduct } from "@/lib/paddle";
 const PADDLE_PRICE_ENV_BY_PRODUCT = {
   standard_pack: "PADDLE_PRICE_STANDARD_PACK",
   pro_pack: "PADDLE_PRICE_PRO_PACK",
+  extra_pack: "PADDLE_PRICE_EXTRA_PACK",
   sale_estimate_single: "PADDLE_PRICE_LISTING_ANALYSIS_SINGLE",
   rent_estimate_single: "PADDLE_PRICE_LISTING_ANALYSIS_SINGLE",
   listing_analysis_single: "PADDLE_PRICE_LISTING_ANALYSIS_SINGLE",

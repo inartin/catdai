@@ -16,6 +16,7 @@ Implemented and active for apartments.
 - Authenticated free sale/buy and rent evaluation users receive 2 full evaluations per UTC month; after that, the result falls back to the blurred preview and shows the monthly-limit message.
 - When the monthly limit is hit, the popup and the result action column both include the same reusable feature-price block with the sale/rent single-access price in EUR and the rounded MDL equivalent, plus a checkout button.
 - The sale and rent purchase flow both use `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE` as the Paddle price ID, show `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` in the UI, and grant one paid evaluation credit after Paddle confirms payment.
+- Paid sale/rent credits use stable non-monthly idempotency keys, while the free sale/rent allowance keeps the existing monthly idempotency.
 - When a paid sale/rent evaluation credit is consumed, the app stores the full result payload in the paid usage event metadata so profile history can reopen that timestamped result without recalculating current market data.
 - Reopened paid snapshots are read-only result pages; change-criteria and compare actions are hidden because they would start a new current-market calculation.
 - Full sale/buy results support edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
@@ -23,6 +24,7 @@ Implemented and active for apartments.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
 - Sale and rent result pages share the same criteria-edit action button, including the edit icon and secondary button styling.
 - 999.md listing-link analysis opens `/anunt` in listing-comparison mode; the result treats the listing asking price as a second primary value beside the market estimate, keeps fast-sale/target grouped under the market side and asked-price-per-m2 under the listing side, and shows the listing verdict plus the original listing link in the same result card.
+- 999.md listing-link analysis requires a `listing_analysis` paid credit and reuses the same listing idempotency key through parsing and result rendering, so it does not consume `sale_estimate` credits.
 - For `/anunt`, listing price history from `listing_price_history` replaces the sector trend when real price changes exist; otherwise the result states that no price change history was detected.
 - For `/anunt`, duplicate candidates from `/api/listing-duplicates` are shown with a combined high + medium count in the header and a text-only duplicate-candidate section above relevant listings; exact address conflicts exclude candidates when parsed addresses are available.
 - For `/anunt`, the bottom action embeds the `Verifică un anunț 999.md` link analyzer form so another listing check can start directly on the result page.
@@ -45,6 +47,7 @@ Implemented and active for apartments.
 - `/evaluare?type=rent` calls `/api/estimate-rent` and renders a rent-specific result view with the same date badge as the sale result header, monthly rent levels, filters, market stats, district comparison, and relevant rent listings. Sale-only result actions such as seller breakdown and PDF export remain on the sale/buy result.
 - `/api/estimate-rent` gates only the `/evaluare?type=rent` flow: paid users get full rent results, authenticated free users consume the `rent_estimate` monthly allowance, and anonymous or limit-reached users receive a preview with rent levels, market-stat values, district values, and listing details locked.
 - `/calculator?rezultat=1` also calls `/api/estimate-rent`, then uses the estimated monthly rent to calculate rent-yield metrics from the calculator investment fields. Calculator requests carry `calculator_usage`, always return `full_access: true`, and do not consume the rent evaluation allowance.
+- Calculator requests consume `yield_calculator` credits, not `rent_estimate` credits.
 - Area is used as a comparable filter only when provided.
 - If area is missing, total prices and range come from matching listings' `price_amount` values instead of `price_per_m2 * area`.
 - It computes fast sale, market rate, premium, price per m2, range, confidence, district comparison, relevant listings.
@@ -62,7 +65,7 @@ Implemented and active for apartments.
 - Cache hits still resolve access and write estimate logs, but skip repeated RPC/listing/trend work.
 - `999.md` preview images for sale and rent relevant listings are loaded after the result page renders through `/api/listing-preview-images`.
 - RPC failures are logged with the failing branch, params, error code, and elapsed time.
-- Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again, after `/api/pdf-generation-authorizations` validates the bearer token.
+- Browser-side PDF generation draws the report directly onto A4 canvas pages and downloads it without calling `/api/estimate` again, after `/api/pdf-generation-authorizations` validates the bearer token and consumes a `pdf_report` credit.
 - Successful authenticated PDF generation events are logged to `pdf_generation_events` with user id, device/session ids, optional estimate log id, and whether cadastral data was included.
 - Successful sale and rent estimation requests are logged to `estimate_log` with `estimate_type = 'sale'` or `estimate_type = 'rent'` for separate admin statistics. Rent requests require a client log or device id so duplicate untracked fetches do not create extra rows.
 - Estimate and PDF event DB writes use `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`; otherwise local development still returns normal API responses without creating analytics rows.

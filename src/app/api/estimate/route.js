@@ -7,6 +7,7 @@ import {
   FREE_MONTHLY_FULL_EVALUATION_LIMIT,
   makeMonthlyFeatureUsageKey,
 } from "@/lib/free-monthly-feature-usage";
+import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
 import { consumePaidFeatureCredit } from "@/lib/paid-feature-usage";
 import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
@@ -468,6 +469,25 @@ function buildEstimateAccessPayload(data, estimateAccess) {
   };
 }
 
+async function persistSaleEvaluationSnapshot(estimateAccess, params, responsePayload) {
+  const usageEventId = estimateAccess?.paidCreditUsage?.usage_event_id;
+  const userId = estimateAccess?.access?.user_id;
+  if (estimateAccess?.accessSource !== "paid_credit" || !usageEventId || !userId) return;
+
+  try {
+    await persistPaidEvaluationSnapshot({
+      usageEventId,
+      userId,
+      featureKey: FULL_EVALUATION_FEATURE_KEY,
+      estimateType: "sale",
+      params,
+      result: responsePayload,
+    });
+  } catch (error) {
+    console.error("[estimate] paid snapshot persist failed:", error?.message || String(error));
+  }
+}
+
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
   if (cfIp) return cfIp.trim();
@@ -825,6 +845,7 @@ export async function POST(request) {
     });
 
     const responsePayload = buildEstimateAccessPayload(cachedData, estimateAccess);
+    await persistSaleEvaluationSnapshot(estimateAccess, params, responsePayload);
     const res = NextResponse.json(responsePayload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     res.headers.set("X-Estimate-Cache", "HIT");
@@ -932,6 +953,7 @@ export async function POST(request) {
   }
 
   const responsePayload = buildEstimateAccessPayload(data, estimateAccess);
+  await persistSaleEvaluationSnapshot(estimateAccess, params, responsePayload);
 
   trackEstimate({
     body,

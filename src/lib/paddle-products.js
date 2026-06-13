@@ -1,4 +1,5 @@
 import { getPaymentProduct, mapPaymentProductGrants } from "@/lib/payment-products";
+import { isPaddleOneTimePrice, listPaddlePricesForProduct } from "@/lib/paddle";
 
 const PADDLE_PRICE_ENV_BY_PRODUCT = {
   standard_pack: "PADDLE_PRICE_STANDARD_PACK",
@@ -23,6 +24,10 @@ export function isValidPaddlePriceId(priceId) {
   return /^pri_[a-z\d]+$/i.test(String(priceId || "").trim());
 }
 
+export function isValidPaddleProductId(productId) {
+  return /^pro_[a-z\d]+$/i.test(String(productId || "").trim());
+}
+
 export function getPaddleProduct(productKey) {
   const product = getPaymentProduct(productKey);
   if (!product) return null;
@@ -42,6 +47,18 @@ export function getPaddleProduct(productKey) {
     };
   }
 
+  if (isValidPaddleProductId(rawPrice)) {
+    return {
+      ...product,
+      priceId: "",
+      priceReference: rawPrice,
+      priceKind: "product",
+      amountMinor: product.amountMinor,
+      currencyCode: null,
+      priceEnvKey: getPaddlePriceEnvKey(product.key),
+    };
+  }
+
   return {
     ...product,
     priceId: rawPrice,
@@ -50,6 +67,31 @@ export function getPaddleProduct(productKey) {
     amountMinor: product.amountMinor,
     currencyCode: null,
     priceEnvKey: getPaddlePriceEnvKey(product.key),
+  };
+}
+
+export async function resolvePaddleCatalogPrice(product) {
+  if (!product) return null;
+  if (isValidPaddlePriceId(product.priceReference)) return product;
+
+  if (!isValidPaddleProductId(product.priceReference)) {
+    return product;
+  }
+
+  const prices = await listPaddlePricesForProduct(product.priceReference);
+  const price = prices.find(isPaddleOneTimePrice);
+  if (!price?.id) {
+    throw new Error(`No active one-time Paddle price found for ${product.key}.`);
+  }
+
+  return {
+    ...product,
+    priceId: price.id,
+    priceReference: price.id,
+    productReference: product.priceReference,
+    priceKind: "catalog",
+    amountMinor: product.amountMinor,
+    currencyCode: price?.unit_price?.currency_code || product.currencyCode || null,
   };
 }
 

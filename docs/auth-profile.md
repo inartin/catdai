@@ -20,6 +20,7 @@ Implemented and active.
 - logout
 - favorites
 - paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus search type, result type, city, and district when available
+- paid sale/rent evaluation usage rows are also shown in history when a saved paid snapshot exists; those rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation
 - paginated transactions tab for the authenticated user's own rows from `paddle_payment_orders`; it shows product, status, amount, Paddle transaction id when available, and the internal order id for support lookup
 - closed `Setări` panel with account deletion
 - localized browser title from `nav.profile`
@@ -47,6 +48,7 @@ Implemented and active.
 - `src/app/profile/page.js`
 - `src/app/api/activity/ping/route.js`
 - `src/app/api/profile/history/route.js`
+- `src/app/api/profile/evaluation-snapshots/[id]/route.js`
 - `src/app/api/profile/transactions/route.js`
 - `src/app/api/profile/delete/route.js`
 - `src/app/api/auth/telegram/route.js`

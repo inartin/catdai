@@ -1,11 +1,13 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
+import { normalizePaidEvaluationSnapshot, PAID_EVALUATION_FEATURE_KEYS } from "@/lib/evaluation-snapshots";
 import { NextResponse } from "next/server";
 
 const DEFAULT_HISTORY_LIMIT = 10;
 const MAX_HISTORY_LIMIT = 30;
 const ESTIMATE_COLUMNS = "id, estimate_type, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at";
 const CADASTRU_COLUMNS = "id, search_type, city, district, cadastral_number, result_type, lookup_source, created_at";
+const PAID_USAGE_COLUMNS = "id, feature_key, metadata, created_at";
 
 function isMissingEstimateTypeError(error) {
   const code = String(error?.code || "");
@@ -50,6 +52,37 @@ function normalizeCadastruRow(row) {
     resultType: row.result_type,
     lookupSource: row.lookup_source,
     createdAt: row.created_at,
+  };
+}
+
+function normalizePaidSnapshotRow(row) {
+  const snapshot = normalizePaidEvaluationSnapshot(row);
+  if (!snapshot) return null;
+
+  const input = snapshot.result.input || {};
+  const estimate = snapshot.result.estimate || {};
+  return {
+    id: `paid-evaluation-${row.id}`,
+    type: "estimate",
+    isSnapshot: true,
+    snapshotId: row.id,
+    href: `/evaluare?snapshot_id=${encodeURIComponent(row.id)}`,
+    estimateType: snapshot.estimateType,
+    city: input.city,
+    district: input.district,
+    districts: Array.isArray(input.districts) ? input.districts : null,
+    roomsCount: input.rooms_count,
+    areaM2: input.area_m2,
+    buildingType: input.building_type,
+    buildingTypes: Array.isArray(input.building_types) ? input.building_types : null,
+    renovation: input.renovation,
+    floor: input.floor,
+    totalFloors: input.total_floors,
+    bathroomsCount: input.bathrooms_count,
+    balconiesCount: input.balconies_count,
+    estimatedPrice: estimate.market_rate,
+    pricePerM2: estimate.price_per_m2,
+    createdAt: snapshot.createdAt || row.created_at,
   };
 }
 
@@ -145,6 +178,31 @@ async function fetchCadastruHistory(userId, cursor, pageSize) {
   return res;
 }
 
+async function fetchPaidEvaluationSnapshots(userId, cursor, pageSize) {
+  const res = await applyCursor(
+    supabaseAdmin
+      .from("user_feature_usage_events")
+      .select(PAID_USAGE_COLUMNS)
+      .eq("user_id", userId)
+      .eq("source", "paid_credit")
+      .in("feature_key", PAID_EVALUATION_FEATURE_KEYS)
+      .order("created_at", { ascending: false })
+      .limit(pageSize + 1),
+    cursor
+  );
+
+  if (res.error && isMissingSchemaError(res.error)) {
+    return { data: [], error: null };
+  }
+
+  if (res.error) return res;
+
+  return {
+    data: (res.data || []).map(normalizePaidSnapshotRow).filter(Boolean),
+    error: null,
+  };
+}
+
 export async function GET(request) {
   const access = await resolveAccessTier(request);
   if (!access.user_id) {
@@ -159,15 +217,16 @@ export async function GET(request) {
     return NextResponse.json({ error: cursor.error }, { status: 400 });
   }
 
-  const [estimateRes, cadastruRes] = await Promise.all([
+  const [estimateRes, cadastruRes, paidSnapshotRes] = await Promise.all([
     fetchEstimateHistory(access.user_id, cursor, pageSize),
     fetchCadastruHistory(access.user_id, cursor, pageSize),
+    fetchPaidEvaluationSnapshots(access.user_id, cursor, pageSize),
   ]);
 
-  if (estimateRes.error || cadastruRes.error) {
+  if (estimateRes.error || cadastruRes.error || paidSnapshotRes.error) {
     console.error(
       "[profile-history] history failed:",
-      estimateRes.error?.message || cadastruRes.error?.message
+      estimateRes.error?.message || cadastruRes.error?.message || paidSnapshotRes.error?.message
     );
     return NextResponse.json({ history: [], nextCursor: null });
   }
@@ -175,6 +234,7 @@ export async function GET(request) {
   const rows = [
     ...(estimateRes.data || []).map(normalizeEstimateRow),
     ...(cadastruRes.data || []).map(normalizeCadastruRow),
+    ...(paidSnapshotRes.data || []),
   ].sort((a, b) => {
     const dateDiff = Date.parse(b.createdAt || "") - Date.parse(a.createdAt || "");
     if (dateDiff) return dateDiff;

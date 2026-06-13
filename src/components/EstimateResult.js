@@ -142,8 +142,9 @@ function formatHistoryDateTime(date, lang) {
   );
 }
 
-function formatResultDate(lang) {
-  return new Date().toLocaleDateString(
+function formatResultDate(lang, date) {
+  const value = date ? new Date(date) : new Date();
+  return value.toLocaleDateString(
     lang === "ru" ? "ru-RU" : "ro-RO",
     { day: "numeric", month: "long", year: "numeric" }
   );
@@ -804,14 +805,14 @@ function FeatureAdjustmentBadge({ item }) {
   );
 }
 
-function ResultDateBadge({ lang }) {
+function ResultDateBadge({ lang, date }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/8 text-xs font-medium text-primary">
       <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="4" width="18" height="18" rx="2" />
         <path d="M16 2v4M8 2v4M3 10h18" />
       </svg>
-      {formatResultDate(lang)}
+      {formatResultDate(lang, date)}
     </span>
   );
 }
@@ -1645,6 +1646,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const [authModalCopyKey, setAuthModalCopyKey] = useState("result.loginToSeeFullAnalysis");
   const [authModalShowAuthOptions, setAuthModalShowAuthOptions] = useState(true);
 
+  const isSnapshot = data.snapshot?.immutable === true;
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const purchaseOffer = freeMonthlyLimitReached ? data.access_limit?.purchase : null;
@@ -1739,7 +1741,12 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         onClose={closeAuthModal}
       >
         {freeMonthlyLimitReached && authModalCopyKey === "result.freeMonthlyLimitReached" && purchaseOffer ? (
-          <FeaturePricingAction offer={purchaseOffer} />
+          <>
+            <p className="mb-4 text-center text-sm font-medium text-gray-500">
+              {t("payment.limitPackageSubtitle")}
+            </p>
+            <FeaturePricingAction offer={purchaseOffer} />
+          </>
         ) : null}
       </AuthRequiredModal>
       <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
@@ -1777,7 +1784,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
-            <ResultDateBadge lang={lang} />
+            <ResultDateBadge lang={lang} date={data.snapshot?.created_at} />
           </div>
         </div>
       </div>
@@ -1917,7 +1924,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
               sidebar
             />
           )}
-          <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
+          {!isSnapshot && <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />}
           {purchaseOffer ? (
             <FeaturePricingAction offer={purchaseOffer} />
           ) : null}
@@ -1962,6 +1969,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const { session, isAuthenticated, clearAuthError } = useAuth();
   const isRentEstimate = data.estimate_type === "rent";
 
+  const isSnapshot = data.snapshot?.immutable === true;
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const purchaseOffer = freeMonthlyLimitReached ? data.access_limit?.purchase : null;
@@ -2312,7 +2320,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   }, []);
   const headerControls = (
     <div className="flex items-center gap-2">
-      <ResultDateBadge lang={lang} />
+      <ResultDateBadge lang={lang} date={data.snapshot?.created_at} />
       <button
         type="button"
         onClick={handleToggleFavorite}
@@ -2371,7 +2379,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         onClose={closeAuthModal}
       >
         {freeMonthlyLimitReached && authModalCopyKey === "result.freeMonthlyLimitReached" && purchaseOffer ? (
-          <FeaturePricingAction offer={purchaseOffer} />
+          <>
+            <p className="mb-4 text-center text-sm font-medium text-gray-500">
+              {t("payment.limitPackageSubtitle")}
+            </p>
+            <FeaturePricingAction offer={purchaseOffer} />
+          </>
         ) : null}
       </AuthRequiredModal>
       <ValuationPdfDialog
@@ -3136,20 +3149,24 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 </>
               )}
             </button>
-            <button
-              type="button"
-              onClick={onCompare}
-              className={secondaryActionButtonClassName}
-            >
-              <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="18" cy="18" r="3" />
-                <circle cx="6" cy="6" r="3" />
-                <path d="M13 6h3a2 2 0 0 1 2 2v7" />
-                <path d="M11 18H8a2 2 0 0 1-2-2V9" />
-              </svg>
-              {t("result.compare")}
-            </button>
-            <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
+            {!isSnapshot && (
+              <>
+                <button
+                  type="button"
+                  onClick={onCompare}
+                  className={secondaryActionButtonClassName}
+                >
+                  <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="18" cy="18" r="3" />
+                    <circle cx="6" cy="6" r="3" />
+                    <path d="M13 6h3a2 2 0 0 1 2 2v7" />
+                    <path d="M11 18H8a2 2 0 0 1-2-2V9" />
+                  </svg>
+                  {t("result.compare")}
+                </button>
+                <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
+              </>
+            )}
             {purchaseOffer ? (
               <FeaturePricingAction offer={purchaseOffer} />
             ) : null}

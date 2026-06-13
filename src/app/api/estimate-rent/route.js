@@ -8,6 +8,7 @@ import {
   FREE_MONTHLY_FULL_EVALUATION_LIMIT,
   makeMonthlyFeatureUsageKey,
 } from "@/lib/free-monthly-feature-usage";
+import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
 import { consumePaidFeatureCredit } from "@/lib/paid-feature-usage";
 import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
@@ -543,8 +544,29 @@ async function resolveRentResponse(request, body, params, rawData) {
   const estimateAccess = await resolveRentEstimateAccess(request, body, params);
   return {
     access: estimateAccess.access,
+    estimateAccess,
     payload: buildRentEstimateAccessPayload(rawData, estimateAccess),
   };
+}
+
+async function persistRentEvaluationSnapshot(rentResponse, params) {
+  const estimateAccess = rentResponse?.estimateAccess;
+  const usageEventId = estimateAccess?.paidCreditUsage?.usage_event_id;
+  const userId = estimateAccess?.access?.user_id;
+  if (estimateAccess?.accessSource !== "paid_credit" || !usageEventId || !userId) return;
+
+  try {
+    await persistPaidEvaluationSnapshot({
+      usageEventId,
+      userId,
+      featureKey: RENT_EVALUATION_FEATURE_KEY,
+      estimateType: "rent",
+      params,
+      result: rentResponse.payload,
+    });
+  } catch (error) {
+    console.error("[estimate-rent] paid snapshot persist failed:", error?.message || String(error));
+  }
 }
 
 export async function POST(request) {
@@ -656,6 +678,7 @@ export async function POST(request) {
       data: cachedData,
       params,
     });
+    await persistRentEvaluationSnapshot(rentResponse, params);
 
     const res = NextResponse.json(rentResponse.payload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -709,6 +732,7 @@ export async function POST(request) {
     data: enrichedData,
     params,
   });
+  await persistRentEvaluationSnapshot(rentResponse, params);
 
   const res = NextResponse.json(rentResponse.payload);
   res.headers.set("X-RateLimit-Remaining", String(remaining));

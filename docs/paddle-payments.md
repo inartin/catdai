@@ -68,6 +68,7 @@ Backend Paddle one-time payment flow is prepared. Evaluation limit popups can st
 
 ## Paddle Requirements
 - Each supported product key needs a Paddle `price_id` in env.
+- If `PADDLE_PRICE_STANDARD_PACK` is set to a Paddle product id (`pro_...`), the create route resolves its active one-time price id before creating the transaction.
 - The create route verifies catalog price IDs and no recurring billing cycle.
 - Non-production create-route failures include a short `details` field so the temporary Paddle test page can show the exact Paddle/API/Supabase failure during setup.
 - Webhook access is granted only after a verified `transaction.completed` event.

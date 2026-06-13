@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 import ConfigIcon from "@/components/icons/ConfigIcon";
 import BookmarkIcon from "@/components/icons/BookmarkIcon";
 import HistoryIcon from "@/components/icons/HistoryIcon";
+import Tooltip from "@/components/Tooltip";
 
 const HISTORY_PAGE_SIZE = 10;
 const TRANSACTIONS_PAGE_SIZE = 10;
@@ -63,11 +64,20 @@ function translateDataValue(prefix, value, t) {
   return translated === key ? value : translated;
 }
 
+function translateDataValues(prefix, values, t) {
+  const list = Array.isArray(values) ? values : [values];
+  return list
+    .filter(Boolean)
+    .map((value) => translateDataValue(prefix, value, t))
+    .filter(Boolean)
+    .join(", ");
+}
+
 function formatHistoryProperty(row, t, lang) {
   return [
     row.roomsCount ? formatRoomValue(row.roomsCount, t) : null,
     row.areaM2 ? `${formatNumber(row.areaM2, lang, { maximumFractionDigits: 0 })} m²` : null,
-    translateDataValue("data.district", row.district, t),
+    translateDataValues("data.district", row.districts?.length ? row.districts : row.district, t),
     translateDataValue("data.city", row.city, t),
   ].filter(Boolean).join(" · ") || "—";
 }
@@ -83,7 +93,7 @@ function formatHistoryPropertyDetails(row, t) {
   }
 
   return [
-    translateDataValue("data.buildingType", row.buildingType, t),
+    translateDataValues("data.buildingType", row.buildingTypes?.length ? row.buildingTypes : row.buildingType, t),
     translateDataValue("data.renovationType", row.renovation, t),
   ].filter(Boolean).join(" · ") || "—";
 }
@@ -488,29 +498,51 @@ export default function ProfilePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {history.map((row) => (
-                            <tr key={row.id} className="hover:bg-gray-50">
-                              <td className="whitespace-nowrap px-4 py-3 text-gray-600">
-                                {formatHistoryDate(row.createdAt, lang)}
-                              </td>
-                              <td className="px-4 py-3 font-medium text-gray-900">
-                                {formatHistoryType(row, t)}
-                              </td>
-                              <td className="px-4 py-3 font-medium text-gray-900">
-                                <div>
-                                  {row.type === "cadastru"
-                                    ? t("profile.historyTypeCadastru")
-                                    : formatHistoryProperty(row, t, lang)}
-                                </div>
-                                <div className="mt-0.5 text-xs font-normal text-gray-500">
-                                  {formatHistoryPropertyDetails(row, t)}
-                                </div>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
-                                {formatHistoryResult(row, lang)}
-                              </td>
-                            </tr>
-                          ))}
+                          {history.map((row) => {
+                            const isClickable = Boolean(row.href);
+                            return (
+                              <tr
+                                key={row.id}
+                                className={`hover:bg-gray-50 ${isClickable ? "cursor-pointer focus-within:bg-gray-50" : ""}`}
+                                tabIndex={isClickable ? 0 : undefined}
+                                onClick={isClickable ? () => router.push(row.href) : undefined}
+                                onKeyDown={isClickable ? (event) => {
+                                  if (event.key === "Enter" || event.key === " ") {
+                                    event.preventDefault();
+                                    router.push(row.href);
+                                  }
+                                } : undefined}
+                              >
+                                <td className={`whitespace-nowrap border-l-4 px-4 py-3 text-gray-600 ${row.isSnapshot ? "border-emerald-500 bg-emerald-50/40" : "border-transparent"}`}>
+                                  {row.isSnapshot ? (
+                                    <Tooltip text={t("profile.paidSnapshotTooltip")}>
+                                      <span className="font-medium text-emerald-700">
+                                        {formatHistoryDate(row.createdAt, lang)}
+                                      </span>
+                                    </Tooltip>
+                                  ) : (
+                                    formatHistoryDate(row.createdAt, lang)
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 font-medium text-gray-900">
+                                  {formatHistoryType(row, t)}
+                                </td>
+                                <td className="px-4 py-3 font-medium text-gray-900">
+                                  <div>
+                                    {row.type === "cadastru"
+                                      ? t("profile.historyTypeCadastru")
+                                      : formatHistoryProperty(row, t, lang)}
+                                  </div>
+                                  <div className="mt-0.5 text-xs font-normal text-gray-500">
+                                    {formatHistoryPropertyDetails(row, t)}
+                                  </div>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
+                                  {formatHistoryResult(row, lang)}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

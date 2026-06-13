@@ -16,6 +16,8 @@ Implemented and active for apartments.
 - Authenticated free sale/buy and rent evaluation users receive 2 full evaluations per UTC month; after that, the result falls back to the blurred preview and shows the monthly-limit message.
 - When the monthly limit is hit, the popup and the result action column both include the same reusable feature-price block with the sale/rent single-access price in EUR and the rounded MDL equivalent, plus a checkout button.
 - The sale and rent purchase flow both use `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE` as the Paddle price ID, show `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` in the UI, and grant one paid evaluation credit after Paddle confirms payment.
+- When a paid sale/rent evaluation credit is consumed, the app stores the full result payload in the paid usage event metadata so profile history can reopen that timestamped result without recalculating current market data.
+- Reopened paid snapshots are read-only result pages; change-criteria and compare actions are hidden because they would start a new current-market calculation.
 - Full sale/buy results support edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Regular `/evaluare` result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.
@@ -51,6 +53,7 @@ Implemented and active for apartments.
 - `/api/estimate` calls the RPC with the server-side Supabase admin client so server valuation work does not inherit the anonymous client timeout.
 - Anonymous `/api/estimate` responses remove locked sale/buy values before returning JSON and mark `locked_sections` for the UI placeholders. Locked preview responses replace the real market trend with fake trend data before it reaches the browser.
 - Authenticated free `/api/estimate` and gated `/api/estimate-rent` responses consume the monthly free full-evaluation allowance in `user_feature_usage_events` after a successful cached or fresh estimate. The idempotency key is based on the UTC month and normalized estimate params so refreshes do not consume another use.
+- Paid-credit sale/rent responses update the same `user_feature_usage_events` row with an `evaluation_snapshot` containing normalized params and the immutable result payload.
 - Backend also runs seller-category estimates for owner vs agency/developer.
 - Seller-category estimates use the same property filters and seller filters, but skip district comparison and relevant listings because the UI only renders their price/range/stats.
 - Seller breakdown shows the comparable listing count for each seller type under the price per m2.
@@ -100,6 +103,8 @@ Applied after RPC in `/api/estimate`.
 - `src/app/api/listing-price-history/route.js`
 - `src/app/api/listing-duplicates/route.js`
 - `src/app/api/estimate-rent/route.js`
+- `src/app/api/profile/evaluation-snapshots/[id]/route.js`
+- `src/lib/evaluation-snapshots.js`
 - `src/app/api/listing-preview-images/route.js`
 - `src/components/PropertyForm.js`
 - `src/components/EstimateResult.js`

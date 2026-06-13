@@ -169,6 +169,16 @@ export async function getPaddlePrice(priceId) {
   return price;
 }
 
+export async function listPaddlePricesForProduct(productId) {
+  const params = new URLSearchParams({
+    product_id: productId,
+    status: "active",
+    per_page: "50",
+  });
+  const response = await paddleApiRequest(`/prices?${params.toString()}`);
+  return Array.isArray(response?.data) ? response.data : [];
+}
+
 export function isPaddleOneTimePrice(price) {
   return price?.status === "active" && price?.billing_cycle == null;
 }

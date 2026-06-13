@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { rateLimit } from "@/lib/rate-limit";
-import { getPaddleProduct, isValidPaddlePriceId } from "@/lib/paddle-products";
+import { getPaddleProduct, isValidPaddlePriceId, resolvePaddleCatalogPrice } from "@/lib/paddle-products";
 import {
   buildPaddleCustomerSnapshot,
   createPaddleTransaction,
@@ -157,9 +157,23 @@ export async function POST(request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const product = getPaddleProduct(body?.product_key);
-  if (!product) {
+  const configuredProduct = getPaddleProduct(body?.product_key);
+  if (!configuredProduct) {
     return NextResponse.json({ error: "Unknown payment product." }, { status: 400 });
+  }
+
+  let product;
+  try {
+    product = await resolvePaddleCatalogPrice(configuredProduct);
+  } catch (error) {
+    const details = getDebugDetails(error);
+    console.error("[paddle-create] price resolve failed:", error.message);
+    return NextResponse.json(
+      details
+        ? { error: `Paddle price is not configured for ${configuredProduct.key}.`, details }
+        : { error: `Paddle price is not configured for ${configuredProduct.key}.` },
+      { status: 500 }
+    );
   }
 
   if (!isValidPaddlePriceId(product.priceReference)) {

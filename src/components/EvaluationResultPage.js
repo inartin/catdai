@@ -153,6 +153,39 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
         return { ok: res.ok, status: res.status, data };
       };
 
+      const snapshotId = pRaw.get("snapshot_id");
+      if (snapshotId) {
+        if (!session?.access_token) {
+          setError({ code: "snapshot_auth", status: 401 });
+          setLoading(false);
+          return;
+        }
+
+        try {
+          const snapshotRes = await fetchJson(
+            `/api/profile/evaluation-snapshots/${encodeURIComponent(snapshotId)}`,
+            { headers: { Authorization: `Bearer ${session.access_token}` } }
+          );
+          if (cancelled) return;
+
+          if (!snapshotRes.ok || !snapshotRes.data?.snapshot?.result) {
+            setError({ code: snapshotRes.data?.error || "snapshot_unavailable", status: snapshotRes.status });
+            loadedPrimaryParamsRef.current = null;
+          } else {
+            setResult(snapshotRes.data.snapshot.result);
+            setResult2(null);
+            setError(null);
+            setError2(null);
+            setIsComparing(false);
+            loadedPrimaryParamsRef.current = primaryStr;
+            loadedCompareParamsRef.current = null;
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+        return;
+      }
+
       const fetchProperty = async (pFx, isPrimary) => {
         const estimateType = pRaw.get(pFx + "type") || pRaw.get(pFx + "mode");
         const isRentMode = estimateType === "rent";

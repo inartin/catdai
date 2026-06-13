@@ -154,22 +154,22 @@ export default function Pricing({ prices, compact = false }) {
         },
         {
           label: featureLabels.listing,
-          limit: "29 lei",
+          limit: "30 lei",
           hasAsterisk: true,
         },
         {
           label: featureLabels.cadastru,
-          limit: "19 lei",
+          limit: "10 lei",
           hasAsterisk: true,
         },
         {
           label: featureLabels.yield,
-          limit: "29 lei",
+          limit: "30 lei",
           hasAsterisk: true,
         },
         {
           label: featureLabels.pdf,
-          limit: "29 lei",
+          limit: "30 lei",
           hasAsterisk: true,
         },
       ],

@@ -365,11 +365,14 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
       }
 
 
+      const isLockedCadastralPreview = data.locked_sections?.cadastru_details === true;
       setCadastralData({
         building: data.building,
         apartment: data.apartment,
         location: data.location,
         partial: data.partial || false,
+        locked_sections: data.locked_sections || {},
+        access_limit: data.access_limit || null,
       });
 
       const f = data.form_fields || {};
@@ -377,14 +380,14 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         ...prev,
         ...(f.city && { city: f.city }),
         ...(f.district && { district: f.district }),
-        ...(f.area_m2 && { area_m2: f.area_m2 }),
+        ...(!isLockedCadastralPreview && f.area_m2 && { area_m2: f.area_m2 }),
         ...(f.floor && !prev.first_floor && !prev.last_floor && { floor: f.floor }),
-        ...(f.total_floors && { total_floors: f.total_floors }),
-        ...(f.building_type && { building_type: f.building_type }),
-        ...(f.bathrooms_count != null && { bathrooms_count: f.bathrooms_count }),
+        ...(!isLockedCadastralPreview && f.total_floors && { total_floors: f.total_floors }),
+        ...(!isLockedCadastralPreview && f.building_type && { building_type: f.building_type }),
+        ...(!isLockedCadastralPreview && f.bathrooms_count != null && { bathrooms_count: f.bathrooms_count }),
       }));
 
-      if (f.floor || f.total_floors || f.bathrooms_count != null) {
+      if (f.floor || (!isLockedCadastralPreview && (f.total_floors || f.bathrooms_count != null))) {
         setShowOptional(true);
       }
     } catch {

@@ -18,6 +18,7 @@ Implemented and active, with partial fallback.
 - `/cadastru` lets users find official cadastral data by exact address or by entering a cadastral number directly.
 - `/evaluare` without result query parameters reuses the same cadastru search form and source note, placing the compact cadastral-number quick-fill card first under the `Locație` category header.
 - Anonymous users can open the page, but search actions show the shared auth popup used by PDF export instead of calling the cadastral APIs.
+- The cadastru search form persists the address and cadastral-number draft in browser storage so OAuth return to `/cadastru` restores the fields the anonymous user filled before logging in; the result page clears that draft once a result URL opens.
 - During beta, `/cadastru` search actions are limited to 5 searches per authenticated user per day. The limit is enforced in the cadastru API search context and the page shows a localized popup without login options when the user reaches it.
 - The page title and subtitle sit above the input card so the page purpose is clear before choosing a search method.
 - The page has localized route metadata, canonical and alternate language tags, and sitemap entries for both Romanian and Russian.
@@ -36,6 +37,7 @@ Implemented and active, with partial fallback.
 - The shared header links to the localized Cadastru URL for the current language on desktop and mobile.
 - Successful searches navigate to `/{lang}/cadastru/rezultat?cadastral_number=...`.
 - `/cadastru/rezultat` fetches authenticated `/api/cadastral`, uses the shared back button from the estimation form, renders the shared `CadastralDataCard` component used by the evaluation result page, and is marked `noindex` because each URL is generated from a user query.
+- Authenticated users without a remaining `cadastru_lookup` credit still land on the result page. It shows the cadastral number, address, apartment floor, and building classifier when available, while the rest of the official fields are replaced server-side with `|` placeholders and blurred behind the same package purchase popup pattern used by evaluation previews.
 - After a result is loaded, `/cadastru/rezultat` keeps the loaded result in component state and does not repeat the lookup on tab focus or auth token refresh unless the cadastral number changes. In-flight lookups are deduped so effect reruns do not create duplicate statistics rows.
 - Valid `/cadastru` search submissions are logged to `cadastru_search_events` for admin stats with `search_type`, optional authenticated `user_id`, city when derivable, optional derived district for address searches, cadastral number when known, result type, lookup source, and timestamp. Result type is one of `no_data`, `address_only`, `apartment_only`, or `full_data`; lookup source is `api` for the external worker or `local` for the in-app backup.
 - Authenticated users can see their own cadastru search rows in `/profile` history, where the result column shows the cadastral number and details show search type, result type, city, and district when available.
@@ -62,7 +64,7 @@ Implemented and active, with partial fallback.
 - Cadastral lookup is available only to authenticated Supabase users.
 - Anonymous users see the shared auth popup before lookup from `/cadastru`, `/cadastru/rezultat`, the valuation form cadastral shortcut, or the PDF dialog cadastral add-on.
 - `/api/cadastral` and `/api/cadastru/address` return `401 unauthorized` without a valid bearer token.
-- Authenticated users also need a remaining `cadastru_lookup` credit from a package or single-feature purchase.
+- Authenticated users also need a remaining `cadastru_lookup` credit from a package or single-feature purchase for unblurred full details.
 - Address search and the follow-up cadastral-number result share the cadastral-number paid idempotency key when possible, so the same lookup is not charged twice.
 
 ## Limits

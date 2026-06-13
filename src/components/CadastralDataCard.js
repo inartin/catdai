@@ -2,7 +2,12 @@
 
 import { useTranslation } from "@/context/LanguageContext";
 
-export default function CadastralDataCard({ cadastral, className = "" }) {
+export default function CadastralDataCard({
+  cadastral,
+  className = "",
+  locked = false,
+  onLockedClick,
+}) {
   const { t } = useTranslation();
 
   if (!cadastral) return null;
@@ -43,6 +48,46 @@ export default function CadastralDataCard({ cadastral, className = "" }) {
   const widthClass = hasFullDetails ? "w-full" : "mx-auto w-full max-w-xl";
   const detailsGridClass = hasFullDetails ? "grid gap-6 lg:grid-cols-2 lg:gap-8" : "grid gap-6";
   const detailValueClass = "whitespace-nowrap text-right font-medium text-gray-900";
+  const hasLockedDetails = locked || cadastral.locked_sections?.cadastru_details === true;
+  const isVisibleLockedField = (section, field) => (
+    (section === "apartment" && field === "floor") ||
+    (section === "building" && field === "classifier")
+  );
+  const isFieldLocked = (section, field) => hasLockedDetails && !isVisibleLockedField(section, field);
+  const lockedValueProps = (section, field) => {
+    if (!isFieldLocked(section, field)) return {};
+    return {
+      role: onLockedClick ? "button" : undefined,
+      tabIndex: onLockedClick ? 0 : undefined,
+      onClick: onLockedClick,
+      onKeyDown: (event) => {
+        if (!onLockedClick) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onLockedClick();
+        }
+      },
+    };
+  };
+  const valueClassName = (section, field) => (
+    `${detailValueClass} ${isFieldLocked(section, field) ? "select-none blur-sm cursor-pointer" : ""}`
+  );
+  const detailRow = (section, field, label, value) => {
+    if (!value) return null;
+    return (
+      <div className="flex items-start justify-between gap-4 text-base">
+        <span className="text-gray-500">{label}</span>
+        <span className={valueClassName(section, field)} {...lockedValueProps(section, field)}>
+          {value}
+        </span>
+      </div>
+    );
+  };
+  const floorValue = cadastral.apartment?.floor
+    ? cadastral.building?.total_floors && !isFieldLocked("building", "total_floors")
+      ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
+      : cadastral.apartment.floor
+    : null;
 
   return (
     <div className={`${className} ${widthClass} overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md`}>
@@ -88,88 +133,19 @@ export default function CadastralDataCard({ cadastral, className = "" }) {
                   {t("form.cadastralApartment")}
                 </p>
                 <div className="space-y-2.5">
-                  {cadastral.apartment?.area_m2 && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralArea")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.area_m2} m²</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.floor && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralFloor")}</span>
-                      <span className={detailValueClass}>
-                        {cadastral.building?.total_floors
-                          ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
-                          : cadastral.apartment.floor}
-                      </span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.toilet && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralToilet")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.toilet}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.bathroom && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralBathroom")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.bathroom}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.is_last_floor && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralLastFloor")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.is_last_floor}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.estimated_value_lei && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralEstimatedValue")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.estimated_value_lei} lei</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.type && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralRoomType")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.type}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.destination && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralDestination")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.destination}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.last_estimated_at && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralLastValuation")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.last_estimated_at}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.ownership_type && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralPropertyType")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.ownership_type}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.real_rights && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralRealRights")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.real_rights}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.notes && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralNotes")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.notes}</span>
-                    </div>
-                  )}
-                  {cadastral.apartment?.restrictions && (
-                    <div className="flex items-start justify-between gap-4 text-base">
-                      <span className="text-gray-500">{t("form.cadastralRestrictions")}</span>
-                      <span className={detailValueClass}>{cadastral.apartment.restrictions}</span>
-                    </div>
-                  )}
+                  {detailRow("apartment", "area_m2", t("form.cadastralArea"), cadastral.apartment?.area_m2 ? `${cadastral.apartment.area_m2} m²` : null)}
+                  {detailRow("apartment", "floor", t("form.cadastralFloor"), floorValue)}
+                  {detailRow("apartment", "toilet", t("form.cadastralToilet"), cadastral.apartment?.toilet)}
+                  {detailRow("apartment", "bathroom", t("form.cadastralBathroom"), cadastral.apartment?.bathroom)}
+                  {detailRow("apartment", "is_last_floor", t("form.cadastralLastFloor"), cadastral.apartment?.is_last_floor)}
+                  {detailRow("apartment", "estimated_value_lei", t("form.cadastralEstimatedValue"), cadastral.apartment?.estimated_value_lei ? `${cadastral.apartment.estimated_value_lei} lei` : null)}
+                  {detailRow("apartment", "type", t("form.cadastralRoomType"), cadastral.apartment?.type)}
+                  {detailRow("apartment", "destination", t("form.cadastralDestination"), cadastral.apartment?.destination)}
+                  {detailRow("apartment", "last_estimated_at", t("form.cadastralLastValuation"), cadastral.apartment?.last_estimated_at)}
+                  {detailRow("apartment", "ownership_type", t("form.cadastralPropertyType"), cadastral.apartment?.ownership_type)}
+                  {detailRow("apartment", "real_rights", t("form.cadastralRealRights"), cadastral.apartment?.real_rights)}
+                  {detailRow("apartment", "notes", t("form.cadastralNotes"), cadastral.apartment?.notes)}
+                  {detailRow("apartment", "restrictions", t("form.cadastralRestrictions"), cadastral.apartment?.restrictions)}
                 </div>
               </div>
             )}
@@ -180,33 +156,15 @@ export default function CadastralDataCard({ cadastral, className = "" }) {
                   {t("form.cadastralBuilding")}
                 </p>
                 <div className="space-y-2.5">
-                  {cadastral.building?.classifier && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralClassifier")}</span><span className={detailValueClass}>{cadastral.building.classifier}</span></div>
-                  )}
-                  {cadastral.building?.total_floors && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralTotalFloors")}</span><span className={detailValueClass}>{cadastral.building.total_floors}</span></div>
-                  )}
-                  {cadastral.building?.condition && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralCondition")}</span><span className={detailValueClass}>{cadastral.building.condition}</span></div>
-                  )}
-                  {cadastral.building?.construction_year && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralYear")}</span><span className={detailValueClass}>{cadastral.building.construction_year}</span></div>
-                  )}
-                  {cadastral.building?.wall_material && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralWallMaterial")}</span><span className={detailValueClass}>{cadastral.building.wall_material}</span></div>
-                  )}
-                  {cadastral.building?.water && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralWater")}</span><span className={detailValueClass}>{cadastral.building.water}</span></div>
-                  )}
-                  {cadastral.building?.sewage && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralSewage")}</span><span className={detailValueClass}>{cadastral.building.sewage}</span></div>
-                  )}
-                  {cadastral.building?.gas && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralGas")}</span><span className={detailValueClass}>{cadastral.building.gas}</span></div>
-                  )}
-                  {cadastral.building?.electricity && (
-                    <div className="flex items-start justify-between gap-4 text-base"><span className="text-gray-500">{t("form.cadastralElectricity")}</span><span className={detailValueClass}>{cadastral.building.electricity}</span></div>
-                  )}
+                  {detailRow("building", "classifier", t("form.cadastralClassifier"), cadastral.building?.classifier)}
+                  {detailRow("building", "total_floors", t("form.cadastralTotalFloors"), cadastral.building?.total_floors)}
+                  {detailRow("building", "condition", t("form.cadastralCondition"), cadastral.building?.condition)}
+                  {detailRow("building", "construction_year", t("form.cadastralYear"), cadastral.building?.construction_year)}
+                  {detailRow("building", "wall_material", t("form.cadastralWallMaterial"), cadastral.building?.wall_material)}
+                  {detailRow("building", "water", t("form.cadastralWater"), cadastral.building?.water)}
+                  {detailRow("building", "sewage", t("form.cadastralSewage"), cadastral.building?.sewage)}
+                  {detailRow("building", "gas", t("form.cadastralGas"), cadastral.building?.gas)}
+                  {detailRow("building", "electricity", t("form.cadastralElectricity"), cadastral.building?.electricity)}
                 </div>
               </div>
             )}

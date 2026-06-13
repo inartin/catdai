@@ -40,7 +40,7 @@ The sale/buy preview still shows the sector/city trend card title and period, bu
 ## Full Payload
 Authenticated free users receive the full sale/buy estimate response while they have monthly free allowance remaining. After the monthly allowance is exhausted, `/api/estimate` returns the same preview payload shape used for anonymous users plus `access_limit.reason = free_monthly_limit_reached`. Users with exhausted purchased sale/rent credits receive `access_limit.reason = paid_evaluation_limit_reached` instead of falling through to free monthly quota.
 Rent evaluation uses the same limit and purchase flow through `/api/estimate-rent` with `rent_estimate` credits.
-Cadastral lookup is login-gated and credit-gated with `cadastru_lookup` credits.
+Cadastral lookup is login-gated and credit-gated with `cadastru_lookup` credits. Authenticated users without a remaining credit receive a result-page preview: cadastral number, address, floor, and classifier remain visible when available, while the remaining official cadastru fields are server-masked with `|` characters and blurred in the UI with the package purchase popup.
 999 listing analysis is credit-gated with `listing_analysis` credits and does not consume sale-estimate credits.
 Rent-yield calculator results are credit-gated with `yield_calculator` credits and do not consume rent-estimate credits; missing credit returns the calculator result shell with rent-yield, tax, market-stat, district, and listing details locked/blurred instead of a hard error.
 PDF export dialogs are visible to anonymous users, but downloading a PDF requires a valid authenticated Supabase bearer token and a `pdf_report` credit checked by `/api/pdf-generation-authorizations`.

@@ -7,10 +7,12 @@ import Footer from "@/components/Footer";
 import BackButton from "@/components/BackButton";
 import CadastralDataCard from "@/components/CadastralDataCard";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
+import FeaturePricingAction from "@/components/FeaturePricingAction";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 
 const inFlightCadastralLookups = new Map();
+const CADASTRU_DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
 
 function fetchCadastralLookup(cacheKey, body, accessToken) {
   const existing = inFlightCadastralLookups.get(cacheKey);
@@ -48,6 +50,7 @@ function CadastruResultContent() {
   const loadedRequestKey = useRef("");
   const [authModalDismissed, setAuthModalDismissed] = useState(false);
   const [limitModalDismissed, setLimitModalDismissed] = useState(false);
+  const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
   const [state, setState] = useState({
     loading: true,
     error: "",
@@ -55,6 +58,17 @@ function CadastruResultContent() {
     dailyLimitReached: false,
   });
   const authRequired = !authLoading && Boolean(cadastralNumber) && !isAuthenticated;
+  const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
+  const purchaseOffer = state.data?.access_limit?.purchase || null;
+
+  useEffect(() => {
+    if (!cadastralNumber) return;
+    try {
+      localStorage.removeItem(CADASTRU_DRAFT_STORAGE_KEY);
+    } catch {
+      // Draft cleanup is best-effort after the result page opens.
+    }
+  }, [cadastralNumber]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -129,6 +143,21 @@ function CadastruResultContent() {
         showAuthOptions={false}
         onClose={() => setLimitModalDismissed(true)}
       />
+      <AuthRequiredModal
+        open={isPaywallModalOpen}
+        copyKey="payment.buyAccess"
+        showAuthOptions={false}
+        onClose={() => setIsPaywallModalOpen(false)}
+      >
+        {purchaseOffer ? (
+          <>
+            <p className="mb-4 text-center text-sm font-medium text-gray-500">
+              {t("payment.limitPackageSubtitle")}
+            </p>
+            <FeaturePricingAction offer={purchaseOffer} />
+          </>
+        ) : null}
+      </AuthRequiredModal>
       <Navbar />
       <main className="flex-1">
         <section className="mx-auto w-full max-w-5xl px-6 pb-12 pt-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12">
@@ -154,7 +183,13 @@ function CadastruResultContent() {
             </div>
           )}
 
-          {state.data && <CadastralDataCard cadastral={state.data} />}
+          {state.data && (
+            <CadastralDataCard
+              cadastral={state.data}
+              locked={isLockedPreview}
+              onLockedClick={isLockedPreview ? () => setIsPaywallModalOpen(true) : undefined}
+            />
+          )}
         </section>
       </main>
       <Footer />

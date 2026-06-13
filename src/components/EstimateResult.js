@@ -2014,6 +2014,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
   const purchaseOffer = (freeMonthlyLimitReached || paidEvaluationLimitReached) ? data.access_limit?.purchase : null;
+  const cadastralLockedPreview = cadastral?.locked_sections?.cadastru_details === true;
+  const cadastralPurchaseOffer = cadastral?.access_limit?.purchase || null;
+  const authModalPurchaseOffer = authModalCopyKey === "payment.buyAccess" && cadastralPurchaseOffer
+    ? cadastralPurchaseOffer
+    : purchaseOffer;
   const lockedSections = data.locked_sections || {};
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
   const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
@@ -2069,6 +2074,13 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
     openAuthModal("result.loginToSeeFullAnalysis");
   }, [freeMonthlyLimitReached, openAuthModal]);
+
+  const openCadastralPaywallModal = useCallback(() => {
+    openAuthModal("payment.buyAccess", {
+      force: true,
+      showAuthOptions: false,
+    });
+  }, [openAuthModal]);
 
   useEffect(() => {
     if (!isAuthenticated || typeof window === "undefined") return;
@@ -2419,12 +2431,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         showAuthOptions={authModalShowAuthOptions}
         onClose={closeAuthModal}
       >
-        {freeMonthlyLimitReached && authModalCopyKey === "result.freeMonthlyLimitReached" && purchaseOffer ? (
+        {authModalPurchaseOffer && (authModalCopyKey === "result.freeMonthlyLimitReached" || authModalCopyKey === "payment.buyAccess") ? (
           <>
             <p className="mb-4 text-center text-sm font-medium text-gray-500">
               {t("payment.limitPackageSubtitle")}
             </p>
-            <FeaturePricingAction offer={purchaseOffer} />
+            <FeaturePricingAction offer={authModalPurchaseOffer} />
           </>
         ) : null}
       </AuthRequiredModal>
@@ -2860,6 +2872,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             <CadastralDataCard
               cadastral={cadastral}
               className={compactLayout ? "" : "order-6"}
+              locked={cadastralLockedPreview}
+              onLockedClick={cadastralLockedPreview ? openCadastralPaywallModal : undefined}
             />
           )}
 

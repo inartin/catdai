@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
+import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import {
   CADASTRU_DAILY_SEARCH_LIMIT,
   getUserCadastruDailySearchStatus,
@@ -11,7 +12,6 @@ import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import {
-  buildFeatureCreditRequiredPayload,
   checkPaidFeatureAccess,
   consumePaidFeatureCredit,
   makePaidFeatureUsageKey,
@@ -360,13 +360,6 @@ function makeCadastruLookupUsageKey(cadastralNumber) {
   });
 }
 
-function featureCreditRequiredResponse(reason) {
-  return NextResponse.json(
-    buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
-    { status: reason === "unauthorized" ? 401 : 402 }
-  );
-}
-
 function normalizeLookupSource(value) {
   return value === "api" || value === "local" ? value : null;
 }
@@ -493,9 +486,6 @@ export async function POST(request) {
     featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
     idempotencyKey: creditIdempotencyKey,
   });
-  if (!creditCheck.allowed) {
-    return featureCreditRequiredResponse(creditCheck.reason);
-  }
 
   let lookupSource = null;
   const recordCadastruSearch = async (payload, resultType = null) => {
@@ -509,6 +499,13 @@ export async function POST(request) {
     });
   };
   const respondWithCadastralPayload = async (payload, options = {}) => {
+    if (!creditCheck.allowed) {
+      const preview = buildCadastruPreviewPayload(payload, creditCheck.reason || "no_credit");
+      const res = NextResponse.json(preview);
+      res.headers.set("X-RateLimit-Remaining", String(remaining));
+      return res;
+    }
+
     const creditUsage = await consumePaidFeatureCredit({
       userId: access.user_id,
       featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
@@ -521,7 +518,10 @@ export async function POST(request) {
       },
     });
     if (!creditUsage.allowed) {
-      return featureCreditRequiredResponse(creditUsage.reason || "no_credit");
+      const preview = buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit");
+      const res = NextResponse.json(preview);
+      res.headers.set("X-RateLimit-Remaining", String(remaining));
+      return res;
     }
 
     await setCachedCadastralPayload(trimmed, payload, lookupSource);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
@@ -18,6 +18,27 @@ const APARTMENT_NUMBER_MAX_LENGTH = 4;
 const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/\d{1,4})?$/;
 const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 const MAX_APARTMENT_NUMBER = 9999;
+const DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
+
+function readSavedDraft() {
+  if (typeof window === "undefined") return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DRAFT_STORAGE_KEY) || "null");
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSavedDraft(draft) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // Draft persistence is best-effort for auth redirects.
+  }
+}
 
 function onlyHouseNumberChars(value) {
   return value.replace(/[^\d/]/g, "").slice(0, HOUSE_NUMBER_MAX_LENGTH);
@@ -44,6 +65,7 @@ export default function CadastruSearchForm({
     apartmentNumber: "",
   });
   const [cadastralNumber, setCadastralNumber] = useState("");
+  const [draftReady, setDraftReady] = useState(false);
   const [lookupState, setLookupState] = useState({
     loading: false,
     method: null,
@@ -52,8 +74,30 @@ export default function CadastruSearchForm({
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
 
+  useEffect(() => {
+    const savedDraft = readSavedDraft();
+    if (savedDraft) {
+      setAddressForm({
+        roadType: savedDraft?.addressForm?.roadType === "bulevard" ? "bulevard" : "strada",
+        street: typeof savedDraft?.addressForm?.street === "string" ? savedDraft.addressForm.street : "",
+        houseNumber: typeof savedDraft?.addressForm?.houseNumber === "string" ? savedDraft.addressForm.houseNumber : "",
+        apartmentNumber: typeof savedDraft?.addressForm?.apartmentNumber === "string" ? savedDraft.addressForm.apartmentNumber : "",
+      });
+      if (typeof savedDraft?.cadastralNumber === "string") {
+        setCadastralNumber(savedDraft.cadastralNumber);
+      }
+    }
+    setDraftReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    writeSavedDraft({ addressForm, cadastralNumber });
+  }, [addressForm, cadastralNumber, draftReady]);
+
   const requireAuth = () => {
     if (isAuthenticated) return false;
+    writeSavedDraft({ addressForm, cadastralNumber });
     clearAuthError();
     setLookupState({ loading: false, method: null, error: "" });
     setIsAuthModalOpen(true);

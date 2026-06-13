@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
 import { findCadastralByAddress } from "@/lib/cadastru-address-search";
+import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import {
   CADASTRU_DAILY_SEARCH_LIMIT,
   getUserCadastruDailySearchStatus,
@@ -12,8 +13,6 @@ import { getCadastruRecordByAddress, persistCadastruRecord } from "@/lib/cadastr
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import {
-  buildFeatureCreditRequiredPayload,
-  checkPaidFeatureAccess,
   consumePaidFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
@@ -94,13 +93,6 @@ function makeCadastruNumberUsageKey(cadastralNumber) {
   return makePaidFeatureUsageKey(CADASTRU_LOOKUP_FEATURE_KEY, {
     cadastral_number: String(cadastralNumber || "").trim(),
   });
-}
-
-function featureCreditRequiredResponse(reason) {
-  return NextResponse.json(
-    buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
-    { status: reason === "unauthorized" ? 401 : 402 }
-  );
 }
 
 async function getCachedCadastruAddress(rawAddress) {
@@ -289,7 +281,10 @@ export async function POST(request) {
         lookup_source: lookupSource || null,
       },
     });
-    return creditUsage.allowed ? null : featureCreditRequiredResponse(creditUsage.reason || "no_credit");
+    if (creditUsage.allowed) return null;
+    const response = NextResponse.json(buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit"));
+    response.headers.set("X-RateLimit-Remaining", String(remaining));
+    return response;
   };
 
   const cached = await getCachedCadastruAddress(rawAddress);
@@ -346,15 +341,6 @@ export async function POST(request) {
     const response = NextResponse.json(payload);
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
-  }
-
-  const addressCreditCheck = await checkPaidFeatureAccess({
-    userId: access.user_id,
-    featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
-    idempotencyKey: makeCadastruAddressUsageKey(rawAddress),
-  });
-  if (!addressCreditCheck.allowed) {
-    return featureCreditRequiredResponse(addressCreditCheck.reason);
   }
 
   try {

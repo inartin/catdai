@@ -29,7 +29,7 @@ export async function generateMetadata() {
   const description = translations[lang]["cadastru.metaDescription"];
 
   return {
-    title: `${title} | Catdai`,
+    title,
     description,
     robots: hasUrlLang ? undefined : { index: false, follow: true },
     alternates: {
@@ -41,7 +41,7 @@ export async function generateMetadata() {
       },
     },
     openGraph: {
-      title: `${title} | Catdai`,
+      title,
       description,
       url: `/${canonicalLang}/cadastru`,
       siteName: "Catdai",
@@ -51,7 +51,7 @@ export async function generateMetadata() {
     },
     twitter: {
       card: "summary",
-      title: `${title} | Catdai`,
+      title,
       description,
     },
   };

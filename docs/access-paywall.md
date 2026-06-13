@@ -11,6 +11,7 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 - Standard, Pro, and Extra grant 2, 10, and 50 uses for each paid feature.
 - Paid-only features require a remaining feature credit: 999 analysis, cadastru lookup, yield calculator, and PDF report.
 - `/api/estimate` records free full-evaluation usage in `user_feature_usage_events` with `source = 'free_monthly'`; repeated loads of the same normalized sale/buy criteria in the same month reuse the same idempotency key.
+- `/api/profile/credits` returns the current UTC-month free sale/rent allowance alongside paid feature credits so `/profile` can show the two free monthly uses with a separate free badge in `Acces rămas`.
 - Runtime usage persistence runs when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`; local dev can use the live Supabase dataset when this flag is enabled.
 - `user_entitlements` schema exists, but `resolveAccessTier()` does not read it yet.
 - Paynet is not used whatsoever and must not be connected to checkout. The old Paynet API routes now return disabled responses.

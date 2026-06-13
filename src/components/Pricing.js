@@ -113,13 +113,15 @@ function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
         ))}
       </ul>
 
-      <p
-        className={`mt-5 rounded-xl px-3.5 py-2.5 text-xs font-semibold leading-5 ${
-          featured ? "bg-primary/10 text-primary-dark" : "bg-gray-50 text-gray-500"
-        }`}
-      >
-        {plan.note}
-      </p>
+      {plan.note && (
+        <p
+          className={`mt-5 rounded-xl px-3.5 py-2.5 text-xs font-semibold leading-5 ${
+            featured ? "bg-primary/10 text-primary-dark" : "bg-gray-50 text-gray-500"
+          }`}
+        >
+          {plan.note}
+        </p>
+      )}
 
       {plan.productKey && (
         <>
@@ -127,7 +129,9 @@ function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
             type="button"
             onClick={() => onCheckout(plan.productKey)}
             disabled={isBusy}
-            className={`mt-4 inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:bg-gray-300 ${
+            className={`inline-flex w-full cursor-pointer items-center justify-center rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:bg-gray-300 ${
+              plan.note ? "mt-4" : "mt-5"
+            } ${
               featured
                 ? "bg-primary text-white hover:bg-primary-dark"
                 : "bg-gray-950 text-white hover:bg-gray-800"
@@ -215,8 +219,6 @@ export default function Pricing({ prices, compact = false }) {
       price: prices.standard,
       title: t("pricing.standardTitle"),
       description: t("pricing.standardDesc"),
-      badge: t("pricing.standardBadge"),
-      note: t("pricing.noTimeLimit"),
       features: makeFeatures("2"),
       actionLabel: t("pricing.choosePlan"),
       loadingLabel: t("payment.checkoutLoading"),
@@ -228,7 +230,6 @@ export default function Pricing({ prices, compact = false }) {
       title: t("pricing.proTitle"),
       description: t("pricing.proDesc"),
       badge: t("pricing.proBadge"),
-      note: t("pricing.noTimeLimit"),
       features: makeFeatures("10"),
       actionLabel: t("pricing.choosePlan"),
       loadingLabel: t("payment.checkoutLoading"),
@@ -239,8 +240,6 @@ export default function Pricing({ prices, compact = false }) {
       price: prices.extra,
       title: t("pricing.extraTitle"),
       description: t("pricing.extraDesc"),
-      badge: t("pricing.extraBadge"),
-      note: t("pricing.extraNote"),
       features: makeFeatures("50"),
       actionLabel: t("pricing.choosePlan"),
       loadingLabel: t("payment.checkoutLoading"),

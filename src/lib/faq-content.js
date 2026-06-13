@@ -32,6 +32,13 @@ export const faqItemsByLang = {
       ],
     },
     {
+      question: "Cum găsesc numărul cadastral după adresă?",
+      answers: [
+        "Introdu orașul, strada, numărul blocului și apartamentul.",
+        "Dacă există date oficiale, CatDai afișează numărul cadastral găsit si alte detalii disponibile, cum ar fi valoarea cadastrală estimată actuală in Lei, anul construcției blocului, etc.",
+      ],
+    },
+    {
       question: "Este CatDai afiliat cu 999.md, Makler.md sau alte platforme?",
       answers: [
         "Nu. CatDai nu este afiliat, sponsorizat sau partener oficial al acestor platforme, decât dacă este indicat explicit în scris.",
@@ -101,6 +108,13 @@ export const faqItemsByLang = {
           href: "/ru/ceny-kvartir/kishinev/botanika-novostroy",
           label: "Пример в новострое",
         },
+      ],
+    },
+    {
+      question: "Как узнать кадастровый номер по адресу?",
+      answers: [
+        "Введите город, улицу, номер дома и квартиры.",
+        "Если данные доступны, CatDai покажет найденный кадастровый номер и дополнительную информацию такую как официальную кадастровую стоимость в леях, год постройки дома и другие.",
       ],
     },
     {

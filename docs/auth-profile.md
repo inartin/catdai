@@ -16,10 +16,10 @@ Implemented and active.
 ## Profile
 `/profile` shows:
 - user avatar/name/email
-- access-type badge in the top-right of the profile card, based on the latest paid package or remaining paid credits
+- clickable package badge in the top-right of the profile card, based on the latest paid package or remaining paid credits; free accounts show `Pachet Start`, and the badge opens `/pricing`
 - Telegram app-managed placeholder emails like `telegram-<id>@auth.catdai.md` are hidden; Telegram username is shown when available.
 - logout
-- purchased feature-credit balances from `user_feature_credits`, including remaining, used, and granted counts per feature, shown in the top profile card above `Setări`
+- free monthly sale/rent allowance balances plus purchased feature-credit balances, including remaining, used, and granted counts per feature, shown in the top profile card above `Setări`; free allowance cards use a separate free badge
 - favorites
 - paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus search type, result type, city, and district when available
 - paid sale/rent evaluation usage rows are also shown in history when a saved paid snapshot exists; those rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation

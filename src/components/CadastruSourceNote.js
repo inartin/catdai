@@ -7,7 +7,7 @@ function SourceIcon() {
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
-      className="h-5 w-5"
+      className="h-6 w-6"
       fill="none"
       stroke="currentColor"
       strokeWidth="1.8"
@@ -24,7 +24,7 @@ export default function CadastruSourceNote() {
   const { t } = useTranslation();
 
   return (
-    <div className="mt-6 flex items-center gap-4 rounded-xl border border-green-100 bg-green-50 px-4 py-4 text-sm text-green-900">
+    <div className="mt-6 flex items-center gap-4 px-1 py-1 text-sm text-green-900">
       <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-primary shadow-sm">
         <SourceIcon />
       </span>

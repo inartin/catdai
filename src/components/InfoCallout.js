@@ -1,7 +1,7 @@
 export default function InfoCallout({ title, children, className = "" }) {
   return (
     <section className={`rounded-2xl border border-blue-100 bg-blue-50/60 p-5 shadow-sm sm:p-6 ${className}`}>
-      <div className="flex gap-4">
+      <div className="flex items-center gap-4">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-600">
           <svg
             viewBox="0 0 24 24"
@@ -18,11 +18,9 @@ export default function InfoCallout({ title, children, className = "" }) {
             <path d="M12 8h.01" />
           </svg>
         </span>
-        <div>
-          <h2 className="text-base font-bold text-gray-900">{title}</h2>
-          <p className="mt-2 text-sm leading-6 text-gray-600">{children}</p>
-        </div>
+        <h2 className="text-base font-bold text-gray-900">{title}</h2>
       </div>
+      <div className="mt-4 text-sm leading-6 text-gray-600">{children}</div>
     </section>
   );
 }

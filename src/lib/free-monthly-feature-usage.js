@@ -3,8 +3,9 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 
 export const FREE_MONTHLY_FULL_EVALUATION_LIMIT = 2;
+export const FREE_MONTHLY_FULL_EVALUATION_FEATURE_KEYS = ["sale_estimate", "rent_estimate"];
 
-function getMonthWindow(now = new Date()) {
+export function getFreeMonthlyFeatureUsageWindow(now = new Date()) {
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   return {
@@ -15,7 +16,7 @@ function getMonthWindow(now = new Date()) {
 }
 
 export function makeMonthlyFeatureUsageKey(featureKey, payload) {
-  const { monthKey } = getMonthWindow();
+  const { monthKey } = getFreeMonthlyFeatureUsageWindow();
   const hash = crypto
     .createHash("sha256")
     .update(JSON.stringify(payload || {}))
@@ -116,7 +117,7 @@ export async function consumeFreeMonthlyFeatureUsage({
   metadata = {},
   limit = FREE_MONTHLY_FULL_EVALUATION_LIMIT,
 }) {
-  const { startIso, endIso } = getMonthWindow();
+  const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
   const resetAt = endIso;
 
   if (!userId) {

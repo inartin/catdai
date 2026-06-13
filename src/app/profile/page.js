@@ -193,6 +193,7 @@ export default function ProfilePage() {
   const [transactionsLoadingMore, setTransactionsLoadingMore] = useState(false);
   const [transactionsNextCursor, setTransactionsNextCursor] = useState(null);
   const [credits, setCredits] = useState([]);
+  const [freeMonthlyCredits, setFreeMonthlyCredits] = useState([]);
   const [creditsLoading, setCreditsLoading] = useState(true);
   const profileName = getProfileName(user);
   const profileSubtitle = getProfileSubtitle(user);
@@ -323,6 +324,7 @@ export default function ProfilePage() {
         setTransactions(transactionsData.transactions || []);
         setTransactionsNextCursor(transactionsData.nextCursor || null);
         setCredits(creditsData.credits || []);
+        setFreeMonthlyCredits(creditsData.freeMonthlyCredits || []);
       })
       .catch(() => {})
       .finally(() => {
@@ -374,13 +376,17 @@ export default function ProfilePage() {
         <div className="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8 min-h-[60vh]">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">{t("nav.profile")}</h1>
           <div className="bg-white shadow rounded-lg p-8 border border-gray-100 relative">
-            <div className={`absolute right-6 top-6 rounded-full border px-3 py-1 text-xs font-bold ${
+            <button
+              type="button"
+              onClick={() => router.push("/pricing")}
+              className={`absolute right-6 top-6 cursor-pointer rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
               accessBadge.tone === "paid"
-                ? "border-primary/20 bg-primary/10 text-primary-dark"
-                : "border-gray-200 bg-gray-50 text-gray-600"
-            }`}>
+                ? "border-primary/20 bg-primary/10 text-primary-dark hover:bg-primary/15"
+                : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100"
+            }`}
+            >
               {accessBadge.label}
-            </div>
+            </button>
             <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
               {user?.user_metadata?.avatar_url || user?.user_metadata?.picture ? (
                 <img 
@@ -423,11 +429,21 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {credits.map((row) => (
-                      <div key={row.featureKey} className="rounded-xl border border-gray-100 bg-white px-3 py-3">
-                        <p className="min-h-10 text-sm font-semibold leading-5 text-gray-900">
-                          {formatCreditFeature(row.featureKey, t)}
-                        </p>
+                    {[
+                      ...freeMonthlyCredits.filter((row) => row.eligible !== false),
+                      ...credits.map((row) => ({ ...row, source: "paid_credit" })),
+                    ].map((row) => (
+                      <div key={`${row.source}-${row.featureKey}`} className="rounded-xl border border-gray-100 bg-white px-3 py-3">
+                        <div className="flex min-h-10 items-start justify-between gap-2">
+                          <p className="text-sm font-semibold leading-5 text-gray-900">
+                            {formatCreditFeature(row.featureKey, t)}
+                          </p>
+                          {row.source === "free_monthly" && (
+                            <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                              {t("profile.creditBadgeFree")}
+                            </span>
+                          )}
+                        </div>
                         <div className="mt-2 flex items-end justify-between gap-2">
                           <div>
                             <p className="text-[11px] font-medium uppercase text-gray-400">{t("profile.creditRemaining")}</p>

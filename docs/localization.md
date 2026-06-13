@@ -9,6 +9,7 @@ Implemented for Romanian and Russian UI.
 - URL prefixes `/ro/...` and `/ru/...` set the language.
 - The Cadastru route passes the URL language from `x-catdai-lang` into `LanguageProvider` so `/ro/cadastru` and `/ru/cadastru` render the correct language in initial HTML.
 - FAQ copy is centralized in `src/lib/faq-content.js`, with separate localized datasets for the full FAQ pages and the landing-page FAQ preview.
+- The full FAQ dataset includes localized cadastral lookup-by-address copy for both Romanian and Russian FAQ pages.
 - Proxy rewrites localized paths to the base route, except localized FAQ pages.
 
 ## UI

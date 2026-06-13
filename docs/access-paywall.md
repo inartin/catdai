@@ -6,7 +6,7 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 ## Current Access Rule
 - Anonymous users are `free`.
 - Authenticated Supabase users are `free` by default; authentication and paid access are separate.
-- Sale/buy full evaluation access for free authenticated users is limited to 2 unique evaluations per UTC month.
+- Sale/buy full evaluation access for authenticated users without purchased sale/rent credits is limited to 2 unique evaluations per UTC month.
 - Paid package and single-feature access is tracked as non-expiring per-feature credits in `user_feature_credits`.
 - Standard, Pro, and Extra grant 2, 10, and 50 uses for each paid feature.
 - Paid-only features require a remaining feature credit: 999 analysis, cadastru lookup, yield calculator, and PDF report.
@@ -22,7 +22,7 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 - Limit-reached blurred-value popups say the 2 free monthly evaluations were used, prompt the user to choose a package, and show Standard as the default package action with a secondary link to `/pricing`.
 - Paddle checkout and status pages use the CatDai-branded RO/RU payment shell and preserve the selected language through the checkout/status redirect.
 - Sale and rent evaluation single-access checkouts use the same Paddle price ID from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE`, display the euro amount from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` plus `≈ MDL` at 20 MDL per EUR, and grant one `sale_estimate` or `rent_estimate` credit after Paddle confirms payment.
-- Authenticated free users consume the monthly free allowance before paid credits; paid credits are used only after the free monthly limit is reached.
+- Authenticated users consume matching paid feature credits before the monthly free sale/rent allowance, so package-paid evaluations are recorded as paid usage and can be reopened from profile history. Users who have ever received sale/rent paid credits do not get extra free monthly evaluations for that same feature after paid credits run out.
 - When a paid sale/rent credit is used, `user_feature_usage_events.metadata.evaluation_snapshot` stores the immutable full result for profile history replay by `snapshot_id`.
 - Repeated loads of the same paid feature result reuse stable paid idempotency keys so refreshes do not consume another credit.
 
@@ -38,7 +38,7 @@ Locked preview sections include fast/target prices, price per m2, range numbers,
 The sale/buy preview still shows the sector/city trend card title and period, but uses fake blurred `9.999`-style trend data and the shared auth tooltip instead of exposing the real trend payload.
 
 ## Full Payload
-Authenticated free users receive the full sale/buy estimate response while they have monthly free allowance remaining. After the monthly allowance is exhausted, `/api/estimate` returns the same preview payload shape used for anonymous users plus `access_limit.reason = free_monthly_limit_reached`.
+Authenticated free users receive the full sale/buy estimate response while they have monthly free allowance remaining. After the monthly allowance is exhausted, `/api/estimate` returns the same preview payload shape used for anonymous users plus `access_limit.reason = free_monthly_limit_reached`. Users with exhausted purchased sale/rent credits receive `access_limit.reason = paid_evaluation_limit_reached` instead of falling through to free monthly quota.
 Rent evaluation uses the same limit and purchase flow through `/api/estimate-rent` with `rent_estimate` credits.
 Cadastral lookup is login-gated and credit-gated with `cadastru_lookup` credits.
 999 listing analysis is credit-gated with `listing_analysis` credits and does not consume sale-estimate credits.

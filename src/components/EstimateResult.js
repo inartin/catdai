@@ -1672,8 +1672,9 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const isSnapshot = data.snapshot?.immutable === true;
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
+  const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
   const purchaseOffer = !isPaid ? data.access_limit?.purchase : null;
-  const paidFeatureCreditRequired = !!purchaseOffer && !freeMonthlyLimitReached;
+  const paidFeatureCreditRequired = !!purchaseOffer && !freeMonthlyLimitReached && !paidEvaluationLimitReached;
   const lockedSections = data.locked_sections || {};
   const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
   const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
@@ -1699,7 +1700,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
       return;
     }
 
-    if (paidFeatureCreditRequired && isAuthenticated) {
+    if ((paidFeatureCreditRequired || paidEvaluationLimitReached) && isAuthenticated) {
       openAuthModal("payment.buyAccess", {
         force: true,
         showAuthOptions: false,
@@ -1708,7 +1709,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
     }
 
     openAuthModal("result.loginToSeeFullAnalysis");
-  }, [freeMonthlyLimitReached, isAuthenticated, openAuthModal, paidFeatureCreditRequired]);
+  }, [freeMonthlyLimitReached, isAuthenticated, openAuthModal, paidEvaluationLimitReached, paidFeatureCreditRequired]);
 
   const estimate = data.estimate || {};
   const range = data.range || {};
@@ -1762,7 +1763,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
     appendDefinedParam(params, "renovation", input.renovation);
     return buildEvaluationUrl(params);
   };
-  const lockedTooltipKey = (freeMonthlyLimitReached || (paidFeatureCreditRequired && isAuthenticated))
+  const lockedTooltipKey = (freeMonthlyLimitReached || paidEvaluationLimitReached || (paidFeatureCreditRequired && isAuthenticated))
     ? "payment.buyAccess"
     : "result.loginToSeeFullAnalysis";
 
@@ -2009,7 +2010,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const isSnapshot = data.snapshot?.immutable === true;
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
-  const purchaseOffer = freeMonthlyLimitReached ? data.access_limit?.purchase : null;
+  const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
+  const purchaseOffer = (freeMonthlyLimitReached || paidEvaluationLimitReached) ? data.access_limit?.purchase : null;
   const lockedSections = data.locked_sections || {};
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
   const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;

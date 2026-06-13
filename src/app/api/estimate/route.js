@@ -12,6 +12,7 @@ import {
   buildFeatureCreditRequiredPayload,
   checkPaidFeatureAccess,
   consumePaidFeatureCredit,
+  getUserFeatureCreditBalance,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
 import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
@@ -463,6 +464,7 @@ async function resolveEstimateAccess(request, body, params) {
   let accessSource = hasFullAccess ? "paid" : null;
   let freeMonthlyUsage = null;
   let paidCreditUsage = null;
+  let paidCreditBalance = null;
 
   // If a share_slug is provided, verify server-side if the sharer was paid
   if (!hasFullAccess && body.share_slug) {
@@ -478,6 +480,28 @@ async function resolveEstimateAccess(request, body, params) {
   }
 
   if (!hasFullAccess && access.user_id) {
+    const idempotencyKey = makePaidFeatureUsageKey(FULL_EVALUATION_FEATURE_KEY, params);
+    paidCreditUsage = await consumePaidFeatureCredit({
+      userId: access.user_id,
+      featureKey: FULL_EVALUATION_FEATURE_KEY,
+      idempotencyKey,
+      metadata: buildUsageMetadata({ params, body }),
+    });
+
+    if (paidCreditUsage.allowed) {
+      hasFullAccess = true;
+      accessSource = "paid_credit";
+    }
+  }
+
+  if (!hasFullAccess && access.user_id) {
+    paidCreditBalance = await getUserFeatureCreditBalance({
+      userId: access.user_id,
+      featureKey: FULL_EVALUATION_FEATURE_KEY,
+    });
+  }
+
+  if (!hasFullAccess && access.user_id && Number(paidCreditBalance?.total_granted) <= 0) {
     const idempotencyKey = makeMonthlyFeatureUsageKey(FULL_EVALUATION_FEATURE_KEY, params);
     freeMonthlyUsage = await consumeFreeMonthlyFeatureUsage({
       userId: access.user_id,
@@ -493,26 +517,12 @@ async function resolveEstimateAccess(request, body, params) {
     }
   }
 
-  if (!hasFullAccess && access.user_id && freeMonthlyUsage?.reason === "free_monthly_limit_reached") {
-    const idempotencyKey = makePaidFeatureUsageKey(FULL_EVALUATION_FEATURE_KEY, params);
-    paidCreditUsage = await consumePaidFeatureCredit({
-      userId: access.user_id,
-      featureKey: FULL_EVALUATION_FEATURE_KEY,
-      idempotencyKey,
-      metadata: buildUsageMetadata({ params, body }),
-    });
-
-    if (paidCreditUsage.allowed) {
-      hasFullAccess = true;
-      accessSource = "paid_credit";
-    }
-  }
-
-  return { access, hasFullAccess, accessSource, freeMonthlyUsage, paidCreditUsage };
+  return { access, hasFullAccess, accessSource, freeMonthlyUsage, paidCreditUsage, paidCreditBalance };
 }
 
 function buildEstimateAccessPayload(data, estimateAccess) {
   const usage = estimateAccess.freeMonthlyUsage;
+  const paidEvaluationLimitReached = Number(estimateAccess.paidCreditBalance?.total_granted) > 0;
   if (estimateAccess.hasFullAccess) {
     return {
       ...data,
@@ -539,7 +549,12 @@ function buildEstimateAccessPayload(data, estimateAccess) {
     ...buildEstimatePreview(data),
     access_tier: "free",
     full_access: false,
-    access_limit: usage?.reason === "free_monthly_limit_reached"
+    access_limit: paidEvaluationLimitReached
+      ? {
+        reason: "paid_evaluation_limit_reached",
+        purchase: getEvaluationPurchaseOffer(FULL_EVALUATION_FEATURE_KEY),
+      }
+      : usage?.reason === "free_monthly_limit_reached"
       ? {
         reason: usage.reason,
         limit: usage.limit,

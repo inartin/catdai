@@ -10,12 +10,11 @@ import {
 } from "@/lib/free-monthly-feature-usage";
 import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
 import {
-  buildFeatureCreditRequiredPayload,
   checkPaidFeatureAccess,
   consumePaidFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
-import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
+import { getEvaluationPurchaseOffer, getFeaturePurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { DISTRICTS_BY_CITY, matchBuildingType, matchCity, matchDistrict, validateEstimateInput } from "@/lib/validation";
@@ -465,13 +464,6 @@ function buildYieldCalculatorUsageMetadata({ params, body }) {
   };
 }
 
-function featureCreditRequiredResponse(featureKey, reason) {
-  return NextResponse.json(
-    buildFeatureCreditRequiredPayload(featureKey, reason),
-    { status: reason === "unauthorized" ? 401 : 402 }
-  );
-}
-
 async function precheckYieldCalculatorAccess(request, body, params) {
   const idempotencyKey = makeYieldCalculatorUsageKey(body, params);
   if (!idempotencyKey) return null;
@@ -483,13 +475,7 @@ async function precheckYieldCalculatorAccess(request, body, params) {
     idempotencyKey,
   });
 
-  if (!check.allowed) {
-    return {
-      blockedResponse: featureCreditRequiredResponse(YIELD_CALCULATOR_FEATURE_KEY, check.reason),
-    };
-  }
-
-  return { access, idempotencyKey };
+  return { access, idempotencyKey, check };
 }
 
 async function consumeYieldCalculatorCredit(calculatorAccess, body, params) {
@@ -584,20 +570,57 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
   };
 }
 
+function buildYieldCalculatorPreviewPayload(data, calculatorAccess) {
+  const preview = buildRentEstimatePreview(data);
+  const reason = calculatorAccess?.check?.reason || "no_credit";
+
+  return {
+    ...preview,
+    estimate: {
+      ...(preview.estimate || {}),
+      market_rate: null,
+    },
+    access_tier: calculatorAccess?.access?.tier || "free",
+    full_access: false,
+    access_limit: {
+      reason,
+      purchase: reason === "unauthorized" ? null : getFeaturePurchaseOffer(YIELD_CALCULATOR_FEATURE_KEY),
+    },
+    locked_sections: {
+      ...(preview.locked_sections || {}),
+      rent_yield_calculation: true,
+    },
+  };
+}
+
 /**
  * Resolves the rent-estimate response payload and the access record used for tracking.
  *
  * The rent-yield calculator (requests carrying `calculator_usage`) is a separate paid
- * product and is never subject to the free monthly evaluare limit — it is always returned
- * with full access so the preview/blur logic never triggers. The chirie evaluare flow is
- * gated exactly like the sale evaluare flow.
+ * product and is never subject to the free monthly evaluare limit. Missing calculator
+ * credit returns a preview payload so the UI can use the same blur/lock pattern as
+ * evaluation results.
  */
 async function resolveRentResponse(request, body, params, rawData, calculatorAccess = null) {
   if (body.calculator_usage) {
+    if (calculatorAccess?.check?.allowed !== true) {
+      return {
+        access: calculatorAccess?.access || await resolveAccessTier(request),
+        payload: buildYieldCalculatorPreviewPayload(rawData, calculatorAccess),
+      };
+    }
+
     const paidCreditUsage = await consumeYieldCalculatorCredit(calculatorAccess, body, params);
     if (!paidCreditUsage?.allowed) {
       return {
-        blockedResponse: featureCreditRequiredResponse(YIELD_CALCULATOR_FEATURE_KEY, paidCreditUsage?.reason || "no_credit"),
+        access: calculatorAccess.access,
+        payload: buildYieldCalculatorPreviewPayload(rawData, {
+          ...calculatorAccess,
+          check: {
+            allowed: false,
+            reason: paidCreditUsage?.reason || "no_credit",
+          },
+        }),
       };
     }
 
@@ -736,10 +759,6 @@ export async function POST(request) {
     );
   }
 
-  if (calculatorAccess?.blockedResponse) {
-    return calculatorAccess.blockedResponse;
-  }
-
   const requestStart = Date.now();
   const cacheKey = makeEstimateRentCacheKey(params);
   const cachedData = await getCachedEstimateRent(cacheKey);
@@ -754,7 +773,6 @@ export async function POST(request) {
         { status: 500 }
       );
     }
-    if (rentResponse.blockedResponse) return rentResponse.blockedResponse;
     trackRentEstimate({
       body,
       access: rentResponse.access,
@@ -809,7 +827,6 @@ export async function POST(request) {
       { status: 500 }
     );
   }
-  if (rentResponse.blockedResponse) return rentResponse.blockedResponse;
   trackRentEstimate({
     body,
     access: rentResponse.access,

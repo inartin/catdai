@@ -42,7 +42,7 @@ Authenticated free users receive the full sale/buy estimate response while they 
 Rent evaluation uses the same limit and purchase flow through `/api/estimate-rent` with `rent_estimate` credits.
 Cadastral lookup is login-gated and credit-gated with `cadastru_lookup` credits.
 999 listing analysis is credit-gated with `listing_analysis` credits and does not consume sale-estimate credits.
-Rent-yield calculator results are credit-gated with `yield_calculator` credits and do not consume rent-estimate credits.
+Rent-yield calculator results are credit-gated with `yield_calculator` credits and do not consume rent-estimate credits; missing credit returns the calculator result shell with rent-yield, tax, market-stat, district, and listing details locked/blurred instead of a hard error.
 PDF export dialogs are visible to anonymous users, but downloading a PDF requires a valid authenticated Supabase bearer token and a `pdf_report` credit checked by `/api/pdf-generation-authorizations`.
 
 ## Share Exception

@@ -7,8 +7,8 @@ Implemented for rent-yield calculations.
 - `/calculator` shows the starting form.
 - Submitting the form keeps the same route and appends `rezultat=1` plus the selected criteria in the query string.
 - Result URLs stay on `/calculator?rezultat=1...`.
-- Result mode calls `/api/estimate-rent` with the property criteria and `calculator_usage`, consumes a `yield_calculator` credit, then applies calculator-only investment fields after the rent estimate returns.
-- Calculator rent-estimate calls are separate from `/evaluare?type=rent` monetization: they return `full_access: true` after the `yield_calculator` credit check and do not consume the monthly free rent-evaluation allowance or `rent_estimate` credits.
+- Result mode calls `/api/estimate-rent` with the property criteria and `calculator_usage`, consumes a `yield_calculator` credit for full results, then applies calculator-only investment fields after the rent estimate returns.
+- Calculator rent-estimate calls are separate from `/evaluare?type=rent` monetization: full results require a `yield_calculator` credit and do not consume the monthly free rent-evaluation allowance or `rent_estimate` credits.
 
 ## Form
 - Reuses `PropertyForm` with the `rentYieldCalculator` variant.
@@ -26,6 +26,7 @@ Implemented for rent-yield calculations.
 
 ## Result
 - Reuses the rent result layout from `EstimateResult`.
+- Without a `yield_calculator` credit, the calculator keeps the result page visible but locks and blurs the rent-yield, tax, market-stat, district, and listing details.
 - The calculator result top card removes the lowest/highest rent listing columns.
 - `Preț Chirie Recomandată` is shown on the left only for the calculator result.
 - On mobile calculator results, the top rent-analysis card hides the renovation/building/floor/bathroom badges to keep the header compact.

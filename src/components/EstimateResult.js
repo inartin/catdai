@@ -1218,7 +1218,7 @@ function DuplicateListingsPreview({ t, count, listings, sectionRef }) {
   );
 }
 
-function RentYieldCalculatorPanel({ calculation }) {
+function RentYieldCalculatorPanel({ calculation, locked = false, onLockedClick }) {
   const { t } = useTranslation();
   const hasTax = calculation.include_rent_tax;
   const gridClassName = hasTax
@@ -1230,6 +1230,9 @@ function RentYieldCalculatorPanel({ calculation }) {
   const valueClassName = "text-3xl font-bold tracking-tight text-gray-900 lg:text-5xl";
   const netValueClassName = "text-4xl font-bold tracking-tight text-primary lg:text-6xl";
   const subLabelClassName = "text-base font-medium leading-snug text-gray-500";
+  const maybeLocked = (text, lockedText, className, showLock = true) => locked
+    ? <LockedValue onClick={onLockedClick} text={lockedText} className={className} showLock={showLock} />
+    : text;
 
   return (
     <>
@@ -1237,11 +1240,15 @@ function RentYieldCalculatorPanel({ calculation }) {
         <section className={`${sectionClassName} border-b border-gray-100 text-center lg:border-b-0 lg:border-r`}>
           <div className={blockClassName}>
             <p className={labelClassName}>{t("calculator.resultRecommendedRent")}</p>
-            <EditableRecommendedRent
-              value={calculation.monthly_rent}
-              onChange={calculation.onMonthlyRentChange}
-              className={valueClassName}
-            />
+            {locked ? (
+              <LockedValue onClick={onLockedClick} text="€9.999" className={valueClassName} />
+            ) : (
+              <EditableRecommendedRent
+                value={calculation.monthly_rent}
+                onChange={calculation.onMonthlyRentChange}
+                className={valueClassName}
+              />
+            )}
             <p className={subLabelClassName}>
               {t("result.rentPerMonth")}
             </p>
@@ -1250,7 +1257,7 @@ function RentYieldCalculatorPanel({ calculation }) {
           <div className={`${blockClassName} border-l border-gray-100 bg-gray-50/40 lg:border-l-0 lg:border-t`}>
             <p aria-hidden="true" className={`${labelClassName} invisible`}>{t("calculator.resultRecommendedRent")}</p>
             <p className={valueClassName}>
-              {formatNullablePrice(calculation.annual_gross_rent)}
+              {maybeLocked(formatNullablePrice(calculation.annual_gross_rent), "€99.999", valueClassName)}
             </p>
             <p className={subLabelClassName}>
               {t("calculator.resultAnnualRent")}
@@ -1262,10 +1269,12 @@ function RentYieldCalculatorPanel({ calculation }) {
           <section className={`${sectionClassName} border-b border-gray-100 bg-primary/5 text-center lg:border-b-0 lg:border-r`}>
             <div className={blockClassName}>
               <p className="text-sm font-semibold leading-snug text-red-500">
-                {t("calculator.resultMonthlyTaxDeducted", { amount: formatNullablePrice(calculation.monthly_tax) })}
+                {locked
+                  ? <LockedValue onClick={onLockedClick} text={t("calculator.resultMonthlyTaxDeducted", { amount: "€999" })} className="text-red-500" showLock={false} />
+                  : t("calculator.resultMonthlyTaxDeducted", { amount: formatNullablePrice(calculation.monthly_tax) })}
               </p>
               <p className={netValueClassName}>
-                {formatNullablePrice(calculation.monthly_effective_rent)}
+                {maybeLocked(formatNullablePrice(calculation.monthly_effective_rent), "€9.999", netValueClassName)}
               </p>
               <p className={subLabelClassName}>
                 {t("calculator.resultPerMonthAfterTax")}
@@ -1277,7 +1286,7 @@ function RentYieldCalculatorPanel({ calculation }) {
                 {t("calculator.resultMonthlyTaxDeducted", { amount: formatNullablePrice(calculation.monthly_tax) })}
               </p>
               <p className={netValueClassName}>
-                {formatNullablePrice(calculation.annual_effective_rent)}
+                {maybeLocked(formatNullablePrice(calculation.annual_effective_rent), "€99.999", netValueClassName)}
               </p>
               <p className={subLabelClassName}>
                 {t("calculator.resultPerYearAfterTax")}
@@ -1289,14 +1298,16 @@ function RentYieldCalculatorPanel({ calculation }) {
         <section className={`${sectionClassName} text-center`}>
           <div className={blockClassName}>
             <p className={labelClassName}>{t("calculator.resultAnnualGrossYield")}</p>
-            <p className={valueClassName}>{formatPlainPercent(calculation.gross_yield_pct)}</p>
+            <p className={valueClassName}>{maybeLocked(formatPlainPercent(calculation.gross_yield_pct), "9.9%", valueClassName)}</p>
           </div>
 
           <div className={`${blockClassName} border-l border-gray-100 bg-gray-50/40 lg:border-l-0 lg:border-t`}>
             <p className={labelClassName}>{t("calculator.resultPaybackPeriod")}</p>
-            <p className={valueClassName}>{formatYears(calculation.payback_years, t)}</p>
+            <p className={valueClassName}>{maybeLocked(formatYears(calculation.payback_years, t), t("calculator.resultYearsValue", { years: "9.9" }), valueClassName)}</p>
             <p className={subLabelClassName}>
-              {t("calculator.resultTotalInvestment", { amount: formatNullablePrice(calculation.total_investment) })}
+              {locked
+                ? <LockedValue onClick={onLockedClick} text={t("calculator.resultTotalInvestment", { amount: "€99.999" })} className="text-gray-500" showLock={false} />
+                : t("calculator.resultTotalInvestment", { amount: formatNullablePrice(calculation.total_investment) })}
             </p>
           </div>
         </section>
@@ -1310,28 +1321,28 @@ function RentYieldCalculatorPanel({ calculation }) {
             </p>
             <div className="grid sm:grid-cols-3">
               <div className="p-5 sm:p-6">
-                <p className="text-3xl font-bold tracking-tight text-gray-900">{formatNullablePrice(calculation.monthly_tax)}</p>
+                <p className="text-3xl font-bold tracking-tight text-gray-900">{maybeLocked(formatNullablePrice(calculation.monthly_tax), "€999", "text-gray-900")}</p>
                 <p className="mt-1 text-base font-medium text-gray-500">{t("calculator.resultMonthlyTaxPaid")}</p>
               </div>
               <div className="border-t border-red-100 p-5 sm:border-l sm:border-t-0 sm:p-6">
-                <p className="text-3xl font-bold tracking-tight text-gray-900">{formatNullablePrice(calculation.annual_tax)}</p>
+                <p className="text-3xl font-bold tracking-tight text-gray-900">{maybeLocked(formatNullablePrice(calculation.annual_tax), "€9.999", "text-gray-900")}</p>
                 <p className="mt-1 text-base font-medium text-gray-500">{t("calculator.resultAnnualTaxPaid")}</p>
               </div>
               <div className="border-t border-red-100 bg-red-50/30 p-5 sm:border-l sm:border-t-0 sm:p-6">
-                <p className="text-3xl font-bold tracking-tight text-gray-900">{formatNullablePrice(calculation.total_tax_until_payback)}</p>
+                <p className="text-3xl font-bold tracking-tight text-gray-900">{maybeLocked(formatNullablePrice(calculation.total_tax_until_payback), "€99.999", "text-gray-900")}</p>
                 <p className="mt-1 text-base font-medium text-gray-500">{t("calculator.resultTaxPaidUntilPayback")}</p>
               </div>
             </div>
           </section>
 
-          <RentYieldAccumulationChart calculation={calculation} />
+          <RentYieldAccumulationChart calculation={calculation} locked={locked} onLockedClick={onLockedClick} />
         </>
       )}
     </>
   );
 }
 
-function RentYieldAccumulationChart({ calculation }) {
+function RentYieldAccumulationChart({ calculation, locked = false, onLockedClick }) {
   const { t } = useTranslation();
   const [hoveredYear, setHoveredYear] = useState(null);
   const annualIncome = Number(calculation.annual_effective_rent);
@@ -1387,13 +1398,14 @@ function RentYieldAccumulationChart({ calculation }) {
       </div>
 
       <div className="mt-4 pb-2">
-        <svg
-          role="img"
-          aria-label={t("calculator.resultAccumulationChartTitle")}
-          viewBox={`0 0 ${width} ${height}`}
-          className="h-auto w-full"
-          preserveAspectRatio="none"
-        >
+        <div className="relative">
+          <svg
+            role="img"
+            aria-label={t("calculator.resultAccumulationChartTitle")}
+            viewBox={`0 0 ${width} ${height}`}
+            className={`h-auto w-full ${locked ? "select-none blur-sm" : ""}`}
+            preserveAspectRatio="none"
+          >
           <line x1={padding.left} x2={padding.left} y1={padding.top} y2={padding.top + chartHeight} stroke="#E5E7EB" strokeWidth="1" />
           {axisTicks.map((tick) => {
             const tickY = y(tick);
@@ -1489,7 +1501,18 @@ function RentYieldAccumulationChart({ calculation }) {
               </text>
             </g>
           )}
-        </svg>
+          </svg>
+          {locked && (
+            <button
+              type="button"
+              onClick={onLockedClick}
+              className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/35"
+              aria-label={t("payment.buyAccess")}
+            >
+              <LockedOverlayIcon />
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );
@@ -1649,11 +1672,13 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const isSnapshot = data.snapshot?.immutable === true;
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
-  const purchaseOffer = freeMonthlyLimitReached ? data.access_limit?.purchase : null;
+  const purchaseOffer = !isPaid ? data.access_limit?.purchase : null;
+  const paidFeatureCreditRequired = !!purchaseOffer && !freeMonthlyLimitReached;
   const lockedSections = data.locked_sections || {};
   const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
   const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
   const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
+  const hideRentYieldCalculation = !isPaid && lockedSections.rent_yield_calculation === true;
 
   const openAuthModal = useCallback((copyKey = "result.loginToSeeFullAnalysis", options = {}) => {
     if (isAuthenticated && !options.force) return;
@@ -1674,8 +1699,16 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
       return;
     }
 
+    if (paidFeatureCreditRequired && isAuthenticated) {
+      openAuthModal("payment.buyAccess", {
+        force: true,
+        showAuthOptions: false,
+      });
+      return;
+    }
+
     openAuthModal("result.loginToSeeFullAnalysis");
-  }, [freeMonthlyLimitReached, openAuthModal]);
+  }, [freeMonthlyLimitReached, isAuthenticated, openAuthModal, paidFeatureCreditRequired]);
 
   const estimate = data.estimate || {};
   const range = data.range || {};
@@ -1729,7 +1762,9 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
     appendDefinedParam(params, "renovation", input.renovation);
     return buildEvaluationUrl(params);
   };
-  const lockedTooltipKey = freeMonthlyLimitReached ? "payment.buyAccess" : "result.loginToSeeFullAnalysis";
+  const lockedTooltipKey = (freeMonthlyLimitReached || (paidFeatureCreditRequired && isAuthenticated))
+    ? "payment.buyAccess"
+    : "result.loginToSeeFullAnalysis";
 
   return (
     <LockedTooltipContext.Provider value={lockedTooltipKey}>
@@ -1740,7 +1775,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         showAuthOptions={authModalShowAuthOptions}
         onClose={closeAuthModal}
       >
-        {freeMonthlyLimitReached && authModalCopyKey === "result.freeMonthlyLimitReached" && purchaseOffer ? (
+        {purchaseOffer && (authModalCopyKey === "result.freeMonthlyLimitReached" || authModalCopyKey === "payment.buyAccess") ? (
           <>
             <p className="mb-4 text-center text-sm font-medium text-gray-500">
               {t("payment.limitPackageSubtitle")}
@@ -1794,6 +1829,8 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
           <RentTaxToggle checked={includeRentTax} onChange={setIncludeRentTax} />
           <RentYieldCalculatorPanel
             calculation={rentYieldCalculation}
+            locked={hideRentYieldCalculation}
+            onLockedClick={openFullAnalysisAuthModal}
           />
         </>
       ) : (
@@ -1832,7 +1869,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         </div>
       )}
 
-      {!isPaid && !rentYieldCalculation && (
+      {!isPaid && (
         <p className="text-sm text-gray-600 px-1">
           {freeMonthlyLimitReached ? t("result.freeMonthlyLimitReachedLine") : t("result.freeTierUncertaintyLine")}
         </p>

@@ -110,7 +110,9 @@ function buildRentEstimateRequest(params) {
 }
 
 function buildRentYieldCalculation(data, calculator) {
-  const monthlyRent = Number(data?.estimate?.market_rate);
+  const lockedSections = data?.locked_sections || {};
+  const isLocked = data?.full_access !== true && lockedSections.rent_yield_calculation === true;
+  const monthlyRent = isLocked ? 9999 : Number(data?.estimate?.market_rate);
   const apartmentPrice = Number(calculator.apartment_price);
   const additionalInvestments = Number(calculator.additional_investments) || 0;
   const totalInvestment = apartmentPrice + additionalInvestments;

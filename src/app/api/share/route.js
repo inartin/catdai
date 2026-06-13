@@ -41,6 +41,7 @@ function canonicalParams(params) {
 }
 
 const PARAM_KEYS = [
+  "type",
   "city",
   "district",
   "rooms",

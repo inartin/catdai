@@ -43,6 +43,14 @@ function ensurePrimaryEstimateType(params) {
   return params;
 }
 
+function appendDefinedParam(params, key, value) {
+  if (value != null && value !== "") params.append(key, String(value));
+}
+
+function isSharedResult(data) {
+  return data?.shared_link?.locked === true || data?.access_source === "shared_paid";
+}
+
 function buildResultUrl(routePath, params) {
   ensurePrimaryEstimateType(params);
   const query = params.toString();
@@ -77,7 +85,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
     document.title = `${t(pageTitleKey)} | Catdai`;
   }, [pageTitleKey, t]);
 
-  // Capture share_slug once on first render so it survives URL stripping
+  // Keep shared results tied to stored criteria.
   const shareSlugRef = useRef(searchParams.get("share_slug"));
   const loadedPrimaryParamsRef = useRef(null);
   const loadedCompareParamsRef = useRef(null);
@@ -91,12 +99,13 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
     const run = async () => {
       const pRaw = new URLSearchParams(paramsString);
       const isFreshEvaluation = pRaw.get("_new") === "1";
+      const urlShareSlug = pRaw.get("share_slug");
+      shareSlugRef.current = urlShareSlug || null;
       const shareSlug = shareSlugRef.current;
 
-      if (isFreshEvaluation || shareSlug) {
+      if (isFreshEvaluation) {
         const clean = new URLSearchParams(paramsString);
         clean.delete("_new");
-        clean.delete("share_slug");
         ensurePrimaryEstimateType(clean);
         window.history.replaceState(null, "", buildResultUrl(routePath, clean));
       }
@@ -110,14 +119,14 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
       });
       p1Params.sort();
       p2Params.sort();
-      const primaryStr = p1Params.toString();
+      const primaryStr = shareSlug ? `share_slug=${shareSlug}` : p1Params.toString();
       const compareStr = p2Params.toString();
 
-      const hasCompare = !!pRaw.get("c_city");
+      const hasCompare = !shareSlug && !!pRaw.get("c_city");
       const needsPrimaryFetch = primaryStr && primaryStr !== loadedPrimaryParamsRef.current;
       const needsCompareFetch = hasCompare && compareStr !== loadedCompareParamsRef.current;
 
-      if (!primaryStr && !hasCompare) {
+      if (!shareSlug && !primaryStr && !hasCompare) {
         setResult(null);
         setError(null);
         setLoading(false);
@@ -187,33 +196,54 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
       }
 
       const fetchProperty = async (pFx, isPrimary) => {
-        const estimateType = pRaw.get(pFx + "type") || pRaw.get(pFx + "mode");
+        let sourceParams = pRaw;
+        let sourcePrefix = pFx;
+        const shareSlug = isPrimary ? shareSlugRef.current : null;
+
+        if (shareSlug) {
+          const shareRes = await fetchJson(`/api/share/${encodeURIComponent(shareSlug)}`);
+          if (!shareRes.ok || !shareRes.data?.params) {
+            return { error: { code: shareRes.data?.error || "shared_link_unavailable", status: shareRes.status } };
+          }
+
+          sourcePrefix = "";
+          sourceParams = new URLSearchParams();
+          Object.entries(shareRes.data.params).forEach(([key, value]) => {
+            if (Array.isArray(value)) {
+              value.forEach((item) => appendDefinedParam(sourceParams, key, item));
+            } else {
+              appendDefinedParam(sourceParams, key, value);
+            }
+          });
+        }
+
+        const estimateType = sourceParams.get(sourcePrefix + "type") || sourceParams.get(sourcePrefix + "mode");
         const isRentMode = estimateType === "rent";
-        const city = pRaw.get(pFx + "city");
-        const districts = pRaw.getAll(pFx + "district").filter(Boolean);
-        const district = districts[0] || pRaw.get(pFx + "district");
-        const buildingTypes = pRaw.getAll(pFx + "building_type").filter(Boolean);
-        const buildingType = buildingTypes[0] || pRaw.get(pFx + "building_type");
-        const rooms = pRaw.get(pFx + "rooms");
-        const area = pRaw.get(pFx + "area");
+        const city = sourceParams.get(sourcePrefix + "city");
+        const districts = sourceParams.getAll(sourcePrefix + "district").filter(Boolean);
+        const district = districts[0] || sourceParams.get(sourcePrefix + "district");
+        const buildingTypes = sourceParams.getAll(sourcePrefix + "building_type").filter(Boolean);
+        const buildingType = buildingTypes[0] || sourceParams.get(sourcePrefix + "building_type");
+        const rooms = sourceParams.get(sourcePrefix + "rooms");
+        const area = sourceParams.get(sourcePrefix + "area");
         if (!city || !rooms) return null;
 
         const roomsVal = rooms === "5+" ? 5 : parseInt(rooms, 10);
-        const bRaw = pRaw.get(pFx + "bathrooms");
-        const balRaw = pRaw.get(pFx + "balconies");
+        const bRaw = sourceParams.get(sourcePrefix + "bathrooms");
+        const balRaw = sourceParams.get(sourcePrefix + "balconies");
         const bVal = bRaw === "3+" ? 3 : bRaw ? parseInt(bRaw, 10) : null;
         const balVal = balRaw === "3+" ? 3 : balRaw != null ? parseInt(balRaw, 10) : null;
-        const firstFloor = isTrueParam(pRaw.get(pFx + "first_floor"));
-        const lastFloor = isTrueParam(pRaw.get(pFx + "last_floor"));
+        const firstFloor = isTrueParam(sourceParams.get(sourcePrefix + "first_floor"));
+        const lastFloor = isTrueParam(sourceParams.get(sourcePrefix + "last_floor"));
 
         const validation = validateEstimateInput({
           city, district, rooms_count: roomsVal, area_m2: area,
-          floor: pRaw.get(pFx + "floor") || null,
+          floor: sourceParams.get(sourcePrefix + "floor") || null,
           first_floor: firstFloor,
           last_floor: lastFloor,
-          total_floors: pRaw.get(pFx + "total_floors") || null,
+          total_floors: sourceParams.get(sourcePrefix + "total_floors") || null,
           building_type: buildingType || null,
-          renovation: pRaw.get(pFx + "renovation") || null,
+          renovation: sourceParams.get(sourcePrefix + "renovation") || null,
           bathrooms_count: bVal, balconies_count: balVal,
         });
 
@@ -222,16 +252,16 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
         }
 
         const v = validation.data;
-        const listingAnalysis = isPrimary && isListingAnalysisPage && pRaw.get("listing_id")
+        const listingAnalysis = isPrimary && isListingAnalysisPage && sourceParams.get("listing_id")
           ? {
-            external_id: pRaw.get("listing_id"),
-            listing_price: pRaw.get("listing_price") || null,
-            listing_currency: pRaw.get("listing_currency") || null,
-            listing_address: pRaw.get("listing_address") || null,
+            external_id: sourceParams.get("listing_id"),
+            listing_price: sourceParams.get("listing_price") || null,
+            listing_currency: sourceParams.get("listing_currency") || null,
+            listing_address: sourceParams.get("listing_address") || null,
           }
           : null;
 
-        const cNum = pRaw.get(pFx + "cadastral_number");
+        const cNum = sourceParams.get(sourcePrefix + "cadastral_number");
         if (cNum) {
           const cadVal = validateCadastralNumber(cNum);
           if (!cadVal.valid) {
@@ -266,6 +296,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
             building_types: buildingTypes,
             renovation: v.renovation ?? null,
             bathrooms_count: v.bathrooms_count ?? null,
+            ...(shareSlug ? { share_slug: shareSlug } : {}),
             ...trackingData,
           }
           : {
@@ -324,7 +355,17 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
             setError(res1.error);
             loadedPrimaryParamsRef.current = null;
           } else {
-            let listingComparison = buildListingComparison(pRaw);
+            if (shareSlug) {
+              res1.data = {
+                ...res1.data,
+                shared_link: {
+                  ...(res1.data.shared_link || {}),
+                  locked: true,
+                  slug: shareSlug,
+                },
+              };
+            }
+            let listingComparison = shareSlug ? null : buildListingComparison(pRaw);
             let listingDuplicates = null;
             if (listingComparison?.external_id) {
               const [historyRes, duplicateRes] = await Promise.all([
@@ -678,8 +719,8 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
           {result && (
             <EstimateResult 
               data={result} 
-              onReset={handleEdit} 
-              onCompare={startCompare} 
+              onReset={isSharedResult(result) ? undefined : handleEdit} 
+              onCompare={isSharedResult(result) ? undefined : startCompare} 
               onClose={isComparing ? handleCloseLeft : undefined}
               onListingsModeChange={setIsListingsMode}
               compactLayout={isComparing}
@@ -750,7 +791,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
           </div>
         )}
       </div>
-      {!isListingsMode && (
+      {!isListingsMode && !isSharedResult(result) && (
         isListingAnalysisPage ? (
           <div className="mx-auto max-w-3xl">
             <LinkAnalyzer titleTag="h2" className="mt-8" />

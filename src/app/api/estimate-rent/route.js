@@ -152,6 +152,41 @@ function normalizeBuildingTypes(body) {
   return { valid: true, buildingTypes };
 }
 
+function normalizeShareValue(value) {
+  if (Array.isArray(value)) return value.length > 0 ? normalizeShareValue(value[0]) : null;
+  if (value == null || value === "") return null;
+  return String(value);
+}
+
+function normalizeShareList(value) {
+  const rawValues = Array.isArray(value) ? value : value != null && value !== "" ? [value] : [];
+  return rawValues.map((item) => String(item)).filter(Boolean).sort();
+}
+
+function shareListsMatch(shareValue, paramValues = []) {
+  const shareValues = normalizeShareList(shareValue);
+  const values = normalizeShareList(paramValues);
+  return shareValues.length === values.length && shareValues.every((value, index) => value === values[index]);
+}
+
+function shareParamsMatchRentParams(shareParams = {}, params = {}) {
+  const shareType = normalizeShareValue(shareParams.type || shareParams.mode);
+  if (shareType && shareType !== "rent") return false;
+
+  const checks = [
+    ["city", params.p_city],
+    ["rooms", params.p_rooms_count],
+    ["area", params.p_area_m2],
+    ["floor", params.p_floor],
+    ["renovation", params.p_renovation],
+    ["bathrooms", params.p_bathrooms_count],
+  ];
+
+  return checks.every(([key, value]) => normalizeShareValue(shareParams[key]) === normalizeShareValue(value))
+    && shareListsMatch(shareParams.district ?? shareParams.districts, params.p_districts)
+    && shareListsMatch(shareParams.building_type ?? shareParams.building_types, params.p_building_types);
+}
+
 function makeEstimateRentCacheKey(params) {
   const hash = crypto
     .createHash("sha256")
@@ -497,6 +532,23 @@ async function resolveRentEstimateAccess(request, body, params) {
   let freeMonthlyUsage = null;
   let paidCreditUsage = null;
   let paidCreditBalance = null;
+  let sharedLink = null;
+
+  if (!hasFullAccess && body.share_slug) {
+    const { data: shareData } = await supabaseAdmin
+      .from("shared_links")
+      .select("params, sharer_is_paid")
+      .eq("slug", String(body.share_slug))
+      .maybeSingle();
+    if (!shareData || !shareParamsMatchRentParams(shareData.params, params)) {
+      throw new Error("invalid_share_params");
+    }
+    if (shareData?.sharer_is_paid) {
+      hasFullAccess = true;
+      accessSource = "shared_paid";
+    }
+    sharedLink = { slug: String(body.share_slug), locked: true };
+  }
 
   if (!hasFullAccess && access.user_id) {
     const idempotencyKey = makePaidFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
@@ -536,7 +588,7 @@ async function resolveRentEstimateAccess(request, body, params) {
     }
   }
 
-  return { access, hasFullAccess, accessSource, freeMonthlyUsage, paidCreditUsage, paidCreditBalance };
+  return { access, hasFullAccess, accessSource, freeMonthlyUsage, paidCreditUsage, paidCreditBalance, sharedLink };
 }
 
 function buildRentEstimateAccessPayload(data, estimateAccess) {
@@ -561,6 +613,7 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
         }
         : null,
       locked_sections: {},
+      ...(estimateAccess.sharedLink ? { shared_link: estimateAccess.sharedLink } : {}),
     };
   }
 
@@ -568,6 +621,7 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
     ...buildRentEstimatePreview(data),
     access_tier: "free",
     full_access: false,
+    ...(estimateAccess.sharedLink ? { shared_link: estimateAccess.sharedLink } : {}),
     access_limit: paidEvaluationLimitReached
       ? {
         reason: "paid_evaluation_limit_reached",

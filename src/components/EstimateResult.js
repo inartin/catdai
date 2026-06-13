@@ -1670,6 +1670,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const [authModalShowAuthOptions, setAuthModalShowAuthOptions] = useState(true);
 
   const isSnapshot = data.snapshot?.immutable === true;
+  const isReadOnlyResult = isSnapshot || data.shared_link?.locked === true;
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
@@ -1962,7 +1963,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
               sidebar
             />
           )}
-          {!isSnapshot && <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />}
+          {!isReadOnlyResult && onReset && <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />}
           {purchaseOffer ? (
             <FeaturePricingAction offer={purchaseOffer} />
           ) : null}
@@ -2008,6 +2009,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const isRentEstimate = data.estimate_type === "rent";
 
   const isSnapshot = data.snapshot?.immutable === true;
+  const isReadOnlyResult = isSnapshot || data.shared_link?.locked === true;
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
@@ -2178,7 +2180,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
 
       const shareParams = {};
       const sp = new URLSearchParams(window.location.search);
-      ["city", "district", "rooms", "area", "floor", "first_floor", "last_floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
+      ["type", "city", "district", "rooms", "area", "floor", "first_floor", "last_floor", "total_floors", "building_type", "renovation", "bathrooms", "balconies", "cadastral_number"].forEach((key) => {
         const val = sp.get(key);
         if (val) shareParams[key] = val;
       });
@@ -3188,22 +3190,24 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 </>
               )}
             </button>
-            {!isSnapshot && (
+            {!isReadOnlyResult && (onCompare || onReset) && (
               <>
-                <button
-                  type="button"
-                  onClick={onCompare}
-                  className={secondaryActionButtonClassName}
-                >
-                  <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="18" cy="18" r="3" />
-                    <circle cx="6" cy="6" r="3" />
-                    <path d="M13 6h3a2 2 0 0 1 2 2v7" />
-                    <path d="M11 18H8a2 2 0 0 1-2-2V9" />
-                  </svg>
-                  {t("result.compare")}
-                </button>
-                <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />
+                {onCompare && (
+                  <button
+                    type="button"
+                    onClick={onCompare}
+                    className={secondaryActionButtonClassName}
+                  >
+                    <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="18" cy="18" r="3" />
+                      <circle cx="6" cy="6" r="3" />
+                      <path d="M13 6h3a2 2 0 0 1 2 2v7" />
+                      <path d="M11 18H8a2 2 0 0 1-2-2V9" />
+                    </svg>
+                    {t("result.compare")}
+                  </button>
+                )}
+                {onReset && <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />}
               </>
             )}
             {purchaseOffer ? (

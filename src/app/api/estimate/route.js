@@ -458,6 +458,34 @@ function buildListingAnalysisAccessPayload(data, listingAccess, paidCreditUsage)
   };
 }
 
+function normalizeShareValue(value) {
+  if (value == null || value === "") return null;
+  return String(value);
+}
+
+function shareParamsMatchSaleBody(shareParams = {}, body = {}) {
+  const shareType = normalizeShareValue(shareParams.type || shareParams.mode);
+  if (shareType === "rent") return false;
+
+  const checks = [
+    ["city", body.city],
+    ["district", body.district],
+    ["rooms", body.rooms_count],
+    ["area", body.area_m2],
+    ["floor", body.floor],
+    ["first_floor", body.first_floor ? "true" : null],
+    ["last_floor", body.last_floor ? "true" : null],
+    ["total_floors", body.total_floors],
+    ["building_type", body.building_type],
+    ["renovation", body.renovation],
+    ["bathrooms", body.bathrooms_count],
+    ["balconies", body.balconies_count],
+    ["cadastral_number", body.cadastral_number],
+  ];
+
+  return checks.every(([key, value]) => normalizeShareValue(shareParams[key]) === normalizeShareValue(value));
+}
+
 async function resolveEstimateAccess(request, body, params) {
   const access = await resolveAccessTier(request);
   let hasFullAccess = isPaidAccessTier(access.tier);
@@ -465,18 +493,23 @@ async function resolveEstimateAccess(request, body, params) {
   let freeMonthlyUsage = null;
   let paidCreditUsage = null;
   let paidCreditBalance = null;
+  let sharedLink = null;
 
   // If a share_slug is provided, verify server-side if the sharer was paid
   if (!hasFullAccess && body.share_slug) {
     const { data: shareData } = await supabaseAdmin
       .from("shared_links")
-      .select("sharer_is_paid")
+      .select("params, sharer_is_paid")
       .eq("slug", String(body.share_slug))
       .maybeSingle();
+    if (!shareData || !shareParamsMatchSaleBody(shareData.params, body)) {
+      throw new Error("invalid_share_params");
+    }
     if (shareData?.sharer_is_paid) {
       hasFullAccess = true;
       accessSource = "shared_paid";
     }
+    sharedLink = { slug: String(body.share_slug), locked: true };
   }
 
   if (!hasFullAccess && access.user_id) {
@@ -517,7 +550,7 @@ async function resolveEstimateAccess(request, body, params) {
     }
   }
 
-  return { access, hasFullAccess, accessSource, freeMonthlyUsage, paidCreditUsage, paidCreditBalance };
+  return { access, hasFullAccess, accessSource, freeMonthlyUsage, paidCreditUsage, paidCreditBalance, sharedLink };
 }
 
 function buildEstimateAccessPayload(data, estimateAccess) {
@@ -542,6 +575,7 @@ function buildEstimateAccessPayload(data, estimateAccess) {
         }
         : null,
       locked_sections: {},
+      ...(estimateAccess.sharedLink ? { shared_link: estimateAccess.sharedLink } : {}),
     };
   }
 
@@ -549,6 +583,7 @@ function buildEstimateAccessPayload(data, estimateAccess) {
     ...buildEstimatePreview(data),
     access_tier: "free",
     full_access: false,
+    ...(estimateAccess.sharedLink ? { shared_link: estimateAccess.sharedLink } : {}),
     access_limit: paidEvaluationLimitReached
       ? {
         reason: "paid_evaluation_limit_reached",

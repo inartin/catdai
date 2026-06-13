@@ -19,6 +19,7 @@ Implemented and active for apartments.
 - Paid sale/rent credits use stable non-monthly idempotency keys and are checked before the free sale/rent allowance, while free usage keeps the existing monthly idempotency.
 - When a paid sale/rent evaluation credit is consumed, the app stores the full result payload in the paid usage event metadata so profile history can reopen that timestamped result without recalculating current market data.
 - Reopened paid snapshots are read-only result pages; change-criteria and compare actions are hidden because they would start a new current-market calculation.
+- Shared `/evaluare` results with `share_slug` are read-only and use the stored `shared_links.params`; viewer-edited URL criteria and compare params do not change the result.
 - Full sale/buy results support edit, compare, share, favorite, PDF export, relevant listings, and alert setup.
 - Regular `/evaluare` result pages include a bottom refresh-style `Estimare nouă` / `Новая оценка` action that starts a fresh `/estimeaza` flow without carrying the current criteria.
 - Result sidebar actions are ordered with PDF export first as the visual primary action, followed by share, compare, and criteria edit as neutral secondary actions.

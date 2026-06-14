@@ -1,11 +1,26 @@
 import crypto from "node:crypto";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { fetchListingPreviewImage } from "@/lib/listing-preview-images";
+import { rateLimit } from "@/lib/rate-limit";
 import { NextResponse } from "next/server";
 
 const MAX_LISTINGS = 6;
+const EXTERNAL_ID_RE = /^\d{5,12}$/;
 const CACHE_TTL_SECONDS = 24 * 60 * 60;
 const CACHE_PREFIX = "catdai:listing-preview-image:v1:";
+const limiter = rateLimit({
+  namespace: "listing-preview-images",
+  interval: 60_000,
+  limit: 30,
+});
+
+function getClientIp(request) {
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp.trim();
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return request.headers.get("x-real-ip") || "unknown";
+}
 
 function normalizeLanguage(language) {
   return language === "ru" ? "ru" : "ro";
@@ -26,7 +41,7 @@ function normalizeExternalIds(value) {
   return [...new Set(
     raw
       .map((id) => String(id || "").trim())
-      .filter(Boolean)
+      .filter((id) => EXTERNAL_ID_RE.test(id))
   )].slice(0, MAX_LISTINGS);
 }
 
@@ -43,6 +58,15 @@ async function resolvePreviewImage(externalId, language) {
 }
 
 export async function POST(request) {
+  const ip = getClientIp(request);
+  const { allowed, retryAfter } = limiter.check(ip);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    );
+  }
+
   let body;
   try {
     body = await request.json();

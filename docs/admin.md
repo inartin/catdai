@@ -7,6 +7,8 @@ Implemented as admin dashboard with direct registered-user package adjustment.
 - `/admin/login?key=...` requires `ADMIN_LOGIN_KEY`.
 - Password is checked against `ADMIN_PASSWORD`.
 - `/api/admin/auth` blocks an IP after 5 failed login attempts for 15 minutes and returns `Retry-After`.
+- In production, admin login throttling requires Redis and fails closed with `503` if Redis is unavailable, so failed attempts are shared across app processes.
+- Admin login does not trust `x-forwarded-for` or `x-real-ip`; `cf-connecting-ip` is used only when `ADMIN_TRUST_CF_CONNECTING_IP=true` after direct-origin access is blocked at the infrastructure layer.
 - Successful login sets an httpOnly signed `admin_token` session cookie that expires after 12 hours.
 - `ADMIN_TOKEN` is used as the server-side HMAC signing secret and is not stored directly in the cookie.
 - All `/admin` and `/api/admin` routes require a valid signed `admin_token` session in `src/proxy.js`.

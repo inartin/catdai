@@ -14,10 +14,11 @@ Backend prepared and active when Redis is reachable.
 - `GET /api/market-trends`: key `catdai:market-trends:v1`, 12h TTL.
 - `POST /api/estimate`: key prefix `catdai:estimate:v1:`, 30m TTL for repeated validated estimate inputs.
 - `POST /api/estimate-rent`: key prefix `catdai:estimate-rent:v7:`, 12h TTL for repeated validated rent estimate inputs.
-- `POST /api/listing-preview-images`: key prefix `catdai:listing-preview-image:v1:`, 24h TTL per listing/language.
+- `POST /api/listing-preview-images`: key prefix `catdai:listing-preview-image:v1:`, 24h TTL per listing/language. The route accepts up to 6 unique 5-12 digit numeric ids, applies a 30/min per-IP limit, and refuses upstream HTML above 512 KB before caching.
 - `POST /api/cadastral`: key prefix `catdai:cadastral:v1:`, 7d TTL for successful cadastral-number lookup responses before the long-lived DB store is checked.
 - `POST /api/cadastru/address`: key prefix `catdai:cadastru-address:v1:`, 7d TTL for successful normalized-address lookup responses before structured address fields in DB are checked.
 - `GET /api/admin/ad-tracking`: key prefix `catdai:admin-ad-tracking:v1`, 10m TTL per source, journey limit, and offset; `fresh=1` bypasses the cache.
+- `POST /api/admin/auth`: key prefix `catdai:admin-login:v1:`, 15m TTL per client IP for failed-login throttling. Production admin login requires Redis and fails closed if it is unavailable.
 
 ## Cadastru Cache
 - Only successful `200` cadastru payloads are cached; unauthorized, invalid, rate-limited, not-found, and upstream-error responses are not cached.

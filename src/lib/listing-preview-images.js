@@ -1,7 +1,11 @@
+const MAX_HTML_BYTES = 512 * 1024;
+const EXTERNAL_ID_RE = /^\d{5,12}$/;
+
 function build999ListingUrl(externalId, language = "ro") {
-  if (!externalId) return null;
+  const normalizedId = String(externalId || "").trim();
+  if (!EXTERNAL_ID_RE.test(normalizedId)) return null;
   const listingLang = language === "ru" ? "ru" : "ro";
-  return `https://999.md/${listingLang}/${encodeURIComponent(String(externalId))}`;
+  return `https://999.md/${listingLang}/${normalizedId}`;
 }
 
 function decodeHtmlAttribute(value) {
@@ -41,6 +45,40 @@ function isUsefulPreviewImage(url) {
   }
 }
 
+async function readBoundedText(res, maxBytes = MAX_HTML_BYTES) {
+  if (res.body && typeof res.body.getReader === "function") {
+    const reader = res.body.getReader();
+    const chunks = [];
+    let total = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel();
+          return null;
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    const buffer = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      buffer.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(buffer);
+  }
+
+  const html = await res.text();
+  return new TextEncoder().encode(html).byteLength > maxBytes ? null : html;
+}
+
 export async function fetchListingPreviewImage(externalId, language) {
   const url = build999ListingUrl(externalId, language);
   if (!url) return null;
@@ -58,7 +96,14 @@ export async function fetchListingPreviewImage(externalId, language) {
       },
     });
 
-    const html = await res.text();
+    if (!res.ok) return null;
+
+    const contentLength = Number(res.headers.get("content-length"));
+    if (Number.isFinite(contentLength) && contentLength > MAX_HTML_BYTES) return null;
+
+    const html = await readBoundedText(res);
+    if (!html) return null;
+
     const imageUrl =
       getMetaTagContent(html, "property", "og:image") ||
       getMetaTagContent(html, "name", "twitter:image");

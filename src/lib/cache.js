@@ -33,6 +33,15 @@ async function getRedis() {
   return redis;
 }
 
+export async function getSharedCacheClient() {
+  try {
+    return await getRedis();
+  } catch (error) {
+    console.error("[cache] Redis client unavailable:", error.message);
+    return null;
+  }
+}
+
 export async function getSharedCache(key) {
   try {
     const client = await getRedis();

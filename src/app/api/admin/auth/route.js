@@ -1,19 +1,30 @@
 import { ADMIN_SESSION_MAX_AGE_SECONDS, createAdminSessionToken } from "@/lib/admin-auth";
+import { getSharedCacheClient } from "@/lib/cache";
 import { NextResponse } from "next/server";
 
 const LOGIN_RATE_LIMIT = 5;
 const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_RATE_WINDOW_SECONDS = LOGIN_RATE_WINDOW_MS / 1000;
+const LOGIN_RATE_PREFIX = "catdai:admin-login:v1:";
 const loginAttempts = new Map();
 
 function getClientIp(request) {
-  const cfIp = request.headers.get("cf-connecting-ip");
-  if (cfIp) return cfIp.trim();
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return request.headers.get("x-real-ip") || request.ip || "unknown";
+  if (process.env.ADMIN_TRUST_CF_CONNECTING_IP === "true") {
+    return request.headers.get("cf-connecting-ip")?.trim() || request.ip || "unknown";
+  }
+
+  return request.ip || "unknown";
 }
 
-function getAttemptRecord(ip) {
+function isProduction() {
+  return process.env.NODE_ENV === "production";
+}
+
+function getAttemptKey(ip) {
+  return `${LOGIN_RATE_PREFIX}${ip}`;
+}
+
+function getLocalAttemptRecord(ip) {
   const now = Date.now();
   const record = loginAttempts.get(ip);
 
@@ -26,26 +37,87 @@ function getAttemptRecord(ip) {
   return record;
 }
 
-function getRetryAfter(record) {
+function getLocalRetryAfter(record) {
   return Math.max(1, Math.ceil((record.start + LOGIN_RATE_WINDOW_MS - Date.now()) / 1000));
 }
 
-function isLoginBlocked(ip) {
-  const record = getAttemptRecord(ip);
-  if (record.count < LOGIN_RATE_LIMIT) return null;
-  return getRetryAfter(record);
+async function getRedisAttemptState(ip) {
+  const client = await getSharedCacheClient();
+  if (!client) {
+    if (isProduction()) throw new Error("Redis is required for admin login rate limiting");
+    return null;
+  }
+
+  const key = getAttemptKey(ip);
+  const [rawCount, ttl] = await Promise.all([client.get(key), client.ttl(key)]);
+  return {
+    client,
+    key,
+    count: Number.parseInt(rawCount || "0", 10) || 0,
+    retryAfter: ttl > 0 ? ttl : LOGIN_RATE_WINDOW_SECONDS,
+  };
 }
 
-function recordFailedLogin(ip) {
-  const record = getAttemptRecord(ip);
+async function isLoginBlocked(ip) {
+  const redisState = await getRedisAttemptState(ip);
+  if (redisState) {
+    if (redisState.count < LOGIN_RATE_LIMIT) return null;
+    return redisState.retryAfter;
+  }
+
+  const record = getLocalAttemptRecord(ip);
+  if (record.count < LOGIN_RATE_LIMIT) return null;
+  return getLocalRetryAfter(record);
+}
+
+async function recordFailedLogin(ip) {
+  const redisState = await getRedisAttemptState(ip);
+  if (redisState) {
+    const count = await redisState.client.incr(redisState.key);
+    if (count === 1) {
+      await redisState.client.expire(redisState.key, LOGIN_RATE_WINDOW_SECONDS);
+      return null;
+    }
+
+    const ttl = await redisState.client.ttl(redisState.key);
+    if (ttl < 0) await redisState.client.expire(redisState.key, LOGIN_RATE_WINDOW_SECONDS);
+    if (count < LOGIN_RATE_LIMIT) return null;
+    return ttl > 0 ? ttl : LOGIN_RATE_WINDOW_SECONDS;
+  }
+
+  const record = getLocalAttemptRecord(ip);
   record.count += 1;
   if (record.count < LOGIN_RATE_LIMIT) return null;
-  return getRetryAfter(record);
+  return getLocalRetryAfter(record);
+}
+
+async function clearFailedLogins(ip) {
+  const client = await getSharedCacheClient();
+  if (client) {
+    await client.del(getAttemptKey(ip));
+    return;
+  }
+
+  loginAttempts.delete(ip);
+}
+
+function rateLimitUnavailableResponse(error) {
+  console.error("[admin/auth] rate limit unavailable:", error.message);
+  return NextResponse.json(
+    { error: "Admin login is temporarily unavailable." },
+    { status: 503 }
+  );
 }
 
 export async function POST(request) {
   const ip = getClientIp(request);
-  const retryAfter = isLoginBlocked(ip);
+  let retryAfter;
+
+  try {
+    retryAfter = await isLoginBlocked(ip);
+  } catch (error) {
+    return rateLimitUnavailableResponse(error);
+  }
 
   if (retryAfter) {
     return NextResponse.json(
@@ -58,7 +130,11 @@ export async function POST(request) {
   const key = searchParams.get("key");
 
   if (!key || key !== process.env.ADMIN_LOGIN_KEY) {
-    recordFailedLogin(ip);
+    try {
+      await recordFailedLogin(ip);
+    } catch (error) {
+      return rateLimitUnavailableResponse(error);
+    }
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -72,7 +148,11 @@ export async function POST(request) {
   const { password } = body;
 
   if (!password || password !== process.env.ADMIN_PASSWORD) {
-    recordFailedLogin(ip);
+    try {
+      await recordFailedLogin(ip);
+    } catch (error) {
+      return rateLimitUnavailableResponse(error);
+    }
     return NextResponse.json({ error: "Invalid password" }, { status: 401 });
   }
 
@@ -83,7 +163,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "Admin session is not configured" }, { status: 500 });
   }
 
-  loginAttempts.delete(ip);
+  await clearFailedLogins(ip);
 
   const res = NextResponse.json({ ok: true });
   res.cookies.set("admin_token", sessionToken, {

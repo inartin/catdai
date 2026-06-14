@@ -16,53 +16,6 @@ import InfoCallout from "@/components/InfoCallout";
 const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
 const LISTING_FAIR_BAND_PCT = 3;
 const LockedTooltipContext = createContext("result.loginToSeeFullAnalysis");
-const LOCKED_DUPLICATE_LISTINGS = [
-  {
-    externalId: "999000001",
-    href: "https://999.md/ro/999000001",
-    title: "Apartament cu 2 camere in bloc nou",
-    address: "str. Alba Iulia 99",
-    meta: "Buiucani, Chisinau · Etaj 9 din 12",
-    price: 99999,
-    priceCurrency: "EUR",
-    pricePerM2: 9999,
-    areaFloor: "99 m² · Etaj 9 din 12",
-    tags: ["2 camere", "99 m²", "Bloc nou"],
-    probability: "high",
-    score: null,
-    reasons: ["same_owner", "same_address"],
-  },
-  {
-    externalId: "999000002",
-    href: "https://999.md/ro/999000002",
-    title: "Apartament luminos langa parc",
-    address: "bd. Dacia 99",
-    meta: "Botanica, Chisinau · Etaj 6 din 9",
-    price: 99999,
-    priceCurrency: "EUR",
-    pricePerM2: 9999,
-    areaFloor: "99 m² · Etaj 6 din 9",
-    tags: ["2 camere", "99 m²", "Euroreparatie"],
-    probability: "medium",
-    score: null,
-    reasons: [],
-  },
-  {
-    externalId: "999000003",
-    href: "https://999.md/ro/999000003",
-    title: "Apartament renovat, zona centrala",
-    address: "str. Bucuresti 99",
-    meta: "Centru, Chisinau · Etaj 4 din 9",
-    price: 99999,
-    priceCurrency: "EUR",
-    pricePerM2: 9999,
-    areaFloor: "99 m² · Etaj 4 din 9",
-    tags: ["2 camere", "99 m²", "Mobilat"],
-    probability: "medium",
-    score: null,
-    reasons: [],
-  },
-];
 
 function rememberPdfLoginReturn() {
   if (typeof window === "undefined") return;
@@ -2474,15 +2427,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const listingDuplicateMediumItems = (Array.isArray(listingDuplicatesData?.medium) ? listingDuplicatesData.medium : [])
     .map((listing) => normalizeDuplicateListing(listing, t, lang, "medium"))
     .filter(Boolean);
-  const realListingDuplicateItems = [...listingDuplicateHighItems, ...listingDuplicateMediumItems];
-  const lockListingDuplicates = !isPaid && listingComparison && lockedSections.listing_duplicates === true;
-  const listingDuplicateItems = lockListingDuplicates
-    ? LOCKED_DUPLICATE_LISTINGS
-    : realListingDuplicateItems;
-  const listingDuplicateCount = listingDuplicatesData || lockListingDuplicates
-    ? listingDuplicateItems.length
-    : 0;
+  const listingDuplicateItems = [...listingDuplicateHighItems, ...listingDuplicateMediumItems];
+  const listingDuplicateCount = listingDuplicateItems.length;
   const hasListingDuplicates = listingDuplicateCount > 0;
+  const lockListingDuplicates = listingDuplicatesData?.locked === true;
   const lockMarketTrend = !isPaid && !listingComparison && lockedSections.market_trend === true;
   const lockListingPriceHistory = !isPaid && listingComparison && lockedSections.listing_price_history === true;
   const marketTrend = data.market_trend;

@@ -1,7 +1,7 @@
 const stores = new Map();
 
-export function rateLimit({ interval = 60_000, limit = 30 } = {}) {
-  const key = `${interval}:${limit}`;
+export function rateLimit({ interval = 60_000, limit = 30, namespace = "default" } = {}) {
+  const key = `${namespace}:${interval}:${limit}`;
   if (!stores.has(key)) stores.set(key, new Map());
   const tokenStore = stores.get(key);
 

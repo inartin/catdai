@@ -83,19 +83,19 @@ export function getPaymentProducts() {
     standard_pack: {
       title: "Standard",
       description: "2 uses per paid feature",
-      amountMdl: prices.standard,
+      amountMdl: prices.standard.mdl,
       grants: grantAllFeatures(2),
     },
     pro_pack: {
       title: "Pro",
       description: "10 uses per paid feature",
-      amountMdl: prices.pro,
+      amountMdl: prices.pro.mdl,
       grants: grantAllFeatures(10),
     },
     extra_pack: {
       title: "Extra",
       description: "50 uses per paid feature",
-      amountMdl: prices.extra,
+      amountMdl: prices.extra.mdl,
       grants: grantAllFeatures(50),
     },
     ...SINGLE_PRODUCTS,

@@ -489,8 +489,9 @@ function getListingHistoryTone(point) {
   };
 }
 
-function ListingPriceHistoryChart({ history, currency, compact = false }) {
+function ListingPriceHistoryChart({ history, currency, compact = false, locked = false, onLockedClick }) {
   const { t, lang } = useTranslation();
+  const lockedTooltipKey = useContext(LockedTooltipContext);
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [pinnedIndex, setPinnedIndex] = useState(null);
   const points = normalizeListingPriceHistory(history);
@@ -515,13 +516,14 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
     );
   }
 
+  const displayPoints = points;
   const width = 440;
   const height = 210;
   const padding = { top: 22, right: 18, bottom: 48, left: 72 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const bottomY = height - padding.bottom;
-  const values = points.map((point) => point.price);
+  const values = displayPoints.map((point) => point.price);
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
   const valuePadding = minValue === maxValue
@@ -530,14 +532,14 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
   const chartMin = Math.max(0, minValue - valuePadding);
   const chartMax = maxValue + valuePadding;
   const valueRange = chartMax - chartMin || 1;
-  const firstTime = points[0].observedTime;
-  const lastTime = points[points.length - 1].observedTime;
+  const firstTime = displayPoints[0].observedTime;
+  const lastTime = displayPoints[displayPoints.length - 1].observedTime;
   const timeRange = lastTime - firstTime;
-  const plotted = points.map((point, index) => {
+  const plotted = displayPoints.map((point, index) => {
     const x = padding.left + (
       timeRange > 0
         ? ((point.observedTime - firstTime) / timeRange) * chartWidth
-        : (index / (points.length - 1)) * chartWidth
+        : (index / (displayPoints.length - 1)) * chartWidth
     );
     const y = bottomY - ((point.price - chartMin) / valueRange) * chartHeight;
     return { ...point, x, y };
@@ -569,14 +571,14 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
   };
   const totalChangeLabel = `${totalChange > 0 ? "+" : totalChange < 0 ? "-" : ""}${formatCurrencyPrice(Math.abs(totalChange), lastPoint.currency || currency)} (${formatTrendPercent(totalChangePct)})`;
 
-  return (
+  const chartMarkup = (
     <div className={wrapperClassName}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
             {t("result.listingPriceHistoryTitle")}
           </p>
-          <p className="mt-0.5 text-[11px] text-gray-400">
+          <p className={`mt-0.5 text-[11px] text-gray-400 ${locked ? "select-none blur-sm" : ""}`}>
             {formatHistoryDate(firstPoint.date, lang)} - {formatHistoryDate(lastPoint.date, lang)}
           </p>
         </div>
@@ -585,13 +587,22 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
           <p className="text-base font-bold text-gray-900">
             {formatCurrencyPrice(lastPoint.price, lastPoint.currency || currency)}
           </p>
-          <p className={`mt-1 text-xs font-bold ${totalChangeTone}`}>
+          <p className={`mt-1 text-xs font-bold ${totalChangeTone} ${locked ? "select-none blur-sm" : ""}`}>
             {totalChangeLabel}
           </p>
           <p className="text-[11px] font-medium text-gray-400">
-            {t("result.listingPriceHistoryFromInitial", {
-              price: formatCurrencyPrice(firstPoint.price, firstPoint.currency || currency),
-            })}
+            {locked ? (
+              <LockedTextTokens
+                text={t("result.listingPriceHistoryFromInitial", { price: "__PRICE__" })}
+                replacements={{ __PRICE__: "€999.999" }}
+                className="text-gray-400"
+                onClick={onLockedClick}
+              />
+            ) : (
+              t("result.listingPriceHistoryFromInitial", {
+                price: formatCurrencyPrice(firstPoint.price, firstPoint.currency || currency),
+              })
+            )}
           </p>
         </div>
       </div>
@@ -623,9 +634,9 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
                   x={padding.left - 10}
                   y={y + 4}
                   textAnchor="end"
-                  className="fill-gray-400 text-[10px]"
+                  className={`fill-gray-400 text-[10px] ${locked ? "select-none blur-sm" : ""}`}
                 >
-                  {formatCompactEuro(value)}
+                  {locked ? "€999k" : formatCompactEuro(value)}
                 </text>
               </g>
             );
@@ -652,7 +663,7 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
             points={coords}
             fill="none"
             stroke="#0ea5e9"
-            strokeWidth="3"
+            strokeWidth={locked ? "4" : "3"}
             strokeLinecap="round"
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
@@ -681,9 +692,9 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
                 x={point.x}
                 y={height - 24}
                 textAnchor={index === 0 ? "start" : index === plotted.length - 1 ? "end" : "middle"}
-                className="fill-gray-400 text-[10px]"
+                className={`fill-gray-400 text-[10px] ${locked ? "select-none blur-sm" : ""}`}
               >
-                {formatHistoryDate(point.date, lang)}
+                {locked ? "99 ian. 9999" : formatHistoryDate(point.date, lang)}
               </text>
             );
           })}
@@ -695,7 +706,7 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
           </text>
         </svg>
 
-        {plotted.map((point, index) => (
+        {!locked && plotted.map((point, index) => (
           <button
             key={`${point.id || point.date}-${index}`}
             type="button"
@@ -713,7 +724,7 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
           />
         ))}
 
-        {activePoint && (
+        {!locked && activePoint && (
           <div
             className="pointer-events-none absolute z-10 w-max max-w-[13rem] -translate-x-1/2 -translate-y-full rounded-xl bg-gray-900 px-3 py-2 text-left text-[11px] font-medium leading-tight text-white shadow-lg"
             style={{
@@ -734,6 +745,24 @@ function ListingPriceHistoryChart({ history, currency, compact = false }) {
         )}
       </div>
     </div>
+  );
+
+  if (!locked) return chartMarkup;
+
+  return (
+    <Tooltip text={t(lockedTooltipKey)} className="block w-full" wrapperClassName="block w-full">
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onLockedClick?.();
+        }}
+        className="relative block w-full cursor-pointer border-0 bg-transparent p-0 text-left"
+      >
+        {chartMarkup}
+        <LockedOverlayIcon />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -758,6 +787,34 @@ function LockedValue({ text = "999999", className = "", onClick, showLock = true
       </button>
     </Tooltip>
   );
+}
+
+function LockedTextTokens({ text, replacements, className = "", onClick }) {
+  const entries = Object.entries(replacements || {}).filter(([, value]) => value);
+  if (!text || entries.length === 0) return text || null;
+
+  const pattern = new RegExp(entries.map(([token]) => token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    const token = match[0];
+    parts.push(
+      <LockedValue
+        key={`${token}-${match.index}`}
+        onClick={onClick}
+        text={replacements[token]}
+        className={className}
+        showLock={false}
+      />
+    );
+    lastIndex = match.index + token.length;
+  }
+
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
 }
 
 function FilterBadge({ label, active }) {
@@ -1096,7 +1153,7 @@ function RelevantListingsPreview({ t, count, listings, onViewAll, sidebar = fals
   );
 }
 
-function DuplicateListingCard({ listing, t }) {
+function DuplicateListingCard({ listing, t, locked = false, onLockedClick }) {
   const metaParts = listing.meta ? listing.meta.split(" · ").filter(Boolean) : [];
   const isHigh = listing.probability === "high";
   const highReasons = getDuplicateHighReasons(listing, t);
@@ -1104,12 +1161,13 @@ function DuplicateListingCard({ listing, t }) {
     ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
     : "bg-amber-50 text-amber-700 ring-1 ring-amber-100";
 
-  return (
+  const cardMarkup = (
     <a
       href={listing.href}
       target="_blank"
       rel="noopener noreferrer"
-      className="block rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-colors hover:border-primary/30 hover:bg-primary/5"
+      onClick={locked ? (event) => event.preventDefault() : undefined}
+      className={`block rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-colors ${locked ? "pointer-events-none" : "hover:border-primary/30 hover:bg-primary/5"}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -1169,9 +1227,24 @@ function DuplicateListingCard({ listing, t }) {
       )}
     </a>
   );
+
+  if (!locked) return cardMarkup;
+
+  return (
+    <button
+      type="button"
+      onClick={onLockedClick}
+      className="relative block w-full cursor-pointer border-0 bg-transparent p-0 text-left"
+    >
+      <div className="pointer-events-none select-none blur-sm">
+        {cardMarkup}
+      </div>
+      <LockedOverlayIcon />
+    </button>
+  );
 }
 
-function DuplicateListingsPreview({ t, count, listings, sectionRef }) {
+function DuplicateListingsPreview({ t, count, listings, sectionRef, locked = false, onLockedClick }) {
   const [showAll, setShowAll] = useState(false);
   if (count <= 0 || listings.length === 0) return null;
 
@@ -1199,6 +1272,8 @@ function DuplicateListingsPreview({ t, count, listings, sectionRef }) {
               key={`${listing.probability}-${listing.externalId}`}
               listing={listing}
               t={t}
+              locked={locked}
+              onLockedClick={onLockedClick}
             />
           ))}
         </div>
@@ -1207,6 +1282,7 @@ function DuplicateListingsPreview({ t, count, listings, sectionRef }) {
             <button
               type="button"
               onClick={() => setShowAll(true)}
+              disabled={locked}
               className="inline-flex cursor-pointer items-center justify-center rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
             >
               {t("result.listingDuplicatesShowMore", { count: hiddenCount.toLocaleString("ro-MD") })}
@@ -2013,7 +2089,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
-  const purchaseOffer = (freeMonthlyLimitReached || paidEvaluationLimitReached) ? data.access_limit?.purchase : null;
+  const listingAnalysisLocked = data.access_limit?.feature_key === "listing_analysis";
+  const listingAnalysisRequiresLogin = listingAnalysisLocked && data.access_limit?.reason === "unauthorized";
+  const purchaseOffer = (freeMonthlyLimitReached || paidEvaluationLimitReached || (listingAnalysisLocked && !listingAnalysisRequiresLogin)) ? data.access_limit?.purchase : null;
   const cadastralLockedPreview = cadastral?.locked_sections?.cadastru_details === true;
   const cadastralPurchaseOffer = cadastral?.access_limit?.purchase || null;
   const authModalPurchaseOffer = authModalCopyKey === "payment.buyAccess" && cadastralPurchaseOffer
@@ -2072,8 +2150,16 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       return;
     }
 
+    if (paidEvaluationLimitReached || (listingAnalysisLocked && !listingAnalysisRequiresLogin)) {
+      openAuthModal("payment.buyAccess", {
+        force: true,
+        showAuthOptions: false,
+      });
+      return;
+    }
+
     openAuthModal("result.loginToSeeFullAnalysis");
-  }, [freeMonthlyLimitReached, openAuthModal]);
+  }, [freeMonthlyLimitReached, listingAnalysisLocked, listingAnalysisRequiresLogin, paidEvaluationLimitReached, openAuthModal]);
 
   const openCadastralPaywallModal = useCallback(() => {
     openAuthModal("payment.buyAccess", {
@@ -2326,6 +2412,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         percent: Math.abs(listingDeltaPct).toFixed(1),
       }))
     : null;
+  const hideListingComparisonValues = !!listingComparison && !isPaid;
   const listingsCount = Number.isFinite(Number(market_stats?.comparable_count))
     ? Number(market_stats.comparable_count)
     : 0;
@@ -2346,8 +2433,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     : 0;
   const hasListingDuplicates = listingDuplicateCount > 0;
   const lockMarketTrend = !isPaid && !listingComparison && lockedSections.market_trend === true;
+  const lockListingPriceHistory = !isPaid && listingComparison && lockedSections.listing_price_history === true;
+  const lockListingDuplicates = !isPaid && listingComparison && lockedSections.listing_duplicates === true;
   const marketTrend = data.market_trend;
-  const lockedTooltipKey = freeMonthlyLimitReached ? "payment.buyAccess" : "result.loginToSeeFullAnalysis";
+  const lockedTooltipKey = freeMonthlyLimitReached || paidEvaluationLimitReached || (listingAnalysisLocked && !listingAnalysisRequiresLogin)
+    ? "payment.buyAccess"
+    : "result.loginToSeeFullAnalysis";
   const resultLayoutClassName = compactLayout
     ? "animate-fade-in flex flex-col gap-5"
     : "animate-fade-in flex flex-col gap-5 lg:gap-6";
@@ -2566,6 +2657,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     history={listingComparison.price_history}
                     currency={listingCurrency}
                     compact={compactLayout}
+                    locked={lockListingPriceHistory}
+                    onLockedClick={openFullAnalysisAuthModal}
                   />
                 ) : (
                   <MarketTrendMiniChart
@@ -2590,11 +2683,15 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 <div className="rounded-xl border border-gray-100 bg-gray-50 p-5 text-center sm:p-6">
                   <p className="text-sm font-medium text-gray-400">{t("result.estimatedPrice")}</p>
                   <p className="mt-2 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-                    {formatPrice(estimate.market_rate)}
+                    {hideListingComparisonValues ? (
+                      <LockedValue onClick={openFullAnalysisAuthModal} text="€999.999" className="text-gray-900" />
+                    ) : (
+                      formatPrice(estimate.market_rate)
+                    )}
                   </p>
                   <p className="mt-2 text-sm font-medium text-gray-500">
                     {hidePriceTiers ? (
-                      <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" className="text-gray-500" />
+                      <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" className="text-gray-500" showLock={false} />
                     ) : (
                       `${formatPrice(estimate.price_per_m2)}/m²`
                     )}
@@ -2633,9 +2730,21 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   <div className="mt-2 flex flex-wrap items-center justify-center gap-2 text-sm font-medium">
                     {listingComparable ? (
                       <>
-                        <span className={listingVerdictColor}>{formatTrendPercent(listingDeltaPct)}</span>
+                        <span className={listingVerdictColor}>
+                          {hideListingComparisonValues ? (
+                            <LockedValue onClick={openFullAnalysisAuthModal} text="-99%" className={listingVerdictColor} showLock={false} />
+                          ) : (
+                            formatTrendPercent(listingDeltaPct)
+                          )}
+                        </span>
                         <span className="text-gray-300">·</span>
-                        <span className={listingVerdictColor}>{listingDeltaAmountLabel}</span>
+                        <span className={listingVerdictColor}>
+                          {hideListingComparisonValues ? (
+                            <LockedValue onClick={openFullAnalysisAuthModal} text="€99.999" className={listingVerdictColor} showLock={false} />
+                          ) : (
+                            listingDeltaAmountLabel
+                          )}
+                        </span>
                       </>
                     ) : (
                       <span className="text-gray-500">{t("result.listingComparisonUnavailable")}</span>
@@ -2650,7 +2759,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     <p className="text-xs font-medium text-gray-400">{t("result.fastSale")}</p>
                     <p className="mt-1 text-lg font-bold text-emerald-600">
                       {hidePriceTiers ? (
-                        <LockedValue onClick={openFullAnalysisAuthModal} text="€999.999" className="text-emerald-600" />
+                        <LockedValue onClick={openFullAnalysisAuthModal} text="€999.999" className="text-emerald-600"  />
                       ) : (
                         formatPrice(estimate.fast_sale)
                       )}
@@ -2667,7 +2776,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                     <p className="text-xs font-medium text-gray-400">{t("result.targetPrice")}</p>
                     <p className="mt-1 text-lg font-bold text-amber-600">
                       {hidePriceTiers ? (
-                        <LockedValue onClick={openFullAnalysisAuthModal} text="€999.999" className="text-amber-600" />
+                        <LockedValue onClick={openFullAnalysisAuthModal} text="€999.999" className="text-amber-600"  />
                       ) : (
                         formatPrice(estimate.premium)
                       )}
@@ -2689,7 +2798,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   <p className="mt-0.5 text-xs text-gray-400">
                     {hidePriceTiers ? (
                       <>
-                        {t("result.marketPerM2")} <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" />
+                        {t("result.marketPerM2")} <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" showLock={false} />
                       </>
                     ) : canShowMarketPerM2 ? `${t("result.marketPerM2")} ${formatPrice(marketPricePerM2)}/m²` : t("result.marketPerM2")}
                   </p>
@@ -2700,7 +2809,20 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             <div className={`border-t border-gray-100 px-5 py-4 sm:px-6 ${listingComparable ? listingVerdictBg : "bg-gray-50"}`}>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className={`text-sm font-bold sm:text-base ${listingComparable ? listingVerdictColor : "text-gray-600"}`}>
-                  {listingComparable ? listingVerdictSentence : t("result.listingComparisonUnavailable")}
+                  {listingComparable && hideListingComparisonValues ? (
+                    <LockedTextTokens
+                      text={t(listingVerdict === "fair" ? "result.listingDeltaFair" : listingVerdict === "under" ? "result.listingDeltaBelow" : "result.listingDeltaAbove", {
+                        amount: "__AMOUNT__",
+                        percent: "__PERCENT__",
+                      })}
+                      replacements={{
+                        __AMOUNT__: "€99.999",
+                        __PERCENT__: "99.9",
+                      }}
+                      className={listingVerdictColor}
+                      onClick={openFullAnalysisAuthModal}
+                    />
+                  ) : listingComparable ? listingVerdictSentence : t("result.listingComparisonUnavailable")}
                 </p>
                 {listingUrl && (
                   <a
@@ -3000,7 +3122,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               )}
             </div>
 
-            {feature_adjustments?.items?.length > 0 && (
+            {!listingComparison && feature_adjustments?.items?.length > 0 && (
               <div className="mb-4">
                 <p className="text-sm text-gray-400 mb-2">{t("result.featureAdjustments")}</p>
                 <div className="flex flex-wrap gap-2">
@@ -3018,13 +3140,13 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               </div>
             )}
 
-            {anyDropped && (
+            {!listingComparison && anyDropped && (
               <p className="text-sm text-gray-600 bg-gray-100 rounded-lg px-4 py-2.5 mb-4 border border-gray-200">
                 {t("result.droppedFilters")}
               </p>
             )}
 
-            {district_coefficient?.applied ? (
+            {!listingComparison && district_coefficient?.applied ? (
               <div className="space-y-2">
                 <div className="p-4 rounded-xl bg-gray-50">
                   <div className="flex items-center gap-4 justify-center">
@@ -3060,7 +3182,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   {input.area_m2 ? `× ${input.area_m2}m² = ${formatPrice(estimate.market_rate)}` : formatPrice(estimate.market_rate)}
                 </p>
               </div>
-            ) : (
+            ) : !listingComparison ? (
               <div className="p-4 rounded-xl bg-gray-50 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">
                   {t("result.segmentMedian")}
@@ -3082,7 +3204,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   </p>
                 )}
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* District comparison */}
@@ -3146,6 +3268,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             count={listingDuplicateCount}
             listings={listingDuplicateItems}
             sectionRef={duplicatesSectionRef}
+            locked={lockListingDuplicates}
+            onLockedClick={openFullAnalysisAuthModal}
           />
 
           {!hideMarketStatsValues && (

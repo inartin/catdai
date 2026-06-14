@@ -25,6 +25,10 @@ function formatPrice(value) {
   return `${value} lei`;
 }
 
+function formatEuroPrice(value) {
+  return Number.isInteger(value) ? value : value.toFixed(2).replace(/\.?0+$/, "");
+}
+
 function FeatureRow({ feature, featured }) {
   return (
     <li className="flex items-center justify-between gap-3 py-2.5">
@@ -102,6 +106,11 @@ function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
           )}
         </span>
       </p>
+      {plan.eurPrice !== null && plan.eurPrice !== undefined && (
+        <p className="mt-1 text-sm font-semibold text-gray-500">
+          ≈ {formatEuroPrice(plan.eurPrice)} €
+        </p>
+      )}
 
       <p className="mt-3 min-h-10 text-sm leading-5 text-gray-500">
         {plan.description}
@@ -216,9 +225,11 @@ export default function Pricing({ prices, compact = false }) {
     {
       key: "standard",
       productKey: "standard_pack",
-      price: prices.standard,
+      price: prices.standard.mdl,
+      eurPrice: prices.standard.eur,
       title: t("pricing.standardTitle"),
       description: t("pricing.standardDesc"),
+      note: t("pricing.paidPackageNote"),
       features: makeFeatures("2"),
       actionLabel: t("pricing.choosePlan"),
       loadingLabel: t("payment.checkoutLoading"),
@@ -226,10 +237,12 @@ export default function Pricing({ prices, compact = false }) {
     {
       key: "pro",
       productKey: "pro_pack",
-      price: prices.pro,
+      price: prices.pro.mdl,
+      eurPrice: prices.pro.eur,
       title: t("pricing.proTitle"),
       description: t("pricing.proDesc"),
       badge: t("pricing.proBadge"),
+      note: t("pricing.paidPackageNote"),
       features: makeFeatures("10"),
       actionLabel: t("pricing.choosePlan"),
       loadingLabel: t("payment.checkoutLoading"),
@@ -237,9 +250,11 @@ export default function Pricing({ prices, compact = false }) {
     {
       key: "extra",
       productKey: "extra_pack",
-      price: prices.extra,
+      price: prices.extra.mdl,
+      eurPrice: prices.extra.eur,
       title: t("pricing.extraTitle"),
       description: t("pricing.extraDesc"),
+      note: t("pricing.paidPackageNote"),
       features: makeFeatures("50"),
       actionLabel: t("pricing.choosePlan"),
       loadingLabel: t("payment.checkoutLoading"),
@@ -292,15 +307,12 @@ export default function Pricing({ prices, compact = false }) {
   };
 
   return (
-    <section className={compact ? "px-4 pb-16" : "px-4 py-12 sm:py-16"}>
+    <section className={compact ? "px-4 pb-16" : "px-4 py-12 sm:py-6"}>
       <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-sm font-bold uppercase tracking-widest text-primary">
             {t("pricing.eyebrow")}
           </p>
-          <h2 className="mt-3 text-2xl font-extrabold tracking-tight text-gray-950 sm:text-3xl">
-            {t("pricing.title")}
-          </h2>
           <p className="mt-3 text-base leading-7 text-gray-600">
             {t("pricing.subtitle")}
           </p>

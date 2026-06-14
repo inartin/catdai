@@ -37,7 +37,7 @@ export default function AuthRequiredModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 cursor-zoom-out"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4 cursor-zoom-out"
       onClick={onClose}
     >
       <div

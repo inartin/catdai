@@ -60,8 +60,15 @@ const paymentLogos = [
     alt: "Visa",
     width: 3385,
     height: 2078,
-    className: "h-8 sm:h-11 max-w-[90px] -ml-4",
-  }
+    className: "h-8 sm:h-11 max-w-[90px]",
+  },
+  {
+    src: "/brands/paddle.svg",
+    alt: "Paddle",
+    width: 240,
+    height: 80,
+    className: "h-6 sm:h-7 max-w-[72px]",
+  },
   // {
   //   src: "/brands/mia_clean.svg",
   //   alt: "MIA",

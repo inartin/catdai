@@ -7,10 +7,11 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 1. `LinkAnalyzer` is available on the landing page and on `/verifica-anunt`; `/estimeaza` links users to `/verifica-anunt?from=estimeaza`, where a back button returns to `/estimeaza`, and `/999` permanently redirects to `/verifica-anunt`.
 2. It posts the URL to `POST /api/analyze-link`.
    - When the visitor is authenticated, the client includes the Supabase bearer token so analytics can attach `user_id`.
+   - Parsing the link does not consume a credit; `/anunt` consumes `listing_analysis` only when a full result is unlocked.
 3. The route extracts the listing id, checks the parsed-listing cache, then tries the signed external 999 worker when configured; if the worker is unavailable or fails, it falls back to the local 999 fetch/parser.
 4. The app validates Chișinău sale apartments and maps the parsed seller-selected fields to estimate params.
 5. The client redirects to `/anunt?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
-6. `/anunt` runs the usual sale estimate, fetches listing price history by `listing.external_id`, and renders the listing-vs-market comparison through the shared result component.
+6. `/anunt` runs the usual sale estimate and renders the listing-vs-market comparison through the shared result component. Users without a `listing_analysis` credit receive the same blurred preview pattern used by `/evaluare` and rent results.
 7. At the bottom of the `/anunt` result, the page embeds `LinkAnalyzer` directly so users can start another 999.md listing check without returning to `/verifica-anunt`.
 
 ## Parsing (`src/lib/parse-999-listing.js`)
@@ -42,15 +43,16 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - Header label switches to "Analiza anunțului" when a listing is analyzed and sits above both the preview image and property title.
 - The listing preview image is a larger 4:3 thumbnail aligned with the property title row, hydrated client-side via `/api/listing-preview-images`.
 - When the parsed listing has a street/house address, the listing-analysis header appends it after district and city.
-- When `listing_price_history` has real price changes for the analyzed listing, the header shows an interactive total-price history chart instead of the sector trend. The chart includes price/date axes, visible change-point dots, and hover/click details per dot.
+- When `listing_price_history` has real price changes for the analyzed listing, full-access users see an interactive total-price history chart instead of the sector trend. Locked listing-analysis previews use fake blurred chart dates, Y-axis values, and chart details, but keep `Ultimul preț` visible and keep the initial-price helper text readable while blurring only its fake price.
 - On desktop, the listing summary and price-history sections split the header card into two equal halves, with the preview image counted inside the left half.
 - On mobile, the listing price-history chart spans the full header card width instead of staying constrained to the text column beside the preview image.
 - Under the latest price, the chart shows total change from the initial recorded price, for example `-€5.500 (-3.4%)` plus `de la prețul inițial €159.900`.
 - When no price change history is found, the header shows `Nu am detectat istoric de schimbări de preț.` instead of the chart.
-- The listing-analysis header also shows the combined high + medium duplicate-candidate count when `/api/listing-duplicates` returns data; clicking it scrolls to the duplicate section. If the duplicate API succeeds with zero matches, the same badge shows `✓ Nu au fost găsite duplicate`.
-- The asking price replaces the middle column in the main estimate card, with a directional arrow + signed % (emerald = under, amber = over, primary = at market within ±3%).
-- A verdict banner states the difference (e.g. "Prețul cerut este cu €5.500 (7.0%) sub prețul de piață mediu") and compares price/m² (listing vs market). The "Vezi anunțul" link sits inside the banner.
+- The listing-analysis header also shows the combined high + medium duplicate-candidate count when `/api/listing-duplicates` returns data; clicking it scrolls to the duplicate section. If the duplicate API succeeds with zero matches, the same badge shows `✓ Nu au fost găsite duplicate`. Duplicate cards are blurred in locked listing-analysis previews.
+- The asking price replaces the middle column in the main estimate card, with a directional arrow + signed % (emerald = under, amber = over, primary = at market within ±3%). Locked previews blur the estimated market level and delta values but keep the asking price visible.
+- A verdict banner states the difference (e.g. "Prețul cerut este cu €5.500 (7.0%) sub prețul de piață mediu") and compares price/m² (listing vs market). Locked previews keep the sentence readable and blur only the numeric amount and percentage. The "Vezi anunțul" link sits inside the banner.
 - A duplicate-candidate section is shown above `Anunțuri relevante`, using text-only clickable cards with street/house address when available, price, a two-line match probability badge, and reason badges on high-probability matches when available.
+- In `/anunt` mode, the `Analiza anunțului` calculation card shows only the criteria badges; deeper calculation details stay in the normal valuation result.
 - The bottom action on `/anunt` is the inline `Verifică un anunț 999.md` link analyzer instead of the generic `Estimare nouă` button.
 - Sharing a listing-analysis result copies the current `/anunt` URL so the listing comparison stays attached.
 

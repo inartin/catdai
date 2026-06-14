@@ -9,13 +9,12 @@ import {
 } from "@/lib/free-monthly-feature-usage";
 import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
 import {
-  buildFeatureCreditRequiredPayload,
   checkPaidFeatureAccess,
   consumePaidFeatureCredit,
   getUserFeatureCreditBalance,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
-import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
+import { getEvaluationPurchaseOffer, getFeaturePurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { validateEstimateInput } from "@/lib/validation";
@@ -405,13 +404,6 @@ function buildListingAnalysisUsageMetadata({ params, body }) {
   };
 }
 
-function featureCreditRequiredResponse(featureKey, reason) {
-  return NextResponse.json(
-    buildFeatureCreditRequiredPayload(featureKey, reason),
-    { status: reason === "unauthorized" ? 401 : 402 }
-  );
-}
-
 async function precheckListingAnalysisAccess(request, body) {
   const idempotencyKey = makeListingAnalysisUsageKey(body);
   if (!idempotencyKey) return null;
@@ -423,13 +415,7 @@ async function precheckListingAnalysisAccess(request, body) {
     idempotencyKey,
   });
 
-  if (!check.allowed) {
-    return {
-      blockedResponse: featureCreditRequiredResponse(LISTING_ANALYSIS_FEATURE_KEY, check.reason),
-    };
-  }
-
-  return { access, idempotencyKey };
+  return { access, idempotencyKey, check };
 }
 
 async function consumeListingAnalysisCredit(listingAccess, body, params) {
@@ -444,6 +430,25 @@ async function consumeListingAnalysisCredit(listingAccess, body, params) {
 }
 
 function buildListingAnalysisAccessPayload(data, listingAccess, paidCreditUsage) {
+  const preview = buildEstimatePreview(data);
+  if (!listingAccess?.check?.allowed) {
+    return {
+      ...preview,
+      access_tier: listingAccess?.access?.tier || "free",
+      full_access: false,
+      access_limit: {
+        reason: listingAccess?.check?.reason || "no_credit",
+        feature_key: LISTING_ANALYSIS_FEATURE_KEY,
+        purchase: getFeaturePurchaseOffer(LISTING_ANALYSIS_FEATURE_KEY),
+      },
+      locked_sections: {
+        ...preview.locked_sections,
+        listing_price_history: true,
+        listing_duplicates: true,
+      },
+    };
+  }
+
   return {
     ...data,
     access_tier: listingAccess.access.tier,
@@ -961,10 +966,6 @@ export async function POST(request) {
     );
   }
 
-  if (listingAnalysisAccess?.blockedResponse) {
-    return listingAnalysisAccess.blockedResponse;
-  }
-
   const requestStart = Date.now();
   const cacheKey = makeEstimateCacheKey(params, body.language);
   const cachedData = await getCachedEstimate(cacheKey);
@@ -974,9 +975,18 @@ export async function POST(request) {
     let trackingAccess;
 
     if (listingAnalysisAccess) {
-      const paidCreditUsage = await consumeListingAnalysisCredit(listingAnalysisAccess, body, params);
-      if (!paidCreditUsage?.allowed) {
-        return featureCreditRequiredResponse(LISTING_ANALYSIS_FEATURE_KEY, paidCreditUsage?.reason || "no_credit");
+      let paidCreditUsage = null;
+      if (listingAnalysisAccess.check?.allowed) {
+        paidCreditUsage = await consumeListingAnalysisCredit(listingAnalysisAccess, body, params);
+        if (!paidCreditUsage?.allowed) {
+          listingAnalysisAccess = {
+            ...listingAnalysisAccess,
+            check: {
+              allowed: false,
+              reason: paidCreditUsage?.reason || "no_credit",
+            },
+          };
+        }
       }
       responsePayload = buildListingAnalysisAccessPayload(cachedData, listingAnalysisAccess, paidCreditUsage);
       trackingAccess = listingAnalysisAccess.access;
@@ -1106,9 +1116,18 @@ export async function POST(request) {
   let trackingAccess;
 
   if (listingAnalysisAccess) {
-    const paidCreditUsage = await consumeListingAnalysisCredit(listingAnalysisAccess, body, params);
-    if (!paidCreditUsage?.allowed) {
-      return featureCreditRequiredResponse(LISTING_ANALYSIS_FEATURE_KEY, paidCreditUsage?.reason || "no_credit");
+    let paidCreditUsage = null;
+    if (listingAnalysisAccess.check?.allowed) {
+      paidCreditUsage = await consumeListingAnalysisCredit(listingAnalysisAccess, body, params);
+      if (!paidCreditUsage?.allowed) {
+        listingAnalysisAccess = {
+          ...listingAnalysisAccess,
+          check: {
+            allowed: false,
+            reason: paidCreditUsage?.reason || "no_credit",
+          },
+        };
+      }
     }
     responsePayload = buildListingAnalysisAccessPayload(data, listingAnalysisAccess, paidCreditUsage);
     trackingAccess = listingAnalysisAccess.access;

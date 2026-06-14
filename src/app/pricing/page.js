@@ -11,9 +11,11 @@ export default function PricingPage() {
       <Navbar />
       <main className="flex-1">
         <Pricing prices={prices} />
+        <p className="mx-auto max-w-6xl my-10 px-4 pb-8 text-center text-xs font-medium text-gray-500">
+          Plata se procesează în EUR prin Paddle. Prețurile în lei sunt afișate orientativ.
+        </p>
       </main>
       <Footer />
     </div>
   );
 }
-

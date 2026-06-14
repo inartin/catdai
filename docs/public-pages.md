@@ -37,7 +37,7 @@ Implemented.
 - `/refund`.
 
 ## App Shell
-- Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, localized Cadastru link, Calculator link to `/calculator`, login/profile link, language switcher, and an always-visible notification button.
+- Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, localized Cadastru link, Calculator link to `/calculator`, Prețuri link to `/pricing` placed right after Calculator, login/profile link, language switcher, and an always-visible notification button.
 - The notification button is UI-only for now, opens an empty right sidebar for authenticated users, stays visible but disabled while auth is loading or anonymous, and includes read-state and clear-notifications UI for future notification data.
 - Shared footer. Its `Noutăți` link routes to `/noutati`; footer legal links include Terms, Privacy, and Refund; Telegram remains only as the social icon link. Footer displays active card/payment-system logos from `public/brands`; Paynet is not shown because it is not used.
 - Cookie banner is global.

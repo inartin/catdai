@@ -21,6 +21,7 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 - The sale/buy full-evaluation free monthly limit is enforced in `/api/estimate` for authenticated free users.
 - Free one-off features show per-use prices instead of usage counts: 999 analysis 29 lei, cadastru 19 lei, yield calculator 29 lei, and PDF report 29 lei.
 - Free card note explains the asterisk as per-use pricing.
+- Standard, Pro, and Extra cards show a bottom note: `Acțiunile rămân disponibile până le folosești.`
 - Feature count badges show the included usage or one-off price for each feature.
 - Feature rows use a fixed height so the same feature lines align across pricing cards.
 - Prices are read server-side from env and passed into the client component.

@@ -295,6 +295,10 @@ export default function Pricing({ prices, compact = false }) {
       const checkoutUrl = payload?.checkout?.url;
       if (!checkoutUrl) throw new Error(t("payment.checkoutError"));
 
+      try {
+        sessionStorage.setItem(`catdai:paddle-product:${payload.order_id}`, JSON.stringify(payload.product || {}));
+      } catch {}
+
       setCheckoutState({ status: "redirecting", productKey, message: "" });
       window.location.href = checkoutUrl;
     } catch (error) {

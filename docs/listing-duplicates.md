@@ -40,6 +40,7 @@ First API version implemented and shown on `/anunt`.
 - Duplicate cards do not show images; they show title, street/house address when available, location/floor, price, key tags, and a two-line `Potrivire` probability badge.
 - High-probability duplicate cards can show multiple small reason badges for same owner and same address.
 - Cards link directly to the original 999.md listing.
+- Locked `/anunt` previews use blurred fake duplicate cards, including fake 999.md listing URLs, so real duplicate data and links are not exposed before unlock.
 
 ## Related Files
 - `src/app/api/listing-duplicates/route.js`

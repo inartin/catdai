@@ -267,5 +267,12 @@ export async function POST(request) {
       url: checkoutUrl,
       transaction_id: summary.transactionId,
     },
+    product: {
+      key: product.key,
+      title: product.title,
+      amount_mdl: product.amountMdl,
+      amount_eur: product.amountEur || null,
+      grants: product.grants || null,
+    },
   });
 }

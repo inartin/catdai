@@ -37,14 +37,16 @@ Paddle one-time payment flow is connected for packages, evaluation limit popups,
   - includes product key, status, amount, currency, Paddle transaction id, paid date, created date, and internal order id
 - `GET /payment/paddle/checkout`
   - noindex default payment link page for Paddle
-  - loads Paddle.js and opens the transaction passed by Paddle as `_ptxn`
+  - loads Paddle.js and opens the transaction passed by Paddle as `_ptxn` in an inline checkout frame on the page
+  - prefills Paddle customer email from the authenticated Supabase user when the email is real; Telegram placeholder emails like `telegram-<id>@auth.catdai.md` are not sent
+  - shows a localized left-side purchase summary from the create-route product payload saved in `sessionStorage`; package summaries show the package name, included usage count, exact EUR price first, and approximate configured `NEXT_PUBLIC_PRICE_*_MDL_COST` as secondary
   - preserves optional local `return_to` and `lang` query values for the status page
-  - uses the shared clean checkout shell with CatDai logo, RO/RU copy, and a secure-payment state panel
+  - uses the shared clean checkout shell with CatDai logo, RO/RU copy, and a secure-payment panel that contains the Paddle frame
   - requires `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`
 - `GET /payment/paddle/success`
   - noindex status page for the Paddle flow
   - polls the status endpoint and shows paid, pending, failed, or canceled state
-  - marks the local order `checkout_closed` when reached after the overlay checkout was closed by the user, without treating it as a final payment cancellation
+  - marks the local order `checkout_closed` when reached after Paddle.js reports the checkout was closed by the user, without treating it as a final payment cancellation
   - uses the same checkout shell and localized RO/RU status copy, including internal order states like `registered`
   - links back to the originating evaluation path when checkout started from a limit popup
 - `GET /payment/paddle/test`
@@ -74,7 +76,8 @@ Paddle one-time payment flow is connected for packages, evaluation limit popups,
 - The create route verifies catalog price IDs and no recurring billing cycle.
 - Non-production create-route failures include a short `details` field so the temporary Paddle test page can show the exact Paddle/API/Supabase failure during setup.
 - Webhook access is granted only after a verified `transaction.completed` event.
-- Subscribe the Paddle webhook destination to `transaction.completed`, `transaction.payment_failed`, and `transaction.canceled`. Closing an overlay checkout is handled client-side with Paddle.js `checkout.closed`; Paddle says `transaction.canceled` is not typically part of automatic checkout workflows.
+- Subscribe the Paddle webhook destination to `transaction.completed`, `transaction.payment_failed`, and `transaction.canceled`. User-closed checkout events are handled client-side with Paddle.js `checkout.closed`; Paddle says `transaction.canceled` is not typically part of automatic checkout workflows.
+- `/payment/paddle/checkout` initializes Paddle Checkout with `displayMode: "inline"`, `frameTarget: "paddle-inline-checkout"`, a 520px initial frame height, and a borderless full-width frame style. Visual branding for the embedded Paddle frame is controlled in the Paddle dashboard under branded inline checkout. Paddle checkout locale maps CatDai RU to `ru` and RO to `en`, because Paddle does not provide Romanian checkout copy.
 - `PADDLE_WEBHOOK_SECRET_KEY` must be the webhook endpoint secret from Paddle, not the `ntfset_...` notification setting id.
 - If a Paddle webhook includes a `subscription_id`, CatDai rejects it because this integration is one-time only.
 - The Paddle API key needs `transaction.write`.
@@ -108,7 +111,7 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
   - `complete_paddle_payment(...)`
 - Paddle grants write into the existing shared `user_feature_credits` table.
 - Paid uses are logged in `user_feature_usage_events`; `user_feature_credits.remaining_uses` and `total_used` drive the profile balance display.
-- `paddle_payment_orders.status` includes `checkout_closed` for a user-closed overlay checkout that has not received a final Paddle payment outcome.
+- `paddle_payment_orders.status` includes `checkout_closed` for a user-closed checkout that has not received a final Paddle payment outcome.
 - Run the shared credit schema from `db/paynet_payments.sql` before `db/paddle_payments.sql`, because that file still defines shared credit tables and helpers used by Paddle. Do not use the Paynet order/notification tables for checkout.
 
 ## Related Files

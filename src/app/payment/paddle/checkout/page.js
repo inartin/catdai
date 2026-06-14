@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 
 const PADDLE_SCRIPT_SRC = "https://cdn.paddle.com/paddle/v2/paddle.js";
+const PADDLE_INLINE_FRAME_TARGET = "paddle-inline-checkout";
 
 function loadPaddleScript() {
   if (typeof window === "undefined") return Promise.reject(new Error("Browser only"));
@@ -39,11 +41,128 @@ function normalizeReturnTo(value) {
   }
 }
 
+function getCheckoutEmail(user) {
+  const email = String(user?.email || "").trim();
+  if (!email || /^telegram-\d+@auth\.catdai\.md$/i.test(email)) return "";
+  return email;
+}
+
+function readStoredProduct(orderId) {
+  if (typeof window === "undefined" || !orderId) return null;
+
+  try {
+    const raw = sessionStorage.getItem(`catdai:paddle-product:${orderId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatMoneyMdl(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "";
+  return `≈ ${Math.round(amount).toLocaleString("ro-MD")} lei`;
+}
+
+function formatMoneyEur(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || amount <= 0) return "";
+  return `${amount.toLocaleString("ro-MD", {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })} €`;
+}
+
+function getConfiguredEurAmount(productKey) {
+  const envByProduct = {
+    standard_pack: process.env.NEXT_PUBLIC_PRICE_STANDARD_PACK_COST,
+    pro_pack: process.env.NEXT_PUBLIC_PRICE_PRO_PACK_COST,
+    extra_pack: process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_COST,
+  };
+  const amount = Number.parseFloat(String(envByProduct[productKey] || "").replace(",", "."));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function getConfiguredMdlAmount(productKey) {
+  const envByProduct = {
+    standard_pack: process.env.NEXT_PUBLIC_PRICE_STANDARD_PACK_MDL_COST,
+    pro_pack: process.env.NEXT_PUBLIC_PRICE_PRO_PACK_MDL_COST,
+    extra_pack: process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST,
+  };
+  const amount = Number.parseFloat(String(envByProduct[productKey] || "").replace(",", "."));
+  return Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
+function getProductSummary(product, t) {
+  const key = String(product?.key || product?.product_key || "").trim();
+  const amountMdl = formatMoneyMdl(getConfiguredMdlAmount(key) || product?.amount_mdl);
+  const amountEur = formatMoneyEur(product?.amount_eur || getConfiguredEurAmount(key));
+
+  const summaries = {
+    standard_pack: {
+      title: t("profile.paymentProduct.standard_pack"),
+      description: "",
+      quantity: t("payment.checkoutProductAllFeatures", { count: 2 }),
+    },
+    pro_pack: {
+      title: t("profile.paymentProduct.pro_pack"),
+      description: "",
+      quantity: t("payment.checkoutProductAllFeatures", { count: 10 }),
+    },
+    extra_pack: {
+      title: t("profile.paymentProduct.extra_pack"),
+      description: "",
+      quantity: t("payment.checkoutProductAllFeatures", { count: 50 }),
+    },
+    sale_estimate_single: {
+      title: t("profile.paymentProduct.sale_estimate_single"),
+      description: t("pricing.featureSale"),
+      quantity: t("payment.checkoutProductSingleUse"),
+    },
+    rent_estimate_single: {
+      title: t("profile.paymentProduct.rent_estimate_single"),
+      description: t("pricing.featureRent"),
+      quantity: t("payment.checkoutProductSingleUse"),
+    },
+    listing_analysis_single: {
+      title: t("profile.paymentProduct.listing_analysis_single"),
+      description: t("pricing.feature999"),
+      quantity: t("payment.checkoutProductSingleUse"),
+    },
+    cadastru_lookup_single: {
+      title: t("profile.paymentProduct.cadastru_lookup_single"),
+      description: t("pricing.featureCadastru"),
+      quantity: t("payment.checkoutProductSingleUse"),
+    },
+    yield_calculator_single: {
+      title: t("profile.paymentProduct.yield_calculator_single"),
+      description: t("pricing.featureYield"),
+      quantity: t("payment.checkoutProductSingleUse"),
+    },
+    pdf_report_single: {
+      title: t("profile.paymentProduct.pdf_report_single"),
+      description: t("pricing.featurePdf"),
+      quantity: t("payment.checkoutProductSingleUse"),
+    },
+  };
+
+  if (!summaries[key]) return null;
+
+  return {
+    ...summaries[key],
+    amountPrimary: amountEur || amountMdl,
+    amountSecondary: amountEur ? amountMdl : "",
+  };
+}
+
 export default function PaddleCheckoutPage() {
   const { lang, setLang, t } = useTranslation();
+  const { session, user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState("loading");
   const [messageKey, setMessageKey] = useState("payment.checkoutOpening");
   const [errorMessage, setErrorMessage] = useState("");
+  const [product, setProduct] = useState(null);
+  const checkoutEmail = getCheckoutEmail(user);
 
   const params = useMemo(() => {
     if (typeof window === "undefined") return { transactionId: "", orderId: "", returnTo: "", lang: "" };
@@ -55,6 +174,39 @@ export default function PaddleCheckoutPage() {
       lang: searchParams.get("lang") || "",
     };
   }, []);
+
+  useEffect(() => {
+    setProduct(readStoredProduct(params.orderId));
+  }, [params.orderId]);
+
+  useEffect(() => {
+    if (authLoading || product?.key || !params.orderId || !session?.access_token) return undefined;
+
+    let active = true;
+
+    async function fetchProductFromOrder() {
+      try {
+        const searchParams = new URLSearchParams({ order_id: params.orderId });
+        const response = await fetch(`/api/payments/paddle/status?${searchParams.toString()}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!active || !response.ok || !payload?.product_key) return;
+        setProduct({
+          key: payload.product_key,
+          amount_mdl: Number(payload.amount_minor) > 0 ? Number(payload.amount_minor) / 100 : null,
+          amount_eur: getConfiguredEurAmount(payload.product_key),
+        });
+      } catch {}
+    }
+
+    fetchProductFromOrder();
+
+    return () => {
+      active = false;
+    };
+  }, [authLoading, params.orderId, product?.key, session?.access_token]);
 
   useEffect(() => {
     if ((params.lang === "ro" || params.lang === "ru") && params.lang !== lang) {
@@ -93,6 +245,7 @@ export default function PaddleCheckoutPage() {
         setErrorMessage("");
         return;
       }
+      if (authLoading) return;
 
       try {
         const Paddle = await loadPaddleScript();
@@ -118,15 +271,21 @@ export default function PaddleCheckoutPage() {
           },
           checkout: {
             settings: {
-              displayMode: "overlay",
+              displayMode: "inline",
+              frameTarget: PADDLE_INLINE_FRAME_TARGET,
+              frameInitialHeight: "520",
+              frameStyle: "width: 100%; min-width: 312px; background-color: transparent; border: none;",
               theme: "light",
-              locale: lang === "ru" ? "ru" : "ro",
+              locale: lang === "ru" ? "ru" : "en",
               allowLogout: false,
             },
           },
         });
 
-        Paddle.Checkout.open({ transactionId: params.transactionId });
+        Paddle.Checkout.open({
+          transactionId: params.transactionId,
+          ...(checkoutEmail ? { customer: { email: checkoutEmail } } : {}),
+        });
         setStatus("ready");
         setMessageKey("payment.checkoutReady");
         setErrorMessage("");
@@ -143,10 +302,11 @@ export default function PaddleCheckoutPage() {
     return () => {
       canceled = true;
     };
-  }, [lang, params.lang, params.orderId, params.returnTo, params.transactionId, setLang]);
+  }, [authLoading, checkoutEmail, lang, params.lang, params.orderId, params.returnTo, params.transactionId, setLang]);
 
   const returnHref = normalizeReturnTo(params.returnTo);
   const isError = status === "error";
+  const productSummary = getProductSummary(product, t);
 
   return (
     <main className="min-h-screen bg-[#f7f8f5] px-4 py-8 text-gray-950 sm:px-6 lg:px-8">
@@ -161,7 +321,7 @@ export default function PaddleCheckoutPage() {
           </span>
         </header>
 
-        <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="grid flex-1 items-start gap-8 py-10 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-dark">
               {t("payment.checkoutEyebrow")}
@@ -172,9 +332,35 @@ export default function PaddleCheckoutPage() {
             <p className="mt-5 max-w-xl text-base leading-7 text-gray-600">
               {t("payment.checkoutSubtitle")}
             </p>
+
+            {productSummary && (
+              <div className="mt-8 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-semibold text-gray-950">{productSummary.title}</h2>
+                    {productSummary.description && (
+                      <p className="mt-2 text-sm leading-6 text-gray-600">{productSummary.description}</p>
+                    )}
+                    {productSummary.quantity && (
+                      <p className="mt-3 inline-flex rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary-dark">
+                        {productSummary.quantity}
+                      </p>
+                    )}
+                  </div>
+                  {productSummary.amountPrimary && (
+                    <div className="shrink-0 text-right">
+                      <p className="text-lg font-bold text-gray-950">{productSummary.amountPrimary}</p>
+                      {productSummary.amountSecondary && (
+                        <p className="mt-1 text-xs font-semibold text-gray-400">{productSummary.amountSecondary}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
             <div className="flex items-start gap-4">
               <span
                 className={`mt-1 h-3 w-3 flex-none rounded-full ${
@@ -194,6 +380,13 @@ export default function PaddleCheckoutPage() {
                 )}
               </div>
             </div>
+
+            {!isError && (
+              <div
+                className={`${PADDLE_INLINE_FRAME_TARGET} mt-6 min-h-[520px] overflow-visible`}
+                aria-label={t("payment.checkoutFrameLabel")}
+              />
+            )}
 
             <div className="mt-6 border-t border-gray-100 pt-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">

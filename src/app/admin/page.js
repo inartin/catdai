@@ -583,14 +583,14 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-8">
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-4 sm:py-6">
           <div ref={selectedUserPopupRef} className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-5 py-4">
+            <div className="flex flex-col gap-4 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{selectedUser.name || "\u2014"}</h2>
                 {selectedUser.email && <p className="mt-0.5 text-sm text-gray-500">{selectedUser.email}</p>}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="relative">
                   <button
                     type="button"
@@ -695,7 +695,7 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
-            <div className="max-h-[75vh] overflow-y-auto p-5">
+            <div className="max-h-[75vh] overflow-y-auto p-4 sm:p-5">
               <ProfileCreditBalances
                 credits={selectedUser.credits || []}
                 freeMonthlyCredits={selectedUser.freeMonthlyCredits || []}
@@ -721,13 +721,13 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <button
           type="button"
           onClick={() => loadStats({ fresh: true })}
           disabled={statsRefreshing}
-          className="px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg text-gray-700 hover:border-primary/40 hover:text-primary disabled:text-gray-400 disabled:hover:border-gray-200 transition-colors"
+          className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary/40 hover:text-primary disabled:text-gray-400 disabled:hover:border-gray-200 sm:w-auto"
         >
           {statsRefreshing ? "Refreshing..." : "Hard refresh"}
         </button>
@@ -736,7 +736,7 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-11 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-11 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}

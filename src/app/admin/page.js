@@ -334,10 +334,6 @@ export default function AdminDashboard() {
   const [selectedUserCreditResetConfirming, setSelectedUserCreditResetConfirming] = useState(false);
   const [selectedUserCreditResetSaving, setSelectedUserCreditResetSaving] = useState(false);
   const [selectedUserCreditResetError, setSelectedUserCreditResetError] = useState(null);
-  const [freeCreditsAmount, setFreeCreditsAmount] = useState("2");
-  const [freeCreditsSaving, setFreeCreditsSaving] = useState(false);
-  const [freeCreditsMessage, setFreeCreditsMessage] = useState(null);
-  const [freeCreditsError, setFreeCreditsError] = useState(null);
   const [activeEstimationsType, setActiveEstimationsType] = useState(null);
   const [estimations, setEstimations] = useState([]);
   const [estimationsLoading, setEstimationsLoading] = useState(false);
@@ -519,41 +515,6 @@ export default function AdminDashboard() {
       setSelectedUserCreditResetError(err.message || "Nu s-a putut reseta accesul");
     } finally {
       setSelectedUserCreditResetSaving(false);
-    }
-  };
-
-  const sendFreeCreditsToAllUsers = async () => {
-    const amount = Number(freeCreditsAmount);
-    if (!Number.isInteger(amount) || amount < 0) {
-      setFreeCreditsError("Introdu o sumă validă de credite");
-      setFreeCreditsMessage(null);
-      return;
-    }
-
-    if (!window.confirm(`Setezi ${amount} credite pentru fiecare tip de acces la toți utilizatorii? Statusul pachetelor nu va fi modificat.`)) {
-      return;
-    }
-
-    setFreeCreditsSaving(true);
-    setFreeCreditsError(null);
-    setFreeCreditsMessage(null);
-
-    try {
-      const res = await fetch("/api/admin/users/free-credits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-
-      setFreeCreditsMessage(`Credite setate pentru ${fmtNum(data.usersUpdated || 0)} utilizatori.`);
-      if (showUsersList) await loadUsers();
-      await loadStats({ fresh: true });
-    } catch (err) {
-      setFreeCreditsError(err.message || "Nu s-au putut seta creditele");
-    } finally {
-      setFreeCreditsSaving(false);
     }
   };
 
@@ -770,45 +731,6 @@ export default function AdminDashboard() {
         >
           {statsRefreshing ? "Refreshing..." : "Hard refresh"}
         </button>
-      </div>
-
-      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Credite gratuite pentru toți utilizatorii</h2>
-            <p className="mt-1 text-xs text-gray-500">
-              Setează creditele pe fiecare tip de acces fără schimbarea statusului pachetului.
-            </p>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end">
-            <label className="text-xs font-medium text-gray-600">
-              Sumă
-              <input
-                type="number"
-                min="0"
-                max="1000"
-                step="1"
-                value={freeCreditsAmount}
-                onChange={(event) => {
-                  setFreeCreditsAmount(event.target.value);
-                  setFreeCreditsError(null);
-                  setFreeCreditsMessage(null);
-                }}
-                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none focus:border-primary sm:w-28"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={sendFreeCreditsToAllUsers}
-              disabled={freeCreditsSaving}
-              className="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {freeCreditsSaving ? "Se trimite..." : "Trimite"}
-            </button>
-          </div>
-        </div>
-        {freeCreditsError && <p className="mt-2 text-xs font-medium text-red-500">{freeCreditsError}</p>}
-        {freeCreditsMessage && <p className="mt-2 text-xs font-medium text-emerald-600">{freeCreditsMessage}</p>}
       </div>
 
       {/* Users & App Usage */}

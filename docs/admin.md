@@ -20,7 +20,6 @@ Shows:
 - paid users count in the main dashboard, aggregating distinct registered users with at least one completed Paddle payment and at least one remaining paid feature credit; clicking the card opens the paid-user list with email, registration date, latest payment, latest product, remaining paid credits, and paid-order count
 - In the user popup, clicking the package badge opens a package dropdown. Selecting a different Start, Standard, Pro, or Extra package shows save/cancel actions. Saving updates the user's active admin package directly, resets all paid feature-credit balances to the selected package grants, deletes paid feature-credit rows when Start is selected, and does not create or require a payment.
 - The reset button next to the popup package badge asks for confirm/cancel and then resets the current package's paid feature credits back to full unused counts.
-- The dashboard has a bulk free-credit action where an admin enters an amount, confirms the popup, and sets each registered user's remaining credits to that amount for every paid feature without changing package status or auth metadata.
 - Registered users table uses vertical column dividers for scanability.
 - Registered users package is based on the pricing page package names: free users show Start with the gray badge, paid Standard is green, Pro is cyan, and Extra is purple.
 - Admin package changes are stored in Supabase auth `app_metadata.catdai_admin_package_key`, which overrides the latest paid package for admin display.
@@ -46,7 +45,7 @@ Shows:
 - `/admin/feedback` is linked from the left menu as `Feedback` and shows the latest registered-user feedback rows with message, user id, date, status, delete action with confirmation, and optional uploaded image preview that opens in an in-page modal.
 - `/admin/news` is linked from the left menu as `News` and lets admins list, create, edit, and remove news items with slug, title, rich description, creation date, and cover image link.
 - `/admin/uploads` is linked from the left menu as `Uploads` and lets admins upload JPEG, PNG, WebP, or GIF images up to 5 MB to Supabase Storage.
-- `/admin/notifications` is linked from the left menu as `Notifications` and lets admins send one in-app message to every registered Supabase user.
+- `/admin/notifications` is linked from the left menu as `Notifications` and lets admins send one in-app message to every registered Supabase user. The bottom of the page also has a bulk free-credit action where an admin enters an amount, confirms the popup, and sets each registered user's remaining credits to that amount for every paid feature without changing package status or auth metadata.
 - In development, all-user notification broadcasts are hardcoded to only `catdai.info@gmail.com` and `iamdevandrei@gmail.com`.
 - Admin uploads use the `img` Supabase Storage bucket by default, or `SUPABASE_IMAGE_BUCKET` when set. Files are saved at the bucket root with a unique sanitized filename. The bucket must be public to use the returned `getPublicUrl` URL without an expiration date; signed URLs are not used.
 

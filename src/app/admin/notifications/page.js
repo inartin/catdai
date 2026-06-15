@@ -12,6 +12,10 @@ export default function AdminNotificationsPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [freeCreditsAmount, setFreeCreditsAmount] = useState("2");
+  const [freeCreditsSending, setFreeCreditsSending] = useState(false);
+  const [freeCreditsError, setFreeCreditsError] = useState("");
+  const [freeCreditsSuccess, setFreeCreditsSuccess] = useState("");
 
   const updateField = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -50,6 +54,40 @@ export default function AdminNotificationsPage() {
       setError(err.message || "Failed to send notification.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const sendFreeCredits = async () => {
+    const amount = Number(freeCreditsAmount);
+    if (!Number.isInteger(amount) || amount < 0) {
+      setFreeCreditsError("Enter a valid credit amount.");
+      setFreeCreditsSuccess("");
+      return;
+    }
+
+    if (!window.confirm(`Set ${amount} credits for all users without changing their package status?`)) return;
+
+    setFreeCreditsSending(true);
+    setFreeCreditsError("");
+    setFreeCreditsSuccess("");
+
+    try {
+      const response = await fetch("/api/admin/users/free-credits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setFreeCreditsSuccess(`Credits set for ${Number(data.usersUpdated || 0).toLocaleString("ro-RO")} users.`);
+    } catch (err) {
+      setFreeCreditsError(err.message || "Failed to set free credits.");
+    } finally {
+      setFreeCreditsSending(false);
     }
   };
 
@@ -116,6 +154,54 @@ export default function AdminNotificationsPage() {
           </button>
         </div>
       </form>
+
+      <div className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Free credits</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Set credits for all registered users without changing package status.
+          </p>
+        </div>
+
+        {freeCreditsError && (
+          <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-600">
+            {freeCreditsError}
+          </div>
+        )}
+
+        {freeCreditsSuccess && (
+          <div className="rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-sm text-green-700">
+            {freeCreditsSuccess}
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <label className="text-sm font-medium text-gray-700">
+            Amount
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              step="1"
+              value={freeCreditsAmount}
+              onChange={(event) => {
+                setFreeCreditsAmount(event.target.value);
+                setFreeCreditsError("");
+                setFreeCreditsSuccess("");
+              }}
+              className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-primary sm:w-32"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={sendFreeCredits}
+            disabled={freeCreditsSending}
+            className="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            {freeCreditsSending ? "Sending..." : "Send"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

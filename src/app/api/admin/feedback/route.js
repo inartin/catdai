@@ -29,3 +29,25 @@ export async function GET(request) {
 
   return NextResponse.json({ feedback: data || [] });
 }
+
+export async function DELETE(request) {
+  const unauthorized = requireAdminApiAuth(request);
+  if (unauthorized) return unauthorized;
+
+  const id = Number(new URL(request.url).searchParams.get("id"));
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return NextResponse.json({ error: "Invalid feedback id." }, { status: 400 });
+  }
+
+  const { error } = await supabaseAdmin
+    .from("user_feedback")
+    .delete()
+    .eq("id", id);
+
+  if (error) {
+    console.error("[admin-feedback] delete failed:", error.message);
+    return NextResponse.json({ error: "Failed to delete feedback." }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}

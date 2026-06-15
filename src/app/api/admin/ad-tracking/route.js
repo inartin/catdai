@@ -4,7 +4,7 @@ import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { NextResponse } from "next/server";
 
 const AD_TRACKING_CACHE_TTL_SECONDS = 10 * 60;
-const AD_TRACKING_CACHE_PREFIX = "catdai:admin-ad-tracking:v1";
+const AD_TRACKING_CACHE_PREFIX = "catdai:admin-ad-tracking:v2";
 
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);

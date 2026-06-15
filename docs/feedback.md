@@ -15,7 +15,7 @@ Implemented for registered users.
 - `POST /api/feedback` accepts a valid Supabase bearer token; unauthenticated submissions are limited to `pricing_custom_request` payloads with a contact email and no image upload.
 - The route rate limits submissions per IP, sanitizes control characters from text, validates image type/size/data, and writes to `user_feedback`.
 - Uploaded images are stored as base64 text in the feedback row for the first beta version.
-- Admins can view latest feedback at `/admin/feedback` through `/api/admin/feedback`.
+- Admins can view latest feedback at `/admin/feedback` through `/api/admin/feedback` and delete individual feedback rows after a browser confirmation.
 
 ## Schema
 - `db/user_feedback.sql` creates `user_feedback` with optional `user_id`, `message`, optional contact email/phone, optional image metadata/data, status, timestamps, indexes, and RLS policies.

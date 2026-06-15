@@ -29,6 +29,7 @@ export default function AdminFeedbackPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openImage, setOpenImage] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const loadFeedback = useCallback(async () => {
     setLoading(true);
@@ -49,6 +50,30 @@ export default function AdminFeedbackPage() {
   useEffect(() => {
     loadFeedback();
   }, [loadFeedback]);
+
+  const deleteFeedback = async (row) => {
+    if (!window.confirm("Delete this feedback?")) return;
+
+    setDeletingId(row.id);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/admin/feedback?id=${encodeURIComponent(row.id)}`, {
+        method: "DELETE",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setItems((current) => current.filter((item) => item.id !== row.id));
+    } catch (err) {
+      setError(err.message || "Failed to delete feedback");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -96,6 +121,14 @@ export default function AdminFeedbackPage() {
                     <p className="whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">
                       {row.message}
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => deleteFeedback(row)}
+                      disabled={deletingId === row.id}
+                      className="mt-3 cursor-pointer rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent"
+                    >
+                      {deletingId === row.id ? "Deleting..." : "Delete"}
+                    </button>
                   </div>
 
                   <div className="text-sm text-gray-500">

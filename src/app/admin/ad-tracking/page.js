@@ -44,6 +44,18 @@ const AD_EVENT_LABELS = {
   signed_in: "Signed in",
 };
 
+const PAYMENT_PRODUCT_LABELS = {
+  standard_pack: "Standard package",
+  pro_pack: "Pro package",
+  extra_pack: "Extra package",
+  sale_estimate_single: "Sale estimate",
+  rent_estimate_single: "Rent estimate",
+  listing_analysis_single: "Listing analysis",
+  cadastru_lookup_single: "Cadastru lookup",
+  yield_calculator_single: "Yield calculator",
+  pdf_report_single: "PDF report",
+};
+
 function fmtAdEventName(eventName, sourceConfig) {
   if (eventName === "source_landing_visit") return `Opened landing page from ${sourceConfig.label}`;
   return AD_EVENT_LABELS[eventName] || eventName || "\u2014";
@@ -78,7 +90,18 @@ function fmtJourneySummary(journey) {
   if (actions.has("estimate_submit")) parts.push("submitted estimate");
   if (actions.has("estimate_result_view")) parts.push("saw result");
   if (actions.has("signed_in")) parts.push("signed in");
+  if (journey.purchased) parts.push("bought");
   return parts.length > 0 ? parts.join(" · ") : `${fmtNum(journey.eventCount)} events`;
+}
+
+function fmtPurchaseSummary(journey) {
+  const purchases = Array.isArray(journey?.purchases) ? journey.purchases : [];
+  if (purchases.length === 0) return null;
+
+  const latest = purchases[0];
+  const productLabel = PAYMENT_PRODUCT_LABELS[latest.productKey] || latest.productKey || "Payment";
+  const suffix = purchases.length > 1 ? ` + ${fmtNum(purchases.length - 1)} more` : "";
+  return `${productLabel}${suffix} · ${fmtDateTime(latest.paidAt)}`;
 }
 
 function eventGroupKey(event, sourceConfig) {
@@ -248,7 +271,7 @@ export default function AdTrackingPage() {
                   className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${isActive
                     ? "bg-primary text-white"
                     : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                    }`}
+                    } cursor-pointer`}
                 >
                   {source.label}
                 </button>
@@ -263,7 +286,7 @@ export default function AdTrackingPage() {
             loadAdTracking(0, { fresh: true });
           }}
           disabled={refreshing || loading || loadingMore}
-          className="self-start px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg text-gray-700 hover:border-primary/40 hover:text-primary disabled:text-gray-400 disabled:hover:border-gray-200 transition-colors"
+          className="self-start px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg text-gray-700 hover:border-primary/40 hover:text-primary disabled:text-gray-400 disabled:hover:border-gray-200 transition-colors cursor-pointer disabled:cursor-not-allowed"
         >
           {refreshing ? "Refreshing..." : "Hard refresh"}
         </button>
@@ -275,14 +298,21 @@ export default function AdTrackingPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
             <StatCard label="Tracked Sessions" value={fmtNum(ad.uniqueSessions)} />
             <StatCard label="Tracked Devices" value={fmtNum(ad.uniqueDevices)} />
             <StatCard label="Registered Users" value={fmtNum(ad.identifiedUsers || 0)} />
+            <StatCard label="Paid Users" value={fmtNum(ad.purchasedUsers || 0)} />
             <StatCard label="Landing Visits" value={fmtNum(adCounts.source_landing_visit || 0)} />
             <StatCard label="Estimate Button Clicks" value={fmtNum(adCounts.landing_estimate_cta || 0)} />
             <StatCard label="Estimate Submits" value={fmtNum(adCounts.estimate_submit || 0)} />
           </div>
+
+          {ad.purchaseTrackingAvailable === false && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+              Payment attribution is unavailable because Paddle order data could not be loaded.
+            </div>
+          )}
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
@@ -307,8 +337,18 @@ export default function AdTrackingPage() {
                             >
                               {journey.userId ? "Registered" : "Anonymous"}
                             </span>
+                            {journey.purchased && (
+                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                Bought
+                              </span>
+                            )}
                           </div>
                           <p className="mt-1 text-sm text-gray-600">{fmtJourneySummary(journey)}</p>
+                          {fmtPurchaseSummary(journey) && (
+                            <p className="mt-1 text-xs font-medium text-primary">
+                              {fmtPurchaseSummary(journey)}
+                            </p>
+                          )}
                           <p className="mt-1 text-xs text-gray-400">
                             First seen {fmtDateTime(journey.firstSeenAt)} · Last seen {fmtDateTime(journey.lastSeenAt)}
                           </p>
@@ -322,7 +362,7 @@ export default function AdTrackingPage() {
                       <button
                         type="button"
                         onClick={() => toggleJourney(journey.key)}
-                        className="mt-4 inline-flex items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-primary/40 hover:text-primary"
+                        className="mt-4 inline-flex cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-primary/40 hover:text-primary"
                       >
                         {openJourneys[journey.key] ? "Hide actions" : `Show actions (${fmtNum(journey.eventCount)})`}
                       </button>

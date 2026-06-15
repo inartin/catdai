@@ -364,6 +364,76 @@ function buildExternalApiUsageStats(rows) {
   };
 }
 
+async function fetchPaidUserSummary() {
+  const paidOrders = await fetchAllRows(() =>
+    supabaseAdmin
+      .from("paddle_payment_orders")
+      .select("user_id, product_key, paid_at, created_at")
+      .eq("status", "paid")
+      .not("user_id", "is", null)
+      .order("created_at", { ascending: false })
+  );
+  const activeCredits = await fetchAllRows(() =>
+    supabaseAdmin
+      .from("user_feature_credits")
+      .select("user_id, remaining_uses")
+      .gt("remaining_uses", 0)
+      .not("user_id", "is", null)
+  );
+
+  const paidUsersById = new Map();
+  for (const order of paidOrders) {
+    if (!order.user_id) continue;
+    const current = paidUsersById.get(order.user_id) || {
+      userId: order.user_id,
+      paidOrders: 0,
+      latestPaidAt: null,
+      latestProductKey: null,
+    };
+    current.paidOrders += 1;
+
+    const paidAt = order.paid_at || order.created_at || null;
+    if (!current.latestPaidAt || (paidAt && Date.parse(paidAt) > Date.parse(current.latestPaidAt))) {
+      current.latestPaidAt = paidAt;
+      current.latestProductKey = order.product_key || null;
+    }
+    paidUsersById.set(order.user_id, current);
+  }
+
+  const remainingCreditsByUser = new Map();
+  for (const credit of activeCredits) {
+    const userId = credit.user_id;
+    if (!userId) continue;
+    remainingCreditsByUser.set(
+      userId,
+      (remainingCreditsByUser.get(userId) || 0) + Math.max(Number(credit.remaining_uses) || 0, 0)
+    );
+  }
+
+  for (const [userId, paidUser] of Array.from(paidUsersById.entries())) {
+    const remainingPaidCredits = remainingCreditsByUser.get(userId) || 0;
+    if (remainingPaidCredits <= 0) {
+      paidUsersById.delete(userId);
+      continue;
+    }
+    paidUser.remainingPaidCredits = remainingPaidCredits;
+  }
+
+  const filteredPaidOrders = paidOrders.filter((order) => paidUsersById.has(order.user_id));
+
+  return {
+    totalPaidUsers: paidUsersById.size,
+    paidOrders: filteredPaidOrders.length,
+    remainingPaidCredits: Array.from(paidUsersById.values()).reduce(
+      (sum, user) => sum + (Number(user.remainingPaidCredits) || 0),
+      0
+    ),
+    users: Array.from(paidUsersById.values()).sort((a, b) =>
+      Date.parse(b.latestPaidAt || 0) - Date.parse(a.latestPaidAt || 0)
+    ),
+  };
+}
+
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
@@ -397,6 +467,10 @@ export async function GET(request) {
       fetchListingLinkAnalysisEvents(),
       fetchCalculatorUsageEvents(),
       fetchExternalApiUsageRows(),
+      fetchPaidUserSummary().catch((error) => {
+        console.error("Failed to load paid user stats:", error.message);
+        return { available: false, totalPaidUsers: 0, paidOrders: 0 };
+      }),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -414,9 +488,23 @@ export async function GET(request) {
     listingLinkAnalysisEvents,
     calculatorUsageEvents,
     externalApiUsageRows,
+    paidUserSummary,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
+  const authUsersById = new Map(users.map((user) => [user.id, user]));
   const cadastruSearchesWithUsers = attachUserNames(cadastruSearchEvents, usersById);
+  const paidUsers = {
+    ...paidUserSummary,
+    users: (paidUserSummary.users || []).map((item) => {
+      const user = authUsersById.get(item.userId);
+      return {
+        ...item,
+        name: user ? userDisplayName(user) : item.userId,
+        email: user?.email || null,
+        registeredAt: user?.created_at || null,
+      };
+    }),
+  };
 
   const result = {
     totalUsers: users.length,
@@ -434,6 +522,7 @@ export async function GET(request) {
     listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
     externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows),
+    paidUsers,
   };
 
   if (!bypassCache) {

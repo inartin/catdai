@@ -187,6 +187,13 @@ function fmtExternalApiUsageSummary(usage) {
   return `999 ${fmtNum(listing999)} / cadastru ${fmtNum(cadastru)} · ${fmtNum(usage.failure)} failed`;
 }
 
+function fmtPaidUserSummary(paidUsers) {
+  if (paidUsers?.available === false) return "Unavailable";
+  const remaining = paidUsers?.remainingPaidCredits || 0;
+  if (!remaining) return "No remaining paid credits";
+  return `${fmtNum(remaining)} remaining credits`;
+}
+
 function fmtExternalApiService(service) {
   if (service === "999_listing") return "999 listing";
   if (service === "cadastru_number") return "Cadastru number";
@@ -313,6 +320,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [showUsersList, setShowUsersList] = useState(false);
+  const [showPaidUsersList, setShowPaidUsersList] = useState(false);
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState(null);
@@ -728,13 +736,20 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-10 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-11 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}
             detail={showUsersList ? "Click to hide list" : "Click to view all users"}
             onClick={toggleUsersList}
             active={showUsersList}
+          />
+          <StatCard
+            label="Paid Users"
+            value={fmtNum(s.paidUsers?.totalPaidUsers || 0)}
+            detail={showPaidUsersList ? "Click to hide list" : fmtPaidUserSummary(s.paidUsers)}
+            onClick={() => setShowPaidUsersList((value) => !value)}
+            active={showPaidUsersList}
           />
           <StatCard
             label="Sale Estimations"
@@ -795,6 +810,50 @@ export default function AdminDashboard() {
             active={showExternalApiUsageList}
           />
         </div>
+        {showPaidUsersList && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="font-semibold text-gray-900">Paid Users</h3>
+            </div>
+
+            {s.paidUsers?.available === false ? (
+              <div className="px-5 py-8 text-center text-amber-600">Paid user data is unavailable</div>
+            ) : !Array.isArray(s.paidUsers?.users) || s.paidUsers.users.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No paid users found</div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase [&>*+*]:border-l [&>*+*]:border-gray-100">
+                      <th className="px-4 py-3">Name</th>
+                      <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Registered Date</th>
+                      <th className="px-4 py-3">Latest Payment</th>
+                      <th className="px-4 py-3">Latest Product</th>
+                      <th className="px-4 py-3 text-right">Remaining Credits</th>
+                      <th className="px-4 py-3 text-right">Paid Orders</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {s.paidUsers.users.map((user) => (
+                      <tr key={user.userId} className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
+                        <td className="px-4 py-3 text-gray-900 font-medium">{user.name || user.userId}</td>
+                        <td className="px-4 py-3 text-gray-600">{user.email || "\u2014"}</td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(user.registeredAt)}</td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDateTime(user.latestPaidAt)}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {PAYMENT_PRODUCT_LABELS_RO[user.latestProductKey] || user.latestProductKey || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-right text-gray-600">{fmtNum(user.remainingPaidCredits)}</td>
+                        <td className="px-4 py-3 text-right text-gray-600">{fmtNum(user.paidOrders)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
         {showUsersList && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">

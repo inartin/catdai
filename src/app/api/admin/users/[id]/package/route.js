@@ -20,6 +20,17 @@ function packageGrants(packageKey) {
 }
 
 async function resetUserCredits({ userId, grants }) {
+  const isEmptyGrant = PAYMENT_FEATURE_KEYS.every((featureKey) => Math.max(Number(grants[featureKey]) || 0, 0) === 0);
+  if (isEmptyGrant) {
+    const { error } = await supabaseAdmin
+      .from("user_feature_credits")
+      .delete()
+      .eq("user_id", userId);
+
+    if (error) throw error;
+    return;
+  }
+
   const rows = PAYMENT_FEATURE_KEYS.map((featureKey) => {
     const uses = Math.max(Number(grants[featureKey]) || 0, 0);
     return {
@@ -91,6 +102,10 @@ export async function PATCH(request, context) {
 }
 
 function rowsForResponse(grants) {
+  if (PAYMENT_FEATURE_KEYS.every((featureKey) => Math.max(Number(grants[featureKey]) || 0, 0) === 0)) {
+    return [];
+  }
+
   return PAYMENT_FEATURE_KEYS.map((featureKey) => {
     const uses = Math.max(Number(grants[featureKey]) || 0, 0);
     return {

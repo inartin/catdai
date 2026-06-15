@@ -17,7 +17,8 @@ Implemented as admin dashboard with direct registered-user package adjustment.
 ## Dashboard
 Shows:
 - registered users with package badge, login provider type such as Telegram or Gmail, registration date, last visit, estimation count, cadastru search count, calculator usage count, PDF report count, 999 link count, shared links, and favorites; clicking a user name opens a Romanian access popup with the same package badge and remaining-access balances, and clicking outside that popup closes it
-- In the user popup, clicking the package badge opens a package dropdown. Selecting a different Start, Standard, Pro, or Extra package shows save/cancel actions. Saving updates the user's active admin package directly, resets all paid feature-credit balances to the selected package grants, and does not create or require a payment.
+- paid users count in the main dashboard, aggregating distinct registered users with at least one completed Paddle payment and at least one remaining paid feature credit; clicking the card opens the paid-user list with email, registration date, latest payment, latest product, remaining paid credits, and paid-order count
+- In the user popup, clicking the package badge opens a package dropdown. Selecting a different Start, Standard, Pro, or Extra package shows save/cancel actions. Saving updates the user's active admin package directly, resets all paid feature-credit balances to the selected package grants, deletes paid feature-credit rows when Start is selected, and does not create or require a payment.
 - The reset button next to the popup package badge asks for confirm/cancel and then resets the current package's paid feature credits back to full unused counts.
 - Registered users table uses vertical column dividers for scanability.
 - Registered users package is based on the pricing page package names: free users show Start with the gray badge, paid Standard is green, Pro is cyan, and Extra is purple.
@@ -25,7 +26,7 @@ Shows:
 - Registered type cells show the user's email in the shared tooltip component when Supabase has an email for that user.
 - The user admin API includes a response version in its short cache so table schema changes do not reuse stale in-memory rows.
 - `/api/admin/users` includes paid feature credits and current-month free sale/rent balances for the user detail popup.
-- `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, and upserts `user_feature_credits` with `remaining_uses = total_granted` and `total_used = 0` for each paid feature.
+- `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, deletes `user_feature_credits` for Start, and otherwise upserts `user_feature_credits` with `remaining_uses = total_granted` and `total_used = 0` for each paid feature.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows
@@ -41,7 +42,7 @@ Shows:
 - Calculator usage rows show date, property summary, total investment, estimated rent, yield, payback period, tax selection, and anonymous/user id.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
-- `/admin/feedback` is linked from the left menu as `Feedback` and shows the latest registered-user feedback rows with message, user id, date, status, and optional uploaded image preview that opens in an in-page modal.
+- `/admin/feedback` is linked from the left menu as `Feedback` and shows the latest registered-user feedback rows with message, user id, date, status, delete action with confirmation, and optional uploaded image preview that opens in an in-page modal.
 - `/admin/news` is linked from the left menu as `News` and lets admins list, create, edit, and remove news items with slug, title, rich description, creation date, and cover image link.
 - `/admin/uploads` is linked from the left menu as `Uploads` and lets admins upload JPEG, PNG, WebP, or GIF images up to 5 MB to Supabase Storage.
 - Admin uploads use the `img` Supabase Storage bucket by default, or `SUPABASE_IMAGE_BUCKET` when set. Files are saved at the bucket root with a unique sanitized filename. The bucket must be public to use the returned `getPublicUrl` URL without an expiration date; signed URLs are not used.
@@ -54,8 +55,8 @@ Shows:
 - Owners list with search and pagination.
 - Owner detail with profile fields and listings.
 - Dashboard registered users and recent sale/rent estimations are inline expandable tables.
-- `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows source tabs for `/?src=zdg` and `/?utm_source=reddit` tracking grouped by visitor session, with closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, exact all-time source session/device/funnel totals in the top cards, paged visitor journeys that load more while scrolling, and a `Hard refresh` button that bypasses the 10-minute Redis cache.
-- `/api/admin/feedback` returns the 100 latest `user_feedback` rows after route-level admin cookie verification.
+- `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows source tabs for `/?src=zdg` and `/?utm_source=reddit` tracking grouped by visitor session, with closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, exact all-time source session/device/funnel totals in the top cards, paid-user attribution for tracked users with completed Paddle payments after their first source event, paged visitor journeys that load more while scrolling, and a `Hard refresh` button that bypasses the 10-minute Redis cache.
+- `/api/admin/feedback` returns the 100 latest `user_feedback` rows and deletes individual rows after route-level admin cookie verification.
 - `/api/admin/news` and `/api/admin/news/[id]` manage `news_posts` rows after route-level admin cookie verification.
 - `/api/admin/uploads` stores images in the configured Supabase Storage bucket and returns `public_url` plus the storage path after route-level admin cookie verification.
 - `POST /api/admin/notifications` creates a personalized in-app message for a registered user by `userId`, `title`, and `message`.

@@ -4,6 +4,7 @@ const PAGE = 1000;
 const DEFAULT_JOURNEY_LIMIT = 50;
 const MAX_JOURNEY_LIMIT = 100;
 const LANDING_EVENT_NAMES = new Set(["source_landing_visit"]);
+const PAID_PAYMENT_STATUSES = new Set(["paid"]);
 
 export const AD_TRACKING_SOURCES = {
   zdg: {
@@ -78,7 +79,93 @@ async function fetchUsersById(userIds) {
   return users;
 }
 
-function groupAdJourneys(events, usersById) {
+function parseTime(value) {
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : null;
+}
+
+function buildFirstSourceSeenByUser(events) {
+  const firstSeenByUser = new Map();
+
+  for (const event of events) {
+    if (!event.user_id) continue;
+    const eventTime = parseTime(event.created_at);
+    if (eventTime == null) continue;
+
+    const currentTime = firstSeenByUser.get(event.user_id);
+    if (currentTime == null || eventTime < currentTime) {
+      firstSeenByUser.set(event.user_id, eventTime);
+    }
+  }
+
+  return firstSeenByUser;
+}
+
+async function fetchPaidOrdersForUsers(userIds) {
+  const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return [];
+
+  const rows = [];
+  for (let i = 0; i < uniqueIds.length; i += 200) {
+    const chunk = uniqueIds.slice(i, i + 200);
+    const { data, error } = await supabaseAdmin
+      .from("paddle_payment_orders")
+      .select("id, user_id, product_key, status, paid_at, created_at, amount_minor, currency_code")
+      .in("user_id", chunk)
+      .in("status", Array.from(PAID_PAYMENT_STATUSES))
+      .order("paid_at", { ascending: false });
+
+    if (error) throw error;
+    rows.push(...(data || []));
+  }
+
+  return rows;
+}
+
+async function fetchAdPurchases(events) {
+  const firstSeenByUser = buildFirstSourceSeenByUser(events);
+  const userIds = Array.from(firstSeenByUser.keys());
+
+  let orders;
+  try {
+    orders = await fetchPaidOrdersForUsers(userIds);
+  } catch (error) {
+    if (error.code === "42P01") {
+      return { available: false, users: new Map(), purchasedUsers: 0, paidOrders: 0 };
+    }
+    throw error;
+  }
+
+  const purchasesByUser = new Map();
+  for (const order of orders) {
+    const userId = order.user_id;
+    const firstSeenTime = firstSeenByUser.get(userId);
+    const paidTime = parseTime(order.paid_at || order.created_at);
+    if (!userId || firstSeenTime == null || paidTime == null || paidTime < firstSeenTime) continue;
+
+    if (!purchasesByUser.has(userId)) purchasesByUser.set(userId, []);
+    purchasesByUser.get(userId).push({
+      id: order.id,
+      productKey: order.product_key,
+      paidAt: order.paid_at || order.created_at,
+      amountMinor: order.amount_minor,
+      currencyCode: order.currency_code,
+    });
+  }
+
+  for (const purchases of purchasesByUser.values()) {
+    purchases.sort((a, b) => (parseTime(b.paidAt) || 0) - (parseTime(a.paidAt) || 0));
+  }
+
+  return {
+    available: true,
+    users: purchasesByUser,
+    purchasedUsers: purchasesByUser.size,
+    paidOrders: Array.from(purchasesByUser.values()).reduce((sum, rows) => sum + rows.length, 0),
+  };
+}
+
+function groupAdJourneys(events, usersById, purchasesByUser = new Map()) {
   const groups = new Map();
 
   for (const event of events) {
@@ -115,10 +202,16 @@ function groupAdJourneys(events, usersById) {
   }
 
   return Array.from(groups.values())
-    .map((group) => ({
-      ...group,
-      events: group.events.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
-    }))
+    .map((group) => {
+      const purchases = group.userId ? purchasesByUser.get(group.userId) || [] : [];
+      return {
+        ...group,
+        purchased: purchases.length > 0,
+        purchases,
+        purchaseCount: purchases.length,
+        events: group.events.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at)),
+      };
+    })
     .sort((a, b) => Date.parse(b.lastSeenAt) - Date.parse(a.lastSeenAt));
 }
 
@@ -160,6 +253,13 @@ export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
   }
 
   const usersById = await fetchUsersById(events.map((event) => event.user_id));
+  let purchaseStats = { available: true, users: new Map(), purchasedUsers: 0, paidOrders: 0 };
+  try {
+    purchaseStats = await fetchAdPurchases(events);
+  } catch (error) {
+    console.error(`Failed to load ${sourceConfig.label} ad purchases:`, error.message);
+    purchaseStats = { available: false, users: new Map(), purchasedUsers: 0, paidOrders: 0 };
+  }
   const uniqueSessions = new Set(events.map((event) => event.session_id).filter(Boolean));
   const uniqueDevices = new Set(events.map((event) => event.device_id).filter(Boolean));
   const identifiedUsers = new Set(events.map((event) => event.user_id).filter(Boolean));
@@ -175,7 +275,7 @@ export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
       candidate.path === event.path
     );
   });
-  const allJourneys = groupAdJourneys(journeyEvents, usersById);
+  const allJourneys = groupAdJourneys(journeyEvents, usersById, purchaseStats.users);
   const journeys = allJourneys.slice(offset, offset + limit);
 
   return {
@@ -187,6 +287,9 @@ export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
     uniqueSessions: uniqueSessions.size,
     uniqueDevices: uniqueDevices.size,
     identifiedUsers: identifiedUsers.size,
+    purchasedUsers: purchaseStats.purchasedUsers,
+    paidOrders: purchaseStats.paidOrders,
+    purchaseTrackingAvailable: purchaseStats.available,
     countsByEvent,
     recentEvents: events.slice(0, limit),
     journeys,
@@ -194,6 +297,52 @@ export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
     journeyOffset: offset,
     totalJourneys: allJourneys.length,
     hasMoreJourneys: offset + journeys.length < allJourneys.length,
+  };
+}
+
+export async function fetchAdPurchaseSummary() {
+  let events;
+  try {
+    events = await fetchAllRows(() =>
+      supabaseAdmin
+        .from("ad_source_events")
+        .select("source, user_id, created_at")
+        .in("source", Object.keys(AD_TRACKING_SOURCES))
+        .not("user_id", "is", null)
+        .order("created_at", { ascending: false })
+    );
+  } catch (error) {
+    if (error.code === "42P01") {
+      return { available: false, totalPurchasedUsers: 0, paidOrders: 0, bySource: {} };
+    }
+    throw error;
+  }
+
+  const purchasedUserIds = new Set();
+  const bySource = {};
+  let paidOrders = 0;
+
+  for (const source of Object.keys(AD_TRACKING_SOURCES)) {
+    const sourceEvents = events.filter((event) => event.source === source);
+    const sourcePurchases = await fetchAdPurchases(sourceEvents);
+
+    bySource[source] = {
+      purchasedUsers: sourcePurchases.purchasedUsers,
+      paidOrders: sourcePurchases.paidOrders,
+      available: sourcePurchases.available,
+    };
+    paidOrders += sourcePurchases.paidOrders;
+
+    for (const userId of sourcePurchases.users.keys()) {
+      purchasedUserIds.add(userId);
+    }
+  }
+
+  return {
+    available: Object.values(bySource).every((item) => item.available),
+    totalPurchasedUsers: purchasedUserIds.size,
+    paidOrders,
+    bySource,
   };
 }
 

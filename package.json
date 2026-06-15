@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
     "stop": "pkill -f 'next dev|cloudflared tunnel run catdai|postcss.js|pnpm run dev'",
     "test": "bash scripts/dev-tunnel.sh",
+    "dev": "bash scripts/dev-tunnel.sh dev",
+    "prod": "bash scripts/dev-tunnel.sh prod",
     "build": "next build",
     "start": "next start",
     "pdf:demo": "node scripts/generate-demo-valuation-pdf.mjs",

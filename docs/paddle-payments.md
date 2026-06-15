@@ -78,6 +78,7 @@ Paddle one-time payment flow is connected for packages, evaluation limit popups,
 - Webhook access is granted only after a verified `transaction.completed` event.
 - Subscribe the Paddle webhook destination to `transaction.completed`, `transaction.payment_failed`, and `transaction.canceled`. User-closed checkout events are handled client-side with Paddle.js `checkout.closed`; Paddle says `transaction.canceled` is not typically part of automatic checkout workflows.
 - `/payment/paddle/checkout` initializes Paddle Checkout with `displayMode: "inline"`, `frameTarget: "paddle-inline-checkout"`, a 520px initial frame height, and a borderless full-width frame style. Visual branding for the embedded Paddle frame is controlled in the Paddle dashboard under branded inline checkout. Paddle checkout locale maps CatDai RU to `ru` and RO to `en`, because Paddle does not provide Romanian checkout copy.
+- App CSP must allow Paddle script, frame, connect, and stylesheet assets; `style-src` includes `https://cdn.paddle.com` because Paddle.js loads `paddle.css`. Paddle may also load ProfitWell, so script CSP allows `https://public.profitwell.com`.
 - `PADDLE_WEBHOOK_SECRET_KEY` must be the webhook endpoint secret from Paddle, not the `ntfset_...` notification setting id.
 - If a Paddle webhook includes a `subscription_id`, CatDai rejects it because this integration is one-time only.
 - The Paddle API key needs `transaction.write`.

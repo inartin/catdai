@@ -44,6 +44,8 @@ Implemented.
 - When a supported landing source is seen on `/`, the browser stores the source for the session and posts simple events to `/api/ad-source-events`.
 - `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, later page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
 - Authenticated tracking requests store `user_id` so ad sessions can be tied to registered Supabase users after login.
+- CSP `connect-src` must include both `https://www.google-analytics.com` and `https://analytics.google.com` because GA4 can send collection requests to either host.
+- Google Ads conversion and consent-mode pings can use `https://pagead2.googlesyndication.com`, so it is also allowed in `connect-src`.
 - Admin ad-tracking top-card totals are computed per selected source from all stored events; the visitor journey list is paged separately.
 - Runtime DB persistence for estimation logs, PDF events, cadastru search events, long-lived cadastru records, 999.md analysis events, shared links, favorites, and free monthly evaluation usage runs when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`.
 - Calculator result usage is stored in `calculator_usage_events` under the same runtime persistence rule, including property filters, investment fields, tax selection, result rent/yield/payback metrics, and registered/anonymous attribution.

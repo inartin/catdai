@@ -31,7 +31,7 @@ Implemented and active.
 - Logged-in users can load their own active `user_notifications` rows from `/api/notifications`.
 - Opening the navbar notification sidebar marks currently unread rows as read.
 - Clearing notifications archives the user's visible rows instead of deleting them.
-- Admin-created personalized messages are inserted through `POST /api/admin/notifications`.
+- Admin-created personalized or all-user broadcast messages are inserted through `POST /api/admin/notifications`.
 
 ## Activity Tracking
 - Authenticated sessions ping `/api/activity/ping`.

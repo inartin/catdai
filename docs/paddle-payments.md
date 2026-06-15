@@ -42,6 +42,7 @@ Paddle one-time payment flow is connected for packages, evaluation limit popups,
   - shows a localized left-side purchase summary from the create-route product payload saved in `sessionStorage`; package summaries show the package name, included usage count, exact EUR price first, and approximate configured `NEXT_PUBLIC_PRICE_*_MDL_COST` as secondary
   - preserves optional local `return_to` and `lang` query values for the status page
   - uses the shared clean checkout shell with CatDai logo, RO/RU copy, and a secure-payment panel that contains the Paddle frame
+  - shows two localized reassurance cards below the checkout shell: Paddle processing with supported payment method chips, and EUR-vs-MDL conversion copy
   - requires `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`
 - `GET /payment/paddle/success`
   - noindex status page for the Paddle flow

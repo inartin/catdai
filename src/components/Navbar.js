@@ -253,11 +253,11 @@ export default function Navbar() {
             className="h-11 w-auto object-contain"
           />
           <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
-          <Tooltip text={t("nav.betaTooltip")}>
+          {/* <Tooltip text={t("nav.betaTooltip")}>
             <span className="inline-flex h-5 items-center rounded-full border border-gray-200 bg-gray-50 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
               beta
             </span>
-          </Tooltip>
+          </Tooltip> */}
         </Link>
 
         <div className="hidden items-center gap-3 md:flex">

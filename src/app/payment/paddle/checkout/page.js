@@ -407,6 +407,62 @@ export default function PaddleCheckoutPage() {
             )}
           </div>
         </section>
+
+        <div className="mb-8 space-y-3">
+          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start gap-4">
+              <span className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-primary-light text-primary-dark">
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" aria-hidden="true">
+                  <path
+                    d="M5.5 9h13M7 9v8.5M11 9v8.5M15 9v8.5M17 9v8.5M4.5 17.5h15M4 20h16M12 3.75 19 7H5l7-3.25Z"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="1.7"
+                  />
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <h2 className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-base font-semibold text-gray-950">
+                  <span>{t("payment.checkoutProcessorTitlePrefix")}</span>
+                  <img src="/brands/paddle.svg" alt="Paddle" className="h-4 w-auto" />
+                </h2>
+                <p className="mt-1.5 text-sm leading-6 text-gray-700">{t("payment.checkoutProcessorDescription")}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {[
+                    { src: "/brands/visa_blue.svg", alt: "Visa", className: "h-auto w-[54px]" },
+                    { src: "/brands/mastercard.svg", alt: "Mastercard", className: "h-[18px] w-auto" },
+                    { src: "/brands/apple-pay.svg", alt: "Apple Pay", className: "h-[18px] w-auto" },
+                    { src: "/brands/google-pay.svg?v=2", alt: "Google Pay", className: "h-5 w-[58px]" },
+                  ].map((method) => (
+                    <span
+                      key={method.alt}
+                      className="inline-flex h-8 w-[86px] items-center justify-center rounded-md border border-gray-200 bg-[#f7f8f5] px-2"
+                    >
+                      <img src={method.src} alt={method.alt} className={`${method.className} max-w-full object-contain`} />
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
+            <div className="flex items-start gap-4">
+              <span className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-primary-light text-primary-dark">
+              €
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-base font-semibold text-gray-950">{t("payment.checkoutCurrencyTitle")}</h2>
+                <p className="mt-1.5 text-sm leading-6 text-gray-700">{t("payment.checkoutCurrencyDescription")}</p>
+                <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-gray-500">
+                  <span className="mt-2 h-1.5 w-1.5 flex-none rounded-full bg-primary" aria-hidden="true" />
+                  <span>{t("payment.checkoutCurrencyNote")}</span>
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
     </main>
   );

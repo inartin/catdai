@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import CloseIcon from "@/components/icons/CloseIcon";
+
+const MAX_CUSTOM_REQUEST_LENGTH = 500;
+const MAX_CUSTOM_REQUEST_BODY_LENGTH = 340;
+
+function sanitizeText(value, maxLength = MAX_CUSTOM_REQUEST_LENGTH) {
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").slice(0, maxLength);
+}
 
 function CheckIcon({ className = "h-4 w-4" }) {
   return (
@@ -157,6 +165,205 @@ function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
   );
 }
 
+function CustomRequestCard({ onOpen }) {
+  const { t } = useTranslation();
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="mt-6 flex w-full cursor-pointer flex-col items-start justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-sm transition-shadow hover:shadow-md sm:flex-row sm:items-center"
+    >
+      <span>
+        <span className="block text-base font-extrabold text-gray-950">
+          {t("pricing.customRequestTitle")}
+        </span>
+        <span className="mt-1 block max-w-2xl text-sm leading-5 text-gray-600">
+          {t("pricing.customRequestDesc")}
+        </span>
+      </span>
+      <span className="inline-flex shrink-0 items-center justify-center rounded-xl bg-gray-950 px-4 py-2.5 text-sm font-bold text-white">
+        {t("pricing.customRequestAction")}
+      </span>
+    </button>
+  );
+}
+
+function CustomRequestModal({ open, onClose }) {
+  const { t } = useTranslation();
+  const { session } = useAuth();
+  const [message, setMessage] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [error, setError] = useState("");
+
+  if (!open) return null;
+
+  const remaining = MAX_CUSTOM_REQUEST_BODY_LENGTH - message.length;
+  const canSubmit = status !== "submitting" && message.trim() && email.trim();
+
+  const resetForm = () => {
+    setMessage("");
+    setEmail("");
+    setPhone("");
+    setError("");
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const cleanMessage = sanitizeText(message, MAX_CUSTOM_REQUEST_BODY_LENGTH).trim();
+    const cleanEmail = sanitizeText(email, 120).trim();
+    const cleanPhone = sanitizeText(phone, 60).trim();
+
+    if (!cleanMessage) {
+      setError(t("pricing.customRequestMessageRequired"));
+      return;
+    }
+
+    if (!cleanEmail) {
+      setError(t("pricing.customRequestEmailRequired"));
+      return;
+    }
+
+    setStatus("submitting");
+    setError("");
+
+    try {
+      const details = [
+        t("pricing.customRequestFeedbackPrefix"),
+        "",
+        cleanMessage,
+      ];
+
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          kind: "pricing_custom_request",
+          message: details.join("\n"),
+          contact_email: cleanEmail,
+          contact_phone: cleanPhone || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || t("pricing.customRequestSubmitError"));
+      }
+
+      resetForm();
+      setStatus("sent");
+    } catch (submitError) {
+      setStatus("idle");
+      setError(submitError.message || t("pricing.customRequestSubmitError"));
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 px-4 py-6">
+      <button
+        type="button"
+        className="absolute inset-0 cursor-pointer"
+        aria-label={t("pricing.customRequestClose")}
+        onClick={onClose}
+      />
+      <section className="relative w-[min(calc(100vw-2rem),440px)] rounded-lg border border-gray-200 bg-white p-5 shadow-xl">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-950">
+              {t("pricing.customRequestModalTitle")}
+            </h2>
+            <p className="mt-1 text-sm leading-5 text-gray-600">
+              {status === "sent" ? t("pricing.customRequestThankYou") : t("pricing.customRequestModalDesc")}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+            aria-label={t("pricing.customRequestClose")}
+          >
+            <CloseIcon size={18} />
+          </button>
+        </div>
+
+        {status === "sent" ? (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm font-semibold text-green-800">
+            {t("pricing.customRequestSentTitle")}
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <label className="block text-sm font-medium text-gray-800" htmlFor="catdai-custom-request-message">
+              {t("pricing.customRequestMessageLabel")}
+            </label>
+            <textarea
+              id="catdai-custom-request-message"
+              value={message}
+              onChange={(event) => {
+                setMessage(sanitizeText(event.target.value, MAX_CUSTOM_REQUEST_BODY_LENGTH));
+                setStatus("idle");
+                setError("");
+              }}
+              maxLength={MAX_CUSTOM_REQUEST_BODY_LENGTH}
+              rows={5}
+              className="block w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm leading-5 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15"
+              placeholder={t("pricing.customRequestMessagePlaceholder")}
+            />
+            <div className="text-xs text-gray-500">
+              {t("feedback.characterCount", { count: remaining })}
+            </div>
+
+            <label className="block text-sm font-medium text-gray-800" htmlFor="catdai-custom-request-email">
+              {t("pricing.customRequestEmailLabel")}
+            </label>
+            <input
+              id="catdai-custom-request-email"
+              type="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(sanitizeText(event.target.value, 120));
+                setStatus("idle");
+                setError("");
+              }}
+              className="block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm leading-5 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15"
+              placeholder={t("pricing.customRequestEmailPlaceholder")}
+            />
+
+            <label className="block text-sm font-medium text-gray-800" htmlFor="catdai-custom-request-phone">
+              {t("pricing.customRequestPhoneLabel")}
+            </label>
+            <input
+              id="catdai-custom-request-phone"
+              type="tel"
+              value={phone}
+              onChange={(event) => {
+                setPhone(sanitizeText(event.target.value, 60));
+                setStatus("idle");
+                setError("");
+              }}
+              className="block w-full rounded-lg border border-gray-200 px-3 py-2 text-sm leading-5 text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15"
+              placeholder={t("pricing.customRequestPhonePlaceholder")}
+            />
+
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {status === "submitting" ? t("feedback.submitting") : t("pricing.customRequestSubmit")}
+            </button>
+          </form>
+        )}
+      </section>
+    </div>
+  );
+}
+
 export default function Pricing({ prices, compact = false }) {
   const { t, lang } = useTranslation();
   const { session } = useAuth();
@@ -165,6 +372,7 @@ export default function Pricing({ prices, compact = false }) {
     productKey: null,
     message: "",
   });
+  const [customRequestOpen, setCustomRequestOpen] = useState(false);
 
   const featureLabels = {
     sale: t("pricing.featureSale"),
@@ -333,7 +541,12 @@ export default function Pricing({ prices, compact = false }) {
             />
           ))}
         </div>
+        <CustomRequestCard onOpen={() => setCustomRequestOpen(true)} />
       </div>
+      <CustomRequestModal
+        open={customRequestOpen}
+        onClose={() => setCustomRequestOpen(false)}
+      />
     </section>
   );
 }

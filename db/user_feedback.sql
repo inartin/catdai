@@ -5,8 +5,10 @@
 
 create table if not exists user_feedback (
   id          bigserial primary key,
-  user_id     uuid not null references auth.users(id) on delete cascade,
+  user_id     uuid references auth.users(id) on delete cascade,
   message     text not null,
+  contact_email text,
+  contact_phone text,
   image_name  text,
   image_type  text,
   image_size  integer,
@@ -16,6 +18,15 @@ create table if not exists user_feedback (
 
   constraint user_feedback_message_length
     check (char_length(message) between 1 and 500),
+
+  constraint user_feedback_user_or_contact
+    check (user_id is not null or contact_email is not null),
+
+  constraint user_feedback_contact_email_length
+    check (contact_email is null or char_length(contact_email) between 3 and 120),
+
+  constraint user_feedback_contact_phone_length
+    check (contact_phone is null or char_length(contact_phone) <= 60),
 
   constraint user_feedback_image_name_length
     check (image_name is null or char_length(image_name) <= 120),
@@ -36,6 +47,40 @@ create table if not exists user_feedback (
       (image_data is not null and image_type is not null and image_size is not null)
     )
 );
+
+alter table user_feedback
+  alter column user_id drop not null;
+
+alter table user_feedback
+  add column if not exists contact_email text,
+  add column if not exists contact_phone text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'user_feedback_user_or_contact'
+  ) then
+    alter table user_feedback
+      add constraint user_feedback_user_or_contact
+      check (user_id is not null or contact_email is not null);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'user_feedback_contact_email_length'
+  ) then
+    alter table user_feedback
+      add constraint user_feedback_contact_email_length
+      check (contact_email is null or char_length(contact_email) between 3 and 120);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint where conname = 'user_feedback_contact_phone_length'
+  ) then
+    alter table user_feedback
+      add constraint user_feedback_contact_phone_length
+      check (contact_phone is null or char_length(contact_phone) <= 60);
+  end if;
+end $$;
 
 create index if not exists idx_user_feedback_created
   on user_feedback (created_at desc);

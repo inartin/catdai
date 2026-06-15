@@ -86,7 +86,9 @@ export default function AdminFeedbackPage() {
                   <div className="min-w-0">
                     <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                       <span>{fmtDateTime(row.created_at)}</span>
-                      <span className="break-all">{row.user_id}</span>
+                      {row.user_id && <span className="break-all">{row.user_id}</span>}
+                      {row.contact_email && <span className="break-all">{row.contact_email}</span>}
+                      {row.contact_phone && <span className="break-all">{row.contact_phone}</span>}
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600">
                         {row.status || "new"}
                       </span>

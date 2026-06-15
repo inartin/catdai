@@ -27,6 +27,12 @@ Implemented and active.
 - closed `Setări` panel with account deletion
 - localized browser title from `nav.profile`
 
+## Notifications
+- Logged-in users can load their own active `user_notifications` rows from `/api/notifications`.
+- Opening the navbar notification sidebar marks currently unread rows as read.
+- Clearing notifications archives the user's visible rows instead of deleting them.
+- Admin-created personalized messages are inserted through `POST /api/admin/notifications`.
+
 ## Activity Tracking
 - Authenticated sessions ping `/api/activity/ping`.
 - Server updates `user_activity.last_seen_at`, throttled to 10 minutes.
@@ -54,4 +60,5 @@ Implemented and active.
 - `src/app/api/profile/transactions/route.js`
 - `src/app/api/profile/credits/route.js`
 - `src/app/api/profile/delete/route.js`
+- `src/app/api/notifications/route.js`
 - `src/app/api/auth/telegram/route.js`

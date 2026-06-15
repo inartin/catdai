@@ -11,6 +11,8 @@ import CloseIcon from "@/components/icons/CloseIcon";
 import MenuIcon from "@/components/icons/MenuIcon";
 import Tooltip from "@/components/Tooltip";
 
+const NOTIFICATION_POLL_INTERVAL_MS = 60_000;
+
 export const GO_HOME_EVENT = "catdai-go-home";
 
 export function emitGoHome() {
@@ -44,8 +46,22 @@ function NotificationButton({ disabled = false, open, unreadCount, onClick, t })
   );
 }
 
-function NotificationSidebar({ open, notifications, onClear, onClose, t }) {
-  const unreadCount = notifications.filter((notification) => notification.unread).length;
+function formatNotificationTime(value, lang) {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "ro-RO", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  } catch {
+    return "";
+  }
+}
+
+function NotificationSidebar({ open, notifications, onClear, onClose, loading, lang, t }) {
+  const unreadCount = notifications.filter((notification) => !notification.read_at).length;
 
   if (!open) return null;
 
@@ -88,7 +104,7 @@ function NotificationSidebar({ open, notifications, onClear, onClose, t }) {
                 <article
                   key={notification.id}
                   className={`rounded-lg border p-4 ${
-                    notification.unread
+                    !notification.read_at
                       ? "border-primary/30 bg-primary-light"
                       : "border-gray-200 bg-white"
                   }`}
@@ -96,29 +112,35 @@ function NotificationSidebar({ open, notifications, onClear, onClose, t }) {
                   <div className="flex items-start gap-3">
                     <span
                       className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${
-                        notification.unread ? "bg-primary" : "bg-gray-300"
+                        !notification.read_at ? "bg-primary" : "bg-gray-300"
                       }`}
                       aria-hidden="true"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
-                        <h2 className="text-sm font-semibold text-gray-950">{t(notification.titleKey)}</h2>
+                        <h2 className="text-sm font-semibold text-gray-950">{notification.title}</h2>
                         <span
                           className={`rounded-full px-2 py-1 text-[11px] font-semibold leading-none ${
-                            notification.unread
+                            !notification.read_at
                               ? "bg-white text-primary-dark"
                               : "bg-gray-100 text-gray-500"
                           }`}
                         >
-                          {notification.unread ? t("notifications.unread") : t("notifications.read")}
+                          {!notification.read_at ? t("notifications.unread") : t("notifications.read")}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm leading-5 text-gray-600">{t(notification.bodyKey)}</p>
-                      <time className="mt-3 block text-xs font-medium text-gray-400">{t(notification.timeKey)}</time>
+                      <p className="mt-1 whitespace-pre-line text-sm leading-5 text-gray-600">{notification.body}</p>
+                      <time className="mt-3 block text-xs font-medium text-gray-400">
+                        {formatNotificationTime(notification.created_at, lang)}
+                      </time>
                     </div>
                   </div>
                 </article>
               ))}
+            </div>
+          ) : loading ? (
+            <div className="flex h-full min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 px-6 text-center">
+              <p className="text-sm font-semibold text-gray-950">{t("notifications.loading")}</p>
             </div>
           ) : (
             <div className="flex h-full min-h-72 flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 px-6 text-center">
@@ -132,7 +154,7 @@ function NotificationSidebar({ open, notifications, onClear, onClose, t }) {
           <button
             type="button"
             onClick={onClear}
-            disabled={notifications.length === 0}
+            disabled={notifications.length === 0 || loading}
             className="inline-flex h-10 w-full items-center justify-center rounded-lg bg-gray-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500"
           >
             {t("notifications.clear")}
@@ -147,15 +169,16 @@ export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { lang, setLang, t } = useTranslation();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, session } = useAuth();
   const mobileMenuRef = useRef(null);
   const [mobileMenuPath, setMobileMenuPath] = useState(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const mobileMenuOpen = mobileMenuPath === pathname;
   const notificationDisabled = loading || !isAuthenticated;
   const effectiveNotificationOpen = isAuthenticated && notificationOpen;
-  const unreadNotificationCount = notifications.filter((notification) => notification.unread).length;
+  const unreadNotificationCount = notifications.filter((notification) => !notification.read_at).length;
   const cadastruHref = `/${lang}/cadastru`;
   const isCadastruPath = pathname === "/cadastru" || /^\/(ro|ru)\/cadastru\/?$/.test(pathname);
   const isCalculatorPath = pathname === "/calculator";
@@ -217,20 +240,86 @@ export default function Navbar() {
     };
   }, [notificationOpen]);
 
+  useEffect(() => {
+    const accessToken = session?.access_token;
+
+    if (!isAuthenticated || !accessToken) {
+      setNotifications([]);
+      setNotificationOpen(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadNotifications = async () => {
+      setNotificationsLoading(true);
+      try {
+        const response = await fetch("/api/notifications?limit=20", {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok) {
+          setNotifications(Array.isArray(payload.notifications) ? payload.notifications : []);
+        }
+      } finally {
+        if (!cancelled) setNotificationsLoading(false);
+      }
+    };
+
+    loadNotifications();
+    const intervalId = window.setInterval(loadNotifications, NOTIFICATION_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [isAuthenticated, session?.access_token]);
+
+  const updateNotifications = async (action, ids = []) => {
+    const accessToken = session?.access_token;
+    if (!accessToken) return false;
+
+    try {
+      const response = await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action, ids }),
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
   const handleNotificationToggle = () => {
     if (notificationDisabled) return;
 
     setMobileMenuPath(null);
     if (!notificationOpen) {
-      setNotifications((current) =>
-        current.map((notification) => ({ ...notification, unread: false }))
-      );
+      const unreadIds = notifications
+        .filter((notification) => !notification.read_at)
+        .map((notification) => notification.id);
+      if (unreadIds.length > 0) {
+        const readAt = new Date().toISOString();
+        setNotifications((current) =>
+          current.map((notification) =>
+            unreadIds.includes(notification.id) ? { ...notification, read_at: readAt } : notification
+          )
+        );
+        updateNotifications("read", unreadIds);
+      }
     }
     setNotificationOpen((prev) => !prev);
   };
 
   const handleNotificationClear = () => {
+    if (notifications.length === 0) return;
     setNotifications([]);
+    updateNotifications("archive");
   };
 
   const handleNotificationClose = () => {
@@ -454,6 +543,8 @@ export default function Navbar() {
         notifications={notifications}
         onClear={handleNotificationClear}
         onClose={handleNotificationClose}
+        loading={notificationsLoading}
+        lang={lang}
         t={t}
       />
     )}

@@ -8,11 +8,19 @@ export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
 
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from("user_feedback")
-    .select("id, user_id, message, image_name, image_type, image_size, image_data, status, created_at")
+    .select("id, user_id, message, contact_email, contact_phone, image_name, image_type, image_size, image_data, status, created_at")
     .order("created_at", { ascending: false })
     .limit(PAGE_SIZE);
+
+  if (error?.message?.includes("Could not find") && error.message.includes("contact_email")) {
+    ({ data, error } = await supabaseAdmin
+      .from("user_feedback")
+      .select("id, user_id, message, image_name, image_type, image_size, image_data, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE));
+  }
 
   if (error) {
     console.error("[admin-feedback] list failed:", error.message);

@@ -4,6 +4,8 @@ import { resolveAccessTier } from "@/lib/access-tier";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const MAX_MESSAGE_LENGTH = 500;
+const MAX_EMAIL_LENGTH = 120;
+const MAX_PHONE_LENGTH = 60;
 const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
 const MAX_IMAGE_BASE64_LENGTH = Math.ceil(MAX_IMAGE_SIZE / 3) * 4;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -20,6 +22,16 @@ function getClientIp(request) {
 function cleanMessage(value) {
   if (typeof value !== "string") return "";
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, MAX_MESSAGE_LENGTH);
+}
+
+function cleanOptionalText(value, maxLength) {
+  if (typeof value !== "string") return null;
+  const cleaned = value.replace(/[\u0000-\u001F\u007F]/g, "").trim().slice(0, maxLength);
+  return cleaned || null;
+}
+
+function isValidEmail(value) {
+  return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function cleanFileName(value) {
@@ -105,16 +117,27 @@ export async function POST(request) {
     );
   }
 
-  const access = await resolveAccessTier(request);
-  if (!access.user_id) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
-
   let body = {};
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+  }
+
+  const contactEmail = cleanOptionalText(body.contact_email, MAX_EMAIL_LENGTH);
+  const contactPhone = cleanOptionalText(body.contact_phone, MAX_PHONE_LENGTH);
+  const isPricingCustomRequest = body.kind === "pricing_custom_request";
+  if (contactEmail && !isValidEmail(contactEmail)) {
+    return NextResponse.json({ error: "Invalid email." }, { status: 400 });
+  }
+
+  const access = await resolveAccessTier(request);
+  if (!access.user_id && (!isPricingCustomRequest || !contactEmail)) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+  }
+
+  if (!access.user_id && body.image) {
+    return NextResponse.json({ error: "Authentication required for image uploads." }, { status: 401 });
   }
 
   const message = cleanMessage(body.message);
@@ -129,14 +152,33 @@ export async function POST(request) {
     return NextResponse.json({ error: imageError.message }, { status: 400 });
   }
 
-  const { error } = await supabaseAdmin.from("user_feedback").insert({
-    user_id: access.user_id,
+  const insertPayload = {
+    user_id: access.user_id || null,
     message,
     image_name: image?.name || null,
     image_type: image?.type || null,
     image_size: image?.size || null,
     image_data: image?.data || null,
+  };
+
+  if (contactEmail) {
+    insertPayload.message = [
+      message,
+      "",
+      `Email: ${contactEmail}`,
+      ...(contactPhone ? [`Telefon: ${contactPhone}`] : []),
+    ].join("\n").slice(0, MAX_MESSAGE_LENGTH);
+  }
+
+  let { error } = await supabaseAdmin.from("user_feedback").insert({
+    ...insertPayload,
+    contact_email: contactEmail,
+    contact_phone: contactPhone,
   });
+
+  if (error?.message?.includes("Could not find") && error.message.includes("contact_email")) {
+    ({ error } = await supabaseAdmin.from("user_feedback").insert(insertPayload));
+  }
 
   if (error) {
     console.error("[feedback] insert failed:", error.message);

@@ -58,6 +58,7 @@ Shows:
 - `/api/admin/feedback` returns the 100 latest `user_feedback` rows after route-level admin cookie verification.
 - `/api/admin/news` and `/api/admin/news/[id]` manage `news_posts` rows after route-level admin cookie verification.
 - `/api/admin/uploads` stores images in the configured Supabase Storage bucket and returns `public_url` plus the storage path after route-level admin cookie verification.
+- `POST /api/admin/notifications` creates a personalized in-app message for a registered user by `userId`, `title`, and `message`.
 
 ## Related Files
 - `src/proxy.js`
@@ -70,3 +71,4 @@ Shows:
 - `db/external_api_usage_daily.sql`
 - `db/listing_link_analysis_events.sql`
 - `db/calculator_usage_events.sql`
+- `db/user_notifications.sql`

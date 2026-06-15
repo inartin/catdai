@@ -13,6 +13,7 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 ## Content
 - UI is localized through `src/locales/ro.json` and `src/locales/ru.json`.
 - The main pricing grid has four equal-height cards: Free, Standard, Pro, and Extra.
+- A full-width custom-request card appears under the four pricing cards and opens a modal for users who need a different mix of actions.
 - Pricing cards use a fixed-height header area so feature rows start at the same vertical position even when descriptions wrap to different line counts.
 - Pro keeps the single highlight badge; the old no-time-limit badges/notes are removed from the pricing cards.
 - Extra includes 50 actions per feature and is presented without the old one-month rule.
@@ -25,6 +26,7 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 - Feature count badges show the included usage or one-off price for each feature.
 - Feature rows use a fixed height so the same feature lines align across pricing cards.
 - Prices are read server-side from env and passed into the client component.
+- Custom requests collect a message, email, and optional phone number, then submit to the existing feedback endpoint/table with a pricing-request prefix.
 - If an env value is missing or invalid, the component falls back to the current default price.
 - Paynet is not used whatsoever; old Paynet routes are disabled and must not be wired into pricing checkout.
 - `db/paddle_payments.sql` allows one-time payment product keys for Standard, Pro, Extra, sale/rent single-evaluation access, and other single-feature purchases.

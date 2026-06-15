@@ -1,21 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const emptyForm = {
   title: "",
   message: "",
 };
 
+function fmtDateTime(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("ro-RO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function AdminNotificationsPage() {
   const [form, setForm] = useState(emptyForm);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [broadcastsLoading, setBroadcastsLoading] = useState(true);
+  const [broadcastsError, setBroadcastsError] = useState("");
+  const [editingBroadcast, setEditingBroadcast] = useState(null);
+  const [editForm, setEditForm] = useState(emptyForm);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [freeCreditsAmount, setFreeCreditsAmount] = useState("2");
   const [freeCreditsSending, setFreeCreditsSending] = useState(false);
   const [freeCreditsError, setFreeCreditsError] = useState("");
   const [freeCreditsSuccess, setFreeCreditsSuccess] = useState("");
+
+  const loadBroadcasts = useCallback(async () => {
+    setBroadcastsLoading(true);
+    setBroadcastsError("");
+
+    try {
+      const response = await fetch("/api/admin/notifications");
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setBroadcasts(Array.isArray(data.broadcasts) ? data.broadcasts : []);
+    } catch (err) {
+      setBroadcastsError(err.message || "Failed to load sent messages.");
+    } finally {
+      setBroadcastsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBroadcasts();
+  }, [loadBroadcasts]);
 
   const updateField = (key, value) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -50,10 +91,63 @@ export default function AdminNotificationsPage() {
 
       setSuccess(`Notification sent to ${data.createdCount || 0} users.`);
       setForm(emptyForm);
+      await loadBroadcasts();
     } catch (err) {
       setError(err.message || "Failed to send notification.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const startEdit = (broadcast) => {
+    setEditingBroadcast(broadcast);
+    setEditForm({
+      title: broadcast.title || "",
+      message: broadcast.body || "",
+    });
+    setBroadcastsError("");
+  };
+
+  const cancelEdit = () => {
+    if (savingEdit) return;
+    setEditingBroadcast(null);
+    setEditForm(emptyForm);
+  };
+
+  const saveEdit = async (event) => {
+    event.preventDefault();
+    if (!editingBroadcast) return;
+    if (!window.confirm("Update this message for every recipient?")) return;
+
+    setSavingEdit(true);
+    setBroadcastsError("");
+
+    try {
+      const response = await fetch("/api/admin/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          createdAt: editingBroadcast.created_at,
+          oldTitle: editingBroadcast.title,
+          oldMessage: editingBroadcast.body,
+          title: editForm.title,
+          message: editForm.message,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setEditingBroadcast(null);
+      setEditForm(emptyForm);
+      await loadBroadcasts();
+      setSuccess(`Updated ${data.updatedCount || 0} notifications.`);
+    } catch (err) {
+      setBroadcastsError(err.message || "Failed to update message.");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -154,6 +248,108 @@ export default function AdminNotificationsPage() {
           </button>
         </div>
       </form>
+
+      <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-4 border-b border-gray-100 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Global messages sent</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Edit a sent message to update every matching user notification row.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={loadBroadcasts}
+            disabled={broadcastsLoading}
+            className="cursor-pointer rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:text-gray-400"
+          >
+            {broadcastsLoading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+
+        {broadcastsError ? (
+          <div className="px-5 py-8 text-center">
+            <p className="text-sm font-medium text-red-500">Failed to load messages</p>
+            <p className="mt-1 text-xs text-gray-400">{broadcastsError}</p>
+          </div>
+        ) : broadcastsLoading && broadcasts.length === 0 ? (
+          <div className="px-5 py-8 text-center text-gray-400">Loading messages...</div>
+        ) : broadcasts.length === 0 ? (
+          <div className="px-5 py-8 text-center text-gray-400">No global messages sent yet</div>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {broadcasts.map((broadcast) => {
+              const isEditing = editingBroadcast?.id === broadcast.id;
+
+              return (
+                <article key={broadcast.id} className="px-5 py-4">
+                  {isEditing ? (
+                    <form onSubmit={saveEdit} className="space-y-3">
+                      <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Title</span>
+                        <input
+                          value={editForm.title}
+                          onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
+                          className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-primary"
+                          maxLength={120}
+                          required
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-sm font-medium text-gray-700">Message</span>
+                        <textarea
+                          value={editForm.message}
+                          onChange={(event) => setEditForm((current) => ({ ...current, message: event.target.value }))}
+                          className="mt-1 min-h-28 w-full resize-y rounded-lg border border-gray-200 px-3 py-2 text-sm leading-6 text-gray-900 outline-none transition-colors focus:border-primary"
+                          maxLength={1000}
+                          required
+                        />
+                      </label>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          disabled={savingEdit}
+                          className="cursor-pointer rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:text-gray-400"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={savingEdit || !editForm.title.trim() || !editForm.message.trim()}
+                          className="cursor-pointer rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300"
+                        >
+                          {savingEdit ? "Saving..." : "Save changes"}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                          <span>{fmtDateTime(broadcast.created_at)}</span>
+                          <span>{broadcast.recipientCount} recipients</span>
+                        </div>
+                        <h3 className="text-base font-semibold text-gray-900">{broadcast.title}</h3>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-gray-600">
+                          {broadcast.body}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(broadcast)}
+                        className="cursor-pointer self-start rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:border-primary/40 hover:text-primary"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       <div className="space-y-4 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div>

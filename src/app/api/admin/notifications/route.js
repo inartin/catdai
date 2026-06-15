@@ -59,6 +59,47 @@ function filterBroadcastUsers(users) {
   );
 }
 
+function buildBroadcastKey(row) {
+  return [row.created_at, row.title, row.body].map((value) => String(value || "")).join("\u0001");
+}
+
+export async function GET(request) {
+  const unauthorized = requireAdminApiAuth(request);
+  if (unauthorized) return unauthorized;
+
+  const { data, error } = await supabaseAdmin
+    .from("user_notifications")
+    .select("id, title, body, created_at, user_id")
+    .eq("source", "admin")
+    .order("created_at", { ascending: false })
+    .limit(5000);
+
+  if (error) {
+    console.error("[admin-notifications] list failed:", error.message);
+    return NextResponse.json({ error: "Failed to load notifications." }, { status: 500 });
+  }
+
+  const grouped = new Map();
+  for (const row of data || []) {
+    const key = buildBroadcastKey(row);
+    const current = grouped.get(key);
+    if (current) {
+      current.recipientCount += 1;
+      continue;
+    }
+
+    grouped.set(key, {
+      id: key,
+      created_at: row.created_at,
+      title: row.title,
+      body: row.body,
+      recipientCount: 1,
+    });
+  }
+
+  return NextResponse.json({ broadcasts: Array.from(grouped.values()).slice(0, 50) });
+}
+
 export async function POST(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
@@ -102,11 +143,13 @@ export async function POST(request) {
       return NextResponse.json({ error: "No users found." }, { status: 404 });
     }
 
+    const createdAt = new Date().toISOString();
     const rows = userIds.map((id) => ({
       user_id: id,
       title,
       body: message,
       source: "admin",
+      created_at: createdAt,
     }));
 
     for (const chunk of chunkRows(rows, INSERT_CHUNK_SIZE)) {
@@ -146,4 +189,50 @@ export async function POST(request) {
   }
 
   return NextResponse.json({ notification: data }, { status: 201 });
+}
+
+export async function PATCH(request) {
+  const unauthorized = requireAdminApiAuth(request);
+  if (unauthorized) return unauthorized;
+
+  const limit = limiter.check(getClientIp(request));
+  if (!limit.allowed) {
+    return NextResponse.json(
+      { error: "Too many notification requests." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+  }
+
+  const createdAt = cleanText(body?.createdAt, 80);
+  const oldTitle = cleanText(body?.oldTitle, MAX_TITLE_LENGTH);
+  const oldMessage = cleanText(body?.oldMessage ?? body?.oldBody, MAX_BODY_LENGTH);
+  const title = cleanText(body?.title, MAX_TITLE_LENGTH);
+  const message = cleanText(body?.message ?? body?.body, MAX_BODY_LENGTH);
+
+  if (!createdAt || !oldTitle || !oldMessage || !title || !message) {
+    return NextResponse.json({ error: "Missing notification edit fields." }, { status: 400 });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("user_notifications")
+    .update({ title, body: message })
+    .eq("source", "admin")
+    .eq("created_at", createdAt)
+    .eq("title", oldTitle)
+    .eq("body", oldMessage)
+    .select("id");
+
+  if (error) {
+    console.error("[admin-notifications] update failed:", error.message);
+    return NextResponse.json({ error: "Failed to update notifications." }, { status: 500 });
+  }
+
+  return NextResponse.json({ updatedCount: data?.length || 0 });
 }

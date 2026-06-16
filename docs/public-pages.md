@@ -11,13 +11,14 @@ Implemented.
 - Landing hero subtitle says the product estimates the market price for sale, purchase, or rent.
 - Landing shows compact sell/buy/rent scope cards below the main market card.
 - Landing scope card descriptions explain realistic seller pricing before publishing or accepting an agent offer, buyer price checks against similar area/parameters, and estimated rent by area and characteristics.
+- Landing mobile replaces the three large sell/buy/rent scope cards with one compact grouped card using small chips.
 - Landing marks visible rent scope labels with a localized `În curând` / `Скоро` badge until rent analysis is active.
 - Landing real estate market card keeps the desktop center column focused on the Chișinău image and market context, while the CTA still routes to the existing `/estimeaza` flow.
 - Landing mobile combines live prices and compact 60-day trend charts in one softly blurred Chișinău image-backed market card, with the city in the header, each price label above its matching green or blue chart, and analyzed-listing count at the bottom.
-- Landing places the 999.md link analyzer below the sell/buy/rent scope cards.
+- Landing places the 999.md link analyzer below the sell/buy/rent scope cards on desktop, and above them on mobile.
 - Landing 999.md link analyzer shows flat white paper-style feature tabs with custom line icons dropping from under the analyzer for price analysis, similar-listing comparison, duplicate checks, and price history.
 - Landing `How it works` intro says users can see whether the price is below market, near market, or too high.
-- Landing `How it works` steps are input data, view estimate, compare with market, and compare scenarios; the estimate step uses a euro icon.
+- Landing `How it works` steps are input data, market price, similar listings, and rapid/medium/premium price levels; the step layout allows longer labels on mobile and desktop.
 - Landing `How it works` mobile trust note uses a compact left-icon layout so the two-line copy stays balanced.
 - Landing hero has the `Evaluează gratuit` primary CTA button below the hero text and routes directly to `/estimeaza`.
 - The desktop real estate card is supporting market context only; the primary CTA lives in the hero.

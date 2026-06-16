@@ -7,7 +7,7 @@ function ArrowIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      className="hidden h-5 w-5 shrink-0 text-gray-300 sm:block"
+      className="mt-[1.125rem] hidden h-5 w-5 shrink-0 text-gray-300 sm:block"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -61,15 +61,15 @@ export default function HowItWorks() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto bg-section-bg rounded-2xl py-6 px-4 mt-10 sm:py-10 sm:px-6">
-        <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center sm:justify-center sm:gap-6">
+      <div className="mx-auto mt-10 max-w-4xl rounded-2xl bg-section-bg px-4 py-5 sm:px-6 sm:py-8">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] sm:items-start sm:gap-4">
           {stepKeys.map((key, i) => (
             <div key={key} className="contents">
-              <div className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-emerald-100 bg-white px-2.5 py-4 shadow-sm sm:min-w-max sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-light sm:h-14 sm:w-14">
+              <div className="grid min-w-0 grid-rows-[3.5rem_minmax(2.75rem,auto)] place-items-center gap-2 rounded-xl border border-emerald-100 bg-white px-2.5 py-3 shadow-sm sm:border-0 sm:bg-transparent sm:px-1 sm:py-0 sm:shadow-none">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-light sm:h-14 sm:w-14">
                   {stepIcons[i]}
                 </div>
-                <span className="text-center text-xs font-medium leading-tight text-gray-600 sm:whitespace-nowrap sm:text-sm">
+                <span className="flex items-start justify-center text-center text-xs font-semibold leading-snug text-gray-600 sm:max-w-32 sm:text-sm">
                   {t(key)}
                 </span>
               </div>

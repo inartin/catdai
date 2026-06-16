@@ -199,33 +199,55 @@ function MarketScopeCards() {
 
   return (
     <section className="px-4 pb-8">
-      <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-3">
-        {scopes.map((scope) => (
-          <div
-            key={scope.key}
-            className="rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm"
-          >
-            <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl border ${scope.accent}`}>
-              {scope.icon}
+      <div className="mx-auto flex max-w-5xl flex-col gap-8 sm:block">
+        <div className="order-2 grid gap-2 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm sm:hidden">
+          {scopes.map((scope) => (
+            <div
+              key={scope.key}
+              className="flex items-start gap-3 rounded-xl bg-gray-50 px-3 py-2.5"
+            >
+              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${scope.accent}`}>
+                {scope.icon}
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-sm font-extrabold leading-5 text-gray-950">
+                  {scope.title}
+                </h2>
+                <p className="mt-0.5 text-xs leading-5 text-gray-500">
+                  {scope.desc}
+                </p>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-base font-extrabold text-gray-950">
-                {scope.title}
-              </h2>
-              {scope.badge && (
-                <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 ring-1 ring-sky-100">
-                  {scope.badge}
-                </span>
-              )}
+          ))}
+        </div>
+        <div className="order-2 hidden gap-3 sm:grid sm:grid-cols-3">
+          {scopes.map((scope) => (
+            <div
+              key={scope.key}
+              className="rounded-2xl border border-gray-100 bg-white p-4 text-left shadow-sm"
+            >
+              <div className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl border ${scope.accent}`}>
+                {scope.icon}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-base font-extrabold text-gray-950">
+                  {scope.title}
+                </h2>
+                {scope.badge && (
+                  <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-extrabold text-sky-700 ring-1 ring-sky-100">
+                    {scope.badge}
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-gray-500">
+                {scope.desc}
+              </p>
             </div>
-            <p className="mt-2 text-sm leading-6 text-gray-500">
-              {scope.desc}
-            </p>
-          </div>
-        ))}
-      </div>
-      <div className="mx-auto mt-16 sm:mt-24 max-w-4xl text-left">
-        <LinkAnalyzer showFeaturePapers />
+          ))}
+        </div>
+        <div className="order-1 mx-auto max-w-4xl text-left sm:mt-24">
+          <LinkAnalyzer showFeaturePapers />
+        </div>
       </div>
     </section>
   );

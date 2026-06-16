@@ -36,11 +36,12 @@ Shows:
 - favorites
 - Telegram alert count with an expandable list of configured Telegram alerts
 - sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
-- Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, and anonymous/user name. Exact searched addresses are not stored for this dashboard.
+- Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, anonymous/user name, and a delete action with browser confirmation. Exact searched addresses are not stored for this dashboard.
 - 999 link-analysis rows show date, status, listing id/link, mapped property summary, asking price, and anonymous/user id.
 - External API usage shows aggregate signed-worker calls for 999 and cadastru, with success/failure totals counted from background writes; the card opens service totals and recent daily rows.
 - Calculator usage rows show date, property summary, total investment, estimated rent, yield, payback period, tax selection, and anonymous/user id.
-- Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?fresh=1` to bypass the 5-minute server cache.
+- Dashboard has a period segmented filter for 1 day, 7 days, 1 month, and All time. `/api/admin/stats` accepts `period=day|week|month|all` and filters dashboard totals, expandable recent rows, paid users, shared links, favorites, alerts, and usage cards to that window. `/api/admin/estimations` accepts the same `period` parameter for the sale/rent estimation detail lists.
+- Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?period=...&fresh=1` to bypass the 5-minute server cache for the selected period.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
 - `/admin/feedback` is linked from the left menu as `Feedback` and shows the latest registered-user feedback rows with message, user id, date, status, delete action with confirmation, and optional uploaded image preview that opens in an in-page modal.
 - `/admin/news` is linked from the left menu as `News` and lets admins list, create, edit, and remove news items with slug, title, rich description, creation date, and cover image link.

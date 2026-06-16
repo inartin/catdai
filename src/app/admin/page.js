@@ -99,6 +99,13 @@ const PAYMENT_STATUS_LABELS_RO = {
   failed: "Eșuat",
 };
 
+const DASHBOARD_PERIOD_OPTIONS = [
+  { key: "day", label: "1 day" },
+  { key: "week", label: "7 days" },
+  { key: "month", label: "1 month" },
+  { key: "all", label: "All time" },
+];
+
 function fmtCadastruSearchType(type) {
   if (type === "address") return "Address";
   if (type === "number") return "Cadastral number";
@@ -318,6 +325,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [statsRefreshing, setStatsRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
+  const [dashboardPeriod, setDashboardPeriod] = useState("all");
   const [error, setError] = useState(null);
   const [showUsersList, setShowUsersList] = useState(false);
   const [showPaidUsersList, setShowPaidUsersList] = useState(false);
@@ -341,6 +349,8 @@ export default function AdminDashboard() {
   const [showTelegramAlertsList, setShowTelegramAlertsList] = useState(false);
   const [showPdfGenerationList, setShowPdfGenerationList] = useState(false);
   const [showCadastruSearchesList, setShowCadastruSearchesList] = useState(false);
+  const [deletingCadastruSearchId, setDeletingCadastruSearchId] = useState(null);
+  const [cadastruSearchDeleteError, setCadastruSearchDeleteError] = useState(null);
   const [showListingLinkAnalysesList, setShowListingLinkAnalysesList] = useState(false);
   const [showExternalApiUsageList, setShowExternalApiUsageList] = useState(false);
   const [showCalculatorUsageList, setShowCalculatorUsageList] = useState(false);
@@ -352,7 +362,9 @@ export default function AdminDashboard() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/admin/stats${fresh ? "?fresh=1" : ""}`);
+      const params = new URLSearchParams({ period: dashboardPeriod });
+      if (fresh) params.set("fresh", "1");
+      const res = await fetch(`/api/admin/stats?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setStats(data);
@@ -362,7 +374,7 @@ export default function AdminDashboard() {
       setLoading(false);
       setStatsRefreshing(false);
     }
-  }, []);
+  }, [dashboardPeriod]);
 
   useEffect(() => {
     loadStats();
@@ -523,7 +535,8 @@ export default function AdminDashboard() {
     setEstimationsError(null);
     setEstimations([]);
     try {
-      const res = await fetch(`/api/admin/estimations?type=${type}`);
+      const params = new URLSearchParams({ type, period: dashboardPeriod });
+      const res = await fetch(`/api/admin/estimations?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setEstimations(Array.isArray(data.estimations) ? data.estimations : []);
@@ -541,6 +554,34 @@ export default function AdminDashboard() {
     }
     setActiveEstimationsType(type);
     loadEstimations(type);
+  };
+
+  const handleDashboardPeriodChange = (period) => {
+    setDashboardPeriod(period);
+    setActiveEstimationsType(null);
+    setEstimations([]);
+  };
+
+  const deleteCadastruSearch = async (row) => {
+    if (!row?.id) return;
+    const confirmed = window.confirm("Delete this cadastru search?");
+    if (!confirmed) return;
+
+    setDeletingCadastruSearchId(row.id);
+    setCadastruSearchDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/admin/cadastru-searches?id=${row.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await loadStats({ fresh: true });
+    } catch (err) {
+      setCadastruSearchDeleteError(err.message || "Failed to delete cadastru search");
+    } finally {
+      setDeletingCadastruSearchId(null);
+    }
   };
 
   if (loading) {
@@ -721,16 +762,33 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
-      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <button
-          type="button"
-          onClick={() => loadStats({ fresh: true })}
-          disabled={statsRefreshing}
-          className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary/40 hover:text-primary disabled:text-gray-400 disabled:hover:border-gray-200 sm:w-auto"
-        >
-          {statsRefreshing ? "Refreshing..." : "Hard refresh"}
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="inline-flex w-full rounded-lg border border-gray-200 bg-white p-1 sm:w-auto">
+            {DASHBOARD_PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => handleDashboardPeriodChange(option.key)}
+                className={`flex-1 cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none ${dashboardPeriod === option.key
+                  ? "bg-primary text-white"
+                  : "text-gray-600 hover:bg-gray-50"
+                  }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => loadStats({ fresh: true })}
+            disabled={statsRefreshing}
+            className="w-full cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary/40 hover:text-primary disabled:text-gray-400 disabled:hover:border-gray-200 sm:w-auto"
+          >
+            {statsRefreshing ? "Refreshing..." : "Hard refresh"}
+          </button>
+        </div>
       </div>
 
       {/* Users & App Usage */}
@@ -1092,6 +1150,9 @@ export default function AdminDashboard() {
               <p className="mt-1 text-xs text-gray-500">
                 {fmtCadastruSourceSummary(s.cadastruSearches?.byLookupSource)}
               </p>
+              {cadastruSearchDeleteError && (
+                <p className="mt-2 text-xs font-medium text-red-500">{cadastruSearchDeleteError}</p>
+              )}
             </div>
 
             {!Array.isArray(s.cadastruSearches?.recent) || s.cadastruSearches.recent.length === 0 ? (
@@ -1108,6 +1169,7 @@ export default function AdminDashboard() {
                       <th className="px-4 py-3">Cadastral number</th>
                       <th className="px-4 py-3">District</th>
                       <th className="px-4 py-3">User</th>
+                      <th className="px-4 py-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -1133,6 +1195,16 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-gray-600 break-all">
                           {row.user_name || "Anonymous"}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => deleteCadastruSearch(row)}
+                            disabled={deletingCadastruSearchId === row.id}
+                            className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-default disabled:text-red-300"
+                          >
+                            {deletingCadastruSearchId === row.id ? "Deleting..." : "Delete"}
+                          </button>
                         </td>
                       </tr>
                     ))}

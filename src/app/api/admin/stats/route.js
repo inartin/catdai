@@ -11,6 +11,12 @@ const PERIODS = {
   "7d": 7 * 24 * 60 * 60 * 1000,
   "30d": 30 * 24 * 60 * 60 * 1000,
 };
+const DASHBOARD_PERIODS = {
+  day: { label: "Last day", ms: PERIODS["24h"] },
+  week: { label: "Last week", ms: PERIODS["7d"] },
+  month: { label: "Last month", ms: PERIODS["30d"] },
+  all: { label: "All time", ms: null },
+};
 
 async function fetchAllRows(buildQuery) {
   let all = [];
@@ -23,6 +29,19 @@ async function fetchAllRows(buildQuery) {
     from += PAGE;
   }
   return all;
+}
+
+function parseDashboardPeriod(value) {
+  return DASHBOARD_PERIODS[value] ? value : "all";
+}
+
+function applySince(query, column, since) {
+  return since ? query.gte(column, since) : query;
+}
+
+function filterRowsSince(rows, column, since) {
+  if (!since) return rows;
+  return rows.filter((row) => row[column] && row[column] >= since);
 }
 
 async function listAllUsers() {
@@ -66,15 +85,18 @@ function buildUserNameMap(users) {
   return new Map((users || []).map((user) => [user.id, userDisplayName(user)]));
 }
 
-async function fetchTelegramAlerts() {
+async function fetchTelegramAlerts(since) {
   return fetchAllRows(() =>
-    supabaseAdmin
-      .from("user_listing_alerts")
-      .select(
-        "id, user_id, label, is_active, website_enabled, telegram_chat_id, base_filters, alert_filters, created_at, last_notified_at"
-      )
-      .eq("telegram_enabled", true)
-      .order("created_at", { ascending: false })
+    applySince(
+      supabaseAdmin
+        .from("user_listing_alerts")
+        .select(
+          "id, user_id, label, is_active, website_enabled, telegram_chat_id, base_filters, alert_filters, created_at, last_notified_at"
+        )
+        .eq("telegram_enabled", true),
+      "created_at",
+      since
+    ).order("created_at", { ascending: false })
   );
 }
 
@@ -84,20 +106,28 @@ function isMissingEstimateTypeError(error) {
   return (code === "PGRST204" || code === "42703") && message.includes("estimate_type");
 }
 
-async function fetchEstimationCounts() {
-  const totalRes = await supabaseAdmin
-    .from("estimate_log")
-    .select("*", { count: "exact", head: true });
+async function fetchEstimationCounts(since) {
+  const totalRes = await applySince(
+    supabaseAdmin
+      .from("estimate_log")
+      .select("*", { count: "exact", head: true }),
+    "created_at",
+    since
+  );
 
   if (totalRes.error) {
     throw new Error(`estimate_log total query failed: ${totalRes.error.message}`);
   }
 
   const total = totalRes.count || 0;
-  const rentRes = await supabaseAdmin
-    .from("estimate_log")
-    .select("*", { count: "exact", head: true })
-    .eq("estimate_type", "rent");
+  const rentRes = await applySince(
+    supabaseAdmin
+      .from("estimate_log")
+      .select("*", { count: "exact", head: true })
+      .eq("estimate_type", "rent"),
+    "created_at",
+    since
+  );
 
   if (rentRes.error) {
     if (isMissingEstimateTypeError(rentRes.error)) {
@@ -142,12 +172,15 @@ function isMissingCadastruColumnError(error) {
   );
 }
 
-async function fetchCadastruRows(columns, defaults = {}) {
+async function fetchCadastruRows(columns, defaults = {}, since) {
   const buildTypedQuery = (columns) => () =>
-    supabaseAdmin
-      .from("cadastru_search_events")
-      .select(columns)
-      .order("created_at", { ascending: false });
+    applySince(
+      supabaseAdmin
+        .from("cadastru_search_events")
+        .select(columns),
+      "created_at",
+      since
+    ).order("created_at", { ascending: false });
 
   const firstPage = await buildTypedQuery(columns)().range(0, PAGE - 1);
   if (!firstPage.error) {
@@ -160,7 +193,7 @@ async function fetchCadastruRows(columns, defaults = {}) {
   return { error: firstPage.error };
 }
 
-async function fetchCadastruSearchEvents() {
+async function fetchCadastruSearchEvents(since) {
   const columnAttempts = [
     {
       columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, created_at",
@@ -185,7 +218,7 @@ async function fetchCadastruSearchEvents() {
   ];
 
   for (const attempt of columnAttempts) {
-    const result = await fetchCadastruRows(attempt.columns, attempt.defaults);
+    const result = await fetchCadastruRows(attempt.columns, attempt.defaults, since);
     if (!result.error) return result.rows;
     if (!isMissingCadastruColumnError(result.error)) return [];
   }
@@ -235,14 +268,17 @@ function attachUserNames(rows, usersById) {
   }));
 }
 
-async function fetchListingLinkAnalysisEvents() {
+async function fetchListingLinkAnalysisEvents(since) {
   const buildQuery = () =>
-    supabaseAdmin
-      .from("listing_link_analysis_events")
-      .select(
-        "id, status, error_code, user_id, external_id, listing_url, city, district, rooms_count, listing_price, listing_currency, created_at"
-      )
-      .order("created_at", { ascending: false });
+    applySince(
+      supabaseAdmin
+        .from("listing_link_analysis_events")
+        .select(
+          "id, status, error_code, user_id, external_id, listing_url, city, district, rooms_count, listing_price, listing_currency, created_at"
+        ),
+      "created_at",
+      since
+    ).order("created_at", { ascending: false });
 
   const firstPage = await buildQuery().range(0, PAGE - 1);
   if (!firstPage.error) {
@@ -274,14 +310,17 @@ function buildListingLinkAnalysisStats(rows, cutoffs) {
   };
 }
 
-async function fetchCalculatorUsageEvents() {
+async function fetchCalculatorUsageEvents(since) {
   const buildQuery = () =>
-    supabaseAdmin
-      .from("calculator_usage_events")
-      .select(
-        "id, user_id, device_id, session_id, city, district, rooms_count, area_m2, building_type, renovation, apartment_price, additional_investments, total_investment, include_rent_tax, estimated_monthly_rent, annual_gross_yield_pct, effective_yield_pct, payback_years, created_at"
-      )
-      .order("created_at", { ascending: false });
+    applySince(
+      supabaseAdmin
+        .from("calculator_usage_events")
+        .select(
+          "id, user_id, device_id, session_id, city, district, rooms_count, area_m2, building_type, renovation, apartment_price, additional_investments, total_investment, include_rent_tax, estimated_monthly_rent, annual_gross_yield_pct, effective_yield_pct, payback_years, created_at"
+        ),
+      "created_at",
+      since
+    ).order("created_at", { ascending: false });
 
   const firstPage = await buildQuery().range(0, PAGE - 1);
   if (!firstPage.error) {
@@ -325,10 +364,14 @@ function buildCalculatorUsageStats(rows, cutoffs) {
   };
 }
 
-async function fetchExternalApiUsageRows() {
-  const { data, error } = await supabaseAdmin
-    .from("external_api_usage_daily")
-    .select("usage_date, service, status, count, updated_at")
+async function fetchExternalApiUsageRows(sinceDate) {
+  const { data, error } = await applySince(
+    supabaseAdmin
+      .from("external_api_usage_daily")
+      .select("usage_date, service, status, count, updated_at"),
+    "usage_date",
+    sinceDate
+  )
     .order("usage_date", { ascending: false });
 
   if (!error) return data || [];
@@ -364,13 +407,17 @@ function buildExternalApiUsageStats(rows) {
   };
 }
 
-async function fetchPaidUserSummary() {
+async function fetchPaidUserSummary(since) {
   const paidOrders = await fetchAllRows(() =>
-    supabaseAdmin
-      .from("paddle_payment_orders")
-      .select("user_id, product_key, paid_at, created_at")
-      .eq("status", "paid")
-      .not("user_id", "is", null)
+    applySince(
+      supabaseAdmin
+        .from("paddle_payment_orders")
+        .select("user_id, product_key, paid_at, created_at")
+        .eq("status", "paid")
+        .not("user_id", "is", null),
+      "created_at",
+      since
+    )
       .order("created_at", { ascending: false })
   );
   const activeCredits = await fetchAllRows(() =>
@@ -439,9 +486,14 @@ export async function GET(request) {
   if (unauthorized) return unauthorized;
 
   const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
+  const period = parseDashboardPeriod(request.nextUrl.searchParams.get("period"));
+  const periodConfig = DASHBOARD_PERIODS[period];
+  const periodSince = periodConfig.ms ? new Date(Date.now() - periodConfig.ms).toISOString() : null;
+  const periodSinceDate = periodSince ? periodSince.slice(0, 10) : null;
+  const cacheKey = period;
 
-  if (!bypassCache && cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
-    return NextResponse.json(cache.data);
+  if (!bypassCache && cache[cacheKey] && Date.now() - cache[cacheKey].ts < CACHE_TTL_MS) {
+    return NextResponse.json(cache[cacheKey].data);
   }
 
   const now = Date.now();
@@ -453,21 +505,32 @@ export async function GET(request) {
   try {
     dataResults = await Promise.all([
       listAllUsers(),
-      fetchEstimationCounts(),
-      supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
-      supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
-      fetchTelegramAlerts(),
-      fetchAllRows(() =>
-        supabaseAdmin
-          .from("pdf_generation_events")
-          .select("id, user_id, device_id, session_id, estimate_log_id, included_cadastral, created_at")
-          .order("created_at", { ascending: false })
+      fetchEstimationCounts(periodSince),
+      applySince(
+        supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
+        "created_at",
+        periodSince
       ),
-      fetchCadastruSearchEvents(),
-      fetchListingLinkAnalysisEvents(),
-      fetchCalculatorUsageEvents(),
-      fetchExternalApiUsageRows(),
-      fetchPaidUserSummary().catch((error) => {
+      applySince(
+        supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
+        "created_at",
+        periodSince
+      ),
+      fetchTelegramAlerts(periodSince),
+      fetchAllRows(() =>
+        applySince(
+          supabaseAdmin
+            .from("pdf_generation_events")
+            .select("id, user_id, device_id, session_id, estimate_log_id, included_cadastral, created_at"),
+          "created_at",
+          periodSince
+        ).order("created_at", { ascending: false })
+      ),
+      fetchCadastruSearchEvents(periodSince),
+      fetchListingLinkAnalysisEvents(periodSince),
+      fetchCalculatorUsageEvents(periodSince),
+      fetchExternalApiUsageRows(periodSinceDate),
+      fetchPaidUserSummary(periodSince).catch((error) => {
         console.error("Failed to load paid user stats:", error.message);
         return { available: false, totalPaidUsers: 0, paidOrders: 0 };
       }),
@@ -492,6 +555,7 @@ export async function GET(request) {
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
+  const filteredUsers = filterRowsSince(users, "created_at", periodSince);
   const cadastruSearchesWithUsers = attachUserNames(cadastruSearchEvents, usersById);
   const paidUsers = {
     ...paidUserSummary,
@@ -507,7 +571,10 @@ export async function GET(request) {
   };
 
   const result = {
-    totalUsers: users.length,
+    period,
+    periodLabel: periodConfig.label,
+    periodSince,
+    totalUsers: filteredUsers.length,
     totalEstimations: estimationCounts.sale || 0,
     totalSaleEstimations: estimationCounts.sale || 0,
     totalRentEstimations: estimationCounts.rent || 0,
@@ -526,7 +593,7 @@ export async function GET(request) {
   };
 
   if (!bypassCache) {
-    cache = { data: result, ts: Date.now() };
+    cache[cacheKey] = { data: result, ts: Date.now() };
   }
   return NextResponse.json(result);
 }

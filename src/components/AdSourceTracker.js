@@ -28,6 +28,7 @@ export default function AdSourceTracker() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (window.location.pathname.startsWith("/admin")) return;
 
     const currentPath = getCurrentPath();
     const params = new URLSearchParams(window.location.search);

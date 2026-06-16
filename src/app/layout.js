@@ -70,6 +70,8 @@ export default function RootLayout({ children }) {
                 __html: `
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
+                  var isAdminRoute = window.location.pathname.startsWith('/admin');
+                  if (!isAdminRoute) {
                   var cookieConsent = localStorage.getItem('cookie_consent');
                   var googleConsent = cookieConsent === 'granted' ? 'granted' : 'denied';
                   gtag('consent', 'default', {
@@ -78,6 +80,7 @@ export default function RootLayout({ children }) {
                     'ad_user_data': googleConsent,
                     'ad_personalization': googleConsent,
                   });
+                  }
                 `,
               }}
             />
@@ -87,6 +90,8 @@ export default function RootLayout({ children }) {
                 __html: `
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
+                  var isAdminRoute = window.location.pathname.startsWith('/admin');
+                  if (!isAdminRoute) {
                   gtag('js', new Date());
                   ${googleTagIds
                     .map(
@@ -106,6 +111,7 @@ export default function RootLayout({ children }) {
                     });
                   };`
                       : ""
+                  }
                   }
                 `,
               }}

@@ -46,8 +46,8 @@ Implemented.
 - Authenticated tracking requests store `user_id` so ad sessions can be tied to registered Supabase users after login.
 - CSP `connect-src` must include both `https://www.google-analytics.com` and `https://analytics.google.com` because GA4 can send collection requests to either host.
 - Google Ads conversion and consent-mode pings can use `https://pagead2.googlesyndication.com`, so it is also allowed in `connect-src`.
-- Admin ad-tracking top-card totals are computed per selected source from all stored events; the visitor journey list is paged separately.
-- Admin ad-tracking also counts distinct tracked registered users with a completed `paddle_payment_orders.status = 'paid'` order after their first stored event for the selected source and marks those visitor journeys as bought. The main admin dashboard separately shows overall paid users across all sources, filtered to users who still have remaining paid feature credits.
+- Admin ad-tracking top-card totals are computed per selected source and selected period from stored events; the visitor journey list is paged separately.
+- Admin ad-tracking also counts distinct tracked registered users with a completed `paddle_payment_orders.status = 'paid'` order after their first stored event for the selected source and period, and marks those visitor journeys as bought. The main admin dashboard separately shows overall paid users across all sources, filtered to users who still have remaining paid feature credits.
 - Runtime DB persistence for estimation logs, PDF events, cadastru search events, long-lived cadastru records, 999.md analysis events, shared links, favorites, and free monthly evaluation usage runs when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`.
 - Calculator result usage is stored in `calculator_usage_events` under the same runtime persistence rule, including property filters, investment fields, tax selection, result rent/yield/payback metrics, and registered/anonymous attribution.
 

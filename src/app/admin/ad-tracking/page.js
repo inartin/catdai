@@ -7,6 +7,12 @@ const AD_SOURCES = [
   { key: "zdg", label: "ZDG", entryPath: "/?src=zdg" },
   { key: "reddit", label: "Reddit", entryPath: "/?utm_source=reddit" },
 ];
+const PERIOD_OPTIONS = [
+  { key: "day", label: "1 day" },
+  { key: "week", label: "7 days" },
+  { key: "month", label: "1 month" },
+  { key: "all", label: "All time" },
+];
 
 function fmtNum(n) {
   if (n == null) return "\u2014";
@@ -137,6 +143,7 @@ function groupJourneyEvents(events = [], sourceConfig) {
 
 export default function AdTrackingPage() {
   const [selectedSource, setSelectedSource] = useState("zdg");
+  const [selectedPeriod, setSelectedPeriod] = useState("all");
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -157,6 +164,7 @@ export default function AdTrackingPage() {
 
     const params = new URLSearchParams({
       source: selectedSource,
+      period: selectedPeriod,
       limit: String(JOURNEY_PAGE_SIZE),
       offset: String(offset),
     });
@@ -196,7 +204,7 @@ export default function AdTrackingPage() {
         setLoadingMore(false);
         setRefreshing(false);
       });
-  }, [selectedSource]);
+  }, [selectedPeriod, selectedSource]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => loadAdTracking(0), 0);
@@ -279,17 +287,40 @@ export default function AdTrackingPage() {
             })}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setOpenJourneys({});
-            loadAdTracking(0, { fresh: true });
-          }}
-          disabled={refreshing || loading || loadingMore}
-          className="self-start px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg text-gray-700 hover:border-primary/40 hover:text-primary disabled:text-gray-400 disabled:hover:border-gray-200 transition-colors cursor-pointer disabled:cursor-not-allowed"
-        >
-          {refreshing ? "Refreshing..." : "Hard refresh"}
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+          <div className="inline-flex w-full rounded-lg border border-gray-200 bg-white p-1 shadow-sm sm:w-auto">
+            {PERIOD_OPTIONS.map((period) => {
+              const isActive = period.key === selectedPeriod;
+              return (
+                <button
+                  key={period.key}
+                  type="button"
+                  onClick={() => {
+                    setOpenJourneys({});
+                    setSelectedPeriod(period.key);
+                  }}
+                  className={`flex-1 cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none ${isActive
+                    ? "bg-primary text-white"
+                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                    }`}
+                >
+                  {period.label}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpenJourneys({});
+              loadAdTracking(0, { fresh: true });
+            }}
+            disabled={refreshing || loading || loadingMore}
+            className="self-start px-4 py-2 text-sm font-medium bg-white border border-gray-200 rounded-lg text-gray-700 hover:border-primary/40 hover:text-primary disabled:text-gray-400 disabled:hover:border-gray-200 transition-colors cursor-pointer disabled:cursor-not-allowed"
+          >
+            {refreshing ? "Refreshing..." : "Hard refresh"}
+          </button>
+        </div>
       </div>
 
       {!ad.available ? (

@@ -101,18 +101,22 @@ function buildFirstSourceSeenByUser(events) {
   return firstSeenByUser;
 }
 
-async function fetchPaidOrdersForUsers(userIds) {
+async function fetchPaidOrdersForUsers(userIds, since) {
   const uniqueIds = Array.from(new Set(userIds.filter(Boolean)));
   if (uniqueIds.length === 0) return [];
 
   const rows = [];
   for (let i = 0; i < uniqueIds.length; i += 200) {
     const chunk = uniqueIds.slice(i, i + 200);
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from("paddle_payment_orders")
       .select("id, user_id, product_key, status, paid_at, created_at, amount_minor, currency_code")
       .in("user_id", chunk)
-      .in("status", Array.from(PAID_PAYMENT_STATUSES))
+      .in("status", Array.from(PAID_PAYMENT_STATUSES));
+
+    if (since) query = query.gte("created_at", since);
+
+    const { data, error } = await query
       .order("paid_at", { ascending: false });
 
     if (error) throw error;
@@ -122,13 +126,13 @@ async function fetchPaidOrdersForUsers(userIds) {
   return rows;
 }
 
-async function fetchAdPurchases(events) {
+async function fetchAdPurchases(events, since) {
   const firstSeenByUser = buildFirstSourceSeenByUser(events);
   const userIds = Array.from(firstSeenByUser.keys());
 
   let orders;
   try {
-    orders = await fetchPaidOrdersForUsers(userIds);
+    orders = await fetchPaidOrdersForUsers(userIds, since);
   } catch (error) {
     if (error.code === "42P01") {
       return { available: false, users: new Map(), purchasedUsers: 0, paidOrders: 0 };
@@ -227,6 +231,17 @@ function normalizePagination({ journeyLimit, journeyOffset } = {}) {
   };
 }
 
+function buildAdEventsQuery(source, since) {
+  let query = supabaseAdmin
+    .from("ad_source_events")
+    .select("event_name, user_id, device_id, session_id, path, referrer, metadata, created_at")
+    .eq("source", source);
+
+  if (since) query = query.gte("created_at", since);
+
+  return query.order("created_at", { ascending: false });
+}
+
 export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
   const sourceConfig = AD_TRACKING_SOURCES[source];
   if (!sourceConfig) {
@@ -234,16 +249,11 @@ export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
   }
 
   const { limit, offset } = normalizePagination(options);
+  const since = options.since || null;
 
   let events;
   try {
-    events = await fetchAllRows(() =>
-      supabaseAdmin
-        .from("ad_source_events")
-        .select("event_name, user_id, device_id, session_id, path, referrer, metadata, created_at")
-        .eq("source", source)
-        .order("created_at", { ascending: false })
-    );
+    events = await fetchAllRows(() => buildAdEventsQuery(source, since));
   } catch (error) {
     if (error.code === "42P01") {
       return { available: false, error: "ad_source_events table is missing.", events: [] };
@@ -255,7 +265,7 @@ export async function fetchAdSourceStats({ source = "zdg", ...options } = {}) {
   const usersById = await fetchUsersById(events.map((event) => event.user_id));
   let purchaseStats = { available: true, users: new Map(), purchasedUsers: 0, paidOrders: 0 };
   try {
-    purchaseStats = await fetchAdPurchases(events);
+    purchaseStats = await fetchAdPurchases(events, since);
   } catch (error) {
     console.error(`Failed to load ${sourceConfig.label} ad purchases:`, error.message);
     purchaseStats = { available: false, users: new Map(), purchasedUsers: 0, paidOrders: 0 };

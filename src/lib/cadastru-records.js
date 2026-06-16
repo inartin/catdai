@@ -25,7 +25,6 @@ const RECORD_COLUMNS = [
   "apartment_area_m2",
   "apartment_floor",
   "apartment_estimated_value_lei",
-  "apartment_last_estimated_at",
   "building_total_floors",
   "building_construction_year",
   "apartment_data",
@@ -290,10 +289,12 @@ function hasDetailedPayload(payload) {
       apartment.bathroom ||
       apartment.is_last_floor ||
       apartment.estimated_value_lei ||
+      apartment.object_type ||
       apartment.type ||
       apartment.destination ||
-      apartment.last_estimated_at ||
+      apartment.room_usage ||
       apartment.ownership_type ||
+      apartment.transactions_count ||
       apartment.real_rights ||
       apartment.notes ||
       apartment.restrictions
@@ -322,10 +323,12 @@ function classifyDetailedCadastruPayload(payload) {
       apartment.bathroom ||
       apartment.is_last_floor ||
       apartment.estimated_value_lei ||
+      apartment.object_type ||
       apartment.type ||
       apartment.destination ||
-      apartment.last_estimated_at ||
+      apartment.room_usage ||
       apartment.ownership_type ||
+      apartment.transactions_count ||
       apartment.real_rights ||
       apartment.notes ||
       apartment.restrictions
@@ -408,7 +411,6 @@ function buildRecordRow(payload, options = {}, existing = null) {
     apartment_area_m2: normalizeNumber(apartment.area_m2 ?? storagePayload.apartment_area_m2),
     apartment_floor: normalizeInteger(apartment.floor ?? storagePayload.apartment_floor),
     apartment_estimated_value_lei: normalizeNumber(apartment.estimated_value_lei ?? storagePayload.estimated_value_lei),
-    apartment_last_estimated_at: cleanText(apartment.last_estimated_at, 80),
     building_total_floors: normalizeInteger(building.total_floors),
     building_construction_year: normalizeInteger(building.construction_year),
     apartment_data: apartment,
@@ -501,7 +503,6 @@ export async function persistCadastruRecord(payload, options = {}) {
             apartment_area_m2: existing.apartment_area_m2,
             apartment_floor: existing.apartment_floor,
             apartment_estimated_value_lei: existing.apartment_estimated_value_lei,
-            apartment_last_estimated_at: existing.apartment_last_estimated_at,
             building_total_floors: existing.building_total_floors,
             building_construction_year: existing.building_construction_year,
             apartment_data: existing.apartment_data || {},

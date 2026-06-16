@@ -33,7 +33,6 @@ create table if not exists public.cadastru_records (
   apartment_area_m2 numeric(10,2),
   apartment_floor integer,
   apartment_estimated_value_lei numeric(14,2),
-  apartment_last_estimated_at text,
 
   building_total_floors integer,
   building_construction_year integer,

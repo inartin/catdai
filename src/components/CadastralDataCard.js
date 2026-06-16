@@ -7,6 +7,7 @@ export default function CadastralDataCard({
   className = "",
   locked = false,
   onLockedClick,
+  forceDesktopLayout = false,
 }) {
   const { t } = useTranslation();
 
@@ -24,10 +25,12 @@ export default function CadastralDataCard({
       cadastral.apartment?.bathroom ||
       cadastral.apartment?.is_last_floor ||
       cadastral.apartment?.estimated_value_lei ||
+      cadastral.apartment?.object_type ||
       cadastral.apartment?.type ||
       cadastral.apartment?.destination ||
-      cadastral.apartment?.last_estimated_at ||
+      cadastral.apartment?.room_usage ||
       cadastral.apartment?.ownership_type ||
+      cadastral.apartment?.transactions_count ||
       cadastral.apartment?.real_rights ||
       cadastral.apartment?.notes ||
       cadastral.apartment?.restrictions
@@ -45,9 +48,11 @@ export default function CadastralDataCard({
   );
   const hasFullDetails = hasApartmentDetails && hasBuildingDetails;
   const hasLimitedCadastralData = Boolean(cadastral.partial || !hasApartmentDetails || !hasBuildingDetails);
-  const widthClass = hasFullDetails ? "w-full" : "mx-auto w-full max-w-xl";
-  const detailsGridClass = hasFullDetails ? "grid gap-6 lg:grid-cols-2 lg:gap-8" : "grid gap-6";
-  const detailValueClass = "whitespace-nowrap text-right font-medium text-gray-900";
+  const widthClass = hasFullDetails || forceDesktopLayout ? "w-full" : "mx-auto w-full max-w-xl";
+  const detailsGridClass = hasFullDetails || forceDesktopLayout
+    ? `grid gap-6 ${forceDesktopLayout ? "grid-cols-2 gap-8" : "lg:grid-cols-2 lg:gap-8"}`
+    : "grid gap-6";
+  const detailValueClass = "min-w-0 break-words text-right font-medium text-gray-900";
   const hasLockedDetails = locked || cadastral.locked_sections?.cadastru_details === true;
   const isVisibleLockedField = (section, field) => (
     (section === "apartment" && field === "floor") ||
@@ -87,6 +92,9 @@ export default function CadastralDataCard({
     ? cadastral.building?.total_floors && !isFieldLocked("building", "total_floors")
       ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
       : cadastral.apartment.floor
+    : null;
+  const roomTypeValue = cadastral.apartment?.type && cadastral.apartment.type !== cadastral.apartment?.room_usage
+    ? cadastral.apartment.type
     : null;
 
   return (
@@ -139,10 +147,12 @@ export default function CadastralDataCard({
                   {detailRow("apartment", "bathroom", t("form.cadastralBathroom"), cadastral.apartment?.bathroom)}
                   {detailRow("apartment", "is_last_floor", t("form.cadastralLastFloor"), cadastral.apartment?.is_last_floor)}
                   {detailRow("apartment", "estimated_value_lei", t("form.cadastralEstimatedValue"), cadastral.apartment?.estimated_value_lei ? `${cadastral.apartment.estimated_value_lei} lei` : null)}
-                  {detailRow("apartment", "type", t("form.cadastralRoomType"), cadastral.apartment?.type)}
+                  {detailRow("apartment", "object_type", t("form.cadastralObjectType"), cadastral.apartment?.object_type)}
+                  {detailRow("apartment", "type", t("form.cadastralRoomType"), roomTypeValue)}
                   {detailRow("apartment", "destination", t("form.cadastralDestination"), cadastral.apartment?.destination)}
-                  {detailRow("apartment", "last_estimated_at", t("form.cadastralLastValuation"), cadastral.apartment?.last_estimated_at)}
+                  {detailRow("apartment", "room_usage", t("form.cadastralRoomUsage"), cadastral.apartment?.room_usage)}
                   {detailRow("apartment", "ownership_type", t("form.cadastralPropertyType"), cadastral.apartment?.ownership_type)}
+                  {detailRow("apartment", "transactions_count", t("form.cadastralTransactions"), cadastral.apartment?.transactions_count)}
                   {detailRow("apartment", "real_rights", t("form.cadastralRealRights"), cadastral.apartment?.real_rights)}
                   {detailRow("apartment", "notes", t("form.cadastralNotes"), cadastral.apartment?.notes)}
                   {detailRow("apartment", "restrictions", t("form.cadastralRestrictions"), cadastral.apartment?.restrictions)}
@@ -151,7 +161,7 @@ export default function CadastralDataCard({
             )}
 
             {hasBuildingDetails && (
-              <div className={`min-w-0 ${hasApartmentDetails ? "border-t border-emerald-100 pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" : ""}`}>
+              <div className={`min-w-0 ${hasApartmentDetails ? forceDesktopLayout ? "border-l border-emerald-100 pl-8" : "border-t border-emerald-100 pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" : ""}`}>
                 <p className="mb-2.5 text-sm font-semibold uppercase tracking-wider text-emerald-700">
                   {t("form.cadastralBuilding")}
                 </p>

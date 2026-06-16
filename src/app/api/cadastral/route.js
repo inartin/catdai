@@ -3,11 +3,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
-import {
-  CADASTRU_DAILY_SEARCH_LIMIT,
-  getUserCadastruDailySearchStatus,
-  logCadastruSearchEvent,
-} from "@/lib/cadastru-search-events";
+import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
@@ -25,6 +21,22 @@ const GEODATA_TIMEOUT_MS = 10_000;
 const NOMINATIM_TIMEOUT_MS = 5_000;
 const CADASTRAL_CACHE_PREFIX = "catdai:cadastral:v1:";
 const CADASTRAL_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
+const CADASTRU_MD_DETAIL_APARTMENT_FIELDS = [
+  "object_type",
+  "destination",
+  "room_usage",
+  "ownership_type",
+  "transactions_count",
+  "real_rights",
+  "notes",
+  "restrictions",
+];
+const CADASTRU_MD_FILL_IF_MISSING_APARTMENT_FIELDS = [
+  "address",
+  "area_m2",
+  "type",
+  "estimated_value_lei",
+];
 
 async function fetchWithTimeout(url, { label, timeoutMs = GEODATA_TIMEOUT_MS, headers } = {}) {
   const started = Date.now();
@@ -237,11 +249,13 @@ function hasApartmentDetails(apartment) {
   return Boolean(
     apartment?.address ||
       apartment?.area_m2 ||
+      apartment?.object_type ||
       apartment?.type ||
       apartment?.destination ||
+      apartment?.room_usage ||
       apartment?.estimated_value_lei ||
-      apartment?.last_estimated_at ||
       apartment?.ownership_type ||
+      apartment?.transactions_count ||
       apartment?.real_rights ||
       apartment?.notes ||
       apartment?.restrictions
@@ -256,10 +270,12 @@ function hasApartmentData(apartment) {
       apartment?.bathroom ||
       apartment?.is_last_floor ||
       apartment?.estimated_value_lei ||
+      apartment?.object_type ||
       apartment?.type ||
       apartment?.destination ||
-      apartment?.last_estimated_at ||
+      apartment?.room_usage ||
       apartment?.ownership_type ||
+      apartment?.transactions_count ||
       apartment?.real_rights ||
       apartment?.notes ||
       apartment?.restrictions
@@ -318,18 +334,6 @@ function resolveCityFromPayload(payload) {
 function resolveSearchContext(body) {
   if (body?.search_context !== "cadastru") return null;
   return body.search_type === "address" ? "address" : "number";
-}
-
-function dailyLimitResponse(status) {
-  return NextResponse.json(
-    {
-      error: "daily_limit_reached",
-      message: "Cadastru searches are limited during beta.",
-      limit: status?.limit || CADASTRU_DAILY_SEARCH_LIMIT,
-      remaining: 0,
-    },
-    { status: 429 }
-  );
 }
 
 function normalizeCadastralPayload(payload, cadastralNumber, accessTier) {
@@ -412,12 +416,57 @@ async function buildCadastruDetailPayload(cadastralNumber, accessTier = "paid") 
       locked_sections: {},
     };
   } catch (error) {
-    console.error("[cadastral] cadastru.md detail fallback failed:", {
+    console.error("[cadastral] cadastru.md detail fetch failed:", {
       message: error?.message || String(error),
       cadastral_number: cadastralNumber,
     });
     return null;
   }
+}
+
+function hasCadastruMdDetailFields(apartment = {}) {
+  return CADASTRU_MD_DETAIL_APARTMENT_FIELDS.some((field) => apartment?.[field]);
+}
+
+function hasAllCadastruMdDetailFields(apartment = {}) {
+  return CADASTRU_MD_DETAIL_APARTMENT_FIELDS.every((field) => apartment?.[field]);
+}
+
+function mergeCadastruMdApartmentDetails(apartment = {}, detailApartment = {}) {
+  const merged = { ...apartment };
+
+  for (const field of CADASTRU_MD_FILL_IF_MISSING_APARTMENT_FIELDS) {
+    if (!merged[field] && detailApartment?.[field]) {
+      merged[field] = detailApartment[field];
+    }
+  }
+
+  for (const field of CADASTRU_MD_DETAIL_APARTMENT_FIELDS) {
+    if (detailApartment?.[field]) {
+      merged[field] = detailApartment[field];
+    }
+  }
+
+  return merged;
+}
+
+function mergeCadastruMdDetailPayload(payload, detailPayload) {
+  if (!detailPayload?.apartment || !hasCadastruMdDetailFields(detailPayload.apartment)) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    official_cadastral_number: payload?.official_cadastral_number || detailPayload.official_cadastral_number,
+    raw_cadastral_number: payload?.raw_cadastral_number || detailPayload.raw_cadastral_number,
+    apartment: mergeCadastruMdApartmentDetails(payload?.apartment || {}, detailPayload.apartment),
+  };
+}
+
+async function enrichWithCadastruMdDetails(payload, cadastralNumber, accessTier) {
+  if (hasAllCadastruMdDetailFields(payload?.apartment)) return payload;
+  const detailPayload = await buildCadastruDetailPayload(cadastralNumber, accessTier);
+  return detailPayload ? mergeCadastruMdDetailPayload(payload, detailPayload) : payload;
 }
 
 export async function POST(request) {
@@ -466,20 +515,6 @@ export async function POST(request) {
   }
 
   const cadastruSearchType = resolveSearchContext(body);
-  if (cadastruSearchType) {
-    let dailyLimit;
-    try {
-      dailyLimit = await getUserCadastruDailySearchStatus(access.user_id);
-    } catch (error) {
-      console.error("[cadastral] daily limit check failed:", error?.message || String(error));
-      return NextResponse.json({ error: "limit_check_failed", message: "Could not verify search limit." }, { status: 500 });
-    }
-
-    if (!dailyLimit.allowed) {
-      return dailyLimitResponse(dailyLimit);
-    }
-  }
-
   const creditIdempotencyKey = makeCadastruLookupUsageKey(trimmed);
   const creditCheck = await checkPaidFeatureAccess({
     userId: access.user_id,
@@ -548,8 +583,13 @@ export async function POST(request) {
   const cached = await getCachedCadastralPayload(trimmed);
   if (cached) {
     lookupSource = cached.lookupSource;
-    return respondWithCadastralPayload(
+    const payload = await enrichWithCadastruMdDetails(
       applyCadastralAccess(cached.payload, trimmed, access.tier),
+      trimmed,
+      access.tier
+    );
+    return respondWithCadastralPayload(
+      payload,
       { countLookup: true }
     );
   }
@@ -557,8 +597,13 @@ export async function POST(request) {
   const stored = await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true });
   if (stored) {
     lookupSource = stored.lookupSource;
-    return respondWithCadastralPayload(
+    const payload = await enrichWithCadastruMdDetails(
       applyCadastralAccess(stored.payload, trimmed, access.tier),
+      trimmed,
+      access.tier
+    );
+    return respondWithCadastralPayload(
+      payload,
       { countLookup: true, resultType: stored.resultType }
     );
   }
@@ -566,8 +611,13 @@ export async function POST(request) {
   try {
     const externalPayload = await fetchExternalCadastralData(trimmed);
     lookupSource = "api";
-    return respondWithCadastralPayload(
+    const payload = await enrichWithCadastruMdDetails(
       normalizeCadastralPayload(externalPayload, trimmed, access.tier),
+      trimmed,
+      access.tier
+    );
+    return respondWithCadastralPayload(
+      payload,
       { officialFetch: true }
     );
   } catch (error) {
@@ -662,13 +712,24 @@ export async function POST(request) {
 
     const html = step3.features[0].properties?.html || "";
     const { building, apartment } = parseHtmlResponse(html, buildingId, apartmentId);
-    const detailPayload = hasApartmentDetails(apartment) ? null : await buildCadastruDetailPayload(trimmed, access.tier);
+    const detailPayload = await buildCadastruDetailPayload(trimmed, access.tier);
     if (detailPayload) {
-      return respondWithCadastralPayload({
-        ...detailPayload,
-        building: Object.keys(building).length ? building : detailPayload.building,
-        form_fields: buildFormFields(Object.keys(building).length ? building : detailPayload.building, detailPayload.apartment),
-      }, { officialFetch: true });
+      const mergedApartment = mergeCadastruMdApartmentDetails(apartment, detailPayload.apartment);
+      const mergedBuilding = Object.keys(building).length ? building : detailPayload.building;
+      const isPartial = !hasApartmentData(apartment) || !hasBuildingData(building);
+      const payload = mergeCadastruMdDetailPayload(
+        {
+          cadastral_number: trimmed,
+          building: mergedBuilding,
+          apartment: mergedApartment,
+          form_fields: buildFormFields(mergedBuilding, mergedApartment),
+          partial: isPartial || undefined,
+          access_tier: access.tier,
+          locked_sections: {},
+        },
+        detailPayload
+      );
+      return respondWithCadastralPayload(payload, { officialFetch: true });
     }
 
     const form_fields = buildFormFields(building, apartment);

@@ -421,27 +421,49 @@ function parseCadastruDetailHtml(html) {
   const cadastralNumber = getDetailValue(rows, ["Numărul cadastral"]);
   const address = getDetailValue(rows, ["Adresa"]);
   const area = normalizeAreaValue(getDetailValue(rows, ["Suprafața", "Suprafata"]));
-  const type = getDetailValue(rows, ["Utilizarea incaperii", "Utilizarea încăperii", "Tipul încăperii", "Tipul obiectului"]);
+  const objectType = getDetailValue(rows, ["Tipul obiectului"]);
+  const roomUsage = getDetailValue(rows, ["Utilizarea incaperii", "Utilizarea încăperii"]);
+  const type = getDetailValue(rows, ["Tipul încăperii"]);
   const estimatedValue = normalizeEstimatedValue(
     getDetailValue(rows, ["Valoarea estimată a bunului imobil, lei", "Valoarea estimată, lei"])
   );
+  const destination = getDetailValue(rows, ["Destinație", "Destinatie"]);
+  const ownershipType = getDetailValue(rows, ["Tipul de proprietate"]);
+  const realRights = getDetailValue(rows, ["Alte drepturi reale"]);
+  const notes = getDetailValue(rows, ["Notări", "Notari"]);
+  const restrictions = getDetailValue(rows, ["Interdicții", "Interdictii"]);
+  const transactionsCount = getDetailValue(rows, ["Numărul tranzacțiilor", "Numarul tranzactiilor"]);
 
-  if (!cadastralNumber && !address && !area && !estimatedValue) return null;
+  if (
+    !cadastralNumber &&
+    !address &&
+    !area &&
+    !estimatedValue &&
+    !objectType &&
+    !destination &&
+    !roomUsage &&
+    !ownershipType &&
+    !transactionsCount &&
+    !realRights &&
+    !notes &&
+    !restrictions
+  ) return null;
 
   return {
     raw_cadastral_number: cadastralNumber || null,
     apartment: {
       address,
       area_m2: area,
+      object_type: objectType,
       type,
-      destination: getDetailValue(rows, ["Destinație", "Destinatie"]),
+      destination,
+      room_usage: roomUsage,
       estimated_value_lei: estimatedValue,
-      last_estimated_at: getDetailValue(rows, ["Data ultimei estimări", "Data ultimei estimari"]),
-      ownership_type: getDetailValue(rows, ["Tipul de proprietate"]),
-      real_rights: getDetailValue(rows, ["Alte drepturi reale"]),
-      notes: getDetailValue(rows, ["Notări", "Notari"]),
-      restrictions: getDetailValue(rows, ["Interdicții", "Interdictii"]),
-      transactions_count: getDetailValue(rows, ["Numărul tranzacțiilor", "Numarul tranzactiilor"]),
+      ownership_type: ownershipType,
+      transactions_count: transactionsCount,
+      real_rights: realRights,
+      notes,
+      restrictions,
     },
     raw_response_preview: stripHtml(html).slice(0, 1000),
   };

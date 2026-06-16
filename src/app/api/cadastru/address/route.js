@@ -4,11 +4,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
 import { findCadastralByAddress } from "@/lib/cadastru-address-search";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
-import {
-  CADASTRU_DAILY_SEARCH_LIMIT,
-  getUserCadastruDailySearchStatus,
-  logCadastruSearchEvent,
-} from "@/lib/cadastru-search-events";
+import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByAddress, persistCadastruRecord } from "@/lib/cadastru-records";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
@@ -130,18 +126,6 @@ function buildStructuredAddress({ city, roadType, street, houseNumber, apartment
   };
 }
 
-function dailyLimitResponse(status) {
-  return NextResponse.json(
-    {
-      error: "daily_limit_reached",
-      message: "Cadastru searches are limited during beta.",
-      limit: status?.limit || CADASTRU_DAILY_SEARCH_LIMIT,
-      remaining: 0,
-    },
-    { status: 429 }
-  );
-}
-
 async function persistAddressResult(payload, options = {}) {
   if (!payload?.cadastral_number) return;
   await persistCadastruRecord(payload, {
@@ -241,20 +225,6 @@ export async function POST(request) {
       },
       { status: 400 }
     );
-  }
-
-  if (shouldTrackCadastruSearch) {
-    let dailyLimit;
-    try {
-      dailyLimit = await getUserCadastruDailySearchStatus(access.user_id);
-    } catch (error) {
-      console.error("[cadastru/address] daily limit check failed:", error?.message || String(error));
-      return NextResponse.json({ error: "limit_check_failed", message: "Could not verify search limit." }, { status: 500 });
-    }
-
-    if (!dailyLimit.allowed) {
-      return dailyLimitResponse(dailyLimit);
-    }
   }
 
   const rawAddress = normalizeSpaces(`${city}, ${roadType} ${street} ${houseNumber} ap ${apartmentNumber}`);

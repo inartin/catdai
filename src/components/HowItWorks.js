@@ -5,18 +5,20 @@ import MarketPositionChart from "@/components/MarketPositionChart";
 
 function ArrowIcon() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      className="mt-[1.125rem] hidden h-5 w-5 shrink-0 text-gray-300 sm:block"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="5" y1="12" x2="19" y2="12" />
-      <polyline points="12 5 19 12 12 19" />
-    </svg>
+    <div className="hidden self-stretch sm:flex sm:items-center">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-5 w-5 shrink-0 text-gray-300"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <line x1="5" y1="12" x2="19" y2="12" />
+        <polyline points="12 5 19 12 12 19" />
+      </svg>
+    </div>
   );
 }
 
@@ -62,7 +64,7 @@ export default function HowItWorks() {
       </div>
 
       <div className="mx-auto mt-10 max-w-4xl rounded-2xl bg-section-bg px-4 py-5 sm:px-6 sm:py-8">
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] sm:items-start sm:gap-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] sm:items-stretch sm:gap-4">
           {stepKeys.map((key, i) => (
             <div key={key} className="contents">
               <div className="grid min-w-0 grid-rows-[3.5rem_minmax(2.75rem,auto)] place-items-center gap-2 rounded-xl border border-emerald-100 bg-white px-2.5 py-3 shadow-sm sm:border-0 sm:bg-transparent sm:px-1 sm:py-0 sm:shadow-none">

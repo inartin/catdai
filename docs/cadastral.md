@@ -19,12 +19,10 @@ Implemented and active, with partial fallback.
 - `/evaluare` without result query parameters reuses the same cadastru search form and source note, placing the compact cadastral-number quick-fill card first under the `Locație` category header.
 - Anonymous users can open the page, but search actions show the shared auth popup used by PDF export instead of calling the cadastral APIs.
 - The cadastru search form persists the address and cadastral-number draft in browser storage so OAuth return to `/cadastru` restores the fields the anonymous user filled before logging in; the result page clears that draft once a result URL opens.
-- During beta, `/cadastru` search actions are limited to 5 searches per authenticated user per day. The limit is enforced in the cadastru API search context and the page shows a localized popup without login options when the user reaches it.
 - The page title and subtitle sit above the input card so the page purpose is clear before choosing a search method.
 - The page has localized route metadata, canonical and alternate language tags, and sitemap entries for both Romanian and Russian.
 - The Cadastru route layout passes the URL language into `LanguageProvider`, so `/ru/cadastru` renders Russian page text in the server HTML instead of waiting for client hydration.
 - Address search posts to authenticated `/api/cadastru/address`, which checks Redis, the structured address fields in `cadastru_records`, the signed external cadastru worker, and finally the reusable in-app helper in `src/lib/cadastru-address-search.js` if the worker is unreachable.
-- `/cadastru` performs a lightweight authenticated `/api/cadastru/search-limit` check before a search so the frontend can show the beta-limit popup before starting a lookup; the lookup APIs still enforce the same limit when called with the cadastru search context.
 - Successful address-search responses are cached in Redis for 7 days by the normalized address and store/update only the matching `cadastru_records` row. Failed/not-found responses are not cached.
 - It shows a fixed, non-selectable Chișinău city field, a road type dropdown for `Str.` or `Bulevard`, and separate inputs for street name, house number, and apartment number.
 - Address input validation runs in both the browser and `/api/cadastru/address`: street is capped at 80 characters, building number accepts only digits plus one optional slash such as `18/2`, and apartment number accepts only digits from `1` to `9999`.
@@ -37,6 +35,7 @@ Implemented and active, with partial fallback.
 - The shared header links to the localized Cadastru URL for the current language on desktop and mobile.
 - Successful searches navigate to `/{lang}/cadastru/rezultat?cadastral_number=...`.
 - `/cadastru/rezultat` fetches authenticated `/api/cadastral`, uses the shared back button from the estimation form, renders the shared `CadastralDataCard` component used by the evaluation result page, and is marked `noindex` because each URL is generated from a user query.
+- The result page includes a localized "save image" action that exports the cadastral result card into a downloadable PNG using the desktop two-column layout, even when the page is opened on mobile.
 - Authenticated users without a remaining `cadastru_lookup` credit still land on the result page. It shows the cadastral number, address, apartment floor, and building classifier when available, while the rest of the official fields are replaced server-side with `|` placeholders and blurred behind the same package purchase popup pattern used by evaluation previews.
 - After a result is loaded, `/cadastru/rezultat` keeps the loaded result in component state and does not repeat the lookup on tab focus or auth token refresh unless the cadastral number changes. In-flight lookups are deduped so effect reruns do not create duplicate statistics rows.
 - Valid `/cadastru` search submissions are logged to `cadastru_search_events` for admin stats with `search_type`, optional authenticated `user_id`, city when derivable, optional derived district for address searches, cadastral number when known, result type, lookup source, and timestamp. Result type is one of `no_data`, `address_only`, `apartment_only`, or `full_data`; lookup source is `api` for the external worker or `local` for the in-app backup.
@@ -49,7 +48,8 @@ Implemented and active, with partial fallback.
 - When only one detail section is available, or only the cadastral number/address is available, the result card uses a compact centered width and keeps the available details on the full inner width instead of reserving an empty second column.
 - Partial cadastral responses use the same result card and still show the cadastral number plus any available address, while detailed apartment/building sections render only when official fields exist.
 - Limited cadastral result cards show a highlighted note in Romanian or Russian explaining that no more official data was found in the verified sources.
-- When Geodata lacks WMS apartment details, the external worker calls cadastru.md APEX `GET_DETAIL_DATA` with the dotted cadastral number and object type `3`, then maps the returned table into apartment address, area, type, destination, estimated value, last valuation date, ownership type, real rights, notes, and restrictions.
+- Cadastral-number lookups call cadastru.md APEX `GET_DETAIL_DATA` with the dotted cadastral number and object type `3` to enrich Geodata or external-worker results with cadastru.md-only fields when available: object type, destination, room usage, ownership type, transaction count, real rights, notes, and restrictions.
+- When Geodata lacks WMS apartment details, cadastru.md detail data can still provide apartment address, area, type, destination, estimated value, ownership type, transaction count, real rights, notes, and restrictions.
 - The cadastru.md session bootstrap retries the APEX entry URLs with browser-like headers, carries cookies between attempts, and accepts hidden `p_instance`, APEX `APP_SESSION`, or page-context session values before calling detail/search processes. This code exists in both the external worker and the in-app backup.
 - `external/cadastru-api` contains a standalone Node.js cadastru worker intended for a Raspberry Pi behind Cloudflare Tunnel. It exposes signed `POST /v1/cadastral` and `POST /v1/cadastru/address` requests, runs the Geodata plus cadastru.md lookup externally, and returns data to the main app without Supabase/user context.
 - The external worker includes `ecosystem.config.cjs` for PM2, running one local-only process on `127.0.0.1:8787`; secrets must stay in the runtime environment or untracked `.env`, not in the PM2 config.
@@ -58,6 +58,7 @@ Implemented and active, with partial fallback.
 ## Data Sources
 - Geodata WFS lookup for parcel geometry.
 - Geodata WMS `GetFeatureInfo` for building/apartment HTML details.
+- cadastru.md APEX detail lookup for fields not exposed by Geodata.
 - Nominatim fallback when detailed geodata is missing.
 
 ## Access
@@ -69,7 +70,6 @@ Implemented and active, with partial fallback.
 
 ## Limits
 - Rate limited to 15 requests/minute per IP.
-- `/cadastru` beta search usage is capped at 5 logged searches per authenticated user per day. Valuation/PDF cadastral lookups outside the `/cadastru` search flow are not included in this beta page limit.
 - Successful cadastral-number and address lookup responses use Redis shared cache for 7 days before falling back to the long-lived Supabase cadastru store.
 - Upstream Geodata calls use a 10 second timeout; Nominatim fallback uses 5 seconds.
 - Timeout logs include the failing stage: `geodata_wfs`, `geodata_wms`, or `nominatim_reverse`.
@@ -78,7 +78,6 @@ Implemented and active, with partial fallback.
 ## Related Files
 - `src/app/api/cadastral/route.js`
 - `src/app/api/cadastru/address/route.js`
-- `src/app/api/cadastru/search-limit/route.js`
 - `src/lib/cadastru-external-api.js`
 - `src/app/cadastru/layout.js`
 - `src/app/cadastru/rezultat/page.js`

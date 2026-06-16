@@ -127,7 +127,7 @@ export default function LinkAnalyzer({
   };
 
   const cardClassName = showFeaturePapers
-    ? "relative z-10 rotate-[-0.4deg] rounded-sm border border-gray-200 bg-[#fdfcf6] p-5"
+    ? "relative z-10 rotate-[-0.4deg] rounded-sm border border-gray-200 bg-white p-5"
     : "relative z-10 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm";
 
   return (
@@ -209,7 +209,7 @@ export default function LinkAnalyzer({
               style={{ transform: `rotate(${tilt}deg)` }}
             >
               <div
-                className="flex h-full flex-col items-center justify-start border-x border-gray-200/80 bg-[#fdfcf6] px-1.5 pt-6 sm:pt-7 shadow-[0_10px_18px_rgba(15,23,42,0.18)] sm:px-2"
+                className="flex h-full flex-col items-center justify-start border-x border-gray-200/80 bg-white px-1.5 pt-6 sm:pt-7 shadow-[0_10px_18px_rgba(15,23,42,0.18)] sm:px-2"
                 style={{
                   clipPath: tornEdge,
                   backgroundImage:

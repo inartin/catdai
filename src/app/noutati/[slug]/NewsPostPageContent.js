@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import { supabase } from "@/lib/supabase";
 
 function fmtDate(value, lang) {
   if (!value) return "";
@@ -23,7 +24,7 @@ function upvoteCount(value) {
 
 export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml, jsonLdHtml }) {
   const { lang, t } = useTranslation();
-  const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
+  const { session, loading: authLoading, clearAuthError } = useAuth();
   const [openImage, setOpenImage] = useState(null);
   const [count, setCount] = useState(() => upvoteCount(post.upvote_count));
   const [upvoted, setUpvoted] = useState(false);
@@ -75,7 +76,10 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
   async function handleUpvote() {
     setUpvoteMessage("");
 
-    if (!isAuthenticated || !session?.access_token) {
+    const { data: freshSessionData } = await supabase.auth.getSession();
+    const accessToken = freshSessionData?.session?.access_token || session?.access_token;
+
+    if (!accessToken) {
       clearAuthError();
       setIsAuthModalOpen(true);
       return;
@@ -89,13 +93,19 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ post_id: post.id }),
       });
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        if (response.status === 401) {
+          clearAuthError();
+          setIsAuthModalOpen(true);
+          return;
+        }
+
         setUpvoteMessage(payload?.error || t("news.upvoteFailed"));
         return;
       }

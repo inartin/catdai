@@ -40,21 +40,14 @@ export function useLivePrices() {
   useEffect(() => {
     const cached = readCache();
 
-    // If cache is fresh, use it directly — no fetch needed
-    if (cached?.fresh) {
-      setData(cached.data);
-      setLoading(false);
-      return;
-    }
-
-    // Show stale data immediately while we try to refresh
     if (cached?.data) {
       setData(cached.data);
+      setLoading(false);
     }
 
     let cancelled = false;
 
-    fetch("/api/prices")
+    fetch("/api/prices", { cache: "no-store" })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();

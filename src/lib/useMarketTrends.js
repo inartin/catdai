@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 const STORAGE_KEY = "catdai_market_trends";
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 
 function readCache() {
   try {
@@ -13,11 +12,7 @@ function readCache() {
     const parsed = JSON.parse(raw);
     if (!parsed?.cached_at || !parsed?.data) return null;
 
-    const age = Date.now() - new Date(parsed.cached_at).getTime();
-    if (age < TWELVE_HOURS_MS) return parsed.data;
-
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
+    return parsed.data;
   } catch {
     return null;
   }
@@ -49,10 +44,9 @@ export function useMarketTrends() {
       if (cached) {
         setData(cached);
         setLoading(false);
-        return;
       }
 
-      fetch("/api/market-trends")
+      fetch("/api/market-trends", { cache: "no-store" })
         .then((res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();

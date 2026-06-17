@@ -80,7 +80,7 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ post_id: post.id }),
+      body: JSON.stringify({ post_id: post.id, access_token: accessToken }),
     });
     const payload = await response.json().catch(() => ({}));
     return { response, payload };

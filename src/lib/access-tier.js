@@ -9,12 +9,15 @@ function getBearerToken(request) {
   return token.trim();
 }
 
+export function getRequestBearerToken(request) {
+  return getBearerToken(request);
+}
+
 export function isPaidAccessTier(tier) {
   return String(tier || "").toLowerCase() === "paid";
 }
 
-export async function resolveAccessTier(request) {
-  const token = getBearerToken(request);
+export async function resolveAccessTierFromToken(token) {
   if (!token) return { tier: "free", user_id: null };
 
   const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
@@ -23,4 +26,8 @@ export async function resolveAccessTier(request) {
   }
 
   return { tier: "free", user_id: authData.user.id };
+}
+
+export async function resolveAccessTier(request) {
+  return resolveAccessTierFromToken(getBearerToken(request));
 }

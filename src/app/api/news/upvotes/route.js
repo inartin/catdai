@@ -1,4 +1,4 @@
-import { resolveAccessTier } from "@/lib/access-tier";
+import { getRequestBearerToken, resolveAccessTier, resolveAccessTierFromToken } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   fetchNewsPostUpvoteCount,
@@ -59,16 +59,18 @@ export async function POST(request) {
     return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   }
 
-  const access = await resolveAccessTier(request);
-  if (!access.user_id) {
-    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-  }
-
   let body = {};
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const access = await resolveAccessTierFromToken(
+    getRequestBearerToken(request) || body?.access_token
+  );
+  if (!access.user_id) {
+    return NextResponse.json({ error: "Authentication required." }, { status: 401 });
   }
 
   const postId = body?.post_id;

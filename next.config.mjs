@@ -13,7 +13,10 @@ const nextConfig = {
   },
 
   async headers() {
-    const allowedOrigin = process.env.APP_URL || "";
+    const allowedOrigin =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      String(process.env.APP_URL || "").split(",")[0]?.trim() ||
+      "";
     const noIndexHeader = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
 
     return [
@@ -63,7 +66,7 @@ const nextConfig = {
         headers: [
           { key: "Access-Control-Allow-Origin", value: allowedOrigin },
           { key: "Access-Control-Allow-Methods", value: "GET, POST, OPTIONS" },
-          { key: "Access-Control-Allow-Headers", value: "Content-Type" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
           { key: "Access-Control-Max-Age", value: "86400" },
           ...noIndexHeader,
         ],

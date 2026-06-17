@@ -2,8 +2,10 @@
 
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 
 function fmtDate(value, lang) {
@@ -15,9 +17,19 @@ function fmtDate(value, lang) {
   });
 }
 
+function upvoteCount(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
 export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml, jsonLdHtml }) {
   const { lang, t } = useTranslation();
+  const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const [openImage, setOpenImage] = useState(null);
+  const [count, setCount] = useState(() => upvoteCount(post.upvote_count));
+  const [upvoted, setUpvoted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [upvoteMessage, setUpvoteMessage] = useState("");
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
     if (!openImage) return undefined;
@@ -34,6 +46,68 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [openImage]);
+
+  useEffect(() => {
+    setCount(upvoteCount(post.upvote_count));
+    setUpvoted(false);
+  }, [post.id, post.upvote_count]);
+
+  useEffect(() => {
+    if (authLoading || !session?.access_token) return;
+
+    let cancelled = false;
+    fetch(`/api/news/upvotes?post_id=${encodeURIComponent(post.id)}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!payload || cancelled) return;
+        setCount(upvoteCount(payload.count));
+        setUpvoted(!!payload.upvoted);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, post.id, session?.access_token]);
+
+  async function handleUpvote() {
+    setUpvoteMessage("");
+
+    if (!isAuthenticated || !session?.access_token) {
+      clearAuthError();
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    if (upvoted || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/news/upvotes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ post_id: post.id }),
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        setUpvoteMessage(payload?.error || t("news.upvoteFailed"));
+        return;
+      }
+
+      setCount(upvoteCount(payload.count));
+      setUpvoted(true);
+    } catch {
+      setUpvoteMessage(t("news.upvoteFailed"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   function openArticleImage(event) {
     const image = event.target.closest?.(".news-content img");
@@ -74,10 +148,33 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
               <span className="text-sm font-medium">{t("news.back")}</span>
             </Link>
 
-            <p className="text-sm font-medium text-gray-500">{fmtDate(post.created_at, lang)}</p>
-              <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
+            <h1 className="text-2xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
               {post.title}
             </h1>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <p className="text-sm font-medium text-gray-500">{fmtDate(post.created_at, lang)}</p>
+              <button
+                type="button"
+                onClick={handleUpvote}
+                disabled={isSubmitting || upvoted}
+                className={`inline-flex min-h-10 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-semibold transition-colors ${
+                  upvoted
+                    ? "cursor-default border-primary/20 bg-primary/10 text-primary"
+                    : "cursor-pointer border-gray-200 bg-white text-gray-700 hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                } disabled:opacity-80`}
+                aria-pressed={upvoted}
+                aria-label={upvoted ? t("news.upvoted") : t("news.upvote")}
+              >
+                <span aria-hidden="true" className="text-base leading-none">👍</span>
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                  {count}
+                </span>
+              </button>
+            </div>
+            {upvoteMessage && (
+              <p className="mt-2 text-sm font-medium text-amber-700">{upvoteMessage}</p>
+            )}
 
             {post.cover_image_url && (
               <div className="mt-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
@@ -116,7 +213,24 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
                         href={`/noutati/${entry.slug}`}
                         className="group block rounded-xl border border-gray-100 p-3 transition-colors hover:border-primary/30 hover:bg-primary/5"
                       >
-                        <p className="text-xs text-gray-400">{fmtDate(entry.created_at, lang)}</p>
+                        <div className="flex items-center justify-between gap-2 text-xs text-gray-400">
+                          <p>{fmtDate(entry.created_at, lang)}</p>
+                          <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-gray-500">
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-3.5 w-3.5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M12 5v14M5 12l7-7 7 7" />
+                            </svg>
+                            {upvoteCount(entry.upvote_count)}
+                          </span>
+                        </div>
                         <h3 className="mt-1 text-sm font-semibold leading-snug text-gray-900 group-hover:text-primary">
                           {entry.title}
                         </h3>
@@ -153,6 +267,11 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
           />
         </div>
       )}
+      <AuthRequiredModal
+        open={isAuthModalOpen}
+        showCopy={false}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
       <Footer />
     </div>
   );

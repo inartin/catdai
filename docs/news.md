@@ -6,12 +6,14 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 ## Data
 - News rows live in `news_posts`.
 - Fields are `slug`, `title`, `description`, `cover_image_url`, and `created_at`.
+- Authenticated article upvotes live in `news_post_upvotes` with one row per `news_post_id + user_id`.
 - `cover_image_url` is stored as text and is expected to be an image link.
 - `description` stores sanitized rich article HTML created in the admin editor.
 - Slugs are generated from the title at creation time and stored so article URLs stay stable after edits.
 - If the current database has not been migrated with the `slug` column yet, the app derives the public URL slug from the current title.
 - External news images are allowed by CSP through `img-src https:`.
 - RLS blocks direct public table access; public pages and admin API routes read through server-side `SUPABASE_SERVICE_KEY`.
+- `news_post_upvotes` has a unique `(news_post_id, user_id)` constraint so a user can upvote each article only once.
 
 ## Admin
 - `/admin/news` is linked from the admin sidebar.
@@ -26,7 +28,10 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 
 ## Public Pages
 - `/noutati` server-renders all news rows as linked cards with cover image and title.
-- `/noutati/[slug]` server-renders an individual news article with sanitized rich HTML, a back link to `/noutati`, and a right sidebar with up to 5 latest other news items in the relevant-listings card style.
+- `/noutati` and `/noutati/[slug]` show article upvote counters.
+- `/noutati/[slug]` server-renders an individual news article with sanitized rich HTML, a back link to `/noutati`, a top-page upvote button, and a right sidebar with up to 5 latest other news items in the relevant-listings card style.
+- `GET /api/news/upvotes?post_id=...` returns the public count and, for authenticated users, their upvote status.
+- `POST /api/news/upvotes` requires a bearer token and inserts one upvote for the authenticated user.
 - Article body images on `/noutati/[slug]` open in a full-size lightbox when clicked.
 - News detail pages use narrower mobile padding and mobile article type, and sanitized article HTML normalizes non-breaking spaces so admin-authored paragraphs can wrap within the viewport.
 - `sitemap.xml` includes every news detail URL with `created_at` as `lastModified`.
@@ -38,10 +43,14 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 - `src/app/noutati/page.js`
 - `src/app/noutati/layout.js`
 - `src/app/noutati/[slug]/page.js`
+- `src/app/noutati/[slug]/NewsPostPageContent.js`
+- `src/app/api/news/upvotes/route.js`
 - `src/lib/news-content.js`
+- `src/lib/news-upvotes.js`
 - `src/app/api/admin/news/route.js`
 - `src/app/api/admin/news/[id]/route.js`
 - `src/components/admin/AdminSidebar.js`
 - `src/lib/news-posts.js`
 - `src/app/sitemap.js`
 - `db/news_posts.sql`
+- `db/news_post_upvotes.sql`

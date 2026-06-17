@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { fetchNewsUpvoteCounts } from "@/lib/news-upvotes";
 
 export const NEWS_POST_SELECT = "id, title, description, cover_image_url, slug, created_at";
 export const NEWS_POST_LIST_SELECT = NEWS_POST_SELECT;
@@ -54,7 +55,8 @@ export async function fetchPublishedNewsPosts() {
         .order("created_at", { ascending: false });
 
       if (!fallback.error) {
-        return (fallback.data || []).map((row) => ({ ...row, slug: slugifyNewsTitle(row.title) }));
+        const fallbackRows = (fallback.data || []).map((row) => ({ ...row, slug: slugifyNewsTitle(row.title) }));
+        return withNewsUpvoteCounts(fallbackRows);
       }
     }
 
@@ -62,7 +64,7 @@ export async function fetchPublishedNewsPosts() {
     return [];
   }
 
-  return data || [];
+  return withNewsUpvoteCounts(data || []);
 }
 
 export async function fetchPublishedNewsPostBySlug(slug) {
@@ -81,7 +83,7 @@ export async function fetchPublishedNewsPostBySlug(slug) {
 
       if (!fallback.error) {
         const row = (fallback.data || []).find((entry) => slugifyNewsTitle(entry.title) === slug);
-        if (row) return { ...row, slug };
+        if (row) return withNewsUpvoteCount({ ...row, slug });
       }
     }
 
@@ -91,5 +93,18 @@ export async function fetchPublishedNewsPostBySlug(slug) {
     return null;
   }
 
-  return data;
+  return withNewsUpvoteCount(data);
+}
+
+async function withNewsUpvoteCounts(posts) {
+  const counts = await fetchNewsUpvoteCounts(posts.map((post) => post.id));
+  return posts.map((post) => ({
+    ...post,
+    upvote_count: counts[post.id] || 0,
+  }));
+}
+
+async function withNewsUpvoteCount(post) {
+  const [withCount] = await withNewsUpvoteCounts([post]);
+  return withCount;
 }

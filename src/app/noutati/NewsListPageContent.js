@@ -14,6 +14,10 @@ function fmtDate(value, lang) {
   });
 }
 
+function upvoteCount(value) {
+  return Number.isFinite(Number(value)) ? Number(value) : 0;
+}
+
 export default function NewsListPageContent({ newsPosts }) {
   const { lang, t } = useTranslation();
 
@@ -51,7 +55,24 @@ export default function NewsListPageContent({ newsPosts }) {
                   )}
                 </div>
                 <div className="p-5">
-                  <p className="text-xs text-gray-400">{fmtDate(post.created_at, lang)}</p>
+                  <div className="flex items-center justify-between gap-3 text-xs text-gray-400">
+                    <p>{fmtDate(post.created_at, lang)}</p>
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 font-semibold text-gray-600">
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 5v14M5 12l7-7 7 7" />
+                      </svg>
+                      {upvoteCount(post.upvote_count)}
+                    </span>
+                  </div>
                   <h2 className="mt-2 text-lg font-bold leading-snug text-gray-950 group-hover:text-primary">
                     {post.title}
                   </h2>

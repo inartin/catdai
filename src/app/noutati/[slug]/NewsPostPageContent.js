@@ -73,6 +73,19 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
     };
   }, [authLoading, post.id, session?.access_token]);
 
+  async function submitUpvote(accessToken) {
+    const response = await fetch("/api/news/upvotes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ post_id: post.id }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    return { response, payload };
+  }
+
   async function handleUpvote() {
     setUpvoteMessage("");
 
@@ -89,23 +102,30 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
 
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/news/upvotes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({ post_id: post.id }),
-      });
-      const payload = await response.json().catch(() => ({}));
+      let { response, payload } = await submitUpvote(accessToken);
 
       if (!response.ok) {
         if (response.status === 401) {
-          clearAuthError();
-          setIsAuthModalOpen(true);
-          return;
+          const { data: refreshedSessionData } = await supabase.auth.refreshSession();
+          const refreshedAccessToken = refreshedSessionData?.session?.access_token;
+
+          if (refreshedAccessToken) {
+            ({ response, payload } = await submitUpvote(refreshedAccessToken));
+          }
+
+          if (response.status === 401) {
+            setUpvoteMessage(t("news.upvoteFailed"));
+            return;
+          }
         }
 
+        if (!response.ok) {
+          setUpvoteMessage(payload?.error || t("news.upvoteFailed"));
+          return;
+        }
+      }
+
+      if (!response.ok) {
         setUpvoteMessage(payload?.error || t("news.upvoteFailed"));
         return;
       }

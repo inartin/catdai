@@ -32,6 +32,7 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 - `/noutati/[slug]` server-renders an individual news article with sanitized rich HTML, a back link to `/noutati`, a top-page upvote button, and a right sidebar with up to 5 latest other news items in the relevant-listings card style.
 - `GET /api/news/upvotes?post_id=...` returns the public count and, for authenticated users, their upvote status.
 - `POST /api/news/upvotes` requires a bearer token and inserts one upvote for the authenticated user.
+- The article upvote action refreshes the Supabase session once and retries if production rejects the first bearer token.
 - Article body images on `/noutati/[slug]` open in a full-size lightbox when clicked.
 - News detail pages use narrower mobile padding and mobile article type, and sanitized article HTML normalizes non-breaking spaces so admin-authored paragraphs can wrap within the viewport.
 - `sitemap.xml` includes every news detail URL with `created_at` as `lastModified`.

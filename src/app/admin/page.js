@@ -824,6 +824,11 @@ export default function AdminDashboard() {
             detail={fmtCheckoutSummary(s.paymentCheckout?.page)}
           />
           <StatCard
+            label="Pricing Page Opened"
+            value={fmtNum(s.paymentCheckout?.pricingPage?.total)}
+            detail={fmtCheckoutSummary(s.paymentCheckout?.pricingPage)}
+          />
+          <StatCard
             label="Sale Estimations"
             value={fmtNum(s.totalSaleEstimations ?? s.totalEstimations)}
             detail={activeEstimationsType === "sale" ? "Click to hide list" : "Click to view recent sale estimations"}

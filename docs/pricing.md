@@ -5,7 +5,7 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 
 ## Routes
 - Landing page shows pricing near the bottom, before the FAQ preview.
-- `/pricing` renders the same pricing component as a standalone page.
+- `/pricing` renders the same pricing component as a standalone page and logs a `pricing_page_opened` event in `payment_checkout_events` for admin statistics.
 - `/payment/paddle/checkout` is the standalone Paddle inline checkout page used by payment flows when `PADDLE_CHECKOUT_URL` points to CatDai.
 - `/payment/paddle/success` is the standalone localized Paddle status page and is not linked from pricing.
 - `/payment/paddle/test` is a temporary standalone test page for creating a `cadastru_lookup_single` Paddle checkout and is not linked from pricing.

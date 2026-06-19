@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import CloseIcon from "@/components/icons/CloseIcon";
+import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 
 const MAX_CUSTOM_REQUEST_LENGTH = 500;
 const MAX_CUSTOM_REQUEST_BODY_LENGTH = 340;
@@ -364,15 +365,24 @@ function CustomRequestModal({ open, onClose }) {
   );
 }
 
-export default function Pricing({ prices, compact = false }) {
+export default function Pricing({ prices, compact = false, trackPageOpen = false }) {
   const { t, lang } = useTranslation();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const [checkoutState, setCheckoutState] = useState({
     status: "idle",
     productKey: null,
     message: "",
   });
   const [customRequestOpen, setCustomRequestOpen] = useState(false);
+  const pageTrackedRef = useRef(false);
+
+  useEffect(() => {
+    if (authLoading || !trackPageOpen || pageTrackedRef.current) return;
+    pageTrackedRef.current = true;
+    trackPaymentCheckoutEvent("pricing_page_opened", {
+      accessToken: session?.access_token,
+    });
+  }, [authLoading, session?.access_token, trackPageOpen]);
 
   const featureLabels = {
     sale: t("pricing.featureSale"),

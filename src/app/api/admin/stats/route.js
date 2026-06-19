@@ -407,6 +407,12 @@ function buildExternalApiUsageStats(rows) {
   };
 }
 
+function isMissingRuntimeTableError(error) {
+  const code = String(error?.code || "");
+  const message = String(error?.message || "");
+  return code === "42P01" || code === "42703" || code === "PGRST204" || code === "PGRST205" || message.includes("schema cache");
+}
+
 async function fetchPaymentCheckoutEvents(since) {
   const buildQuery = () =>
     applySince(
@@ -423,8 +429,7 @@ async function fetchPaymentCheckoutEvents(since) {
     return fetchAllRows(buildQuery);
   }
 
-  const code = String(firstPage.error?.code || "");
-  if (code === "42P01" || code === "42703" || code === "PGRST204") return [];
+  if (isMissingRuntimeTableError(firstPage.error)) return [];
   throw new Error(`payment_checkout_events query failed: ${firstPage.error.message}`);
 }
 
@@ -459,6 +464,7 @@ function buildPaymentCheckoutStats(rows, cutoffs) {
     total: rows.length,
     popup: buildEventType("checkout_popup_opened"),
     page: buildEventType("checkout_page_opened"),
+    pricingPage: buildEventType("pricing_page_opened"),
   };
 }
 

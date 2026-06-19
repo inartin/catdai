@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const limiter = rateLimit({ interval: 60_000, limit: 120, namespace: "payment-checkout-events" });
-const ALLOWED_EVENTS = new Set(["checkout_popup_opened", "checkout_page_opened"]);
+const ALLOWED_EVENTS = new Set(["checkout_popup_opened", "checkout_page_opened", "pricing_page_opened"]);
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -36,7 +36,8 @@ function cleanPaddleTransactionId(value) {
 
 function isMissingSchemaError(error) {
   const code = String(error?.code || "");
-  return code === "42P01" || code === "42703" || code === "PGRST204";
+  const message = String(error?.message || "");
+  return code === "42P01" || code === "42703" || code === "PGRST204" || code === "PGRST205" || message.includes("schema cache");
 }
 
 export async function POST(request) {

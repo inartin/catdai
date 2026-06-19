@@ -116,7 +116,7 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
 - Paddle grants write into the existing shared `user_feature_credits` table.
 - Paid uses are logged in `user_feature_usage_events`; `user_feature_credits.remaining_uses` and `total_used` drive the profile balance display.
 - `paddle_payment_orders.status` includes `checkout_closed` for a user-closed checkout that has not received a final Paddle payment outcome.
-- `payment_checkout_events` records `checkout_popup_opened` when the reusable purchase popup is shown and `checkout_page_opened` when `/payment/paddle/checkout` loads; admin stats count total opens and unique user/device visitors separately.
+- `payment_checkout_events` records `checkout_popup_opened` when the reusable purchase popup is shown, `checkout_page_opened` when `/payment/paddle/checkout` loads, and `pricing_page_opened` when the standalone pricing page opens; admin stats count total opens and unique user/device visitors separately.
 - Run the shared credit schema from `db/paynet_payments.sql` before `db/paddle_payments.sql`, because that file still defines shared credit tables and helpers used by Paddle. Do not use the Paynet order/notification tables for checkout.
 
 ## Related Files

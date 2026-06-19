@@ -93,10 +93,23 @@ create table if not exists public.payment_checkout_events (
   created_at            timestamptz not null default now(),
 
   constraint payment_checkout_events_type_check
-    check (event_type in ('checkout_popup_opened', 'checkout_page_opened')),
+    check (event_type in ('checkout_popup_opened', 'checkout_page_opened', 'pricing_page_opened')),
   constraint payment_checkout_events_transaction_check
     check (paddle_transaction_id is null or paddle_transaction_id ~ '^txn_[A-Za-z0-9]+$')
 );
+
+do $$
+begin
+  alter table public.payment_checkout_events
+    drop constraint if exists payment_checkout_events_type_check;
+  alter table public.payment_checkout_events
+    add constraint payment_checkout_events_type_check
+    check (event_type in (
+      'checkout_popup_opened',
+      'checkout_page_opened',
+      'pricing_page_opened'
+    ));
+end $$;
 
 create index if not exists idx_payment_checkout_events_created
   on public.payment_checkout_events (created_at desc);

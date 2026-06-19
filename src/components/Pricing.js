@@ -400,12 +400,12 @@ export default function Pricing({ prices, compact = false }) {
       features: [
         {
           label: featureLabels.sale,
-          limit: t("pricing.freeMonthlyLimit", { count: 2 }),
+          limit: t("pricing.freeMonthlyLimit", { count: 1 }),
           limitMeta: "0 lei",
         },
         {
           label: featureLabels.rent,
-          limit: t("pricing.freeMonthlyLimit", { count: 2 }),
+          limit: t("pricing.freeMonthlyLimit", { count: 1 }),
           limitMeta: "0 lei",
         },
         {

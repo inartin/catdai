@@ -18,7 +18,7 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 - Pro keeps the single highlight badge; the old no-time-limit badges/notes are removed from the pricing cards.
 - Extra includes 50 actions per feature and is presented without the old one-month rule.
 - Each card enumerates usage per feature: sale estimate, rent estimate, 999 analysis, cadastru lookup, yield calculator, and PDF report.
-- Free shows `0 lei*`; sale/rent rows keep the `2/lună` monthly limit and show `0 lei` under the limit badge.
+- Free shows `0 lei*`; sale/rent rows keep the `1/lună` monthly limit and show `0 lei` under the limit badge.
 - The sale/buy full-evaluation free monthly limit is enforced in `/api/estimate` for authenticated free users.
 - Free one-off features show per-use prices instead of usage counts: 999 analysis 29 lei, cadastru 19 lei, yield calculator 29 lei, and PDF report 29 lei.
 - Free card note explains the asterisk as per-use pricing.

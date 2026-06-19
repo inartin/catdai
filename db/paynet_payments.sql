@@ -500,7 +500,7 @@ create or replace function public.consume_free_monthly_feature_usage(
   p_idempotency_key text,
   p_month_start timestamptz,
   p_month_end timestamptz,
-  p_limit integer default 2,
+  p_limit integer default 1,
   p_metadata jsonb default '{}'::jsonb
 )
 returns table (

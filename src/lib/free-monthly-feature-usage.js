@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 
-export const FREE_MONTHLY_FULL_EVALUATION_LIMIT = 2;
+export const FREE_MONTHLY_FULL_EVALUATION_LIMIT = 1;
 export const FREE_MONTHLY_FULL_EVALUATION_FEATURE_KEYS = ["sale_estimate", "rent_estimate"];
 
 export function getFreeMonthlyFeatureUsageWindow(now = new Date()) {

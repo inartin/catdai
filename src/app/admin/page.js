@@ -201,6 +201,10 @@ function fmtPaidUserSummary(paidUsers) {
   return `${fmtNum(remaining)} remaining credits`;
 }
 
+function fmtCheckoutSummary(item) {
+  return `${fmtNum(item?.uniqueVisitors || 0)} users`;
+}
+
 function fmtExternalApiService(service) {
   if (service === "999_listing") return "999 listing";
   if (service === "cadastru_number") return "Cadastru number";
@@ -794,7 +798,7 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-11 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-12 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}
@@ -808,6 +812,16 @@ export default function AdminDashboard() {
             detail={showPaidUsersList ? "Click to hide list" : fmtPaidUserSummary(s.paidUsers)}
             onClick={() => setShowPaidUsersList((value) => !value)}
             active={showPaidUsersList}
+          />
+          <StatCard
+            label="Checkout Popup Opened"
+            value={fmtNum(s.paymentCheckout?.popup?.total)}
+            detail={fmtCheckoutSummary(s.paymentCheckout?.popup)}
+          />
+          <StatCard
+            label="Checkout Page Opened"
+            value={fmtNum(s.paymentCheckout?.page?.total)}
+            detail={fmtCheckoutSummary(s.paymentCheckout?.page)}
           />
           <StatCard
             label="Sale Estimations"

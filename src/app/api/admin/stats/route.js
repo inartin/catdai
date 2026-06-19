@@ -407,6 +407,61 @@ function buildExternalApiUsageStats(rows) {
   };
 }
 
+async function fetchPaymentCheckoutEvents(since) {
+  const buildQuery = () =>
+    applySince(
+      supabaseAdmin
+        .from("payment_checkout_events")
+        .select("id, event_type, user_id, device_id, session_id, order_id, product_key, source_product_key, path, created_at"),
+      "created_at",
+      since
+    ).order("created_at", { ascending: false });
+
+  const firstPage = await buildQuery().range(0, PAGE - 1);
+  if (!firstPage.error) {
+    if (!firstPage.data || firstPage.data.length < PAGE) return firstPage.data || [];
+    return fetchAllRows(buildQuery);
+  }
+
+  const code = String(firstPage.error?.code || "");
+  if (code === "42P01" || code === "42703" || code === "PGRST204") return [];
+  throw new Error(`payment_checkout_events query failed: ${firstPage.error.message}`);
+}
+
+function getVisitorKey(row) {
+  if (row.user_id) return `user:${row.user_id}`;
+  if (row.device_id) return `device:${row.device_id}`;
+  if (row.session_id) return `session:${row.session_id}`;
+  return null;
+}
+
+function buildPaymentCheckoutStats(rows, cutoffs) {
+  const buildEventType = (eventType) => {
+    const filtered = rows.filter((row) => row.event_type === eventType);
+    const uniqueVisitors = new Set(filtered.map(getVisitorKey).filter(Boolean));
+
+    return {
+      total: filtered.length,
+      uniqueVisitors: uniqueVisitors.size,
+      registered: filtered.filter((row) => row.user_id).length,
+      anonymous: filtered.filter((row) => !row.user_id).length,
+      periods: Object.fromEntries(
+        Object.entries(cutoffs).map(([period, cutoff]) => [
+          period,
+          filtered.filter((row) => row.created_at && row.created_at >= cutoff).length,
+        ])
+      ),
+      recent: filtered.slice(0, 50),
+    };
+  };
+
+  return {
+    total: rows.length,
+    popup: buildEventType("checkout_popup_opened"),
+    page: buildEventType("checkout_page_opened"),
+  };
+}
+
 async function fetchPaidUserSummary(since) {
   const paidOrders = await fetchAllRows(() =>
     applySince(
@@ -530,6 +585,7 @@ export async function GET(request) {
       fetchListingLinkAnalysisEvents(periodSince),
       fetchCalculatorUsageEvents(periodSince),
       fetchExternalApiUsageRows(periodSinceDate),
+      fetchPaymentCheckoutEvents(periodSince),
       fetchPaidUserSummary(periodSince).catch((error) => {
         console.error("Failed to load paid user stats:", error.message);
         return { available: false, totalPaidUsers: 0, paidOrders: 0 };
@@ -551,6 +607,7 @@ export async function GET(request) {
     listingLinkAnalysisEvents,
     calculatorUsageEvents,
     externalApiUsageRows,
+    paymentCheckoutEvents,
     paidUserSummary,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
@@ -589,6 +646,7 @@ export async function GET(request) {
     listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
     externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows),
+    paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
     paidUsers,
   };
 

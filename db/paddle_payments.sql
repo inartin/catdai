@@ -74,6 +74,42 @@ create index if not exists idx_paddle_payment_orders_status_created
 create index if not exists idx_paddle_payment_orders_transaction
   on public.paddle_payment_orders (paddle_transaction_id);
 
+-- ============================================================
+-- payment_checkout_events - checkout popup/page analytics
+-- ============================================================
+
+create table if not exists public.payment_checkout_events (
+  id                    bigserial primary key,
+  event_type            text not null,
+  user_id               uuid references auth.users(id) on delete set null,
+  device_id             text,
+  session_id            text,
+  order_id              uuid references public.paddle_payment_orders(id) on delete set null,
+  paddle_transaction_id text,
+  product_key           text,
+  source_product_key    text,
+  path                  text,
+  referrer              text,
+  created_at            timestamptz not null default now(),
+
+  constraint payment_checkout_events_type_check
+    check (event_type in ('checkout_popup_opened', 'checkout_page_opened')),
+  constraint payment_checkout_events_transaction_check
+    check (paddle_transaction_id is null or paddle_transaction_id ~ '^txn_[A-Za-z0-9]+$')
+);
+
+create index if not exists idx_payment_checkout_events_created
+  on public.payment_checkout_events (created_at desc);
+
+create index if not exists idx_payment_checkout_events_type_created
+  on public.payment_checkout_events (event_type, created_at desc);
+
+create index if not exists idx_payment_checkout_events_user_created
+  on public.payment_checkout_events (user_id, created_at desc);
+
+create index if not exists idx_payment_checkout_events_session
+  on public.payment_checkout_events (session_id);
+
 do $$
 begin
   alter table public.paddle_payment_orders
@@ -312,13 +348,17 @@ $$;
 
 alter table public.paddle_payment_orders enable row level security;
 alter table public.paddle_webhook_events enable row level security;
+alter table public.payment_checkout_events enable row level security;
 
 revoke all on public.paddle_payment_orders from anon, authenticated;
 revoke all on public.paddle_webhook_events from anon, authenticated;
+revoke all on public.payment_checkout_events from anon, authenticated;
 
 grant all on public.paddle_payment_orders to service_role;
 grant all on public.paddle_webhook_events to service_role;
+grant all on public.payment_checkout_events to service_role;
 grant usage, select on sequence public.paddle_webhook_events_id_seq to service_role;
+grant usage, select on sequence public.payment_checkout_events_id_seq to service_role;
 
 revoke execute on function public.grant_paddle_payment_order_feature_credits(uuid, text, integer) from public;
 revoke execute on function public.complete_paddle_payment(uuid, text, text, integer, text, jsonb, timestamptz) from public;

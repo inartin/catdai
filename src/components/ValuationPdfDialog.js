@@ -964,7 +964,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
           </p>
         )}
         {purchaseOffer && (
-          <FeaturePricingAction offer={purchaseOffer} className="mt-4" />
+          <FeaturePricingAction offer={purchaseOffer} className="mt-4" trackPopupOpen />
         )}
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

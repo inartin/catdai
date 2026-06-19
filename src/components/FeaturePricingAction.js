@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 
 function formatMdl(value) {
   const amount = Number(value);
@@ -28,15 +29,15 @@ function getReturnPath() {
 export default function FeaturePricingAction({
   offer,
   className = "",
+  trackPopupOpen = false,
   onCheckoutStart,
   onCheckoutError,
 }) {
   const { t, lang } = useTranslation();
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
-
-  if (!offer?.product_key) return null;
+  const popupTrackedRef = useRef(false);
 
   const packageOffer = {
     product_key: "standard_pack",
@@ -51,6 +52,19 @@ export default function FeaturePricingAction({
     t("pricing.featureYield"),
     t("pricing.featurePdf"),
   ];
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!trackPopupOpen || !offer?.product_key || popupTrackedRef.current) return;
+    popupTrackedRef.current = true;
+    trackPaymentCheckoutEvent("checkout_popup_opened", {
+      accessToken: session?.access_token,
+      product_key: packageOffer.product_key,
+      source_product_key: offer.product_key,
+    });
+  }, [authLoading, offer?.product_key, packageOffer.product_key, session?.access_token, trackPopupOpen]);
+
+  if (!offer?.product_key) return null;
 
   const startCheckout = async () => {
     if (!session?.access_token) return;

@@ -1858,7 +1858,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             <p className="mb-4 text-center text-sm font-medium text-gray-500">
               {t("payment.limitPackageSubtitle")}
             </p>
-            <FeaturePricingAction offer={purchaseOffer} />
+            <FeaturePricingAction offer={purchaseOffer} trackPopupOpen />
           </>
         ) : null}
       </AuthRequiredModal>
@@ -2525,7 +2525,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             <p className="mb-4 text-center text-sm font-medium text-gray-500">
               {t("payment.limitPackageSubtitle")}
             </p>
-            <FeaturePricingAction offer={authModalPurchaseOffer} />
+            <FeaturePricingAction offer={authModalPurchaseOffer} trackPopupOpen />
           </>
         ) : null}
       </AuthRequiredModal>

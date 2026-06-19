@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 
 const PADDLE_SCRIPT_SRC = "https://cdn.paddle.com/paddle/v2/paddle.js";
 const PADDLE_INLINE_FRAME_TARGET = "paddle-inline-checkout";
@@ -162,6 +163,7 @@ export default function PaddleCheckoutPage() {
   const [messageKey, setMessageKey] = useState("payment.checkoutOpening");
   const [errorMessage, setErrorMessage] = useState("");
   const [product, setProduct] = useState(null);
+  const checkoutPageTrackedRef = useRef(false);
   const checkoutEmail = getCheckoutEmail(user);
 
   const params = useMemo(() => {
@@ -178,6 +180,17 @@ export default function PaddleCheckoutPage() {
   useEffect(() => {
     setProduct(readStoredProduct(params.orderId));
   }, [params.orderId]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (checkoutPageTrackedRef.current) return;
+    checkoutPageTrackedRef.current = true;
+    trackPaymentCheckoutEvent("checkout_page_opened", {
+      accessToken: session?.access_token,
+      order_id: params.orderId,
+      paddle_transaction_id: params.transactionId,
+    });
+  }, [authLoading, params.orderId, params.transactionId, session?.access_token]);
 
   useEffect(() => {
     if (authLoading || product?.key || !params.orderId || !session?.access_token) return undefined;

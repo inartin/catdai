@@ -38,6 +38,7 @@ Paddle one-time payment flow is connected for packages, evaluation limit popups,
 - `GET /payment/paddle/checkout`
   - noindex default payment link page for Paddle
   - loads Paddle.js and opens the transaction passed by Paddle as `_ptxn` in an inline checkout frame on the page
+  - logs a `checkout_page_opened` event in `payment_checkout_events` for admin statistics
   - prefills Paddle customer email from the authenticated Supabase user when the email is real; Telegram placeholder emails like `telegram-<id>@auth.catdai.md` are not sent
   - shows a localized left-side purchase summary from the create-route product payload saved in `sessionStorage`; package summaries show the package name, included usage count, exact EUR price first, and approximate configured `NEXT_PUBLIC_PRICE_*_MDL_COST` as secondary
   - preserves optional local `return_to` and `lang` query values for the status page
@@ -109,11 +110,13 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
 - `db/paddle_payments.sql` adds:
   - `paddle_payment_orders`
   - `paddle_webhook_events`
+  - `payment_checkout_events`
   - `grant_paddle_payment_order_feature_credits(...)`
   - `complete_paddle_payment(...)`
 - Paddle grants write into the existing shared `user_feature_credits` table.
 - Paid uses are logged in `user_feature_usage_events`; `user_feature_credits.remaining_uses` and `total_used` drive the profile balance display.
 - `paddle_payment_orders.status` includes `checkout_closed` for a user-closed checkout that has not received a final Paddle payment outcome.
+- `payment_checkout_events` records `checkout_popup_opened` when the reusable purchase popup is shown and `checkout_page_opened` when `/payment/paddle/checkout` loads; admin stats count total opens and unique user/device visitors separately.
 - Run the shared credit schema from `db/paynet_payments.sql` before `db/paddle_payments.sql`, because that file still defines shared credit tables and helpers used by Paddle. Do not use the Paynet order/notification tables for checkout.
 
 ## Related Files
@@ -122,6 +125,7 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
 - `src/lib/paddle-products.js`
 - `src/app/api/payments/paddle/create/route.js`
 - `src/app/api/payments/paddle/status/route.js`
+- `src/app/api/payment-checkout-events/route.js`
 - `src/app/api/paddle/webhooks/route.js`
 - `src/app/payment/paddle/checkout/page.js`
 - `src/app/payment/paddle/checkout/layout.js`

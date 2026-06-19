@@ -367,7 +367,7 @@ function CadastruResultContent() {
             <p className="mb-4 text-center text-sm font-medium text-gray-500">
               {t("payment.limitPackageSubtitle")}
             </p>
-            <FeaturePricingAction offer={purchaseOffer} />
+            <FeaturePricingAction offer={purchaseOffer} trackPopupOpen />
           </>
         ) : null}
       </AuthRequiredModal>

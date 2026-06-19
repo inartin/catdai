@@ -97,6 +97,32 @@ export function trackAdSourceEvent(eventName, metadata = {}) {
   } catch {}
 }
 
+export function trackPaymentCheckoutEvent(eventType, metadata = {}) {
+  if (typeof window === "undefined") return;
+
+  const { accessToken, ...eventMetadata } = metadata || {};
+  const body = JSON.stringify({
+    event_type: eventType,
+    device_id: getDeviceId(),
+    session_id: getSessionId(),
+    path: window.location.pathname + window.location.search,
+    referrer: document.referrer || null,
+    ...eventMetadata,
+  });
+
+  const headers = { "Content-Type": "application/json" };
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  try {
+    fetch("/api/payment-checkout-events", {
+      method: "POST",
+      headers,
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
+}
+
 function djb2(str) {
   let hash = 5381;
   for (let i = 0; i < str.length; i++) {

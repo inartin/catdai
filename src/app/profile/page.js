@@ -186,6 +186,9 @@ export default function ProfilePage() {
   const [credits, setCredits] = useState([]);
   const [freeMonthlyCredits, setFreeMonthlyCredits] = useState([]);
   const [creditsLoading, setCreditsLoading] = useState(true);
+  const [extraSubscription, setExtraSubscription] = useState(null);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscriptionCanceling, setSubscriptionCanceling] = useState(false);
   const profileName = getProfileName(user);
   const profileSubtitle = getProfileSubtitle(user);
   const accessBadge = getProfileAccessBadge({ transactions, credits, creditsLoading, t });
@@ -296,6 +299,26 @@ export default function ProfilePage() {
     }
   };
 
+  const handleCancelExtraSubscription = async () => {
+    if (!session?.access_token || !extraSubscription?.id) return;
+    if (!window.confirm(t("profile.cancelExtraSubscriptionConfirm"))) return;
+
+    setSubscriptionCanceling(true);
+    try {
+      const res = await fetch("/api/profile/subscription", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to cancel subscription.");
+      setExtraSubscription(data.subscription || null);
+    } catch (error) {
+      alert(error?.message || t("profile.cancelExtraSubscriptionError"));
+    } finally {
+      setSubscriptionCanceling(false);
+    }
+  };
+
   useEffect(() => {
     if (!session?.access_token) return;
     let cancelled = false;
@@ -306,8 +329,9 @@ export default function ProfilePage() {
       fetch(`/api/profile/history?limit=${HISTORY_PAGE_SIZE}`, { headers }).then((res) => res.json()),
       fetch(`/api/profile/transactions?limit=${TRANSACTIONS_PAGE_SIZE}`, { headers }).then((res) => res.json()),
       fetch("/api/profile/credits", { headers }).then((res) => res.json()),
+      fetch("/api/profile/subscription", { headers }).then((res) => res.json()),
     ])
-      .then(([favoritesData, historyData, transactionsData, creditsData]) => {
+      .then(([favoritesData, historyData, transactionsData, creditsData, subscriptionData]) => {
         if (cancelled) return;
         setFavorites(favoritesData.favorites || []);
         setHistory(historyData.history || []);
@@ -316,6 +340,7 @@ export default function ProfilePage() {
         setTransactionsNextCursor(transactionsData.nextCursor || null);
         setCredits(creditsData.credits || []);
         setFreeMonthlyCredits(creditsData.freeMonthlyCredits || []);
+        setExtraSubscription(subscriptionData.subscription || null);
       })
       .catch(() => {})
       .finally(() => {
@@ -324,6 +349,7 @@ export default function ProfilePage() {
         setHistoryLoading(false);
         setTransactionsLoading(false);
         setCreditsLoading(false);
+        setSubscriptionLoading(false);
       });
 
     return () => {
@@ -455,6 +481,34 @@ export default function ProfilePage() {
                 >
                   {t("profile.delete")}
                 </button>
+                {extraSubscription && (
+                  <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
+                    <div className="text-sm font-semibold text-gray-900">
+                      {t("profile.extraSubscriptionTitle")}
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {extraSubscription.cancelAtPeriodEnd
+                        ? t("profile.extraSubscriptionCancelScheduled", {
+                            date: formatHistoryDate(extraSubscription.currentPeriodEnd, lang),
+                          })
+                        : t("profile.extraSubscriptionActive", {
+                            date: formatHistoryDate(extraSubscription.currentPeriodEnd, lang),
+                          })}
+                    </p>
+                    {!extraSubscription.cancelAtPeriodEnd && (
+                      <button
+                        type="button"
+                        onClick={handleCancelExtraSubscription}
+                        disabled={subscriptionCanceling || subscriptionLoading}
+                        className="mt-3 cursor-pointer rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {subscriptionCanceling
+                          ? t("profile.cancelExtraSubscriptionLoading")
+                          : t("profile.cancelExtraSubscription")}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

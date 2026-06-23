@@ -35,7 +35,7 @@ export async function GET(request) {
 
   let query = supabaseAdmin
     .from("paddle_payment_orders")
-    .select("id, user_id, product_key, status, paddle_transaction_id, paddle_checkout_url, amount_minor, currency_code, paid_at")
+    .select("id, user_id, product_key, status, paddle_transaction_id, paddle_subscription_id, paddle_checkout_url, amount_minor, currency_code, paid_at")
     .eq("user_id", user.id)
     .limit(1);
 
@@ -55,6 +55,7 @@ export async function GET(request) {
     product_key: data.product_key,
     status: data.status,
     paddle_transaction_id: data.paddle_transaction_id,
+    paddle_subscription_id: data.paddle_subscription_id,
     checkout_url: data.paddle_checkout_url,
     amount_minor: data.amount_minor,
     currency_code: data.currency_code,

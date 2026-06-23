@@ -83,6 +83,7 @@ export function getPaymentProducts() {
     standard_pack: {
       title: "Standard",
       description: "2 uses per paid feature",
+      billingMode: "one_time",
       amountMdl: prices.standard.mdl,
       amountEur: prices.standard.eur,
       grants: grantAllFeatures(2),
@@ -90,13 +91,15 @@ export function getPaymentProducts() {
     pro_pack: {
       title: "Pro",
       description: "10 uses per paid feature",
+      billingMode: "one_time",
       amountMdl: prices.pro.mdl,
       amountEur: prices.pro.eur,
       grants: grantAllFeatures(10),
     },
     extra_pack: {
       title: "Extra",
-      description: "50 uses per paid feature",
+      description: "50 uses per paid feature per month",
+      billingMode: "subscription",
       amountMdl: prices.extra.mdl,
       amountEur: prices.extra.eur,
       grants: grantAllFeatures(50),
@@ -121,6 +124,7 @@ export function getPaymentProduct(productKey) {
   return {
     key,
     ...product,
+    billingMode: product.billingMode || "one_time",
     amountEur,
     amountMdl,
     amountMinor,

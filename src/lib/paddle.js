@@ -162,6 +162,17 @@ export async function createPaddleTransaction(payload) {
   };
 }
 
+export async function cancelPaddleSubscription(subscriptionId, effectiveFrom = "next_billing_period") {
+  const response = await paddleApiRequest(`/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
+    method: "POST",
+    body: { effective_from: effectiveFrom },
+  });
+
+  const subscription = response?.data;
+  if (!subscription?.id) throw new Error("Paddle subscription cancel response is missing id");
+  return subscription;
+}
+
 export async function getPaddlePrice(priceId) {
   const response = await paddleApiRequest(`/prices/${encodeURIComponent(priceId)}`);
   const price = response?.data;
@@ -181,6 +192,13 @@ export async function listPaddlePricesForProduct(productId) {
 
 export function isPaddleOneTimePrice(price) {
   return price?.status === "active" && price?.billing_cycle == null;
+}
+
+export function isPaddleMonthlySubscriptionPrice(price) {
+  const cycle = price?.billing_cycle;
+  return price?.status === "active"
+    && cycle?.interval === "month"
+    && Number(cycle?.frequency) === 1;
 }
 
 export function extractPaddleTransactionSummary(transaction = {}) {
@@ -245,16 +263,20 @@ export function getPaddleWebhookEventFields(event = {}) {
   const data = event?.data || {};
   const customData = data?.custom_data || {};
   const totals = data?.details?.totals || {};
+  const eventType = event?.event_type ? String(event.event_type) : null;
+  const isSubscriptionEvent = String(eventType || "").startsWith("subscription.");
+  const billingPeriod = data?.billing_period || data?.current_billing_period || {};
+  const scheduledChange = data?.scheduled_change || null;
   const priceIds = Array.isArray(data?.items)
     ? data.items.map((item) => item?.price?.id || item?.price_id).filter(Boolean).map(String)
     : [];
 
   return {
     eventId: event?.event_id ? String(event.event_id) : null,
-    eventType: event?.event_type ? String(event.event_type) : null,
+    eventType,
     occurredAt: event?.occurred_at || null,
     notificationId: event?.notification_id ? String(event.notification_id) : null,
-    transactionId: data?.id ? String(data.id) : null,
+    transactionId: !isSubscriptionEvent && data?.id ? String(data.id) : null,
     transactionStatus: data?.status ? String(data.status) : null,
     orderId: customData?.catdai_order_id ? String(customData.catdai_order_id) : null,
     userId: customData?.catdai_user_id ? String(customData.catdai_user_id) : null,
@@ -263,7 +285,16 @@ export function getPaddleWebhookEventFields(event = {}) {
     amountMinor: parsePositiveInteger(totals.total ?? totals.grand_total),
     currencyCode: totals.currency_code || data?.currency_code || null,
     collectionMode: data?.collection_mode ? String(data.collection_mode) : null,
-    subscriptionId: data?.subscription_id ? String(data.subscription_id) : null,
+    subscriptionId: data?.subscription_id
+      ? String(data.subscription_id)
+      : isSubscriptionEvent && data?.id
+        ? String(data.id)
+        : null,
+    subscriptionStatus: isSubscriptionEvent && data?.status ? String(data.status) : null,
+    billingPeriodStart: billingPeriod?.starts_at || null,
+    billingPeriodEnd: billingPeriod?.ends_at || null,
+    scheduledChangeAction: scheduledChange?.action ? String(scheduledChange.action) : null,
+    cancelAtPeriodEnd: scheduledChange?.action === "cancel",
     priceIds,
   };
 }

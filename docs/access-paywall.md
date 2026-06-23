@@ -7,8 +7,8 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 - Anonymous users are `free`.
 - Authenticated Supabase users are `free` by default; authentication and paid access are separate.
 - Sale/buy and rent full evaluation access for authenticated users without purchased sale/rent credits is limited to 1 unique evaluation per feature per UTC month.
-- Paid package and single-feature access is tracked as non-expiring per-feature credits in `user_feature_credits`.
-- Standard, Pro, and Extra grant 2, 10, and 50 uses for each paid feature.
+- Paid package and single-feature access is tracked in `user_feature_credits`.
+- Standard and Pro grant 2 and 10 non-expiring uses for each paid feature. Extra is a monthly Paddle subscription that resets to 50 uses for each paid feature on each paid billing period, and failed or inactive renewal states clear remaining Extra credits.
 - Paid-only features require a remaining feature credit: 999 analysis, cadastru lookup, yield calculator, and PDF report.
 - `/api/estimate` records free full-evaluation usage in `user_feature_usage_events` with `source = 'free_monthly'`; repeated loads of the same normalized sale/buy criteria in the same month reuse the same idempotency key.
 - `/api/profile/credits` returns the current UTC-month free sale/rent allowance alongside paid feature credits so `/profile` can show the 1 free monthly use per feature with a separate free badge in `Acces rămas`.
@@ -16,9 +16,8 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 - `user_entitlements` schema exists, but `resolveAccessTier()` does not read it yet.
 - Paynet is not used whatsoever and must not be connected to checkout. The old Paynet API routes now return disabled responses.
 - `db/paynet_payments.sql` still contains shared credit tables/helpers used by the current free monthly usage limit and by Paddle grants.
-- `db/paddle_payments.sql` prepares the Paddle one-time payment schema: Paddle payment orders, webhook audit rows, and idempotent grants into the same feature-credit system.
-- `POST /api/payments/paddle/create` and `POST /api/paddle/webhooks` create Paddle transactions and grant credits only after verified `transaction.completed` notifications.
-- The Paddle create route rejects transaction responses that contain recurring items or a `subscription_id`, so subscription-backed checkouts are not accepted.
+- `db/paddle_payments.sql` prepares Paddle payment orders, Extra subscription state, webhook audit rows, one-time grants, and idempotent monthly subscription resets into the same feature-credit system.
+- `POST /api/payments/paddle/create` and `POST /api/paddle/webhooks` create Paddle transactions and grant or reset credits only after verified `transaction.completed` notifications.
 - Limit-reached sale and rent evaluation popups and result action columns show the same reusable feature-pricing checkout action.
 - Limit-reached blurred-value popups say the free monthly evaluation was used, prompt the user to choose a package, and show Standard as the default package action with a secondary link to `/pricing`.
 - Paddle checkout and status pages use the CatDai-branded RO/RU payment shell and preserve the selected language through the checkout/status redirect.

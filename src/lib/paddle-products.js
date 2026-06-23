@@ -1,5 +1,9 @@
 import { getPaymentProduct, mapPaymentProductGrants } from "@/lib/payment-products";
-import { isPaddleOneTimePrice, listPaddlePricesForProduct } from "@/lib/paddle";
+import {
+  isPaddleMonthlySubscriptionPrice,
+  isPaddleOneTimePrice,
+  listPaddlePricesForProduct,
+} from "@/lib/paddle";
 
 const PADDLE_PRICE_ENV_BY_PRODUCT = {
   standard_pack: "PADDLE_PRICE_STANDARD_PACK",
@@ -80,9 +84,12 @@ export async function resolvePaddleCatalogPrice(product) {
   }
 
   const prices = await listPaddlePricesForProduct(product.priceReference);
-  const price = prices.find(isPaddleOneTimePrice);
+  const price = prices.find(
+    product.billingMode === "subscription" ? isPaddleMonthlySubscriptionPrice : isPaddleOneTimePrice
+  );
   if (!price?.id) {
-    throw new Error(`No active one-time Paddle price found for ${product.key}.`);
+    const priceType = product.billingMode === "subscription" ? "monthly subscription" : "one-time";
+    throw new Error(`No active ${priceType} Paddle price found for ${product.key}.`);
   }
 
   return {

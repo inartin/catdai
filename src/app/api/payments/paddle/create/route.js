@@ -115,14 +115,20 @@ function buildPaddleTransactionPayload({ order, product, user, customer, returnT
   return payload;
 }
 
-function isOneTimePaddleTransaction(transaction, product) {
-  if (transaction?.subscription_id) return false;
+function isExpectedPaddleTransaction(transaction, product) {
+  if (transaction?.subscription_id && product.billingMode !== "subscription") return false;
   if (!Array.isArray(transaction?.items) || transaction.items.length === 0) return false;
 
   return transaction.items.every((item) => {
     const price = item?.price || {};
-    if (price.billing_cycle != null) return false;
-    return price.id === product.priceId;
+    if (price.id !== product.priceId) return false;
+
+    if (product.billingMode === "subscription") {
+      const cycle = price.billing_cycle;
+      return cycle?.interval === "month" && Number(cycle?.frequency) === 1;
+    }
+
+    return price.billing_cycle == null;
   });
 }
 
@@ -228,10 +234,11 @@ export async function POST(request) {
     );
   }
 
-  if (!isOneTimePaddleTransaction(paddleRegistration.transaction, product)) {
-    await markOrderFailed(order.id, "Paddle transaction contains recurring items");
+  if (!isExpectedPaddleTransaction(paddleRegistration.transaction, product)) {
+    await markOrderFailed(order.id, "Paddle transaction billing type mismatch");
+    const expectedPriceType = product.billingMode === "subscription" ? "a monthly subscription price" : "a one-time price";
     return NextResponse.json(
-      { error: `Paddle price for ${product.key} must be a one-time price.` },
+      { error: `Paddle price for ${product.key} must be ${expectedPriceType}.` },
       { status: 500 }
     );
   }
@@ -270,6 +277,7 @@ export async function POST(request) {
     product: {
       key: product.key,
       title: product.title,
+      billing_mode: product.billingMode,
       amount_mdl: product.amountMdl,
       amount_eur: product.amountEur || null,
       grants: product.grants || null,

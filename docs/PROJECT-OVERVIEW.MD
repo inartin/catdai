@@ -14,7 +14,7 @@ Monetization planned:
 
 Free tier: limited estimates and simple yield calculator
 Paid single actions and one-property package shown in the reusable Pricing section
-Paddle one-time payment backend routes are prepared; Paddle has a minimal standalone default payment link page for test payments. Paynet is not used whatsoever.
+Paddle payment backend routes are prepared for one-time products and the Extra monthly subscription; Paddle has a minimal standalone default payment link page for test payments. Paynet is not used whatsoever.
 Monthly plans shown for active users and agents
 Tech Stack
 Framework & Runtime:

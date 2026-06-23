@@ -24,8 +24,8 @@ Implemented and active.
 - favorites
 - paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus search type, result type, city, and district when available
 - paid sale/rent evaluation usage rows are shown in history when a saved paid snapshot exists; if the same action also has an `estimate_log` row, history hides the ordinary row and keeps only the paid snapshot row. Paid rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation
-- paginated transactions tab for the authenticated user's own rows from `paddle_payment_orders`; it shows product, status, amount, Paddle transaction id when available, and the internal order id for support lookup
-- closed `Setări` panel with account deletion
+- paginated transactions tab for the authenticated user's own rows from `paddle_payment_orders`; it shows product, status, amount, Paddle transaction/subscription id when available, and the internal order id for support lookup
+- closed `Setări` panel with account deletion and an Extra subscription cancellation action when the user has an active Extra subscription; cancellation is scheduled for the next billing period
 - localized browser title from `nav.profile`
 
 ## Notifications
@@ -59,6 +59,7 @@ Implemented and active.
 - `src/app/api/profile/history/route.js`
 - `src/app/api/profile/evaluation-snapshots/[id]/route.js`
 - `src/app/api/profile/transactions/route.js`
+- `src/app/api/profile/subscription/route.js`
 - `src/app/api/profile/credits/route.js`
 - `src/app/api/profile/delete/route.js`
 - `src/app/api/notifications/route.js`

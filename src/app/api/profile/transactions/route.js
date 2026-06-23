@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 const DEFAULT_TRANSACTIONS_LIMIT = 10;
 const MAX_TRANSACTIONS_LIMIT = 30;
-const PADDLE_ORDER_COLUMNS = "id, product_key, status, paddle_transaction_id, amount_minor, currency_code, paid_at, created_at";
+const PADDLE_ORDER_COLUMNS = "id, product_key, status, paddle_transaction_id, paddle_subscription_id, amount_minor, currency_code, paid_at, created_at";
 
 function isMissingSchemaError(error) {
   const code = String(error?.code || "");
@@ -48,6 +48,7 @@ function normalizePaddleOrder(row) {
     productKey: row.product_key,
     status: row.status,
     transactionId: row.paddle_transaction_id,
+    subscriptionId: row.paddle_subscription_id,
     amountMinor: row.amount_minor,
     currencyCode: row.currency_code,
     paidAt: row.paid_at,

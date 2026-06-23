@@ -819,14 +819,14 @@ export default function AdminDashboard() {
             detail={fmtCheckoutSummary(s.paymentCheckout?.popup)}
           />
           <StatCard
-            label="Checkout Page Opened"
-            value={fmtNum(s.paymentCheckout?.page?.total)}
-            detail={fmtCheckoutSummary(s.paymentCheckout?.page)}
-          />
-          <StatCard
             label="Pricing Page Opened"
             value={fmtNum(s.paymentCheckout?.pricingPage?.total)}
             detail={fmtCheckoutSummary(s.paymentCheckout?.pricingPage)}
+          />
+          <StatCard
+            label="Checkout Page Opened"
+            value={fmtNum(s.paymentCheckout?.page?.total)}
+            detail={fmtCheckoutSummary(s.paymentCheckout?.page)}
           />
           <StatCard
             label="Sale Estimations"

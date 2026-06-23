@@ -171,6 +171,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCancelSubscriptionModalOpen, setIsCancelSubscriptionModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("favorites");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [favorites, setFavorites] = useState([]);
@@ -301,7 +302,6 @@ export default function ProfilePage() {
 
   const handleCancelExtraSubscription = async () => {
     if (!session?.access_token || !extraSubscription?.id) return;
-    if (!window.confirm(t("profile.cancelExtraSubscriptionConfirm"))) return;
 
     setSubscriptionCanceling(true);
     try {
@@ -316,6 +316,7 @@ export default function ProfilePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to cancel subscription.");
       setExtraSubscription(data.subscription || null);
+      setIsCancelSubscriptionModalOpen(false);
     } catch (error) {
       alert(error?.message || t("profile.cancelExtraSubscriptionError"));
     } finally {
@@ -453,6 +454,34 @@ export default function ProfilePage() {
                 className="mb-6"
                 isDarkMode={false}
               />
+              {extraSubscription && (
+                <div className="mb-6 rounded-lg border border-gray-100 bg-gray-50 p-4">
+                  <div className="text-sm font-semibold text-gray-900">
+                    {t("profile.extraSubscriptionTitle")}
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {extraSubscription.cancelAtPeriodEnd
+                      ? t("profile.extraSubscriptionCancelScheduled", {
+                          date: formatHistoryDate(extraSubscription.currentPeriodEnd, lang),
+                        })
+                      : t("profile.extraSubscriptionActive", {
+                          date: formatHistoryDate(extraSubscription.currentPeriodEnd, lang),
+                        })}
+                  </p>
+                  {!extraSubscription.cancelAtPeriodEnd && (
+                    <button
+                      type="button"
+                      onClick={() => setIsCancelSubscriptionModalOpen(true)}
+                      disabled={subscriptionCanceling || subscriptionLoading}
+                      className="mt-3 cursor-pointer rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {subscriptionCanceling
+                        ? t("profile.cancelExtraSubscriptionLoading")
+                        : t("profile.cancelExtraSubscription")}
+                    </button>
+                  )}
+                </div>
+              )}
               <button
                 type="button"
                 className="flex w-full items-center justify-between gap-3 rounded-lg px-1 py-2 text-left text-lg font-medium text-gray-900 transition-colors hover:text-primary"
@@ -485,34 +514,6 @@ export default function ProfilePage() {
                 >
                   {t("profile.delete")}
                 </button>
-                {extraSubscription && (
-                  <div className="mt-4 rounded-lg border border-gray-100 bg-gray-50 p-4">
-                    <div className="text-sm font-semibold text-gray-900">
-                      {t("profile.extraSubscriptionTitle")}
-                    </div>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {extraSubscription.cancelAtPeriodEnd
-                        ? t("profile.extraSubscriptionCancelScheduled", {
-                            date: formatHistoryDate(extraSubscription.currentPeriodEnd, lang),
-                          })
-                        : t("profile.extraSubscriptionActive", {
-                            date: formatHistoryDate(extraSubscription.currentPeriodEnd, lang),
-                          })}
-                    </p>
-                    {!extraSubscription.cancelAtPeriodEnd && (
-                      <button
-                        type="button"
-                        onClick={handleCancelExtraSubscription}
-                        disabled={subscriptionCanceling || subscriptionLoading}
-                        className="mt-3 cursor-pointer rounded-md border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {subscriptionCanceling
-                          ? t("profile.cancelExtraSubscriptionLoading")
-                          : t("profile.cancelExtraSubscription")}
-                      </button>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -740,6 +741,42 @@ export default function ProfilePage() {
                   <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
                 )}
                 {t("profile.delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCancelSubscriptionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              {t("profile.cancelExtraSubscription")}
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              {t("profile.cancelExtraSubscriptionConfirm")}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="cursor-pointer px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => setIsCancelSubscriptionModalOpen(false)}
+                disabled={subscriptionCanceling}
+              >
+                {t("form.back")}
+              </button>
+              <button
+                type="button"
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleCancelExtraSubscription}
+                disabled={subscriptionCanceling}
+              >
+                {subscriptionCanceling && (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                )}
+                {subscriptionCanceling
+                  ? t("profile.cancelExtraSubscriptionLoading")
+                  : t("profile.cancelExtraSubscription")}
               </button>
             </div>
           </div>

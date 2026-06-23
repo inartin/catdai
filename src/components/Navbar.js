@@ -38,7 +38,7 @@ function NotificationButton({ disabled = false, open, unreadCount, onClick, t })
     >
       <AlertIcon size={18} />
       {unreadCount > 0 && (
-        <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-primary">
+        <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500">
           <span className="sr-only">{t("notifications.unreadCount", { count: unreadCount })}</span>
         </span>
       )}

@@ -151,7 +151,7 @@ function getProductSummary(product, t) {
 
   return {
     ...summaries[key],
-    amountPrimary: amountEur || amountMdl,
+    amountPrimary: key === "extra_pack" && (amountEur || amountMdl) ? `${amountEur || amountMdl}/luna` : amountEur || amountMdl,
     amountSecondary: amountEur ? amountMdl : "",
   };
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
+import LockIcon from "@/components/icons/LockIcon";
 
 const PADDLE_SCRIPT_SRC = "https://cdn.paddle.com/paddle/v2/paddle.js";
 const PADDLE_INLINE_FRAME_TARGET = "paddle-inline-checkout";
@@ -322,49 +323,71 @@ export default function PaddleCheckoutPage() {
   const productSummary = getProductSummary(product, t);
 
   return (
-    <main className="min-h-screen bg-[#f7f8f5] px-4 py-8 text-gray-950 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl flex-col">
-        <header className="flex items-center justify-between gap-4">
-          <Link href="/" aria-label={t("nav.homeAriaLabel")} className="inline-flex items-center gap-3">
-            <img src="/icon0.svg" alt="" className="h-12 w-auto object-contain" />
+    <div className="min-h-screen bg-[#f7f8f5] text-gray-950">
+      <header className="border-b border-gray-100 bg-white sticky top-0 z-50">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <Link href="/" aria-label={t("nav.homeAriaLabel")} className="flex items-center gap-3">
+            <img src="/icon0.svg" alt="" className="h-11 w-auto object-contain" />
             <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
           </Link>
-          <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            <LockIcon size={14} strokeWidth={2.5} className="text-emerald-600" />
             {t("payment.secureLabel")}
           </span>
-        </header>
+        </div>
+      </header>
 
-        <section className="grid flex-1 items-start gap-8 py-10 lg:grid-cols-[0.8fr_1.2fr]">
+      <main className="mx-auto max-w-5xl px-4 py-3 sm:px-6 lg:px-8 lg:py-8">
+        <section className="grid items-start gap-3 lg:gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-dark">
-              {t("payment.checkoutEyebrow")}
-            </p>
-            <h1 className="mt-4 max-w-2xl text-4xl font-semibold leading-tight tracking-normal text-gray-950 sm:text-5xl">
+            <div className="mb-3 flex items-center justify-between gap-4 lg:block lg:mb-6">
+              <Link
+                href={returnHref}
+                className="group inline-flex items-center gap-2 text-sm font-semibold text-gray-500 transition-colors hover:text-gray-950"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="h-4 w-4 transition-transform group-hover:-translate-x-1"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+                </svg>
+                {t("form.back")}
+              </Link>
+
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-dark lg:mt-6 lg:text-sm">
+                {t("payment.checkoutEyebrow")}
+              </p>
+            </div>
+            <h1 className="max-w-2xl text-2xl font-bold leading-tight tracking-normal text-gray-950 sm:text-3xl lg:mt-2 lg:text-4xl">
               {t("payment.checkoutTitle")}
             </h1>
-            <p className="mt-5 max-w-xl text-base leading-7 text-gray-600">
+            <p className="mt-2 max-w-xl text-sm leading-6 text-gray-600 sm:text-base lg:mt-3">
               {t("payment.checkoutSubtitle")}
             </p>
 
             {productSummary && (
-              <div className="mt-8 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+              <div className="mt-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm lg:mt-8 lg:p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <h2 className="text-lg font-semibold text-gray-950">{productSummary.title}</h2>
+                    <h2 className="text-base font-bold text-gray-950 lg:text-lg">{productSummary.title}</h2>
                     {productSummary.description && (
-                      <p className="mt-2 text-sm leading-6 text-gray-600">{productSummary.description}</p>
+                      <p className="mt-1 text-xs leading-5 text-gray-500 lg:text-sm lg:leading-6 lg:text-gray-600">{productSummary.description}</p>
                     )}
                     {productSummary.quantity && (
-                      <p className="mt-3 inline-flex rounded-full bg-primary-light px-3 py-1 text-xs font-semibold text-primary-dark">
+                      <p className="mt-2.5 inline-flex rounded-full bg-primary-light px-2.5 py-0.5 text-xs font-semibold text-primary-dark lg:mt-3 lg:px-3 lg:py-1">
                         {productSummary.quantity}
                       </p>
                     )}
                   </div>
                   {productSummary.amountPrimary && (
                     <div className="shrink-0 text-right">
-                      <p className="text-lg font-bold text-gray-950">{productSummary.amountPrimary}</p>
+                      <p className="text-base font-bold text-gray-950 lg:text-lg">{productSummary.amountPrimary}</p>
                       {productSummary.amountSecondary && (
-                        <p className="mt-1 text-xs font-semibold text-gray-400">{productSummary.amountSecondary}</p>
+                        <p className="mt-0.5 text-[10px] font-semibold text-gray-400 lg:text-xs lg:mt-1">{productSummary.amountSecondary}</p>
                       )}
                     </div>
                   )}
@@ -373,39 +396,43 @@ export default function PaddleCheckoutPage() {
             )}
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
-            <div className="flex items-start gap-4">
-              <span
-                className={`mt-1 h-3 w-3 flex-none rounded-full ${
-                  isError ? "bg-red-500" : status === "ready" ? "bg-emerald-500" : "bg-primary"
-                }`}
-                aria-hidden="true"
-              />
-              <div className="min-w-0">
-                <h2 className="text-xl font-semibold text-gray-950">
-                  {isError ? t("payment.checkoutAttentionTitle") : t("payment.checkoutPanelTitle")}
-                </h2>
-                <p className="mt-3 text-sm leading-6 text-gray-600">{t(messageKey)}</p>
+          <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm lg:p-6">
+            {(status !== "ready" || isError) && (
+              <div className="mb-3 flex flex-col gap-1 lg:mb-6 lg:gap-1.5">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={`h-2.5 w-2.5 flex-none rounded-full ${
+                      isError ? "bg-red-500" : "bg-primary"
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <h2 className="text-base font-semibold text-gray-950 lg:text-lg">
+                    {isError ? t("payment.checkoutAttentionTitle") : t("payment.checkoutPanelTitle")}
+                  </h2>
+                </div>
+                <p className="text-xs text-gray-500 lg:text-sm">{t(messageKey)}</p>
                 {errorMessage && (
-                  <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
                     {errorMessage}
                   </p>
                 )}
               </div>
-            </div>
+            )}
 
             {!isError && (
               <div
-                className={`${PADDLE_INLINE_FRAME_TARGET} mt-6 min-h-[520px] overflow-visible`}
+                className={`${PADDLE_INLINE_FRAME_TARGET} min-h-[520px] overflow-visible ${
+                  status === "ready" ? "" : "mt-3 lg:mt-6"
+                }`}
                 aria-label={t("payment.checkoutFrameLabel")}
               />
             )}
 
-            <div className="mt-6 border-t border-gray-100 pt-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">
+            <div className="mt-3 border-t border-gray-100 pt-3 lg:mt-6 lg:pt-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400 lg:text-xs">
                 {t("payment.nextStepLabel")}
               </p>
-              <p className="mt-2 text-sm leading-6 text-gray-600">
+              <p className="mt-1 text-xs leading-5 text-gray-500 lg:text-sm lg:leading-6 lg:text-gray-600">
                 {isError ? t("payment.checkoutErrorNextStep") : t("payment.checkoutNextStep")}
               </p>
             </div>
@@ -413,7 +440,7 @@ export default function PaddleCheckoutPage() {
             {isError && (
               <Link
                 href={returnHref}
-                className="mt-6 inline-flex w-full items-center justify-center rounded-lg bg-gray-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+                className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-gray-950 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-gray-800 lg:mt-6"
               >
                 {t("payment.backToEvaluation")}
               </Link>
@@ -421,7 +448,7 @@ export default function PaddleCheckoutPage() {
           </div>
         </section>
 
-        <div className="mb-8 space-y-3">
+        <div className="mt-3 mb-8 space-y-3">
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-start gap-4">
               <span className="inline-flex h-10 w-10 flex-none items-center justify-center rounded-lg bg-primary-light text-primary-dark">
@@ -476,7 +503,7 @@ export default function PaddleCheckoutPage() {
             </div>
           </section>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

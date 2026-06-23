@@ -299,20 +299,6 @@ export default function Navbar() {
     if (notificationDisabled) return;
 
     setMobileMenuPath(null);
-    if (!notificationOpen) {
-      const unreadIds = notifications
-        .filter((notification) => !notification.read_at)
-        .map((notification) => notification.id);
-      if (unreadIds.length > 0) {
-        const readAt = new Date().toISOString();
-        setNotifications((current) =>
-          current.map((notification) =>
-            unreadIds.includes(notification.id) ? { ...notification, read_at: readAt } : notification
-          )
-        );
-        updateNotifications("read", unreadIds);
-      }
-    }
     setNotificationOpen((prev) => !prev);
   };
 

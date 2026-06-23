@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import LockIcon from "@/components/icons/LockIcon";
 
 const TERMINAL_STATUSES = new Set(["paid", "canceled", "payment_failed", "failed"]);
 const PAYMENT_STATUS_KEYS = {
@@ -207,19 +208,22 @@ export default function PaddlePaymentSuccessPage() {
   const localizedStatus = order?.status ? t(PAYMENT_STATUS_KEYS[order.status] || "payment.orderStatusUnknown") : "";
 
   return (
-    <main className="min-h-screen bg-[#f7f8f5] px-4 py-8 text-gray-950 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl flex-col">
-        <header className="flex items-center justify-between gap-4">
-          <Link href="/" aria-label={t("nav.homeAriaLabel")} className="inline-flex items-center gap-3">
-            <img src="/icon0.svg" alt="" className="h-12 w-auto object-contain" />
+    <div className="min-h-screen bg-[#f7f8f5] text-gray-950">
+      <header className="border-b border-gray-100 bg-white sticky top-0 z-50">
+        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <Link href="/" aria-label={t("nav.homeAriaLabel")} className="flex items-center gap-3">
+            <img src="/icon0.svg" alt="" className="h-11 w-auto object-contain" />
             <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
           </Link>
-          <span className="rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+            <LockIcon size={14} strokeWidth={2.5} className="text-emerald-600" />
             {t("payment.secureLabel")}
           </span>
-        </header>
+        </div>
+      </header>
 
-        <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1.1fr_0.9fr]">
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="grid items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-dark">
               {t("payment.statusEyebrow")}
@@ -262,7 +266,7 @@ export default function PaddlePaymentSuccessPage() {
             </Link>
           </div>
         </section>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

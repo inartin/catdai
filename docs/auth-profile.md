@@ -30,7 +30,7 @@ Implemented and active.
 
 ## Notifications
 - Logged-in users can load their own active `user_notifications` rows from `/api/notifications`.
-- Opening the navbar notification sidebar marks currently unread rows as read.
+- Opening the navbar notification sidebar keeps unread rows unread until the user clears them.
 - Clearing notifications archives the user's visible rows instead of deleting them.
 - Admin-created personalized or all-user broadcast messages are inserted through `POST /api/admin/notifications`.
 - Paddle subscription lifecycle messages are inserted as `source = 'system'` notifications for Extra activation, renewal, cancellation, and failed renewal.

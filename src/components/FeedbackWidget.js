@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import { usePathname } from "next/navigation";
 import CloseIcon from "@/components/icons/CloseIcon";
 import FeedbackIcon from "@/components/icons/FeedbackIcon";
 
@@ -24,6 +25,7 @@ function readFileAsDataUrl(file) {
 }
 
 export default function FeedbackWidget() {
+  const pathname = usePathname();
   const { session, isAuthenticated, loading } = useAuth();
   const { t } = useTranslation();
   const fileInputRef = useRef(null);
@@ -33,6 +35,7 @@ export default function FeedbackWidget() {
   const [status, setStatus] = useState("idle");
   const [error, setError] = useState("");
 
+  if (pathname === "/payment/paddle/checkout" || pathname?.endsWith("/checkout")) return null;
   if (loading || !isAuthenticated) return null;
 
   const remaining = MAX_MESSAGE_LENGTH - message.length;

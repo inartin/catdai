@@ -307,7 +307,11 @@ export default function ProfilePage() {
     try {
       const res = await fetch("/api/profile/subscription", {
         method: "POST",
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ lang }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to cancel subscription.");

@@ -33,6 +33,7 @@ Implemented and active.
 - Opening the navbar notification sidebar marks currently unread rows as read.
 - Clearing notifications archives the user's visible rows instead of deleting them.
 - Admin-created personalized or all-user broadcast messages are inserted through `POST /api/admin/notifications`.
+- Paddle subscription lifecycle messages are inserted as `source = 'system'` notifications for Extra activation, renewal, cancellation, and failed renewal.
 
 ## Activity Tracking
 - Authenticated sessions ping `/api/activity/ping`.
@@ -63,4 +64,5 @@ Implemented and active.
 - `src/app/api/profile/credits/route.js`
 - `src/app/api/profile/delete/route.js`
 - `src/app/api/notifications/route.js`
+- `src/lib/system-notifications.js`
 - `src/app/api/auth/telegram/route.js`

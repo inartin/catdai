@@ -27,6 +27,7 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
   - tracks Extra subscription state from `subscription.*` events
   - resets Extra credits to 50 per paid feature for each completed subscription billing period
   - clears Extra credits when renewal payment fails or the subscription becomes canceled, past due, or paused
+  - creates `source = 'system'` user notifications for Extra activation, renewal, cancellation, and failed renewal
   - stores all webhook deliveries for audit and idempotency
 - `GET /api/payments/paddle/status`
   - requires Supabase bearer token
@@ -46,6 +47,7 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
   - requires Supabase bearer token
   - cancels the user's active Extra subscription at the next billing period through Paddle
   - marks `cancel_at_period_end` locally while Paddle webhooks remain the source of truth
+  - creates a system notification when the cancellation is scheduled
 - `GET /payment/paddle/checkout`
   - noindex default payment link page for Paddle
   - loads Paddle.js and opens the transaction passed by Paddle as `_ptxn` in an inline checkout frame on the page
@@ -141,6 +143,7 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
 - `src/lib/payment-products.js`
 - `src/lib/paddle.js`
 - `src/lib/paddle-products.js`
+- `src/lib/system-notifications.js`
 - `src/app/api/payments/paddle/create/route.js`
 - `src/app/api/payments/paddle/status/route.js`
 - `src/app/api/profile/subscription/route.js`

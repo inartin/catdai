@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getPaddleWebhookEventFields, isValidPaddleWebhookSignature } from "@/lib/paddle";
 import { mapPaddleProductGrants } from "@/lib/paddle-products";
+import { createSystemNotification } from "@/lib/system-notifications";
 
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -13,7 +14,7 @@ async function findOrder(fields) {
   if (isUuid(fields.orderId)) {
     const { data, error } = await supabaseAdmin
       .from("paddle_payment_orders")
-      .select("id, user_id, product_key, status, paddle_price_id, paddle_transaction_id, paddle_subscription_id")
+      .select("id, user_id, product_key, status, paddle_price_id, paddle_transaction_id, paddle_subscription_id, language")
       .eq("id", fields.orderId)
       .maybeSingle();
 
@@ -24,7 +25,7 @@ async function findOrder(fields) {
   if (fields.transactionId) {
     const { data, error } = await supabaseAdmin
       .from("paddle_payment_orders")
-      .select("id, user_id, product_key, status, paddle_price_id, paddle_transaction_id, paddle_subscription_id")
+      .select("id, user_id, product_key, status, paddle_price_id, paddle_transaction_id, paddle_subscription_id, language")
       .eq("paddle_transaction_id", fields.transactionId)
       .maybeSingle();
 
@@ -253,6 +254,69 @@ async function clearSubscriptionCredits(subscription) {
   return Array.isArray(data) ? data[0] : data;
 }
 
+async function resolveSubscriptionNotificationLang(order, subscription) {
+  if (order?.language) return order.language;
+
+  const subscriptionId = subscription?.paddle_subscription_id;
+  const userId = subscription?.user_id;
+  if (!subscriptionId && !userId) return "ro";
+
+  let query = supabaseAdmin
+    .from("paddle_payment_orders")
+    .select("language")
+    .eq("product_key", "extra_pack")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  query = subscriptionId ? query.eq("paddle_subscription_id", subscriptionId) : query.eq("user_id", userId);
+
+  const { data, error } = await query.maybeSingle();
+  if (!error && data?.language) return data.language;
+
+  if (subscriptionId && userId) {
+    const fallback = await supabaseAdmin
+      .from("paddle_payment_orders")
+      .select("language")
+      .eq("user_id", userId)
+      .eq("product_key", "extra_pack")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!fallback.error && fallback.data?.language) return fallback.data.language;
+  }
+
+  return "ro";
+}
+
+async function notifySubscriptionPaid({ fields, order, previousSubscription, currentSubscription, reset }) {
+  if (!currentSubscription?.user_id || reset?.reset_applied === false) return;
+
+  const isExtended = Boolean(
+    previousSubscription?.last_transaction_id
+    && previousSubscription.last_transaction_id !== fields.transactionId
+  ) || Boolean(!order && previousSubscription);
+
+  const lang = await resolveSubscriptionNotificationLang(order, currentSubscription);
+  await createSystemNotification({
+    userId: currentSubscription.user_id,
+    type: isExtended ? "extra_subscription_extended" : "extra_subscription_started",
+    lang,
+    periodEnd: fields.billingPeriodEnd || currentSubscription.current_period_end,
+  });
+}
+
+async function notifySubscriptionStatus({ type, order, subscription }) {
+  if (!subscription?.user_id) return;
+
+  const lang = await resolveSubscriptionNotificationLang(order, subscription);
+  await createSystemNotification({
+    userId: subscription.user_id,
+    type,
+    lang,
+    periodEnd: subscription.current_period_end,
+  });
+}
+
 async function markOrderStatus(order, status, fields, payload) {
   if (!order?.id || order.status === "paid") return;
 
@@ -393,6 +457,13 @@ export async function POST(request) {
         }
 
         const reset = await resetSubscriptionCredits(fields, currentSubscription);
+        await notifySubscriptionPaid({
+          fields,
+          order,
+          previousSubscription: subscription,
+          currentSubscription,
+          reset,
+        });
         await markWebhookProcessed(webhook.id);
         return NextResponse.json({ success: true, subscription: true, reset });
       }
@@ -408,6 +479,19 @@ export async function POST(request) {
       const clear = shouldClearSubscriptionCredits(fields, currentSubscription)
         ? await clearSubscriptionCredits(currentSubscription)
         : null;
+      if (fields.eventType === "subscription.canceled") {
+        await notifySubscriptionStatus({
+          type: "extra_subscription_canceled",
+          order,
+          subscription: currentSubscription,
+        });
+      } else if (fields.eventType === "subscription.past_due") {
+        await notifySubscriptionStatus({
+          type: "extra_subscription_failed",
+          order,
+          subscription: currentSubscription,
+        });
+      }
       await markWebhookProcessed(webhook.id);
       return NextResponse.json({ success: true, subscription: Boolean(currentSubscription), clear, ignored: !currentSubscription });
     }
@@ -421,6 +505,11 @@ export async function POST(request) {
         const clear = shouldClearSubscriptionCredits(fields, currentSubscription)
           ? await clearSubscriptionCredits(currentSubscription)
           : null;
+        await notifySubscriptionStatus({
+          type: "extra_subscription_failed",
+          order,
+          subscription: currentSubscription,
+        });
         await markWebhookProcessed(webhook.id);
         return NextResponse.json({ success: true, subscription: Boolean(currentSubscription), clear });
       }

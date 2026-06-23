@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { cancelPaddleSubscription } from "@/lib/paddle";
+import { createSystemNotification, normalizeSystemNotificationLang } from "@/lib/system-notifications";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 function isMissingSchemaError(error) {
@@ -62,6 +63,11 @@ export async function POST(request) {
   }
 
   try {
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {}
+    const lang = normalizeSystemNotificationLang(body?.lang);
     const subscription = await findExtraSubscription(access.user_id);
     if (!subscription?.paddle_subscription_id) {
       return NextResponse.json({ error: "Extra subscription not found." }, { status: 404 });
@@ -90,6 +96,13 @@ export async function POST(request) {
       .single();
 
     if (error) throw error;
+
+    await createSystemNotification({
+      userId: access.user_id,
+      type: "extra_subscription_cancel_scheduled",
+      lang,
+      periodEnd: data?.current_period_end,
+    });
 
     return NextResponse.json({ subscription: normalizeSubscription(data) });
   } catch (error) {

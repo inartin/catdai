@@ -491,7 +491,7 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       mobileDescription: t("pricing.standardMobileDesc"),
       note: t("pricing.paidPackageNote"),
       features: makeFeatures("2"),
-      actionLabel: t("pricing.choosePlan"),
+      actionLabel: t("pricing.choosePlan", { plan: t("pricing.standardTitle") }),
       loadingLabel: t("payment.checkoutLoading"),
     },
     {
@@ -505,7 +505,7 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       badge: t("pricing.proBadge"),
       note: t("pricing.paidPackageNote"),
       features: makeFeatures("10"),
-      actionLabel: t("pricing.choosePlan"),
+      actionLabel: t("pricing.choosePlan", { plan: t("pricing.proTitle") }),
       loadingLabel: t("payment.checkoutLoading"),
     },
     {
@@ -519,7 +519,7 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       badge: t("pricing.extraBadge"),
       note: t("pricing.extraPackageNote"),
       features: makeFeatures("50"),
-      actionLabel: t("pricing.choosePlan"),
+      actionLabel: t("pricing.choosePlan", { plan: t("pricing.extraTitle") }),
       loadingLabel: t("payment.checkoutLoading"),
     },
   ];

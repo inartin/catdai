@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import LoginButton from "@/components/LoginButton";
@@ -227,20 +227,6 @@ export default function Navbar() {
   }, [mobileMenuOpen]);
 
   useEffect(() => {
-    if (!notificationOpen) return;
-
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") setNotificationOpen(false);
-    };
-
-    document.addEventListener("keydown", onKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [notificationOpen]);
-
-  useEffect(() => {
     const accessToken = session?.access_token;
 
     if (!isAuthenticated || !accessToken) {
@@ -276,7 +262,7 @@ export default function Navbar() {
     };
   }, [isAuthenticated, session?.access_token]);
 
-  const updateNotifications = async (action, ids = []) => {
+  const updateNotifications = useCallback(async (action, ids = []) => {
     const accessToken = session?.access_token;
     if (!accessToken) return false;
 
@@ -293,23 +279,58 @@ export default function Navbar() {
     } catch {
       return false;
     }
-  };
+  }, [session?.access_token]);
+
+  const markVisibleNotificationsRead = useCallback(() => {
+    const unreadIds = notifications
+      .filter((notification) => !notification.read_at)
+      .map((notification) => notification.id);
+
+    if (unreadIds.length === 0) return;
+
+    const readAt = new Date().toISOString();
+    setNotifications((current) =>
+      current.map((notification) =>
+        unreadIds.includes(notification.id) ? { ...notification, read_at: readAt } : notification
+      )
+    );
+    updateNotifications("read", unreadIds);
+  }, [notifications, updateNotifications]);
+
+  const handleNotificationClose = useCallback(() => {
+    markVisibleNotificationsRead();
+    setNotificationOpen(false);
+  }, [markVisibleNotificationsRead]);
+
+  useEffect(() => {
+    if (!notificationOpen) return;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") handleNotificationClose();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [handleNotificationClose, notificationOpen]);
 
   const handleNotificationToggle = () => {
     if (notificationDisabled) return;
 
     setMobileMenuPath(null);
-    setNotificationOpen((prev) => !prev);
+    if (notificationOpen) {
+      handleNotificationClose();
+    } else {
+      setNotificationOpen(true);
+    }
   };
 
   const handleNotificationClear = () => {
     if (notifications.length === 0) return;
     setNotifications([]);
     updateNotifications("archive");
-  };
-
-  const handleNotificationClose = () => {
-    setNotificationOpen(false);
   };
 
   return (

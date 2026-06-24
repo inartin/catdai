@@ -11,6 +11,7 @@ import HistoryIcon from "@/components/icons/HistoryIcon";
 import Tooltip from "@/components/Tooltip";
 import ProfileCreditBalances from "@/components/ProfileCreditBalances";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
+import { formatLocalizedDate } from "@/lib/localized-date";
 
 const HISTORY_PAGE_SIZE = 10;
 const TRANSACTIONS_PAGE_SIZE = 10;
@@ -31,14 +32,12 @@ function formatNumber(value, lang, options = {}) {
 
 function formatHistoryDate(value, lang) {
   if (!value) return "—";
-  const date = new Date(value);
-  const locale = lang === "ru" ? "ru-RU" : "ro-RO";
-  const datePart = date.toLocaleDateString(locale, {
+  const datePart = formatLocalizedDate(value, lang, {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
-  const timePart = date.toLocaleTimeString(locale, {
+  const timePart = formatLocalizedDate(value, lang, {
     hour: "2-digit",
     minute: "2-digit",
   });

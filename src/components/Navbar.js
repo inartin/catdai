@@ -10,6 +10,7 @@ import AlertIcon from "@/components/icons/AlertIcon";
 import CloseIcon from "@/components/icons/CloseIcon";
 import MenuIcon from "@/components/icons/MenuIcon";
 import Tooltip from "@/components/Tooltip";
+import { formatLocalizedDate, normalizeLocalizedDateText } from "@/lib/localized-date";
 
 const NOTIFICATION_POLL_INTERVAL_MS = 60_000;
 
@@ -47,17 +48,12 @@ function NotificationButton({ disabled = false, open, unreadCount, onClick, t })
 }
 
 function formatNotificationTime(value, lang) {
-  if (!value) return "";
-  try {
-    return new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "ro-RO", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(value));
-  } catch {
-    return "";
-  }
+  return formatLocalizedDate(value, lang, {
+    day: "2-digit",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function NotificationSidebar({ open, notifications, onClear, onClose, loading, lang, t }) {
@@ -129,7 +125,9 @@ function NotificationSidebar({ open, notifications, onClear, onClose, loading, l
                           {!notification.read_at ? t("notifications.unread") : t("notifications.read")}
                         </span>
                       </div>
-                      <p className="mt-1 whitespace-pre-line text-sm leading-5 text-gray-600">{notification.body}</p>
+                      <p className="mt-1 whitespace-pre-line text-sm leading-5 text-gray-600">
+                        {normalizeLocalizedDateText(notification.body, lang)}
+                      </p>
                       <time className="mt-3 block text-xs font-medium text-gray-400">
                         {formatNotificationTime(notification.created_at, lang)}
                       </time>

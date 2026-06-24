@@ -48,7 +48,7 @@ Shows:
 - `/admin/news` is linked from the left menu as `News` and lets admins list, create, edit, and remove news items with slug, title, rich description, creation date, and cover image link.
 - `/admin/uploads` is linked from the left menu as `Uploads` and lets admins upload JPEG, PNG, WebP, or GIF images up to 5 MB to Supabase Storage.
 - `/admin/notifications` is linked from the left menu as `Notifications` and lets admins send one in-app message to every registered Supabase user. The bottom of the page also has a bulk free-credit action where an admin enters an amount, confirms the popup, and sets each registered user's remaining credits to that amount for every paid feature without changing package status or auth metadata.
-- Logged-in users see in-app messages in the navbar notification sidebar; unread messages stay visibly unread while the sidebar is open and are marked read when the sidebar is closed.
+- Logged-in users see in-app messages in the navbar notification sidebar; unread messages stay visibly unread while the sidebar is open, are marked read when the sidebar is closed, and show dates with full capitalized month names.
 - In development, all-user notification broadcasts are hardcoded to only `catdai.info@gmail.com` and `iamdevandrei@gmail.com`.
 - Admin uploads use the `img` Supabase Storage bucket by default, or `SUPABASE_IMAGE_BUCKET` when set. Files are saved at the bucket root with a unique sanitized filename. The bucket must be public to use the returned `getPublicUrl` URL without an expiration date; signed URLs are not used.
 

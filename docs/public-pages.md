@@ -39,7 +39,7 @@ Implemented.
 
 ## App Shell
 - Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, localized Cadastru link, Calculator link to `/calculator`, Prețuri link to `/pricing` placed right after Calculator, login/profile link, language switcher, and an always-visible notification button.
-- The notification button opens a right sidebar for authenticated users, stays visible but disabled while auth is loading or anonymous, loads the user's active `user_notifications` rows, marks unread rows as read when opened, and archives rows when cleared.
+- The notification button opens a right sidebar for authenticated users, stays visible but disabled while auth is loading or anonymous, loads the user's active `user_notifications` rows, formats dates with full capitalized month names, marks unread rows as read when the sidebar closes, and archives rows when cleared.
 - Shared footer. Its `Noutăți` link routes to `/noutati`; footer legal links include Terms, Privacy, and Refund; Telegram remains only as the social icon link. Footer displays active card/payment-system logos from `public/brands`; Paynet is not shown because it is not used.
 - Cookie banner is global.
 - PWA manifest and app icons are present.

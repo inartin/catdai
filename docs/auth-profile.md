@@ -25,15 +25,15 @@ Implemented and active.
 - paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus search type, result type, city, and district when available
 - paid sale/rent evaluation usage rows are shown in history when a saved paid snapshot exists; if the same action also has an `estimate_log` row, history hides the ordinary row and keeps only the paid snapshot row. Paid rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation
 - paginated transactions tab for the authenticated user's own rows from `paddle_payment_orders`; it shows product, status, amount, Paddle transaction/subscription id when available, and the internal order id for support lookup
-- closed `Setări` panel with account deletion and an Extra subscription cancellation action when the user has an active Extra subscription; cancellation is scheduled for the next billing period
+- closed `Setări` panel with account deletion and an Extra subscription cancellation action when the user has an active Extra subscription; cancellation is scheduled for the next billing period and visible subscription dates use full capitalized month names
 - localized browser title from `nav.profile`
 
 ## Notifications
 - Logged-in users can load their own active `user_notifications` rows from `/api/notifications`.
-- Opening the navbar notification sidebar keeps unread rows unread until the user clears them.
+- Opening the navbar notification sidebar keeps unread rows visibly unread until the sidebar closes.
 - Clearing notifications archives the user's visible rows instead of deleting them.
 - Admin-created personalized or all-user broadcast messages are inserted through `POST /api/admin/notifications`.
-- Paddle subscription lifecycle messages are inserted as `source = 'system'` notifications for Extra activation, renewal, cancellation, and failed renewal.
+- Paddle subscription lifecycle messages are inserted as `source = 'system'` notifications for Extra activation, renewal, cancellation, and failed renewal, with full capitalized month names in Romanian and Russian dates.
 
 ## Activity Tracking
 - Authenticated sessions ping `/api/activity/ping`.

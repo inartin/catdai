@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { formatLocalizedDate } from "@/lib/localized-date";
 
 const DEFAULT_LANG = "ro";
 
@@ -62,15 +63,11 @@ export function normalizeSystemNotificationLang(lang) {
 function formatNotificationDate(value, lang) {
   if (!value) return lang === "ru" ? "конца оплаченного периода" : "sfârșitul perioadei plătite";
 
-  try {
-    return new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "ro-RO", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    }).format(new Date(value));
-  } catch {
-    return lang === "ru" ? "конца оплаченного периода" : "sfârșitul perioadei plătite";
-  }
+  return formatLocalizedDate(value, lang, {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }) || (lang === "ru" ? "конца оплаченного периода" : "sfârșitul perioadei plătite");
 }
 
 export async function createSystemNotification({ userId, type, lang, periodEnd }) {

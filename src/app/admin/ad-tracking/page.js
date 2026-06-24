@@ -6,6 +6,7 @@ const JOURNEY_PAGE_SIZE = 50;
 const AD_SOURCES = [
   { key: "zdg", label: "ZDG", entryPath: "/?src=zdg" },
   { key: "reddit", label: "Reddit", entryPath: "/?utm_source=reddit" },
+  { key: "vtememd", label: "vtememd", entryPath: "/?utm_source=vtememd" },
 ];
 const PERIOD_OPTIONS = [
   { key: "day", label: "1 day" },

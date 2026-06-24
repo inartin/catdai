@@ -11,6 +11,7 @@ function getCurrentPath() {
 const LANDING_SOURCE_RULES = [
   { source: "zdg", param: "src", value: "zdg" },
   { source: "reddit", param: "utm_source", value: "reddit" },
+  { source: "vtememd", param: "utm_source", value: "vtememd" },
 ];
 
 function getLandingAdSource(params) {

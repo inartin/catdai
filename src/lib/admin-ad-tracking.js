@@ -15,6 +15,10 @@ export const AD_TRACKING_SOURCES = {
     label: "Reddit",
     entryPath: "/?utm_source=reddit",
   },
+  vtememd: {
+    label: "vtememd",
+    entryPath: "/?utm_source=vtememd",
+  },
 };
 
 async function fetchAllRows(buildQuery) {

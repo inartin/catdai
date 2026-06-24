@@ -40,7 +40,7 @@ Implemented.
 - `/estimeaza` sends `conversion_event_page_view_1` once on client mount when GA is available.
 - Estimate logging stores device/session ids, input summary, result price, language, response time, and hashed IP.
 - `/profile` exposes the authenticated user's own analytics rows in the paginated `Istoric` tab: `estimate_log` rows for sale/rent valuations and `cadastru_search_events` rows for cadastru searches. Cadastru rows show the cadastral number as the result plus search type, result type, lookup source, and district when available.
-- Landing-only ad source tracking supports `/?src=zdg` and `/?utm_source=reddit`.
+- Landing-only ad source tracking supports `/?src=zdg`, `/?utm_source=reddit`, and `/?utm_source=vtememd`.
 - When a supported landing source is seen on `/`, the browser stores the source for the session and posts simple events to `/api/ad-source-events`.
 - `ad_source_events` is a separate Supabase table for this first-party trail: landing visit, later page views, landing CTA, estimate form view, estimate submit, estimate result view, and sign-in attachment.
 - Authenticated tracking requests store `user_id` so ad sessions can be tied to registered Supabase users after login.

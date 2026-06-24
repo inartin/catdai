@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
+import AuthRequiredModal from "@/components/AuthRequiredModal";
 import CloseIcon from "@/components/icons/CloseIcon";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 
@@ -74,15 +75,53 @@ function FeatureRow({ feature, featured }) {
   );
 }
 
+function ChevronIcon({ open }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m6 8 4 4 4-4" />
+    </svg>
+  );
+}
+
 function getReturnPath() {
   if (typeof window === "undefined") return null;
   return `${window.location.pathname}${window.location.search}`;
 }
 
 function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
+  const { t } = useTranslation();
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
   const priceLabel = plan.price === 0 ? plan.priceLabel : formatPrice(plan.price);
   const isBusy = checkoutState.productKey === plan.productKey
     && (checkoutState.status === "loading" || checkoutState.status === "redirecting");
+  const checkoutBlock = (marginClass = "mt-5") => plan.productKey ? (
+    <>
+      <button
+        type="button"
+        onClick={() => onCheckout(plan.productKey)}
+        disabled={isBusy}
+        className={`inline-flex w-full cursor-pointer items-center justify-center rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:bg-gray-300 ${marginClass} ${
+          featured
+            ? "bg-primary text-white hover:bg-primary-dark"
+            : "bg-gray-950 text-white hover:bg-gray-800"
+        }`}
+      >
+        {isBusy ? plan.loadingLabel : plan.actionLabel}
+      </button>
+      {checkoutState.productKey === plan.productKey && checkoutState.message && (
+        <p className="mt-2 text-xs font-medium text-red-600">{checkoutState.message}</p>
+      )}
+    </>
+  ) : null;
 
   return (
     <article
@@ -122,46 +161,46 @@ function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
       )}
 
       <p className="mt-3 min-h-10 text-sm leading-5 text-gray-500">
-        {plan.description}
+        <span className="hidden md:block">{plan.description}</span>
+        <span className="block md:hidden">
+          {plan.mobileDescription || plan.description}
+        </span>
       </p>
 
-      <ul className="mt-5 flex-1 divide-y divide-gray-100 border-t border-gray-100">
-        {plan.features.map((feature) => (
-          <FeatureRow key={feature.label} feature={feature} featured={featured} />
-        ))}
-      </ul>
-
-      {plan.note && (
-        <p
-          className={`mt-5 rounded-xl px-3.5 py-2.5 text-xs font-semibold leading-5 ${
-            featured ? "bg-primary/10 text-primary-dark" : "bg-gray-50 text-gray-500"
-          }`}
+      <div className="md:hidden">
+        {checkoutBlock("mt-4")}
+        <button
+          type="button"
+          onClick={() => setMobileDetailsOpen((open) => !open)}
+          className="mt-4 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-800 transition-colors hover:bg-gray-50"
+          aria-expanded={mobileDetailsOpen}
         >
-          {plan.note}
-        </p>
-      )}
+          {mobileDetailsOpen ? t("pricing.hideDetails") : t("pricing.showDetails")}
+          <ChevronIcon open={mobileDetailsOpen} />
+        </button>
+      </div>
 
-      {plan.productKey && (
-        <>
-          <button
-            type="button"
-            onClick={() => onCheckout(plan.productKey)}
-            disabled={isBusy}
-            className={`inline-flex w-full cursor-pointer items-center justify-center rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:bg-gray-300 ${
-              plan.note ? "mt-4" : "mt-5"
-            } ${
-              featured
-                ? "bg-primary text-white hover:bg-primary-dark"
-                : "bg-gray-950 text-white hover:bg-gray-800"
+      <div className={`${mobileDetailsOpen ? "block" : "hidden"} md:flex md:flex-1 md:flex-col`}>
+        <ul className="mt-5 flex-1 divide-y divide-gray-100 border-t border-gray-100">
+          {plan.features.map((feature) => (
+            <FeatureRow key={feature.label} feature={feature} featured={featured} />
+          ))}
+        </ul>
+
+        {plan.note && (
+          <p
+            className={`mt-5 rounded-xl px-3.5 py-2.5 text-xs font-semibold leading-5 ${
+              featured ? "bg-primary/10 text-primary-dark" : "bg-gray-50 text-gray-500"
             }`}
           >
-            {isBusy ? plan.loadingLabel : plan.actionLabel}
-          </button>
-          {checkoutState.productKey === plan.productKey && checkoutState.message && (
-            <p className="mt-2 text-xs font-medium text-red-600">{checkoutState.message}</p>
-          )}
-        </>
-      )}
+            {plan.note}
+          </p>
+        )}
+
+        <div className="hidden md:block">
+          {checkoutBlock(plan.note ? "mt-4" : "mt-5")}
+        </div>
+      </div>
     </article>
   );
 }
@@ -367,13 +406,14 @@ function CustomRequestModal({ open, onClose }) {
 
 export default function Pricing({ prices, compact = false, trackPageOpen = false }) {
   const { t, lang } = useTranslation();
-  const { session, loading: authLoading } = useAuth();
+  const { session, loading: authLoading, clearAuthError } = useAuth();
   const [checkoutState, setCheckoutState] = useState({
     status: "idle",
     productKey: null,
     message: "",
   });
   const [customRequestOpen, setCustomRequestOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const pageTrackedRef = useRef(false);
 
   useEffect(() => {
@@ -406,6 +446,7 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       priceHasAsterisk: true,
       title: t("pricing.freeTitle"),
       description: t("pricing.freeDesc"),
+      mobileDescription: t("pricing.freeMobileDesc"),
       note: t("pricing.freeNote"),
       features: [
         {
@@ -447,6 +488,7 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       eurPrice: prices.standard.eur,
       title: t("pricing.standardTitle"),
       description: t("pricing.standardDesc"),
+      mobileDescription: t("pricing.standardMobileDesc"),
       note: t("pricing.paidPackageNote"),
       features: makeFeatures("2"),
       actionLabel: t("pricing.choosePlan"),
@@ -459,6 +501,7 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       eurPrice: prices.pro.eur,
       title: t("pricing.proTitle"),
       description: t("pricing.proDesc"),
+      mobileDescription: t("pricing.proMobileDesc"),
       badge: t("pricing.proBadge"),
       note: t("pricing.paidPackageNote"),
       features: makeFeatures("10"),
@@ -472,6 +515,7 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       eurPrice: prices.extra.eur,
       title: t("pricing.extraTitle"),
       description: t("pricing.extraDesc"),
+      mobileDescription: t("pricing.extraMobileDesc"),
       badge: t("pricing.extraBadge"),
       note: t("pricing.extraPackageNote"),
       features: makeFeatures("50"),
@@ -482,11 +526,9 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
 
   const startCheckout = async (productKey) => {
     if (!session?.access_token) {
-      setCheckoutState({
-        status: "error",
-        productKey,
-        message: t("payment.loginRequiredForCheckout"),
-      });
+      clearAuthError?.();
+      setCheckoutState({ status: "idle", productKey: null, message: "" });
+      setAuthModalOpen(true);
       return;
     }
 
@@ -557,6 +599,11 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       <CustomRequestModal
         open={customRequestOpen}
         onClose={() => setCustomRequestOpen(false)}
+      />
+      <AuthRequiredModal
+        open={authModalOpen}
+        copyKey="payment.loginRequiredForCheckout"
+        onClose={() => setAuthModalOpen(false)}
       />
     </section>
   );

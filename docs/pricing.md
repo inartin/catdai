@@ -15,6 +15,8 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 - The main pricing grid has four equal-height cards: Free, Standard, Pro, and Extra.
 - A full-width custom-request card appears under the four pricing cards and opens a modal for users who need a different mix of actions.
 - Pricing cards use a fixed-height header area so feature rows start at the same vertical position even when descriptions wrap to different line counts.
+- On mobile, pricing card details are collapsed by default. The price, credit summary, and paid-card checkout button remain visible; feature rows and notes expand from the details toggle.
+- If an unauthenticated user clicks a package checkout button, pricing opens the shared login modal instead of showing an inline error.
 - Pro keeps the highlight badge; Extra shows a monthly-payment badge.
 - Extra includes 50 actions per feature per month; without a successful renewal, remaining Extra credits are cleared.
 - Each card enumerates usage per feature: sale estimate, rent estimate, 999 analysis, cadastru lookup, yield calculator, and PDF report.

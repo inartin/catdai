@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
-import AuthRequiredModal from "@/components/AuthRequiredModal";
 import CloseIcon from "@/components/icons/CloseIcon";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 
@@ -95,6 +94,15 @@ function ChevronIcon({ open }) {
 function getReturnPath() {
   if (typeof window === "undefined") return null;
   return `${window.location.pathname}${window.location.search}`;
+}
+
+function buildPendingCheckoutUrl(productKey, lang) {
+  const url = new URL("/payment/paddle/checkout", window.location.origin);
+  url.searchParams.set("product_key", productKey);
+  url.searchParams.set("lang", lang);
+  const returnPath = getReturnPath();
+  if (returnPath) url.searchParams.set("return_to", returnPath);
+  return url.toString();
 }
 
 function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
@@ -406,14 +414,13 @@ function CustomRequestModal({ open, onClose }) {
 
 export default function Pricing({ prices, compact = false, trackPageOpen = false }) {
   const { t, lang } = useTranslation();
-  const { session, loading: authLoading, clearAuthError } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const [checkoutState, setCheckoutState] = useState({
     status: "idle",
     productKey: null,
     message: "",
   });
   const [customRequestOpen, setCustomRequestOpen] = useState(false);
-  const [authModalOpen, setAuthModalOpen] = useState(false);
   const pageTrackedRef = useRef(false);
 
   useEffect(() => {
@@ -526,9 +533,8 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
 
   const startCheckout = async (productKey) => {
     if (!session?.access_token) {
-      clearAuthError?.();
-      setCheckoutState({ status: "idle", productKey: null, message: "" });
-      setAuthModalOpen(true);
+      setCheckoutState({ status: "redirecting", productKey, message: "" });
+      window.location.href = buildPendingCheckoutUrl(productKey, lang);
       return;
     }
 
@@ -599,11 +605,6 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       <CustomRequestModal
         open={customRequestOpen}
         onClose={() => setCustomRequestOpen(false)}
-      />
-      <AuthRequiredModal
-        open={authModalOpen}
-        copyKey="payment.loginRequiredForCheckout"
-        onClose={() => setAuthModalOpen(false)}
       />
     </section>
   );

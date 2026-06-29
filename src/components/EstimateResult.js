@@ -15,7 +15,8 @@ import InfoCallout from "@/components/InfoCallout";
 
 const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
 const LISTING_FAIR_BAND_PCT = 3;
-const LockedTooltipContext = createContext("result.loginToSeeFullAnalysis");
+const LockedTooltipContext = createContext("payment.buyAccess");
+const STANDARD_PACKAGE_OFFER = { product_key: "standard_pack" };
 
 function rememberPdfLoginReturn() {
   if (typeof window === "undefined") return;
@@ -1751,6 +1752,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
   const purchaseOffer = !isPaid ? data.access_limit?.purchase : null;
+  const authModalPurchaseOffer = purchaseOffer || (!isPaid ? STANDARD_PACKAGE_OFFER : null);
   const paidFeatureCreditRequired = !!purchaseOffer && !freeMonthlyLimitReached && !paidEvaluationLimitReached;
   const lockedSections = data.locked_sections || {};
   const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
@@ -1785,7 +1787,10 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
       return;
     }
 
-    openAuthModal("result.loginToSeeFullAnalysis");
+    openAuthModal("payment.buyAccess", {
+      force: true,
+      showAuthOptions: false,
+    });
   }, [freeMonthlyLimitReached, isAuthenticated, openAuthModal, paidEvaluationLimitReached, paidFeatureCreditRequired]);
 
   const estimate = data.estimate || {};
@@ -1840,9 +1845,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
     appendDefinedParam(params, "renovation", input.renovation);
     return buildEvaluationUrl(params);
   };
-  const lockedTooltipKey = (freeMonthlyLimitReached || paidEvaluationLimitReached || (paidFeatureCreditRequired && isAuthenticated))
-    ? "payment.buyAccess"
-    : "result.loginToSeeFullAnalysis";
+  const lockedTooltipKey = "payment.buyAccess";
 
   return (
     <LockedTooltipContext.Provider value={lockedTooltipKey}>
@@ -1853,12 +1856,12 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         showAuthOptions={authModalShowAuthOptions}
         onClose={closeAuthModal}
       >
-        {purchaseOffer && (authModalCopyKey === "result.freeMonthlyLimitReached" || authModalCopyKey === "payment.buyAccess") ? (
+        {authModalPurchaseOffer && (authModalCopyKey === "result.freeMonthlyLimitReached" || authModalCopyKey === "payment.buyAccess") ? (
           <>
             <p className="mb-4 text-center text-sm font-medium text-gray-500">
               {t("payment.limitPackageSubtitle")}
             </p>
-            <FeaturePricingAction offer={purchaseOffer} trackPopupOpen />
+            <FeaturePricingAction offer={authModalPurchaseOffer} trackPopupOpen />
           </>
         ) : null}
       </AuthRequiredModal>
@@ -2091,12 +2094,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
   const listingAnalysisLocked = data.access_limit?.feature_key === "listing_analysis";
   const listingAnalysisRequiresLogin = listingAnalysisLocked && data.access_limit?.reason === "unauthorized";
-  const purchaseOffer = (freeMonthlyLimitReached || paidEvaluationLimitReached || (listingAnalysisLocked && !listingAnalysisRequiresLogin)) ? data.access_limit?.purchase : null;
+  const purchaseOffer = (freeMonthlyLimitReached || paidEvaluationLimitReached || listingAnalysisLocked) ? data.access_limit?.purchase : null;
   const cadastralLockedPreview = cadastral?.locked_sections?.cadastru_details === true;
   const cadastralPurchaseOffer = cadastral?.access_limit?.purchase || null;
   const authModalPurchaseOffer = authModalCopyKey === "payment.buyAccess" && cadastralPurchaseOffer
     ? cadastralPurchaseOffer
-    : purchaseOffer;
+    : purchaseOffer || (!isPaid ? STANDARD_PACKAGE_OFFER : null);
   const lockedSections = data.locked_sections || {};
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
   const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
@@ -2158,7 +2161,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       return;
     }
 
-    openAuthModal("result.loginToSeeFullAnalysis");
+    openAuthModal("payment.buyAccess", {
+      force: true,
+      showAuthOptions: false,
+    });
   }, [freeMonthlyLimitReached, listingAnalysisLocked, listingAnalysisRequiresLogin, paidEvaluationLimitReached, openAuthModal]);
 
   const openCadastralPaywallModal = useCallback(() => {
@@ -2434,9 +2440,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const lockMarketTrend = !isPaid && !listingComparison && lockedSections.market_trend === true;
   const lockListingPriceHistory = !isPaid && listingComparison && lockedSections.listing_price_history === true;
   const marketTrend = data.market_trend;
-  const lockedTooltipKey = freeMonthlyLimitReached || paidEvaluationLimitReached || (listingAnalysisLocked && !listingAnalysisRequiresLogin)
-    ? "payment.buyAccess"
-    : "result.loginToSeeFullAnalysis";
+  const lockedTooltipKey = "payment.buyAccess";
   const resultLayoutClassName = compactLayout
     ? "animate-fade-in flex flex-col gap-5"
     : "animate-fade-in flex flex-col gap-5 lg:gap-6";

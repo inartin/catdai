@@ -26,6 +26,15 @@ function getReturnPath() {
   return `${window.location.pathname}${window.location.search}`;
 }
 
+function buildPendingCheckoutUrl(productKey, lang) {
+  const url = new URL("/payment/paddle/checkout", window.location.origin);
+  url.searchParams.set("product_key", productKey);
+  url.searchParams.set("lang", lang);
+  const returnPath = getReturnPath();
+  if (returnPath) url.searchParams.set("return_to", returnPath);
+  return url.toString();
+}
+
 export default function FeaturePricingAction({
   offer,
   className = "",
@@ -67,7 +76,12 @@ export default function FeaturePricingAction({
   if (!offer?.product_key) return null;
 
   const startCheckout = async () => {
-    if (!session?.access_token) return;
+    if (!session?.access_token) {
+      setStatus("redirecting");
+      window.location.href = buildPendingCheckoutUrl(packageOffer.product_key, lang);
+      return;
+    }
+
     setStatus("loading");
     setMessage("");
     onCheckoutStart?.();
@@ -134,8 +148,8 @@ export default function FeaturePricingAction({
       <button
         type="button"
         onClick={startCheckout}
-        disabled={status === "loading" || status === "redirecting" || !session?.access_token}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-gray-900/10 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+        disabled={authLoading || status === "loading" || status === "redirecting"}
+        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gray-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-gray-900/10 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       >
         {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : t("payment.continueWithStandard")}
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

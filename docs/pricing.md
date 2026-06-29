@@ -16,7 +16,7 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 - A full-width custom-request card appears under the four pricing cards and opens a modal for users who need a different mix of actions.
 - Pricing cards use a fixed-height header area so feature rows start at the same vertical position even when descriptions wrap to different line counts.
 - On mobile, pricing card details are collapsed by default. The price, credit summary, and paid-card checkout button remain visible; feature rows and notes expand from the details toggle.
-- If an unauthenticated user clicks a package checkout button, pricing opens the shared login modal instead of showing an inline error.
+- If an unauthenticated user clicks a package checkout button, pricing opens `/payment/paddle/checkout` with the selected product and shows login methods in the checkout panel. After login, the same page creates the Paddle transaction and loads inline checkout.
 - Pro keeps the highlight badge; Extra shows a monthly-payment badge.
 - Extra includes 50 actions per feature per month; without a successful renewal, remaining Extra credits are cleared.
 - Each card enumerates usage per feature: sale estimate, rent estimate, 999 analysis, cadastru lookup, yield calculator, and PDF report.
@@ -35,7 +35,7 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 - Shared product definitions now live in `src/lib/payment-products.js`.
 - Paddle price IDs are read per product key from env through `src/lib/paddle-products.js`; Standard, Pro, and single-feature products require one-time prices, while Extra requires a monthly subscription price.
 - `PADDLE_PRICE_STANDARD_PACK` may be a Paddle price id (`pri_...`) or a product id (`pro_...`); product ids are resolved to the first active one-time price before checkout.
-- Limit-reached evaluation popups use the reusable `FeaturePricingAction` component and present Standard as the default package with MDL price from `NEXT_PUBLIC_PRICE_STANDARD_PACK_MDL_COST`, approximate EUR equivalent from `NEXT_PUBLIC_PRICE_STANDARD_PACK_COST`, pricing-style included-feature rows, a primary checkout action, and a secondary `/pricing` link.
+- Locked evaluation popups use the reusable `FeaturePricingAction` component and present Standard as the default package with MDL price from `NEXT_PUBLIC_PRICE_STANDARD_PACK_MDL_COST`, approximate EUR equivalent from `NEXT_PUBLIC_PRICE_STANDARD_PACK_COST`, pricing-style included-feature rows, a primary checkout action, and a secondary `/pricing` link.
 - `standard_pack` and `pro_pack` grant 2 and 10 non-expiring uses per paid feature. `extra_pack` resets each paid monthly subscription period to 50 uses per paid feature.
 - Single-feature products grant 1 use for sale evaluation, rent evaluation, 999 analysis, cadastru lookup, yield calculator, or PDF report.
 - Profile `Acces rămas` shows free monthly sale/rent balances with a free badge plus the remaining and used purchased credits per feature.

@@ -18,7 +18,7 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 - `db/paynet_payments.sql` still contains shared credit tables/helpers used by the current free monthly usage limit and by Paddle grants.
 - `db/paddle_payments.sql` prepares Paddle payment orders, Extra subscription state, webhook audit rows, one-time grants, and idempotent monthly subscription resets into the same feature-credit system.
 - `POST /api/payments/paddle/create` and `POST /api/paddle/webhooks` create Paddle transactions and grant or reset credits only after verified `transaction.completed` notifications.
-- Limit-reached sale and rent evaluation popups and result action columns show the same reusable feature-pricing checkout action.
+- Locked sale and rent evaluation popups and result action columns show the same reusable feature-pricing checkout action.
 - Limit-reached blurred-value popups say the free monthly evaluation was used, prompt the user to choose a package, and show Standard as the default package action with a secondary link to `/pricing`.
 - Paddle checkout and status pages use the CatDai-branded RO/RU payment shell and preserve the selected language through the checkout/status redirect.
 - Sale and rent evaluation single-access checkouts use the same Paddle price ID from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE`, display the euro amount from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` plus `≈ MDL` at 20 MDL per EUR, and grant one `sale_estimate` or `rent_estimate` credit after Paddle confirms payment.
@@ -31,7 +31,7 @@ Sale/buy estimate results return a preview for anonymous users:
 - the main market estimate stays visible
 - locked values are removed from `/api/estimate` before the JSON response
 - the UI shows blurred placeholder values with a lock icon and the shared tooltip
-- clicking a blurred value opens the shared auth popup
+- clicking a blurred value opens the shared package popup; anonymous checkout continues on `/payment/paddle/checkout` with login methods in the checkout panel before Paddle loads
 - when the monthly free limit is reached, blurred values use the unlock-evaluation tooltip instead of the login tooltip
 
 Locked preview sections include fast/target prices, price per m2, range numbers, market stats, district comparison values, seller breakdown, and listing details.

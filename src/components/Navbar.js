@@ -436,13 +436,19 @@ export default function Navbar() {
         </div>
 
       <div ref={mobileMenuRef} className="flex items-center gap-2 md:hidden">
-          <NotificationButton
-            disabled={notificationDisabled}
-            open={effectiveNotificationOpen}
-            unreadCount={unreadNotificationCount}
-            onClick={handleNotificationToggle}
-            t={t}
+          <LoginButton
+            className="inline-flex h-9 items-center rounded-lg border border-gray-200 bg-gray-50 px-2.5 leading-none text-gray-700 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
+            onPress={() => setMobileMenuPath(null)}
           />
+          {isAuthenticated && (
+            <NotificationButton
+              disabled={notificationDisabled}
+              open={effectiveNotificationOpen}
+              unreadCount={unreadNotificationCount}
+              onClick={handleNotificationToggle}
+              t={t}
+            />
+          )}
           <button
             type="button"
             aria-label={t("nav.menu")}
@@ -500,7 +506,6 @@ export default function Navbar() {
                 >
                   {t("nav.pricing")}
                 </Link>
-                <LoginButton className="flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900" menuAlign="left" />
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-1">
                   <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
                     {t("nav.langAriaLabel")}

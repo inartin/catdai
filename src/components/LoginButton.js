@@ -7,7 +7,7 @@ import AuthOptions from "@/components/AuthOptions";
 import CloseIcon from "@/components/icons/CloseIcon";
 import { useRouter } from "next/navigation";
 
-export default function LoginButton({ className = "", menuAlign = "right" }) {
+export default function LoginButton({ className = "", menuAlign = "right", onPress }) {
   const { t } = useTranslation();
   const router = useRouter();
   const {
@@ -50,6 +50,7 @@ export default function LoginButton({ className = "", menuAlign = "right" }) {
       <button
         type="button"
         onClick={async () => {
+          onPress?.();
           clearAuthError();
           if (isLoggedIn) {
             router.push('/profile');

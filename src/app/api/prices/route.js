@@ -5,8 +5,9 @@ export const dynamic = "force-dynamic";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 const TWENTY_FOUR_HOURS_SECONDS = 24 * 60 * 60;
-const CACHE_KEY = "catdai:prices:latest:v1";
-const LAST_KNOWN_KEY = "catdai:prices:last-known:v1";
+const PRICE_CITY = "Chișinău";
+const CACHE_KEY = "catdai:prices:latest:chisinau:v1";
+const LAST_KNOWN_KEY = "catdai:prices:last-known:chisinau:v1";
 // 30 days – effectively "permanent"; refreshed on every successful fetch
 const LAST_KNOWN_TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -22,7 +23,10 @@ async function fetchFromParser() {
   const token = process.env.CATDAI_API_TOKEN;
   const baseUrl = process.env.CATDAI_API_URL || "http://localhost:3100";
 
-  const res = await fetch(`${baseUrl}/api/prices/latest`, {
+  const url = new URL("/api/prices/latest", baseUrl);
+  url.searchParams.set("city", PRICE_CITY);
+
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(10_000),
     cache: "no-store",

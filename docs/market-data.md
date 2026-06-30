@@ -12,9 +12,9 @@ Implemented, depends on external parser and Supabase snapshots.
 
 ## Live Prices API
 - App route: `GET /api/prices`.
-- It proxies parser route `/api/prices/latest`.
+- It proxies parser route `/api/prices/latest?city=Chișinău` so the landing market card uses only Chișinău rows, even if the parser has imported other cities.
 - Requires `CATDAI_API_TOKEN`.
-- Uses Redis shared cache for 24h when reachable, with in-memory stale fallback.
+- Uses a Chișinău-specific Redis shared cache for 24h when reachable, with in-memory stale fallback.
 
 ## Market Trends
 - App route: `GET /api/market-trends`.

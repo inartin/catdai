@@ -155,7 +155,10 @@ BEGIN
     WHERE is_active = true
       AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
       AND price_amount IS NOT NULL AND price_amount > 0
-      AND city = p_city
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
       AND (NOT use_district OR district = p_district)
       AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
       AND (NOT use_building_type OR building_type = p_building_type)
@@ -225,7 +228,10 @@ BEGIN
     FROM listing
     WHERE is_active = true
       AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
-      AND city = p_city
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
       AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories));
 
     SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)
@@ -233,7 +239,10 @@ BEGIN
     FROM listing
     WHERE is_active = true
       AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
-      AND city = p_city
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
       AND district = p_district
       AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories));
 
@@ -282,7 +291,10 @@ BEGIN
       FROM listing l
       WHERE l.is_active = true
         AND l.price_per_m2 IS NOT NULL AND l.price_per_m2 > 0
-        AND l.city = p_city
+        AND (
+          (p_city = 'Chișinău' AND l.city = 'Chișinău' AND COALESCE(l.district, '') <> 'Durlești')
+          OR (p_city = 'Durlești' AND (l.city = 'Durlești' OR l.district = 'Durlești'))
+        )
         AND l.district IS NOT NULL
         AND (p_rooms_count IS NULL OR l.rooms_count = p_rooms_count)
         AND (p_building_type IS NULL OR l.building_type = p_building_type)
@@ -340,7 +352,10 @@ BEGIN
       WHERE is_active = true
         AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
         AND price_amount IS NOT NULL AND price_amount > 0
-        AND city = p_city
+        AND (
+          (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+          OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+        )
         AND (NOT use_district OR district = p_district)
         AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
         AND (NOT use_building_type OR building_type = p_building_type)

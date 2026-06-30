@@ -20,28 +20,15 @@ function normalizeDiacritics(str) {
 const CITIES = {
   chisinau: "Chișinău",
   durlesti: "Durlești",
-  balti: "Bălți",
-  cahul: "Cahul",
-  ungheni: "Ungheni",
-  soroca: "Soroca",
-  orhei: "Orhei",
-  edinet: "Edineț",
-  comrat: "Comrat",
 };
 
 const DISTRICTS_BY_CITY = {
   "Chișinău": [
     "Centru", "Botanica", "Buiucani", "Ciocana", "Râșcani",
-    "Telecentru", "Sculeni", "Poșta Veche", "Durlești", "Codru",
-    "Aeroport", "Periferie",
+    "Telecentru", "Sculeni", "Poșta Veche", "Codru",
+    "Aeroport",
   ],
-  "Bălți": ["Centru", "Dacia", "Slobozia", "Pământeni"],
-  "Cahul": ["Centru"],
-  "Ungheni": ["Centru"],
-  "Soroca": ["Centru"],
-  "Orhei": ["Centru"],
-  "Edineț": ["Centru"],
-  "Comrat": ["Centru"],
+  "Durlești": [],
 };
 
 const BUILDING_TYPES = ["Construcţii noi", "Secundar"];

@@ -259,13 +259,23 @@ function getRenovationFilters(renovation) {
   return renovation ? [renovation] : [];
 }
 
+function applySupportedCityFilter(query, city) {
+  if (city === "Chișinău") {
+    return query.eq("city", "Chișinău").or("district.is.null,district.neq.Durlești");
+  }
+  if (city === "Durlești") {
+    return query.or("city.eq.Durlești,district.eq.Durlești");
+  }
+  return query.eq("city", "__unsupported__");
+}
+
 function applyRentBoundaryFilters(query, params, filtersUsed) {
   query = query
     .eq("is_active", true)
-    .eq("city", params.p_city)
     .gt("price_amount", 0)
     .not("price_amount", "is", null)
     .not("external_id", "is", null);
+  query = applySupportedCityFilter(query, params.p_city);
 
   if (Array.isArray(params.p_districts) && params.p_districts.length > 0) {
     query = query.in("district", params.p_districts);

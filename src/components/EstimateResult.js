@@ -767,7 +767,7 @@ function ListingPriceHistoryChart({ history, currency, compact = false, locked =
   );
 }
 
-function LockedValue({ text = "999999", className = "", onClick, showLock = true }) {
+function LockedValue({ text = "999999", className = "", blurClassName = "blur-sm", onClick, showLock = true }) {
   const { t } = useTranslation();
   const lockedTooltipKey = useContext(LockedTooltipContext);
 
@@ -781,7 +781,7 @@ function LockedValue({ text = "999999", className = "", onClick, showLock = true
         }}
         className="relative inline-flex cursor-pointer border-0 bg-transparent p-0"
       >
-        <span className={`inline-block select-none blur-sm ${className}`}>
+        <span className={`inline-block select-none ${blurClassName} ${className}`}>
           {text}
         </span>
         {showLock && <LockedOverlayIcon />}
@@ -1756,6 +1756,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const paidFeatureCreditRequired = !!purchaseOffer && !freeMonthlyLimitReached && !paidEvaluationLimitReached;
   const lockedSections = data.locked_sections || {};
   const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
+  const hideMarketEstimate = !isPaid && lockedSections.market_estimate === true;
   const hideMarketStatsValues = !isPaid && lockedSections.market_stats_values !== false;
   const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
   const hideRentYieldCalculation = !isPaid && lockedSections.rent_yield_calculation === true;
@@ -1930,7 +1931,11 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
           <div className="order-1 col-span-2 flex min-h-56 flex-col items-center justify-center border-b border-gray-100 p-6 text-center sm:order-2 sm:col-span-1 sm:border-b-0 sm:border-r sm:p-8">
             <p className="mb-2 text-base text-gray-400 sm:text-sm">{t("result.rentEstimatedMonthly")}</p>
             <p className="text-6xl font-bold tracking-tight text-gray-900">
-              {formatPrice(estimate.market_rate)}
+              {hideMarketEstimate ? (
+                <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999" className="text-gray-900" />
+              ) : (
+                formatPrice(estimate.market_rate)
+              )}
             </p>
             <p className="mt-2 text-base text-gray-500">
               {t("result.rentPerMonth")}
@@ -2101,6 +2106,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     ? cadastralPurchaseOffer
     : purchaseOffer || (!isPaid ? STANDARD_PACKAGE_OFFER : null);
   const lockedSections = data.locked_sections || {};
+  const hideMarketEstimate = !isPaid && lockedSections.market_estimate === true;
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
   const hideMarketPositionNumbers = !isPaid && lockedSections.market_position_numbers !== false;
   const hideDistrictComparisonValues = !isPaid && lockedSections.district_comparison_values !== false;
@@ -2844,11 +2850,15 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             <div className="p-6 sm:p-8 text-center border-b border-gray-100">
               <p className="text-base text-gray-400 mb-2">{t("result.estimatedPrice")}</p>
               <p className="text-6xl font-bold tracking-tight text-gray-900">
-                {formatPrice(estimate.market_rate)}
+                {hideMarketEstimate ? (
+                  <LockedValue onClick={openFullAnalysisAuthModal} text="€999.999" blurClassName="blur-md" className="text-gray-900" />
+                ) : (
+                  formatPrice(estimate.market_rate)
+                )}
               </p>
               <p className="text-base text-gray-500 mt-2">
                 {hidePriceTiers ? (
-                  <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" className="text-gray-500" />
+                  <LockedValue onClick={openFullAnalysisAuthModal} text="€9.999/m²" className="text-gray-500" showLock={false} />
                 ) : (
                   `${formatPrice(estimate.price_per_m2)}/m²`
                 )}
@@ -2876,7 +2886,11 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               <div className="hidden p-5 text-center bg-primary/5 sm:block sm:p-6">
                 <p className="text-sm text-gray-400 mb-1">{t("result.marketPrice")}</p>
                 <p className="text-xl font-bold text-primary">
-                  {formatPrice(estimate.market_rate)}
+                  {hideMarketEstimate ? (
+                    <LockedValue onClick={openFullAnalysisAuthModal} text="€999.999" className="text-primary" />
+                  ) : (
+                    formatPrice(estimate.market_rate)
+                  )}
                 </p>
               </div>
               <div className="p-5 text-center sm:p-6">

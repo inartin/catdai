@@ -594,8 +594,12 @@ function buildEstimateAccessPayload(data, estimateAccess) {
     };
   }
 
+  const preview = buildEstimatePreview(data, {
+    hideMarketEstimate: !estimateAccess.access?.user_id,
+  });
+
   return {
-    ...buildEstimatePreview(data),
+    ...preview,
     access_tier: "free",
     full_access: false,
     ...(estimateAccess.sharedLink ? { shared_link: estimateAccess.sharedLink } : {}),
@@ -845,7 +849,7 @@ function buildMarketTrendPreview(input) {
   };
 }
 
-function buildEstimatePreview(payload) {
+function buildEstimatePreview(payload, { hideMarketEstimate = false } = {}) {
   const maskEstimateData = (estData, { keepMarketRate = false } = {}) => {
     if (!estData) return null;
     return {
@@ -876,7 +880,7 @@ function buildEstimatePreview(payload) {
   };
 
   return {
-    ...maskEstimateData(payload, { keepMarketRate: true }),
+    ...maskEstimateData(payload, { keepMarketRate: !hideMarketEstimate }),
     district_coefficient: null,
     district_comparison: buildDistrictComparisonPreview(payload.district_comparison),
     estimates_by_seller: payload.estimates_by_seller ? {
@@ -888,6 +892,7 @@ function buildEstimatePreview(payload) {
     relevant_listings: [],
     listing_duplicates: null,
     locked_sections: {
+      ...(hideMarketEstimate ? { market_estimate: true } : {}),
       price_tiers: true,
       market_position_numbers: true,
       district_comparison_values: true,

@@ -28,7 +28,7 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 
 ## Result Payload
 Sale/buy estimate results return a preview for anonymous users:
-- the main market estimate stays visible
+- the main market estimate is removed from `/api/estimate` before the JSON response and rendered as a blurred fake value
 - locked values are removed from `/api/estimate` before the JSON response
 - the UI shows blurred placeholder values with a lock icon and the shared tooltip
 - clicking a blurred value opens the shared package popup; anonymous checkout continues on `/payment/paddle/checkout` with login methods in the checkout panel before Paddle loads
@@ -38,8 +38,8 @@ Locked preview sections include fast/target prices, price per m2, range numbers,
 The sale/buy preview still shows the sector/city trend card title and period, but uses fake blurred `9.999`-style trend data and the shared auth tooltip instead of exposing the real trend payload.
 
 ## Full Payload
-Authenticated free users receive the full sale/buy estimate response while they have monthly free allowance remaining. After the monthly allowance is exhausted, `/api/estimate` returns the same preview payload shape used for anonymous users plus `access_limit.reason = free_monthly_limit_reached`. Users with exhausted purchased sale/rent credits receive `access_limit.reason = paid_evaluation_limit_reached` instead of falling through to free monthly quota.
-Rent evaluation uses the same limit and purchase flow through `/api/estimate-rent` with `rent_estimate` credits.
+Authenticated free users receive the full sale/buy estimate response while they have monthly free allowance remaining. After the monthly allowance is exhausted, `/api/estimate` returns the locked detailed-value preview plus `access_limit.reason = free_monthly_limit_reached`; anonymous previews additionally remove the headline estimate. Users with exhausted purchased sale/rent credits receive `access_limit.reason = paid_evaluation_limit_reached` instead of falling through to free monthly quota.
+Rent evaluation uses the same limit and purchase flow through `/api/estimate-rent` with `rent_estimate` credits. Anonymous rent previews remove the main monthly estimate from the JSON response and render a blurred fake value.
 Cadastral lookup is login-gated and credit-gated with `cadastru_lookup` credits. Authenticated users without a remaining credit receive a result-page preview: cadastral number, address, floor, and classifier remain visible when available, while the remaining official cadastru fields are server-masked with `|` characters and blurred in the UI with the package purchase popup.
 999 listing analysis is credit-gated with `listing_analysis` credits and does not consume sale-estimate credits. Missing login or credit returns the `/anunt` result shell with sale values, listing price-history, and detailed market data locked/blurred instead of a hard error; duplicate candidates render as fake blurred cards only when the duplicate lookup found at least one real high/medium duplicate.
 Rent-yield calculator results are credit-gated with `yield_calculator` credits and do not consume rent-estimate credits; missing credit returns the calculator result shell with rent-yield, tax, market-stat, district, and listing details locked/blurred instead of a hard error.

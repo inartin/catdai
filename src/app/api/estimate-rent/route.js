@@ -446,11 +446,13 @@ function buildRentDistrictComparisonPreview(items) {
   }).filter(Boolean);
 }
 
-function buildRentEstimatePreview(payload) {
+function buildRentEstimatePreview(payload, { hideMarketEstimate = false } = {}) {
+  const estimate = payload.estimate || {};
   return {
     ...payload,
     estimate: {
-      ...(payload.estimate || {}),
+      ...estimate,
+      market_rate: hideMarketEstimate ? null : estimate.market_rate,
       price_per_m2: null,
       low: null,
       high: null,
@@ -471,6 +473,7 @@ function buildRentEstimatePreview(payload) {
     rent_level_listings: {},
     relevant_listings: [],
     locked_sections: {
+      ...(hideMarketEstimate ? { market_estimate: true } : {}),
       rent_levels: true,
       market_stats_values: true,
       district_comparison_values: true,
@@ -627,8 +630,12 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
     };
   }
 
+  const preview = buildRentEstimatePreview(data, {
+    hideMarketEstimate: !estimateAccess.access?.user_id,
+  });
+
   return {
-    ...buildRentEstimatePreview(data),
+    ...preview,
     access_tier: "free",
     full_access: false,
     ...(estimateAccess.sharedLink ? { shared_link: estimateAccess.sharedLink } : {}),

@@ -25,6 +25,7 @@ Implemented and active.
 - paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus search type, result type, city, and district when available
 - paid sale/rent evaluation usage rows are shown in history when a saved paid snapshot exists; if the same action also has an `estimate_log` row, history hides the ordinary row and keeps only the paid snapshot row. Paid rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation
 - paginated transactions tab for the authenticated user's own rows from `paddle_payment_orders`; it shows product, status, amount, Paddle transaction/subscription id when available, and the internal order id for support lookup
+- refunded and chargeback Paddle orders remain visible in transaction history, but they are not treated as active paid packages
 - closed `Setări` panel with account deletion and an Extra subscription cancellation action when the user has an active Extra subscription; cancellation is scheduled for the next billing period and visible subscription dates use full capitalized month names
 - localized browser title from `nav.profile`
 

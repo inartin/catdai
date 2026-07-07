@@ -24,6 +24,7 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
   - public endpoint for Paddle notifications
   - verifies `Paddle-Signature` using the raw request body
   - processes `transaction.completed`, `transaction.canceled`, and `transaction.payment_failed`
+  - processes approved full `adjustment.updated` refunds and chargebacks by marking the local order refunded/chargeback and revoking remaining paid credits from that order
   - tracks Extra subscription state from `subscription.*` events
   - resets Extra credits to 50 per paid feature for each completed subscription billing period
   - clears Extra credits when renewal payment fails or the subscription becomes canceled, past due, or paused
@@ -93,7 +94,7 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
 - The create route verifies catalog price IDs and billing cycle type.
 - Non-production create-route failures include a short `details` field so the temporary Paddle test page can show the exact Paddle/API/Supabase failure during setup.
 - Webhook access is granted only after a verified `transaction.completed` event.
-- Subscribe the Paddle webhook destination to `transaction.completed`, `transaction.payment_failed`, `transaction.canceled`, `subscription.created`, `subscription.activated`, `subscription.updated`, `subscription.canceled`, `subscription.past_due`, `subscription.paused`, `subscription.resumed`, and `subscription.trialing`. User-closed checkout events are handled client-side with Paddle.js `checkout.closed`; Paddle says `transaction.canceled` is not typically part of automatic checkout workflows.
+- Subscribe the Paddle webhook destination to `transaction.completed`, `transaction.payment_failed`, `transaction.canceled`, `adjustment.created`, `adjustment.updated`, `subscription.created`, `subscription.activated`, `subscription.updated`, `subscription.canceled`, `subscription.past_due`, `subscription.paused`, `subscription.resumed`, and `subscription.trialing`. User-closed checkout events are handled client-side with Paddle.js `checkout.closed`; Paddle says `transaction.canceled` is not typically part of automatic checkout workflows.
 - `/payment/paddle/checkout` initializes Paddle Checkout with `displayMode: "inline"`, `frameTarget: "paddle-inline-checkout"`, a 520px initial frame height, and a borderless full-width frame style. Visual branding for the embedded Paddle frame is controlled in the Paddle dashboard under branded inline checkout. Paddle checkout locale maps CatDai RU to `ru` and RO to `en`, because Paddle does not provide Romanian checkout copy.
 - App CSP must allow Paddle script, frame, connect, and stylesheet assets; `style-src` includes `https://cdn.paddle.com` because Paddle.js loads `paddle.css`. Paddle may also load ProfitWell, so script CSP allows `https://public.profitwell.com`.
 - `PADDLE_WEBHOOK_SECRET_KEY` must be the webhook endpoint secret from Paddle, not the `ntfset_...` notification setting id.
@@ -130,12 +131,13 @@ PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
   - `paddle_webhook_events`
   - `payment_checkout_events`
   - `grant_paddle_payment_order_feature_credits(...)`
+  - `revoke_paddle_payment_order_feature_credits(...)`
   - `reset_paddle_subscription_period_feature_credits(...)`
   - `clear_paddle_subscription_feature_credits(...)`
   - `complete_paddle_payment(...)`
 - One-time Paddle grants add to the existing shared `user_feature_credits` table. Extra subscription renewals reset those rows to 50 per paid feature for the new paid billing period; failed/expired Extra subscription states clear those rows.
 - Paid uses are logged in `user_feature_usage_events`; `user_feature_credits.remaining_uses` and `total_used` drive the profile balance display.
-- `paddle_payment_orders.status` includes `checkout_closed` for a user-closed checkout that has not received a final Paddle payment outcome.
+- `paddle_payment_orders.status` includes `checkout_closed` for a user-closed checkout that has not received a final Paddle payment outcome, plus `refunded` and `chargeback` for approved full Paddle adjustments that revoke remaining paid credits.
 - `payment_checkout_events` records `checkout_popup_opened` when the reusable purchase popup is shown, `checkout_page_opened` when `/payment/paddle/checkout` loads, and `pricing_page_opened` when the standalone pricing page opens; admin stats count total opens and unique user/device visitors separately.
 - Run the shared credit schema from `db/paynet_payments.sql` before `db/paddle_payments.sql`, because that file still defines shared credit tables and helpers used by Paddle. Do not use the Paynet order/notification tables for checkout.
 

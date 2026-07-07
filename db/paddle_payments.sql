@@ -51,7 +51,7 @@ create table if not exists public.paddle_payment_orders (
       'pdf_report_single'
     )),
   constraint paddle_payment_orders_status_check
-    check (status in ('pending', 'registered', 'checkout_closed', 'paid', 'canceled', 'payment_failed', 'failed')),
+    check (status in ('pending', 'registered', 'checkout_closed', 'paid', 'refund_pending', 'refunded', 'chargeback', 'canceled', 'payment_failed', 'failed')),
   constraint paddle_payment_orders_amount_check
     check (amount_minor is null or amount_minor >= 0),
   constraint paddle_payment_orders_currency_check
@@ -241,6 +241,9 @@ begin
       'registered',
       'checkout_closed',
       'paid',
+      'refund_pending',
+      'refunded',
+      'chargeback',
       'canceled',
       'payment_failed',
       'failed'
@@ -392,6 +395,118 @@ begin
 
   granted := true;
   remaining_uses := coalesce(v_remaining_uses, 0);
+  return next;
+end;
+$$;
+
+create or replace function public.revoke_paddle_payment_order_feature_credits(
+  p_order_id uuid,
+  p_adjustment_id text,
+  p_order_status text,
+  p_payload jsonb default '{}'::jsonb,
+  p_refunded_at timestamptz default now()
+)
+returns table (
+  order_id uuid,
+  product_key text,
+  revoked boolean
+)
+language plpgsql
+as $$
+declare
+  v_order public.paddle_payment_orders%rowtype;
+  v_adjustment_key text;
+  v_revocations jsonb;
+  v_feature_key text;
+  v_uses_text text;
+  v_uses_count integer;
+  v_credit public.user_feature_credits%rowtype;
+  v_remaining integer;
+begin
+  if p_order_id is null then
+    raise exception 'p_order_id is required';
+  end if;
+
+  if p_order_status not in ('refunded', 'chargeback') then
+    raise exception 'unsupported refund order status: %', p_order_status;
+  end if;
+
+  v_adjustment_key := nullif(trim(coalesce(p_adjustment_id, '')), '');
+  if v_adjustment_key is null then
+    raise exception 'p_adjustment_id is required';
+  end if;
+
+  select *
+    into v_order
+  from public.paddle_payment_orders
+  where id = p_order_id
+  for update;
+
+  if not found then
+    raise exception 'paddle payment order not found: %', p_order_id;
+  end if;
+
+  if v_order.user_id is null then
+    raise exception 'paddle payment order % has no user_id', v_order.id;
+  end if;
+
+  v_revocations := coalesce(v_order.response_payload->'refund_revocations', '{}'::jsonb);
+
+  if v_revocations ? v_adjustment_key then
+    update public.paddle_payment_orders
+    set status = p_order_status
+    where id = v_order.id;
+
+    order_id := v_order.id;
+    product_key := v_order.product_key;
+    revoked := false;
+    return next;
+    return;
+  end if;
+
+  for v_feature_key, v_uses_text in
+    select key, value from jsonb_each_text(coalesce(v_order.credit_grants, '{}'::jsonb))
+  loop
+    v_uses_count := v_uses_text::integer;
+    if v_uses_count <= 0 then
+      continue;
+    end if;
+
+    select *
+      into v_credit
+    from public.user_feature_credits
+    where user_id = v_order.user_id
+      and feature_key = v_feature_key
+    for update;
+
+    if found then
+      v_remaining := greatest(v_credit.remaining_uses - v_uses_count, 0);
+
+      update public.user_feature_credits
+      set
+        remaining_uses = v_remaining,
+        total_granted = greatest(v_credit.total_used + v_remaining, 0)
+      where user_id = v_order.user_id
+        and feature_key = v_feature_key;
+    end if;
+  end loop;
+
+  update public.paddle_payment_orders
+  set
+    status = p_order_status,
+    response_payload = coalesce(response_payload, '{}'::jsonb)
+      || jsonb_build_object(
+        'refund_adjustment', coalesce(p_payload, '{}'::jsonb),
+        'refund_revocations', v_revocations || jsonb_build_object(v_adjustment_key, jsonb_build_object(
+          'status', p_order_status,
+          'revoked_at', coalesce(p_refunded_at, now())
+        ))
+      )
+  where id = v_order.id;
+
+  order_id := v_order.id;
+  product_key := v_order.product_key;
+  revoked := true;
   return next;
 end;
 $$;
@@ -653,11 +768,13 @@ grant usage, select on sequence public.paddle_webhook_events_id_seq to service_r
 grant usage, select on sequence public.payment_checkout_events_id_seq to service_role;
 
 revoke execute on function public.grant_paddle_payment_order_feature_credits(uuid, text, integer) from public;
+revoke execute on function public.revoke_paddle_payment_order_feature_credits(uuid, text, text, jsonb, timestamptz) from public;
 revoke execute on function public.reset_paddle_subscription_period_feature_credits(text, uuid, text, text, timestamptz, timestamptz, jsonb) from public;
 revoke execute on function public.clear_paddle_subscription_feature_credits(text) from public;
 revoke execute on function public.complete_paddle_payment(uuid, text, text, integer, text, jsonb, timestamptz) from public;
 
 grant execute on function public.grant_paddle_payment_order_feature_credits(uuid, text, integer) to service_role;
+grant execute on function public.revoke_paddle_payment_order_feature_credits(uuid, text, text, jsonb, timestamptz) to service_role;
 grant execute on function public.reset_paddle_subscription_period_feature_credits(text, uuid, text, text, timestamptz, timestamptz, jsonb) to service_role;
 grant execute on function public.clear_paddle_subscription_feature_credits(text) to service_role;
 grant execute on function public.complete_paddle_payment(uuid, text, text, integer, text, jsonb, timestamptz) to service_role;

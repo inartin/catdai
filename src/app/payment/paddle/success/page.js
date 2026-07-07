@@ -6,12 +6,15 @@ import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import LockIcon from "@/components/icons/LockIcon";
 
-const TERMINAL_STATUSES = new Set(["paid", "canceled", "payment_failed", "failed"]);
+const TERMINAL_STATUSES = new Set(["paid", "refund_pending", "refunded", "chargeback", "canceled", "payment_failed", "failed"]);
 const PAYMENT_STATUS_KEYS = {
   pending: "payment.orderStatusPending",
   registered: "payment.orderStatusRegistered",
   checkout_closed: "payment.orderStatusCheckoutClosed",
   paid: "payment.orderStatusPaid",
+  refund_pending: "payment.orderStatusRefundPending",
+  refunded: "payment.orderStatusRefunded",
+  chargeback: "payment.orderStatusChargeback",
   payment_failed: "payment.orderStatusFailed",
   failed: "payment.orderStatusFailed",
   canceled: "payment.orderStatusCanceled",

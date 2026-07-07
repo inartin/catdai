@@ -4,6 +4,9 @@ import { getPaddleWebhookEventFields, isValidPaddleWebhookSignature } from "@/li
 import { mapPaddleProductGrants } from "@/lib/paddle-products";
 import { createSystemNotification } from "@/lib/system-notifications";
 
+const ORDER_SELECT = "id, user_id, product_key, status, paddle_price_id, paddle_transaction_id, paddle_subscription_id, language, response_payload";
+const REFUND_REVOKE_ACTIONS = new Set(["refund", "chargeback"]);
+
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     String(value || "")
@@ -14,7 +17,7 @@ async function findOrder(fields) {
   if (isUuid(fields.orderId)) {
     const { data, error } = await supabaseAdmin
       .from("paddle_payment_orders")
-      .select("id, user_id, product_key, status, paddle_price_id, paddle_transaction_id, paddle_subscription_id, language")
+      .select(ORDER_SELECT)
       .eq("id", fields.orderId)
       .maybeSingle();
 
@@ -25,7 +28,7 @@ async function findOrder(fields) {
   if (fields.transactionId) {
     const { data, error } = await supabaseAdmin
       .from("paddle_payment_orders")
-      .select("id, user_id, product_key, status, paddle_price_id, paddle_transaction_id, paddle_subscription_id, language")
+      .select(ORDER_SELECT)
       .eq("paddle_transaction_id", fields.transactionId)
       .maybeSingle();
 
@@ -254,6 +257,70 @@ async function clearSubscriptionCredits(subscription) {
   return Array.isArray(data) ? data[0] : data;
 }
 
+async function markSubscriptionCanceled(subscription) {
+  if (!subscription?.paddle_subscription_id) return;
+
+  const { error } = await supabaseAdmin
+    .from("paddle_subscriptions")
+    .update({ status: "canceled", cancel_at_period_end: false })
+    .eq("paddle_subscription_id", subscription.paddle_subscription_id);
+
+  if (error) throw new Error(error.message);
+}
+
+function isAdjustmentEvent(fields) {
+  return String(fields.eventType || "").startsWith("adjustment.");
+}
+
+function isFullRefundAdjustment(fields) {
+  if (!REFUND_REVOKE_ACTIONS.has(fields.adjustmentAction)) return false;
+  if (fields.adjustmentAction === "refund") {
+    return fields.adjustmentStatus === "approved" && fields.adjustmentType === "full";
+  }
+  return fields.adjustmentAction === "chargeback" && fields.adjustmentType !== "partial";
+}
+
+function refundedOrderStatus(fields) {
+  return fields.adjustmentAction === "chargeback" ? "chargeback" : "refunded";
+}
+
+async function revokeOrderCreditsForAdjustment(fields, order, payload) {
+  const { data, error } = await supabaseAdmin.rpc("revoke_paddle_payment_order_feature_credits", {
+    p_order_id: order.id,
+    p_adjustment_id: fields.adjustmentId,
+    p_order_status: refundedOrderStatus(fields),
+    p_payload: payload,
+    p_refunded_at: fields.occurredAt || new Date().toISOString(),
+  });
+
+  if (error) throw new Error(error.message);
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function handleAdjustment(fields, order, subscription, payload) {
+  if (!isFullRefundAdjustment(fields)) {
+    return { ignored: true };
+  }
+
+  if (!order?.id) {
+    console.error("[paddle-webhook] refund adjustment has no local order:", fields.transactionId);
+    return { ignored: true, reason: "order_not_found" };
+  }
+
+  const revoked = await revokeOrderCreditsForAdjustment(fields, order, payload);
+  let clear = null;
+
+  if (order.product_key === "extra_pack") {
+    const currentSubscription = subscription || await findSubscription({ subscriptionId: fields.subscriptionId || order.paddle_subscription_id });
+    if (currentSubscription) {
+      clear = await clearSubscriptionCredits(currentSubscription);
+      await markSubscriptionCanceled(currentSubscription);
+    }
+  }
+
+  return { status: refundedOrderStatus(fields), revoked, clear };
+}
+
 async function resolveSubscriptionNotificationLang(order, subscription) {
   if (order?.language) return order.language;
 
@@ -444,7 +511,18 @@ export async function POST(request) {
       );
     }
 
+    if (isAdjustmentEvent(fields)) {
+      const adjustment = await handleAdjustment(fields, order, subscription, payload);
+      await markWebhookProcessed(webhook.id);
+      return NextResponse.json({ success: true, adjustment });
+    }
+
     if (fields.eventType === "transaction.completed") {
+      if (order && ["refunded", "chargeback"].includes(order.status)) {
+        await markWebhookProcessed(webhook.id);
+        return NextResponse.json({ success: true, ignored: true, status: order.status });
+      }
+
       if (fields.subscriptionId) {
         if (order?.id) {
           await completeOrder({ ...fields, orderId: order.id }, payload);

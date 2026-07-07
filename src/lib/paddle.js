@@ -265,6 +265,7 @@ export function getPaddleWebhookEventFields(event = {}) {
   const totals = data?.details?.totals || {};
   const eventType = event?.event_type ? String(event.event_type) : null;
   const isSubscriptionEvent = String(eventType || "").startsWith("subscription.");
+  const isAdjustmentEvent = String(eventType || "").startsWith("adjustment.");
   const billingPeriod = data?.billing_period || data?.current_billing_period || {};
   const scheduledChange = data?.scheduled_change || null;
   const priceIds = Array.isArray(data?.items)
@@ -276,8 +277,17 @@ export function getPaddleWebhookEventFields(event = {}) {
     eventType,
     occurredAt: event?.occurred_at || null,
     notificationId: event?.notification_id ? String(event.notification_id) : null,
-    transactionId: !isSubscriptionEvent && data?.id ? String(data.id) : null,
+    transactionId: isAdjustmentEvent && data?.transaction_id
+      ? String(data.transaction_id)
+      : !isSubscriptionEvent && data?.id
+        ? String(data.id)
+        : null,
     transactionStatus: data?.status ? String(data.status) : null,
+    adjustmentId: isAdjustmentEvent && data?.id ? String(data.id) : null,
+    adjustmentAction: isAdjustmentEvent && data?.action ? String(data.action) : null,
+    adjustmentStatus: isAdjustmentEvent && data?.status ? String(data.status) : null,
+    adjustmentType: isAdjustmentEvent && data?.type ? String(data.type) : null,
+    adjustmentReason: isAdjustmentEvent && data?.reason ? String(data.reason) : null,
     orderId: customData?.catdai_order_id ? String(customData.catdai_order_id) : null,
     userId: customData?.catdai_user_id ? String(customData.catdai_user_id) : null,
     productKey: customData?.product_key ? String(customData.product_key) : null,

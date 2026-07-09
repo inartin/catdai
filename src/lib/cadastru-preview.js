@@ -18,7 +18,8 @@ function maskObjectFields(source, visibleFields = []) {
   );
 }
 
-export function buildCadastruPreviewPayload(payload, reason = "no_credit") {
+export function buildCadastruPreviewPayload(payload, reason = "no_credit", options = {}) {
+  const maskCadastralNumber = options?.maskCadastralNumber === true;
   const apartment = {
     ...(payload?.apartment || {}),
     address: payload?.apartment?.address || payload?.matched_address || null,
@@ -30,7 +31,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit") {
   };
 
   return {
-    cadastral_number: payload?.cadastral_number,
+    cadastral_number: maskCadastralNumber ? "0100201.999.01.0101" : payload?.cadastral_number,
     status: payload?.status,
     source: payload?.source,
     method: payload?.method,
@@ -46,6 +47,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit") {
     locked_sections: {
       ...(payload?.locked_sections || {}),
       cadastru_details: true,
+      ...(maskCadastralNumber ? { cadastral_number: true } : {}),
     },
     access_limit: buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
   };

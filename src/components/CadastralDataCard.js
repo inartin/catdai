@@ -54,6 +54,7 @@ export default function CadastralDataCard({
     : "grid gap-6";
   const detailValueClass = "min-w-0 break-words text-right font-medium text-gray-900";
   const hasLockedDetails = locked || cadastral.locked_sections?.cadastru_details === true;
+  const isCadastralNumberLocked = hasLockedDetails && cadastral.locked_sections?.cadastral_number === true;
   const isVisibleLockedField = (section, field) => (
     (section === "apartment" && field === "floor") ||
     (section === "building" && field === "classifier")
@@ -77,6 +78,20 @@ export default function CadastralDataCard({
   const valueClassName = (section, field) => (
     `${detailValueClass} ${isFieldLocked(section, field) ? "select-none blur-sm cursor-pointer" : ""}`
   );
+  const cadastralNumberProps = isCadastralNumberLocked
+    ? {
+        role: onLockedClick ? "button" : undefined,
+        tabIndex: onLockedClick ? 0 : undefined,
+        onClick: onLockedClick,
+        onKeyDown: (event) => {
+          if (!onLockedClick) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onLockedClick();
+          }
+        },
+      }
+    : {};
   const detailRow = (section, field, label, value) => {
     if (!value) return null;
     return (
@@ -112,7 +127,10 @@ export default function CadastralDataCard({
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
               {t("cadastru.numberLabel")}
             </p>
-            <p className="mt-1 font-mono text-xl font-semibold tracking-wide text-emerald-950">
+            <p
+              className={`mt-1 font-mono text-xl font-semibold tracking-wide text-emerald-950 ${isCadastralNumberLocked ? "select-none blur-sm cursor-pointer" : ""}`}
+              {...cadastralNumberProps}
+            >
               {cadastral.cadastral_number}
             </p>
           </div>

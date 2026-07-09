@@ -515,6 +515,7 @@ export async function POST(request) {
   }
 
   const cadastruSearchType = resolveSearchContext(body);
+  const maskPreviewCadastralNumber = cadastruSearchType === "address" || body?.preview_origin === "address";
   const creditIdempotencyKey = makeCadastruLookupUsageKey(trimmed);
   const creditCheck = await checkPaidFeatureAccess({
     userId: access.user_id,
@@ -535,7 +536,9 @@ export async function POST(request) {
   };
   const respondWithCadastralPayload = async (payload, options = {}) => {
     if (!creditCheck.allowed) {
-      const preview = buildCadastruPreviewPayload(payload, creditCheck.reason || "no_credit");
+      const preview = buildCadastruPreviewPayload(payload, creditCheck.reason || "no_credit", {
+        maskCadastralNumber: maskPreviewCadastralNumber,
+      });
       const res = NextResponse.json(preview);
       res.headers.set("X-RateLimit-Remaining", String(remaining));
       return res;
@@ -553,7 +556,9 @@ export async function POST(request) {
       },
     });
     if (!creditUsage.allowed) {
-      const preview = buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit");
+      const preview = buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit", {
+        maskCadastralNumber: maskPreviewCadastralNumber,
+      });
       const res = NextResponse.json(preview);
       res.headers.set("X-RateLimit-Remaining", String(remaining));
       return res;

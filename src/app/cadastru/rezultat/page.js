@@ -13,6 +13,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const inFlightCadastralLookups = new Map();
 const CADASTRU_DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
+const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
 
 function triggerCanvasDownload(canvas, fileName) {
   canvas.toBlob((blob) => {
@@ -267,6 +268,17 @@ function fetchCadastralLookup(cacheKey, body, accessToken) {
   return promise;
 }
 
+function readAddressResultPreview() {
+  if (typeof window === "undefined") return null;
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(ADDRESS_PREVIEW_STORAGE_KEY) || "null");
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
 function CadastruResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -274,6 +286,7 @@ function CadastruResultContent() {
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
   const source = searchParams.get("source") || "";
+  const isAddressPreviewHandoff = source === "address" && searchParams.get("preview") === "1";
   const loadedRequestKey = useRef("");
   const [authModalDismissed, setAuthModalDismissed] = useState(false);
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
@@ -289,20 +302,35 @@ function CadastruResultContent() {
   const exportCardRef = useRef(null);
 
   useEffect(() => {
-    if (!cadastralNumber) return;
+    if (!cadastralNumber && !isAddressPreviewHandoff) return;
     try {
       localStorage.removeItem(CADASTRU_DRAFT_STORAGE_KEY);
     } catch {
       // Draft cleanup is best-effort after the result page opens.
     }
-  }, [cadastralNumber]);
+  }, [cadastralNumber, isAddressPreviewHandoff]);
+
+  useEffect(() => {
+    if (!isAddressPreviewHandoff) return;
+    const preview = readAddressResultPreview();
+    loadedRequestKey.current = "address-preview";
+    setState({
+      loading: false,
+      error: preview ? "" : t("cadastru.lookupError"),
+      data: preview,
+    });
+  }, [isAddressPreviewHandoff, t]);
 
   useEffect(() => {
     if (authLoading) return;
     if (!cadastralNumber) {
+      if (!isAddressPreviewHandoff) {
+        setState({ loading: false, error: "", data: null });
+      }
       return;
     }
 
+    if (isAddressPreviewHandoff) return;
     if (!isAuthenticated) return;
 
     const searchSource = source === "address" || source === "number" ? source : "";
@@ -319,6 +347,7 @@ function CadastruResultContent() {
         const body = {
           cadastral_number: cadastralNumber,
           ...(searchSource === "number" ? { search_context: "cadastru", search_type: searchSource } : {}),
+          ...(searchSource === "address" ? { preview_origin: "address" } : {}),
         };
 
         const response = await fetchCadastralLookup(`${requestKey}|${session.access_token}`, body, session.access_token);
@@ -347,7 +376,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [authLoading, cadastralNumber, clearAuthError, isAuthenticated, session?.access_token, source, t]);
+  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAuthenticated, session?.access_token, source, t]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -393,7 +422,7 @@ function CadastruResultContent() {
             </div>
           )}
 
-          {(state.error || (!cadastralNumber && !state.loading)) && (
+          {(state.error || (!cadastralNumber && !state.loading && !state.data)) && (
             <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-sm font-medium text-red-800 shadow-sm sm:p-8">
               {state.error || t("cadastru.lookupError")}
             </div>

@@ -252,7 +252,11 @@ export async function POST(request) {
       },
     });
     if (creditUsage.allowed) return null;
-    const response = NextResponse.json(buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit"));
+    const response = NextResponse.json(
+      buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit", {
+        maskCadastralNumber: true,
+      })
+    );
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   };

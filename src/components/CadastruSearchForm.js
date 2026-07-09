@@ -19,6 +19,7 @@ const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/\d{1,4})?$/;
 const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 const MAX_APARTMENT_NUMBER = 9999;
 const DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
+const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
 
 function readSavedDraft() {
   if (typeof window === "undefined") return null;
@@ -37,6 +38,24 @@ function writeSavedDraft(draft) {
     localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
   } catch {
     // Draft persistence is best-effort for auth redirects.
+  }
+}
+
+function writeAddressResultPreview(preview) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(ADDRESS_PREVIEW_STORAGE_KEY, JSON.stringify(preview));
+  } catch {
+    // Preview persistence is best-effort for the result route handoff.
+  }
+}
+
+function clearAddressResultPreview() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(ADDRESS_PREVIEW_STORAGE_KEY);
+  } catch {
+    // Preview cleanup is best-effort.
   }
 }
 
@@ -196,6 +215,17 @@ export default function CadastruSearchForm({
       }
 
       const data = await response.json();
+      if (data?.locked_sections?.cadastral_number === true) {
+        writeAddressResultPreview(data);
+        const params = new URLSearchParams({
+          source: "address",
+          preview: "1",
+        });
+        router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
+        return;
+      }
+
+      clearAddressResultPreview();
       if (data?.cadastral_number) {
         const params = new URLSearchParams({
           cadastral_number: data.cadastral_number,
@@ -225,6 +255,7 @@ export default function CadastruSearchForm({
     }
 
     setLookupState({ loading: true, method: "number", error: "" });
+    clearAddressResultPreview();
     const params = new URLSearchParams({
       cadastral_number: validation.value,
       source: "number",

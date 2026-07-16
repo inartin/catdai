@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Hero from "@/components/Hero";
 import CategoryCards from "@/components/CategoryCards";
 import HowItWorks from "@/components/HowItWorks";
+import LandingUsageStats from "@/components/LandingUsageStats";
 import ExampleResults from "@/components/ExampleResults";
 import LandingFaqPreview from "@/components/LandingFaqPreview";
 import LinkAnalyzer from "@/components/LinkAnalyzer";
@@ -268,6 +269,7 @@ export default function HomeContent({ prices }) {
       <Hero onPrimaryCta={() => handleCategorySelect("imobil")} />
       <CategoryCards />
       <MarketScopeCards />
+      <LandingUsageStats />
       <HowItWorks />
       <ExampleResults />
       {/* <ListingAlertsTeaser /> Temporarily Disabled - will add in near future */}

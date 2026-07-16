@@ -17,6 +17,7 @@ Implemented.
 - Landing mobile combines live prices and compact 60-day trend charts in one softly blurred Chișinău image-backed market card, with the city in the header, each price label above its matching green or blue chart, and analyzed-listing count at the bottom.
 - Landing places the 999.md link analyzer below the sell/buy/rent scope cards on desktop, and above them on mobile.
 - Landing 999.md link analyzer shows flat white paper-style feature tabs with custom line icons dropping from under the analyzer for price analysis, similar-listing comparison, duplicate checks, and price history.
+- Landing shows an all-time usage-stat card between the product scope/link analyzer and `How it works`, using the same white surface, `rounded-2xl`, emerald border, and standard landing shadow as the existing market card.
 - Landing `How it works` intro says users can see whether the price is below market, near market, or too high.
 - Landing `How it works` steps are input data, market price, similar listings, and rapid/medium/premium price levels; the step layout allows longer labels on mobile and desktop.
 - Landing `How it works` mobile trust note uses a compact left-icon layout so the two-line copy stays balanced.
@@ -50,7 +51,9 @@ Implemented.
 
 ## Related Files
 - `src/app/page.js`
+- `src/app/api/landing-stats/route.js`
 - `src/components/HomeContent.js`
+- `src/components/LandingUsageStats.js`
 - `src/components/Navbar.js`
 - `src/components/Footer.js`
 - `src/components/CookieBanner.js`

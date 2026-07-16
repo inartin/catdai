@@ -27,6 +27,26 @@ const MARKET_SERIES = {
   },
 };
 
+function trackDistrictTrendsPopupOpen() {
+  const send = () => {
+    if (typeof navigator.sendBeacon === "function") {
+      navigator.sendBeacon("/api/market-trends-popup-events");
+      return;
+    }
+
+    fetch("/api/market-trends-popup-events", {
+      method: "POST",
+      keepalive: true,
+    }).catch(() => {});
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(send, { timeout: 2000 });
+  } else {
+    window.setTimeout(send, 500);
+  }
+}
+
 function formatListings(n) {
   if (!n) return "—";
   if (n >= 1000) return `~${Math.round(n / 1000)}k`;
@@ -605,7 +625,14 @@ function DistrictTrendCard({ district, trendData, t, lang }) {
         {series.map((item) => (
           <div key={item.key} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-xs">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-            <span className="truncate font-semibold text-gray-600">{item.label}</span>
+            <span className="min-w-0">
+              <span className="block truncate font-semibold text-gray-600">{item.label}</span>
+              {item.trend?.listing_count != null && (
+                <span className="mt-0.5 block truncate text-[10px] font-medium text-gray-400">
+                  {Number(item.trend.listing_count).toLocaleString("ro-MD")} {t("categories.listingsAnalyzed")}
+                </span>
+              )}
+            </span>
             <span className="font-bold tabular-nums text-gray-800">
               {formatPrice(item.trend?.end_value)}/m²
             </span>
@@ -751,6 +778,10 @@ export default function CategoryCards() {
   const { data: priceData } = useLivePrices();
   const { data: trendData } = useMarketTrends();
   const [districtModalOpen, setDistrictModalOpen] = useState(false);
+  const openDistrictModal = () => {
+    setDistrictModalOpen(true);
+    trackDistrictTrendsPopupOpen();
+  };
 
   return (
     <>
@@ -761,7 +792,7 @@ export default function CategoryCards() {
             lang={lang}
             priceData={priceData}
             trendData={trendData}
-            onOpenDistricts={() => setDistrictModalOpen(true)}
+            onOpenDistricts={openDistrictModal}
           />
         </div>
       </section>

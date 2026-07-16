@@ -17,6 +17,11 @@ const DASHBOARD_PERIODS = {
   month: { label: "Last month", ms: PERIODS["30d"] },
   all: { label: "All time", ms: null },
 };
+const MARKET_TRENDS_PERIOD_DAYS = {
+  day: 1,
+  week: 7,
+  month: 30,
+};
 
 async function fetchAllRows(buildQuery) {
   let all = [];
@@ -42,6 +47,31 @@ function applySince(query, column, since) {
 function filterRowsSince(rows, column, since) {
   if (!since) return rows;
   return rows.filter((row) => row[column] && row[column] >= since);
+}
+
+function getMarketTrendsPeriodStart(period) {
+  const days = MARKET_TRENDS_PERIOD_DAYS[period];
+  if (!days) return null;
+
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Chisinau",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = Object.fromEntries(
+    formatter
+      .formatToParts(new Date())
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value])
+  );
+  const start = new Date(Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day)
+  ));
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+  return start.toISOString().slice(0, 10);
 }
 
 async function listAllUsers() {
@@ -433,6 +463,31 @@ async function fetchPaymentCheckoutEvents(since) {
   throw new Error(`payment_checkout_events query failed: ${firstPage.error.message}`);
 }
 
+async function fetchMarketTrendsPopupStats(sinceDate) {
+  let query = supabaseAdmin
+    .from("market_trends_popup_daily")
+    .select("open_count");
+
+  if (sinceDate) query = query.gte("event_date", sinceDate);
+
+  const response = await query;
+
+  if (response.error) {
+    if (isMissingRuntimeTableError(response.error)) {
+      return { available: false, total: 0 };
+    }
+    throw new Error(`market_trends_popup_daily query failed: ${response.error.message}`);
+  }
+
+  return {
+    available: true,
+    total: (response.data || []).reduce(
+      (sum, row) => sum + Math.max(Number(row.open_count) || 0, 0),
+      0
+    ),
+  };
+}
+
 function getVisitorKey(row) {
   if (row.user_id) return `user:${row.user_id}`;
   if (row.device_id) return `device:${row.device_id}`;
@@ -551,6 +606,7 @@ export async function GET(request) {
   const periodConfig = DASHBOARD_PERIODS[period];
   const periodSince = periodConfig.ms ? new Date(Date.now() - periodConfig.ms).toISOString() : null;
   const periodSinceDate = periodSince ? periodSince.slice(0, 10) : null;
+  const marketTrendsSinceDate = getMarketTrendsPeriodStart(period);
   const cacheKey = period;
 
   if (!bypassCache && cache[cacheKey] && Date.now() - cache[cacheKey].ts < CACHE_TTL_MS) {
@@ -592,6 +648,7 @@ export async function GET(request) {
       fetchCalculatorUsageEvents(periodSince),
       fetchExternalApiUsageRows(periodSinceDate),
       fetchPaymentCheckoutEvents(periodSince),
+      fetchMarketTrendsPopupStats(marketTrendsSinceDate),
       fetchPaidUserSummary(periodSince).catch((error) => {
         console.error("Failed to load paid user stats:", error.message);
         return { available: false, totalPaidUsers: 0, paidOrders: 0 };
@@ -614,6 +671,7 @@ export async function GET(request) {
     calculatorUsageEvents,
     externalApiUsageRows,
     paymentCheckoutEvents,
+    marketTrendsPopup,
     paidUserSummary,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
@@ -653,6 +711,7 @@ export async function GET(request) {
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
     externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows),
     paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
+    marketTrendsPopup,
     paidUsers,
   };
 

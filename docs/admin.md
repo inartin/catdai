@@ -20,6 +20,7 @@ Shows:
 - paid users count in the main dashboard, aggregating distinct registered users with at least one completed Paddle payment and at least one remaining paid feature credit; clicking the card opens the paid-user list with email, registration date, latest payment, latest product, remaining paid credits, and paid-order count
 - refunded and chargeback Paddle orders show in the user payment list, but refunded/chargeback orders are excluded from the paid package badge and paid-user aggregation
 - checkout popup opens, checkout page opens, and standalone pricing page opens as separate dashboard cards, each showing total opens plus unique user/device visitors for the selected period
+- landing market-trends popup opens appear as a simple dashboard count for the selected period, summed from one aggregate row per Chișinău calendar day
 - In the user popup, clicking the package badge opens a package dropdown. Selecting a different Start, Standard, Pro, or Extra package shows save/cancel actions. Saving updates the user's active admin package directly, resets all paid feature-credit balances to the selected package grants, deletes paid feature-credit rows when Start is selected, and does not create or require a payment.
 - The reset button next to the popup package badge asks for confirm/cancel and then resets the current package's paid feature credits back to full unused counts.
 - Registered users table uses vertical column dividers for scanability.
@@ -73,10 +74,12 @@ Shows:
 - `src/app/admin/*`
 - `src/app/api/admin/*`
 - `src/app/api/payment-checkout-events/route.js`
+- `src/app/api/market-trends-popup-events/route.js`
 - `src/lib/admin-ad-tracking.js`
 - `db/pdf_generation_events.sql`
 - `db/cadastru_search_events.sql`
 - `db/external_api_usage_daily.sql`
 - `db/listing_link_analysis_events.sql`
 - `db/calculator_usage_events.sql`
+- `db/market_trends_popup_events.sql`
 - `db/user_notifications.sql`

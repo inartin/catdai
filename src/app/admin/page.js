@@ -832,6 +832,11 @@ export default function AdminDashboard() {
             detail={fmtCheckoutSummary(s.paymentCheckout?.page)}
           />
           <StatCard
+            label="Prețuri actuale Popup"
+            value={s.marketTrendsPopup?.available === false ? "—" : fmtNum(s.marketTrendsPopup?.total)}
+            detail={s.marketTrendsPopup?.available === false ? "Apply market trends popup SQL" : "Popup opens"}
+          />
+          <StatCard
             label="Sale Estimations"
             value={fmtNum(s.totalSaleEstimations ?? s.totalEstimations)}
             detail={activeEstimationsType === "sale" ? "Click to hide list" : "Click to view recent sale estimations"}

@@ -303,6 +303,36 @@ create index idx_ad_source_events_user_created
   on ad_source_events (user_id, created_at desc);
 
 -- ============================================================
+-- market_trends_popup_daily — daily landing district-chart popup opens
+-- ============================================================
+create table market_trends_popup_daily (
+  event_date  date primary key,
+  open_count  bigint not null default 0 check (open_count >= 0),
+  updated_at  timestamptz not null default now()
+);
+
+create or replace function increment_market_trends_popup_daily()
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  insert into market_trends_popup_daily (event_date, open_count)
+  values ((now() at time zone 'Europe/Chisinau')::date, 1)
+  on conflict (event_date) do update
+    set open_count = market_trends_popup_daily.open_count + 1,
+        updated_at = now();
+$$;
+
+alter table market_trends_popup_daily enable row level security;
+
+revoke all on market_trends_popup_daily from anon, authenticated;
+grant all on market_trends_popup_daily to service_role;
+
+revoke all on function increment_market_trends_popup_daily() from public, anon, authenticated;
+grant execute on function increment_market_trends_popup_daily() to service_role;
+
+-- ============================================================
 -- user_activity — last authenticated user visit timestamp
 -- ============================================================
 create table user_activity (

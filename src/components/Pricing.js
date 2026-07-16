@@ -8,6 +8,12 @@ import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 
 const MAX_CUSTOM_REQUEST_LENGTH = 500;
 const MAX_CUSTOM_REQUEST_BODY_LENGTH = 340;
+const PACKAGE_PLAN_KEYS = {
+  free: "free",
+  standard_pack: "standard",
+  pro_pack: "pro",
+  extra_pack: "extra",
+};
 
 function sanitizeText(value, maxLength = MAX_CUSTOM_REQUEST_LENGTH) {
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").slice(0, maxLength);
@@ -105,7 +111,7 @@ function buildPendingCheckoutUrl(productKey, lang) {
   return url.toString();
 }
 
-function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
+function PriceCard({ plan, featured = false, active = false, checkoutState, onCheckout }) {
   const { t } = useTranslation();
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
   const priceLabel = plan.price === 0 ? plan.priceLabel : formatPrice(plan.price);
@@ -134,20 +140,26 @@ function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
   return (
     <article
       className={`relative flex h-full flex-col rounded-2xl bg-white p-6 transition-shadow duration-200 ${
-        featured
+        active
+          ? "border-2 border-primary shadow-[0_20px_50px_-18px_rgba(46,125,50,0.35)]"
+          : featured
           ? "border-2 border-primary shadow-[0_24px_60px_-12px_rgba(46,125,50,0.3)]"
           : "border border-gray-200 shadow-sm hover:shadow-md"
       }`}
     >
-      {featured && plan.badge && (
+      {active ? (
+        <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3.5 py-1 text-xs font-bold text-white shadow-sm">
+          {t("pricing.activePlan")}
+        </span>
+      ) : featured && plan.badge ? (
         <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3.5 py-1 text-xs font-bold text-white shadow-sm">
           {plan.badge}
         </span>
-      )}
+      ) : null}
 
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-base font-extrabold text-gray-900">{plan.title}</h3>
-        {!featured && plan.badge && (
+        {!active && !featured && plan.badge && (
           <span className="whitespace-nowrap rounded-full bg-gray-100 px-2.5 py-0.5 text-[11px] font-semibold text-gray-600">
             {plan.badge}
           </span>
@@ -162,11 +174,16 @@ function PriceCard({ plan, featured = false, checkoutState, onCheckout }) {
           )}
         </span>
       </p>
-      {plan.eurPrice !== null && plan.eurPrice !== undefined && (
-        <p className="mt-1 text-sm font-semibold text-gray-500">
-          ≈ {formatEuroPrice(plan.eurPrice)} €
-        </p>
-      )}
+      <p
+        className={`mt-1 text-sm font-semibold text-gray-500 ${
+          plan.eurPrice === null || plan.eurPrice === undefined ? "invisible" : ""
+        }`}
+        aria-hidden={plan.eurPrice === null || plan.eurPrice === undefined}
+      >
+        {plan.eurPrice !== null && plan.eurPrice !== undefined
+          ? `≈ ${formatEuroPrice(plan.eurPrice)} €`
+          : "0 €"}
+      </p>
 
       <p className="mt-3 min-h-10 text-sm leading-5 text-gray-500">
         <span className="hidden md:block">{plan.description}</span>
@@ -412,7 +429,12 @@ function CustomRequestModal({ open, onClose }) {
   );
 }
 
-export default function Pricing({ prices, compact = false, trackPageOpen = false }) {
+export default function Pricing({
+  prices,
+  compact = false,
+  trackPageOpen = false,
+  hiddenPlanKeys = [],
+}) {
   const { t, lang } = useTranslation();
   const { session, loading: authLoading } = useAuth();
   const [checkoutState, setCheckoutState] = useState({
@@ -421,6 +443,7 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
     message: "",
   });
   const [customRequestOpen, setCustomRequestOpen] = useState(false);
+  const [activePlanKey, setActivePlanKey] = useState(null);
   const pageTrackedRef = useRef(false);
 
   useEffect(() => {
@@ -430,6 +453,34 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       accessToken: session?.access_token,
     });
   }, [authLoading, session?.access_token, trackPageOpen]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!session?.access_token) {
+      setActivePlanKey(null);
+      return;
+    }
+
+    let cancelled = false;
+    fetch("/api/profile/package", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("active_plan_lookup_failed");
+        return response.json();
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setActivePlanKey(PACKAGE_PLAN_KEYS[payload.packageKey] || null);
+      })
+      .catch(() => {
+        if (!cancelled) setActivePlanKey(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, session?.access_token]);
 
   const featureLabels = {
     sale: t("pricing.featureSale"),
@@ -450,43 +501,11 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       key: "free",
       price: 0,
       priceLabel: t("pricing.freePrice"),
-      priceHasAsterisk: true,
       title: t("pricing.freeTitle"),
       description: t("pricing.freeDesc"),
       mobileDescription: t("pricing.freeMobileDesc"),
       note: t("pricing.freeNote"),
-      features: [
-        {
-          label: featureLabels.sale,
-          limit: t("pricing.freeMonthlyLimit", { count: 1 }),
-          limitMeta: "0 lei",
-        },
-        {
-          label: featureLabels.rent,
-          limit: t("pricing.freeMonthlyLimit", { count: 1 }),
-          limitMeta: "0 lei",
-        },
-        {
-          label: featureLabels.listing,
-          limit: "30 lei",
-          hasAsterisk: true,
-        },
-        {
-          label: featureLabels.cadastru,
-          limit: "10 lei",
-          hasAsterisk: true,
-        },
-        {
-          label: featureLabels.yield,
-          limit: "30 lei",
-          hasAsterisk: true,
-        },
-        {
-          label: featureLabels.pdf,
-          limit: "30 lei",
-          hasAsterisk: true,
-        },
-      ],
+      features: makeFeatures("5"),
     },
     {
       key: "standard",
@@ -530,6 +549,8 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
       loadingLabel: t("payment.checkoutLoading"),
     },
   ];
+  const visiblePlans = plans.filter((plan) => !hiddenPlanKeys.includes(plan.key));
+  const activePlan = plans.find((plan) => plan.key === activePlanKey) || null;
 
   const startCheckout = async (productKey) => {
     if (!session?.access_token) {
@@ -587,14 +608,21 @@ export default function Pricing({ prices, compact = false, trackPageOpen = false
           <p className="mt-3 text-base leading-7 text-gray-600">
             {t("pricing.subtitle")}
           </p>
+          {activePlan && (
+            <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-4 py-2 text-sm font-bold text-primary-dark">
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              {t("pricing.activePlan")}: {activePlan.title}
+            </p>
+          )}
         </div>
 
-        <div className="mt-10 grid items-stretch gap-4 gap-y-6 md:grid-cols-2 xl:grid-cols-4">
-          {plans.map((plan) => (
+        <div className={`mt-10 grid items-stretch gap-4 gap-y-6 md:grid-cols-2 ${visiblePlans.length <= 2 ? "mx-auto max-w-3xl" : "xl:grid-cols-4"}`}>
+          {visiblePlans.map((plan) => (
             <PriceCard
               key={plan.key}
               plan={plan}
               featured={plan.key === "pro"}
+              active={plan.key === activePlanKey}
               checkoutState={checkoutState}
               onCheckout={startCheckout}
             />

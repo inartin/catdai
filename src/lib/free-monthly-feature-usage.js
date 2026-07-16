@@ -2,8 +2,15 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 
-export const FREE_MONTHLY_FULL_EVALUATION_LIMIT = 1;
-export const FREE_MONTHLY_FULL_EVALUATION_FEATURE_KEYS = ["sale_estimate", "rent_estimate"];
+export const FREE_MONTHLY_FEATURE_LIMIT = 5;
+export const FREE_MONTHLY_FEATURE_KEYS = [
+  "sale_estimate",
+  "rent_estimate",
+  "listing_analysis",
+  "cadastru_lookup",
+  "yield_calculator",
+  "pdf_report",
+];
 
 export function getFreeMonthlyFeatureUsageWindow(now = new Date()) {
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -29,7 +36,66 @@ export function makeMonthlyFeatureUsageKey(featureKey, payload) {
 function isMissingFreeUsageRpc(error) {
   const code = String(error?.code || "");
   const message = String(error?.message || "");
-  return code === "42883" || code === "PGRST202" || message.includes("consume_free_monthly_feature_usage");
+  return code === "42883"
+    || code === "PGRST202"
+    || message.includes("consume_free_monthly_feature_usage")
+    || message.includes("free monthly usage is not supported for feature key");
+}
+
+export async function checkFreeMonthlyFeatureUsage({
+  userId,
+  featureKey,
+  idempotencyKey,
+  limit = FREE_MONTHLY_FEATURE_LIMIT,
+}) {
+  const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
+
+  if (!userId) {
+    return { allowed: false, reason: "unauthorized", remaining_uses: 0 };
+  }
+
+  if (!FREE_MONTHLY_FEATURE_KEYS.includes(featureKey)) {
+    return { allowed: false, reason: "unknown_feature", remaining_uses: 0 };
+  }
+
+  if (!shouldPersistRuntimeData()) {
+    return { allowed: true, reason: "runtime_persistence_disabled", remaining_uses: limit };
+  }
+
+  const { data: existing, error: existingError } = await supabaseAdmin
+    .from("user_feature_usage_events")
+    .select("id, source")
+    .eq("user_id", userId)
+    .eq("feature_key", featureKey)
+    .eq("idempotency_key", idempotencyKey)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing) {
+    return {
+      allowed: true,
+      reason: "already_consumed",
+      source: existing.source,
+      usage_event_id: existing.id,
+      remaining_uses: null,
+    };
+  }
+
+  const { count, error: countError } = await supabaseAdmin
+    .from("user_feature_usage_events")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("feature_key", featureKey)
+    .eq("source", "free_monthly")
+    .gte("created_at", startIso)
+    .lt("created_at", endIso);
+
+  if (countError) throw countError;
+
+  const used = count || 0;
+  return used < limit
+    ? { allowed: true, reason: "has_free_credit", remaining_uses: limit - used }
+    : { allowed: false, reason: "free_monthly_limit_reached", remaining_uses: 0 };
 }
 
 async function consumeFreeMonthlyFeatureUsageFallback({
@@ -115,7 +181,7 @@ export async function consumeFreeMonthlyFeatureUsage({
   featureKey,
   idempotencyKey,
   metadata = {},
-  limit = FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+  limit = FREE_MONTHLY_FEATURE_LIMIT,
 }) {
   const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
   const resetAt = endIso;
@@ -124,6 +190,17 @@ export async function consumeFreeMonthlyFeatureUsage({
     return {
       allowed: false,
       reason: "unauthorized",
+      limit,
+      used_count: 0,
+      remaining_uses: 0,
+      reset_at: resetAt,
+    };
+  }
+
+  if (!FREE_MONTHLY_FEATURE_KEYS.includes(featureKey)) {
+    return {
+      allowed: false,
+      reason: "unknown_feature",
       limit,
       used_count: 0,
       remaining_uses: 0,

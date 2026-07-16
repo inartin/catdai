@@ -12,20 +12,21 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 
 ## Content
 - UI is localized through `src/locales/ro.json` and `src/locales/ru.json`.
-- The main pricing grid has four equal-height cards: Free, Standard, Pro, and Extra.
-- A full-width custom-request card appears under the four pricing cards and opens a modal for users who need a different mix of actions.
-- Pricing cards use a fixed-height header area so feature rows start at the same vertical position even when descriptions wrap to different line counts.
+- The `/pricing` grid currently shows Free and Extra; Standard and Pro remain configured but are hidden on this page.
+- Logged-in users see their current package in a localized status pill above the grid; a visible active card is also highlighted, while hidden Standard or Pro packages remain named in the status pill.
+- `/api/profile/package` resolves the current package from an active Extra subscription first, then a non-free admin package, then the latest paid package order; stale free metadata cannot mask a paid tier.
+- A full-width custom-request card appears under the visible pricing cards and opens a modal for users who need a different mix of actions.
+- Pricing cards reserve equal price, EUR-equivalent, and description height so feature rows align vertically across desktop cards.
 - On mobile, pricing card details are collapsed by default. The price, credit summary, and paid-card checkout button remain visible; feature rows and notes expand from the details toggle.
 - If an unauthenticated user clicks a package checkout button, pricing opens `/payment/paddle/checkout` with the selected product and shows login methods in the checkout panel. After login, the same page creates the Paddle transaction and loads inline checkout.
 - Pro keeps the highlight badge; Extra shows a monthly-payment badge.
 - Extra includes 50 actions per feature per month; without a successful renewal, remaining Extra credits are cleared.
 - Each card enumerates usage per feature: sale estimate, rent estimate, 999 analysis, cadastru lookup, yield calculator, and PDF report.
-- Free shows `0 lei*`; sale/rent rows keep the `1/lună` monthly limit and show `0 lei` under the limit badge.
-- The sale/buy full-evaluation free monthly limit is enforced in `/api/estimate` for authenticated free users.
-- Free one-off features show per-use prices instead of usage counts: 999 analysis 29 lei, cadastru 19 lei, yield calculator 29 lei, and PDF report 29 lei.
-- Free card note explains the asterisk as per-use pricing.
+- Free shows `0 lei` and 5 monthly uses for every feature, using the same feature-count layout as paid tiers.
+- Free monthly limits are enforced for authenticated users across sale/rent estimates, 999 analysis, cadastru, yield calculator, and PDF reports.
+- Free card note explains that the included actions renew monthly; no per-feature prices appear in the card.
 - Standard and Pro cards show the no-time-limit note. Extra shows that credits renew monthly and do not roll over.
-- Feature count badges show the included usage or one-off price for each feature.
+- Feature count badges show the included usage for each feature.
 - Feature rows use a fixed height so the same feature lines align across pricing cards.
 - Prices are read server-side from env and passed into the client component.
 - Custom requests collect a message, email, and optional phone number, then submit to the existing feedback endpoint/table with a pricing-request prefix.
@@ -35,10 +36,10 @@ Implemented as a reusable UI section. Standard, Pro, and Extra pricing cards sta
 - Shared product definitions now live in `src/lib/payment-products.js`.
 - Paddle price IDs are read per product key from env through `src/lib/paddle-products.js`; Standard, Pro, and single-feature products require one-time prices, while Extra requires a monthly subscription price.
 - `PADDLE_PRICE_STANDARD_PACK` may be a Paddle price id (`pri_...`) or a product id (`pro_...`); product ids are resolved to the first active one-time price before checkout.
-- Locked evaluation popups use the reusable `FeaturePricingAction` component and present Standard as the default package with MDL price from `NEXT_PUBLIC_PRICE_STANDARD_PACK_MDL_COST`, approximate EUR equivalent from `NEXT_PUBLIC_PRICE_STANDARD_PACK_COST`, pricing-style included-feature rows, a primary checkout action, and a secondary `/pricing` link.
+- Locked feature popups use the reusable `FeaturePricingAction` component and present Extra as the default monthly package with 50 uses per feature, pricing-style included-feature rows, a primary checkout action, and a secondary `/pricing` link.
 - `standard_pack` and `pro_pack` grant 2 and 10 non-expiring uses per paid feature. `extra_pack` resets each paid monthly subscription period to 50 uses per paid feature.
 - Single-feature products grant 1 use for sale evaluation, rent evaluation, 999 analysis, cadastru lookup, yield calculator, or PDF report.
-- Profile `Acces rămas` shows free monthly sale/rent balances with a free badge plus the remaining and used purchased credits per feature.
+- Profile `Acces rămas` shows all six free monthly feature balances with a free badge plus remaining and used purchased credits.
 
 ## Env
 ```env

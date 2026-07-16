@@ -2,8 +2,8 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 import {
-  FREE_MONTHLY_FULL_EVALUATION_FEATURE_KEYS,
-  FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+  FREE_MONTHLY_FEATURE_KEYS,
+  FREE_MONTHLY_FEATURE_LIMIT,
   getFreeMonthlyFeatureUsageWindow,
 } from "@/lib/free-monthly-feature-usage";
 import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
@@ -151,7 +151,7 @@ async function fetchFreeMonthlyUsageRows() {
       .from("user_feature_usage_events")
       .select("user_id, feature_key")
       .eq("source", "free_monthly")
-      .in("feature_key", FREE_MONTHLY_FULL_EVALUATION_FEATURE_KEYS)
+      .in("feature_key", FREE_MONTHLY_FEATURE_KEYS)
       .gte("created_at", startIso)
       .lt("created_at", endIso)
       .not("user_id", "is", null)
@@ -298,15 +298,15 @@ function normalizeFreeMonthlyRows({ usageRows = [], paidCreditRows = [] } = {}) 
     usedByFeature.set(row.feature_key, (usedByFeature.get(row.feature_key) || 0) + 1);
   }
 
-  return FREE_MONTHLY_FULL_EVALUATION_FEATURE_KEYS.map((featureKey) => {
+  return FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
     const paidCreditRow = paidCreditsByFeature.get(featureKey);
     const hasPaidGrant = Number(paidCreditRow?.total_granted) > 0;
-    const used = hasPaidGrant ? FREE_MONTHLY_FULL_EVALUATION_LIMIT : usedByFeature.get(featureKey) || 0;
+    const used = hasPaidGrant ? FREE_MONTHLY_FEATURE_LIMIT : usedByFeature.get(featureKey) || 0;
     return {
       featureKey,
-      remainingUses: Math.max(FREE_MONTHLY_FULL_EVALUATION_LIMIT - used, 0),
-      totalGranted: FREE_MONTHLY_FULL_EVALUATION_LIMIT,
-      totalUsed: Math.min(used, FREE_MONTHLY_FULL_EVALUATION_LIMIT),
+      remainingUses: Math.max(FREE_MONTHLY_FEATURE_LIMIT - used, 0),
+      totalGranted: FREE_MONTHLY_FEATURE_LIMIT,
+      totalUsed: Math.min(used, FREE_MONTHLY_FEATURE_LIMIT),
       source: "free_monthly",
       eligible: !hasPaidGrant,
     };

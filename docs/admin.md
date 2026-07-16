@@ -27,7 +27,7 @@ Shows:
 - Admin package changes are stored in Supabase auth `app_metadata.catdai_admin_package_key`, which overrides the latest paid package for admin display.
 - Registered type cells show the user's email in the shared tooltip component when Supabase has an email for that user.
 - The user admin API includes a response version in its short cache so table schema changes do not reuse stale in-memory rows.
-- `/api/admin/users` includes paid feature credits and current-month free sale/rent balances for the user detail popup.
+- `/api/admin/users` includes paid feature credits and current-month free balances for all six gated features in the user detail popup.
 - `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, deletes `user_feature_credits` for Start, and otherwise upserts `user_feature_credits` with `remaining_uses = total_granted` and `total_used = 0` for each paid feature.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows

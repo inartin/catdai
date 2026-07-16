@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import {
   buildFeatureCreditRequiredPayload,
-  consumePaidFeatureCredit,
+  consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
 import { rateLimit } from "@/lib/rate-limit";
@@ -43,7 +43,7 @@ export async function POST(request) {
     return NextResponse.json({ error: "report_key_required" }, { status: 400 });
   }
 
-  const usage = await consumePaidFeatureCredit({
+  const usage = await consumeFeatureCredit({
     userId: access.user_id,
     featureKey: PDF_REPORT_FEATURE_KEY,
     idempotencyKey: makePaidFeatureUsageKey(PDF_REPORT_FEATURE_KEY, body.report_key),

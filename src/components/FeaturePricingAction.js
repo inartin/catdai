@@ -49,9 +49,9 @@ export default function FeaturePricingAction({
   const popupTrackedRef = useRef(false);
 
   const packageOffer = {
-    product_key: "standard_pack",
-    price_eur: process.env.NEXT_PUBLIC_PRICE_STANDARD_PACK_COST || 5,
-    price_mdl: process.env.NEXT_PUBLIC_PRICE_STANDARD_PACK_MDL_COST || 99,
+    product_key: "extra_pack",
+    price_eur: process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_COST || 25,
+    price_mdl: process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499,
   };
   const includedFeatures = [
     t("pricing.featureSale"),
@@ -126,7 +126,7 @@ export default function FeaturePricingAction({
     <div className={`rounded-2xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}>
       <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-4 py-4 text-left">
         <p className="text-lg font-extrabold tracking-tight text-gray-950">
-          {t("payment.standardPackageTitle", { price: formatMdl(packageOffer.price_mdl) })}
+          {t("payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl) })}
         </p>
         <p className="mt-1 text-sm font-semibold text-gray-500">
           {formatEuroApprox(packageOffer.price_eur)}
@@ -137,7 +137,7 @@ export default function FeaturePricingAction({
         <ul className="mt-2 divide-y divide-gray-200 border-t border-gray-200">
           {includedFeatures.map((label) => (
             <li key={label} className="flex items-center gap-2 py-2.5">
-              <span className="shrink-0 text-sm font-bold tabular-nums text-gray-900">2×</span>
+              <span className="shrink-0 text-sm font-bold tabular-nums text-gray-900">50×</span>
               <span className="min-w-0 text-sm leading-5 text-gray-700">
                 {label}
               </span>
@@ -149,9 +149,9 @@ export default function FeaturePricingAction({
         type="button"
         onClick={startCheckout}
         disabled={authLoading || status === "loading" || status === "redirecting"}
-        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-gray-950 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-gray-900/10 transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       >
-        {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : t("payment.continueWithStandard")}
+        {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : t("payment.continueWithExtra")}
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M5 12h14" />
           <path d="m13 6 6 6-6 6" />

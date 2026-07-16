@@ -850,7 +850,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
         return;
       }
       if (!authorization.authorized && authorization.reason === "credit") {
-        setPurchaseOffer(authorization.purchase || { product_key: "standard_pack" });
+        setPurchaseOffer(authorization.purchase || { product_key: "extra_pack" });
         return;
       }
 

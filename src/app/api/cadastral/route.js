@@ -8,8 +8,8 @@ import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import {
-  checkPaidFeatureAccess,
-  consumePaidFeatureCredit,
+  checkFeatureAccess,
+  consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
 import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
@@ -517,7 +517,7 @@ export async function POST(request) {
   const cadastruSearchType = resolveSearchContext(body);
   const maskPreviewCadastralNumber = cadastruSearchType === "address" || body?.preview_origin === "address";
   const creditIdempotencyKey = makeCadastruLookupUsageKey(trimmed);
-  const creditCheck = await checkPaidFeatureAccess({
+  const creditCheck = await checkFeatureAccess({
     userId: access.user_id,
     featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
     idempotencyKey: creditIdempotencyKey,
@@ -544,7 +544,7 @@ export async function POST(request) {
       return res;
     }
 
-    const creditUsage = await consumePaidFeatureCredit({
+    const creditUsage = await consumeFeatureCredit({
       userId: access.user_id,
       featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
       idempotencyKey: creditIdempotencyKey,

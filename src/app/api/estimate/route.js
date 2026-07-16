@@ -4,12 +4,13 @@ import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import {
   consumeFreeMonthlyFeatureUsage,
-  FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+  FREE_MONTHLY_FEATURE_LIMIT,
   makeMonthlyFeatureUsageKey,
 } from "@/lib/free-monthly-feature-usage";
 import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
 import {
-  checkPaidFeatureAccess,
+  checkFeatureAccess,
+  consumeFeatureCredit,
   consumePaidFeatureCredit,
   getUserFeatureCreditBalance,
   makePaidFeatureUsageKey,
@@ -419,7 +420,7 @@ async function precheckListingAnalysisAccess(request, body) {
   if (!idempotencyKey) return null;
 
   const access = await resolveAccessTier(request);
-  const check = await checkPaidFeatureAccess({
+  const check = await checkFeatureAccess({
     userId: access.user_id,
     featureKey: LISTING_ANALYSIS_FEATURE_KEY,
     idempotencyKey,
@@ -431,7 +432,7 @@ async function precheckListingAnalysisAccess(request, body) {
 async function consumeListingAnalysisCredit(listingAccess, body, params) {
   if (!listingAccess) return null;
 
-  return consumePaidFeatureCredit({
+  return consumeFeatureCredit({
     userId: listingAccess.access.user_id,
     featureKey: LISTING_ANALYSIS_FEATURE_KEY,
     idempotencyKey: listingAccess.idempotencyKey,
@@ -463,7 +464,7 @@ function buildListingAnalysisAccessPayload(data, listingAccess, paidCreditUsage)
     ...data,
     access_tier: listingAccess.access.tier,
     full_access: true,
-    access_source: "paid_credit",
+    access_source: paidCreditUsage?.source || listingAccess.check?.source || "paid_credit",
     paid_credit_usage: paidCreditUsage
       ? {
         remaining: paidCreditUsage.remaining_uses,
@@ -556,7 +557,7 @@ async function resolveEstimateAccess(request, body, params) {
       featureKey: FULL_EVALUATION_FEATURE_KEY,
       idempotencyKey,
       metadata: buildUsageMetadata({ params, body }),
-      limit: FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+      limit: FREE_MONTHLY_FEATURE_LIMIT,
     });
 
     if (freeMonthlyUsage.allowed) {

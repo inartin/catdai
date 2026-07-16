@@ -16,7 +16,7 @@ import InfoCallout from "@/components/InfoCallout";
 const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
 const LISTING_FAIR_BAND_PCT = 3;
 const LockedTooltipContext = createContext("payment.buyAccess");
-const STANDARD_PACKAGE_OFFER = { product_key: "standard_pack" };
+const EXTRA_PACKAGE_OFFER = { product_key: "extra_pack" };
 
 function rememberPdfLoginReturn() {
   if (typeof window === "undefined") return;
@@ -1752,7 +1752,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
   const purchaseOffer = !isPaid ? data.access_limit?.purchase : null;
-  const authModalPurchaseOffer = purchaseOffer || (!isPaid ? STANDARD_PACKAGE_OFFER : null);
+  const authModalPurchaseOffer = purchaseOffer || (!isPaid ? EXTRA_PACKAGE_OFFER : null);
   const paidFeatureCreditRequired = !!purchaseOffer && !freeMonthlyLimitReached && !paidEvaluationLimitReached;
   const lockedSections = data.locked_sections || {};
   const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
@@ -2104,7 +2104,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const cadastralPurchaseOffer = cadastral?.access_limit?.purchase || null;
   const authModalPurchaseOffer = authModalCopyKey === "payment.buyAccess" && cadastralPurchaseOffer
     ? cadastralPurchaseOffer
-    : purchaseOffer || (!isPaid ? STANDARD_PACKAGE_OFFER : null);
+    : purchaseOffer || (!isPaid ? EXTRA_PACKAGE_OFFER : null);
   const lockedSections = data.locked_sections || {};
   const hideMarketEstimate = !isPaid && lockedSections.market_estimate === true;
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
@@ -2460,7 +2460,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     ? "flex flex-col gap-5"
     : "flex flex-col gap-5";
   const actionButtonClassName = getActionButtonClassName(compactLayout);
-  const primaryActionButtonClassName = `${actionButtonClassName} w-full cursor-pointer font-semibold bg-primary text-white shadow-lg shadow-primary/20 hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 transition-all flex items-center justify-center gap-2`;
+  const primaryActionButtonClassName = `${actionButtonClassName} w-full cursor-pointer font-semibold bg-gray-950 text-white shadow-lg shadow-gray-900/15 hover:-translate-y-0.5 hover:bg-gray-800 hover:shadow-xl hover:shadow-gray-900/20 transition-all flex items-center justify-center gap-2`;
   const secondaryActionButtonClassName = getSecondaryActionButtonClassName(compactLayout);
   const actionIconClassName = getActionIconClassName(compactLayout);
   const closeAuthModal = useCallback(() => {
@@ -3298,6 +3298,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             />
           )}
 
+          {purchaseOffer ? (
+            <FeaturePricingAction offer={purchaseOffer} />
+          ) : null}
+
           {/* Actions */}
           <div className="flex flex-col gap-3">
             <button
@@ -3364,9 +3368,6 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 {onReset && <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />}
               </>
             )}
-            {purchaseOffer ? (
-              <FeaturePricingAction offer={purchaseOffer} />
-            ) : null}
           </div>
         </aside>
       </div>

@@ -500,7 +500,7 @@ create or replace function public.consume_free_monthly_feature_usage(
   p_idempotency_key text,
   p_month_start timestamptz,
   p_month_end timestamptz,
-  p_limit integer default 1,
+  p_limit integer default 5,
   p_metadata jsonb default '{}'::jsonb
 )
 returns table (
@@ -523,7 +523,14 @@ begin
     raise exception 'p_user_id is required';
   end if;
 
-  if p_feature_key not in ('sale_estimate', 'rent_estimate') then
+  if p_feature_key not in (
+    'sale_estimate',
+    'rent_estimate',
+    'listing_analysis',
+    'cadastru_lookup',
+    'yield_calculator',
+    'pdf_report'
+  ) then
     raise exception 'free monthly usage is not supported for feature key: %', p_feature_key;
   end if;
 

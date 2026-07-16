@@ -1,5 +1,10 @@
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import {
+  checkFreeMonthlyFeatureUsage,
+  consumeFreeMonthlyFeatureUsage,
+  makeMonthlyFeatureUsageKey,
+} from "@/lib/free-monthly-feature-usage";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { getFeaturePurchaseOffer, isKnownPaymentFeature } from "@/lib/payment-products";
 
@@ -198,6 +203,23 @@ export async function checkPaidFeatureAccess({ userId, featureKey, idempotencyKe
   };
 }
 
+export async function checkFeatureAccess({ userId, featureKey, idempotencyKey }) {
+  const paidAccess = await checkPaidFeatureAccess({ userId, featureKey, idempotencyKey });
+  if (paidAccess.allowed || paidAccess.reason !== "no_credit") return paidAccess;
+
+  const balance = await getUserFeatureCreditBalance({ userId, featureKey });
+  if (balance.total_granted > 0) return paidAccess;
+
+  const freeAccess = await checkFreeMonthlyFeatureUsage({
+    userId,
+    featureKey,
+    idempotencyKey: makeMonthlyFeatureUsageKey(featureKey, { idempotencyKey }),
+  });
+  return freeAccess.reason === "free_monthly_limit_reached"
+    ? { ...freeAccess, reason: "no_credit" }
+    : freeAccess;
+}
+
 export async function consumePaidFeatureCredit({
   userId,
   featureKey,
@@ -252,4 +274,34 @@ export async function consumePaidFeatureCredit({
       ? null
       : Math.max(Number(result.remaining_uses) || 0, 0),
   };
+}
+
+export async function consumeFeatureCredit({
+  userId,
+  featureKey,
+  idempotencyKey,
+  metadata = {},
+}) {
+  const paidUsage = await consumePaidFeatureCredit({
+    userId,
+    featureKey,
+    idempotencyKey,
+    metadata,
+  });
+  if (paidUsage.allowed || !["no_credit", "runtime_persistence_disabled"].includes(paidUsage.reason)) {
+    return paidUsage;
+  }
+
+  const balance = await getUserFeatureCreditBalance({ userId, featureKey });
+  if (balance.total_granted > 0) return paidUsage;
+
+  const freeUsage = await consumeFreeMonthlyFeatureUsage({
+    userId,
+    featureKey,
+    idempotencyKey: makeMonthlyFeatureUsageKey(featureKey, { idempotencyKey }),
+    metadata,
+  });
+  return freeUsage.reason === "free_monthly_limit_reached"
+    ? { ...freeUsage, reason: "no_credit" }
+    : freeUsage;
 }

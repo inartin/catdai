@@ -6,13 +6,13 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 ## Current Access Rule
 - Anonymous users are `free`.
 - Authenticated Supabase users are `free` by default; authentication and paid access are separate.
-- Sale/buy and rent full evaluation access for authenticated users without purchased sale/rent credits is limited to 1 unique evaluation per feature per UTC month.
+- Authenticated free users receive 5 unique uses per feature per UTC month across sale/rent estimates, 999 analysis, cadastru, yield calculator, and PDF reports.
 - Paid package and single-feature access is tracked in `user_feature_credits`.
 - Standard and Pro grant 2 and 10 non-expiring uses for each paid feature. Extra is a monthly Paddle subscription that resets to 50 uses for each paid feature on each paid billing period, and failed or inactive renewal states clear remaining Extra credits.
 - Approved full Paddle refunds and chargebacks mark the local payment as refunded/chargeback and remove remaining paid credits from that payment; already consumed credits remain visible in usage totals.
-- Paid-only features require a remaining feature credit: 999 analysis, cadastru lookup, yield calculator, and PDF report.
-- `/api/estimate` records free full-evaluation usage in `user_feature_usage_events` with `source = 'free_monthly'`; repeated loads of the same normalized sale/buy criteria in the same month reuse the same idempotency key.
-- `/api/profile/credits` returns the current UTC-month free sale/rent allowance alongside paid feature credits so `/profile` can show the 1 free monthly use per feature with a separate free badge in `Acces rămas`.
+- Each gated feature consumes paid credits first, then the free monthly allowance when the user has never received a paid grant for that feature.
+- Free usage is recorded in `user_feature_usage_events` with `source = 'free_monthly'`; repeated loads of the same normalized request in the same month reuse the same idempotency key.
+- `/api/profile/credits` returns the current UTC-month allowance for all six features alongside paid credits, with a separate free badge in `Acces rămas`.
 - Runtime usage persistence runs when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`; local dev can use the live Supabase dataset when this flag is enabled.
 - `user_entitlements` schema exists, but `resolveAccessTier()` does not read it yet.
 - Paynet is not used whatsoever and must not be connected to checkout. The old Paynet API routes now return disabled responses.
@@ -21,10 +21,11 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 - `POST /api/payments/paddle/create` and `POST /api/paddle/webhooks` create Paddle transactions and grant or reset credits only after verified `transaction.completed` notifications.
 - `POST /api/paddle/webhooks` also handles approved full Paddle refund/chargeback adjustments and revokes remaining credits so refunded orders no longer keep paid access.
 - Locked sale and rent evaluation popups and result action columns show the same reusable feature-pricing checkout action.
-- Limit-reached blurred-value popups say the free monthly evaluation was used, prompt the user to choose a package, and show Standard as the default package action with a secondary link to `/pricing`.
+- In the desktop result sidebar, the Extra unlock card appears above the PDF/share/compare actions; the unlock button is green and the PDF action is black.
+- Limit-reached blurred-value popups say the free monthly evaluation was used and show Extra as the default package action with a secondary link to `/pricing`.
 - Paddle checkout and status pages use the CatDai-branded RO/RU payment shell and preserve the selected language through the checkout/status redirect.
 - Sale and rent evaluation single-access checkouts use the same Paddle price ID from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE`, display the euro amount from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` plus `≈ MDL` at 20 MDL per EUR, and grant one `sale_estimate` or `rent_estimate` credit after Paddle confirms payment.
-- Authenticated users consume matching paid feature credits before the monthly free sale/rent allowance, so package-paid evaluations are recorded as paid usage and can be reopened from profile history. Users who have ever received sale/rent paid credits do not get extra free monthly evaluations for that same feature after paid credits run out.
+- Authenticated users consume matching paid feature credits before the free monthly allowance. Users who have ever received paid credits for a feature do not receive an additional free allowance for that same feature after paid credits run out.
 - When a paid sale/rent credit is used, `user_feature_usage_events.metadata.evaluation_snapshot` stores the immutable full result for profile history replay by `snapshot_id`.
 - Repeated loads of the same paid feature result reuse stable paid idempotency keys so refreshes do not consume another credit.
 
@@ -45,7 +46,7 @@ Rent evaluation uses the same limit and purchase flow through `/api/estimate-ren
 Cadastral lookup is login-gated and credit-gated with `cadastru_lookup` credits. Authenticated users without a remaining credit receive a result-page preview: direct cadastral-number searches keep the submitted number visible, address searches replace the discovered cadastral number with a fake blurred number, and address, floor, and classifier remain visible when available. The remaining official cadastru fields are server-masked with `|` characters and blurred in the UI with the package purchase popup.
 999 listing analysis is credit-gated with `listing_analysis` credits and does not consume sale-estimate credits. Missing login or credit returns the `/anunt` result shell with sale values, listing price-history, and detailed market data locked/blurred instead of a hard error; duplicate candidates render as fake blurred cards only when the duplicate lookup found at least one real high/medium duplicate.
 Rent-yield calculator results are credit-gated with `yield_calculator` credits and do not consume rent-estimate credits; missing credit returns the calculator result shell with rent-yield, tax, market-stat, district, and listing details locked/blurred instead of a hard error.
-PDF export dialogs are visible to anonymous users, but downloading a PDF requires a valid authenticated Supabase bearer token and a `pdf_report` credit checked by `/api/pdf-generation-authorizations`. Authenticated users without PDF credit see the reusable Standard package purchase action inside the PDF dialog after clicking download.
+PDF export dialogs are visible to anonymous users, but downloading a PDF requires a valid authenticated Supabase bearer token and a `pdf_report` credit checked by `/api/pdf-generation-authorizations`. Authenticated users without PDF credit see the reusable Extra package purchase action inside the PDF dialog after clicking download.
 Shared paywall and PDF dialogs render above reusable tooltip portals so locked-state tooltips do not float on top of open popups.
 
 ## Share Exception

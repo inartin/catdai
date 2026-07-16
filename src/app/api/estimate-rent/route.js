@@ -5,12 +5,13 @@ import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { logCalculatorUsageEvent } from "@/lib/calculator-usage-events";
 import {
   consumeFreeMonthlyFeatureUsage,
-  FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+  FREE_MONTHLY_FEATURE_LIMIT,
   makeMonthlyFeatureUsageKey,
 } from "@/lib/free-monthly-feature-usage";
 import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
 import {
-  checkPaidFeatureAccess,
+  checkFeatureAccess,
+  consumeFeatureCredit,
   consumePaidFeatureCredit,
   getUserFeatureCreditBalance,
   makePaidFeatureUsageKey,
@@ -518,7 +519,7 @@ async function precheckYieldCalculatorAccess(request, body, params) {
   if (!idempotencyKey) return null;
 
   const access = await resolveAccessTier(request);
-  const check = await checkPaidFeatureAccess({
+  const check = await checkFeatureAccess({
     userId: access.user_id,
     featureKey: YIELD_CALCULATOR_FEATURE_KEY,
     idempotencyKey,
@@ -530,7 +531,7 @@ async function precheckYieldCalculatorAccess(request, body, params) {
 async function consumeYieldCalculatorCredit(calculatorAccess, body, params) {
   if (!calculatorAccess) return null;
 
-  return consumePaidFeatureCredit({
+  return consumeFeatureCredit({
     userId: calculatorAccess.access.user_id,
     featureKey: YIELD_CALCULATOR_FEATURE_KEY,
     idempotencyKey: calculatorAccess.idempotencyKey,
@@ -592,7 +593,7 @@ async function resolveRentEstimateAccess(request, body, params) {
       featureKey: RENT_EVALUATION_FEATURE_KEY,
       idempotencyKey,
       metadata: buildRentUsageMetadata({ params, body }),
-      limit: FREE_MONTHLY_FULL_EVALUATION_LIMIT,
+      limit: FREE_MONTHLY_FEATURE_LIMIT,
     });
 
     if (freeMonthlyUsage.allowed) {
@@ -716,7 +717,7 @@ async function resolveRentResponse(request, body, params, rawData, calculatorAcc
         ...rawData,
         access_tier: calculatorAccess.access.tier,
         full_access: true,
-        access_source: "paid_credit",
+        access_source: paidCreditUsage.source || "paid_credit",
         paid_credit_usage: {
           remaining: paidCreditUsage.remaining_uses,
         },

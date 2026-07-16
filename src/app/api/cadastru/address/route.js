@@ -9,7 +9,7 @@ import { getCadastruRecordByAddress, persistCadastruRecord } from "@/lib/cadastr
 import { resolveAccessTier } from "@/lib/access-tier";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import {
-  consumePaidFeatureCredit,
+  consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
 
@@ -239,7 +239,7 @@ export async function POST(request) {
     const idempotencyKey = payload?.cadastral_number
       ? makeCadastruNumberUsageKey(payload.cadastral_number)
       : makeCadastruAddressUsageKey(rawAddress);
-    const creditUsage = await consumePaidFeatureCredit({
+    const creditUsage = await consumeFeatureCredit({
       userId: access.user_id,
       featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
       idempotencyKey,

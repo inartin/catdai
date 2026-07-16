@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { findListingDuplicates } from "@/lib/listing-duplicates";
 import { resolveAccessTier } from "@/lib/access-tier";
-import { buildFeatureCreditRequiredPayload, checkPaidFeatureAccess, makePaidFeatureUsageKey } from "@/lib/paid-feature-usage";
+import { buildFeatureCreditRequiredPayload, checkFeatureAccess, makePaidFeatureUsageKey } from "@/lib/paid-feature-usage";
 import { extractListingIdFromUrl } from "@/lib/parse-999-listing";
 import { rateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -92,7 +92,7 @@ async function requireListingAnalysisAccess(request, body) {
   }
 
   const access = await resolveAccessTier(request);
-  const check = await checkPaidFeatureAccess({
+  const check = await checkFeatureAccess({
     userId: access.user_id,
     featureKey: LISTING_ANALYSIS_FEATURE_KEY,
     idempotencyKey: makePaidFeatureUsageKey(LISTING_ANALYSIS_FEATURE_KEY, { external_id: externalId }),

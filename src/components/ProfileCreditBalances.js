@@ -36,7 +36,9 @@ export default function ProfileCreditBalances({
   const copy = { ...DEFAULT_LABELS, ...labels };
   const rows = [
     ...freeMonthlyCredits.filter((row) => row.eligible !== false),
-    ...credits.map((row) => ({ ...row, source: "paid_credit" })),
+    ...credits
+      .filter((row) => Number(row.totalGranted) > 0)
+      .map((row) => ({ ...row, source: "paid_credit" })),
   ];
 
   return (

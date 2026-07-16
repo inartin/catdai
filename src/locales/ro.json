@@ -80,6 +80,7 @@
   "categories.secondary": "Secundare",
   "categories.today": "azi",
   "categories.listingsAnalyzed": "anunțuri analizate",
+  "categories.trendPeriod": "ultimele 3 luni",
   "categories.lastUpdatedJustNow": "Ultima actualizare: chiar acum",
   "categories.lastUpdatedMins": "Ultima actualizare: acum {count} min",
   "categories.lastUpdatedHours": "Ultima actualizare: acum {count} ore",

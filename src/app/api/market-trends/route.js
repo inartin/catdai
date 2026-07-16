@@ -4,11 +4,11 @@ import { getSharedCache, setSharedCache } from "@/lib/cache";
 
 export const dynamic = "force-dynamic";
 
-const MARKET_TREND_DAYS = 60;
+const MARKET_TREND_DAYS = 90;
 const MIN_MARKET_TREND_POINTS = 2;
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const CACHE_TTL_SECONDS = 12 * 60 * 60;
-const CACHE_KEY = "catdai:market-trends:v1";
+const CACHE_KEY = "catdai:market-trends:v2";
 const CACHE_HEADERS = {
   "Cache-Control": "public, max-age=0, s-maxage=43200, stale-while-revalidate=86400",
 };

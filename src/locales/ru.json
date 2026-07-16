@@ -80,6 +80,7 @@
   "categories.secondary": "Вторичка",
   "categories.today": "сегодня",
   "categories.listingsAnalyzed": "объявлений проанализировано",
+  "categories.trendPeriod": "последние 3 месяца",
   "categories.lastUpdatedJustNow": "Последнее обновление: только что",
   "categories.lastUpdatedMins": "Последнее обновление: {count} мин назад",
   "categories.lastUpdatedHours": "Последнее обновление: {count} ч назад",

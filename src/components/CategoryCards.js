@@ -181,7 +181,7 @@ function MobileSeriesChart({ item, lang, price }) {
   const [activePoint, setActivePoint] = useState(null);
   const width = 220;
   const height = 72;
-  const padding = 6;
+  const padding = 2;
   const rightPadding = 48;
   const values = item.points.map((point) => point.value);
   const minValue = values.length ? Math.min(...values) : 0;
@@ -192,6 +192,10 @@ function MobileSeriesChart({ item, lang, price }) {
     ? buildCombinedChartPoints(item.points, dateIndex, minValue, maxValue, width, height, padding, rightPadding)
     : [];
   const coords = chartPoints.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const firstPoint = chartPoints.reduce(
+    (initial, point) => (!initial || point.date < initial.date ? point : initial),
+    null
+  );
 
   return (
     <div>
@@ -207,6 +211,17 @@ function MobileSeriesChart({ item, lang, price }) {
 
       {chartPoints.length >= 2 ? (
         <div className="relative mt-2 h-[4.5rem]">
+          {firstPoint && (
+            <span
+              className="pointer-events-none absolute z-10 -mt-1 -translate-y-full whitespace-nowrap text-[10px] font-medium tabular-nums text-gray-400"
+              style={{
+                left: `${(firstPoint.x / width) * 100}%`,
+                top: `${(firstPoint.y / height) * 100}%`,
+              }}
+            >
+              {formatPrice(firstPoint.value)}
+            </span>
+          )}
           <span className={`absolute right-0 top-1/2 z-10 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-bold ${item.chipClass}`}>
             {formatTrendPercent(item.trend?.change_pct)}
           </span>
@@ -217,7 +232,7 @@ function MobileSeriesChart({ item, lang, price }) {
             role="img"
             aria-label={item.label}
           >
-            <line x1="0" y1={height - padding} x2={width - rightPadding} y2={height - padding} stroke="#111827" strokeOpacity="0.08" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            <line x1={padding} y1={height - padding} x2={width - rightPadding} y2={height - padding} stroke="#111827" strokeOpacity="0.08" strokeWidth="1" vectorEffect="non-scaling-stroke" />
             <polyline
               points={coords}
               fill="none"
@@ -335,7 +350,7 @@ function MobileMarketTrendPanel({ t, lang, priceData, trendData }) {
         </div>
 
         <p className="mt-5 text-[11px] text-gray-400">
-          {t("result.trendPeriod", { days: trendData?.period_days || 30 })}
+          {t("categories.trendPeriod")}
         </p>
 
         <div className="mt-4 space-y-4">
@@ -389,7 +404,7 @@ function LandingTrendCharts({ t, lang, trendData }) {
     return (
       <div className="mt-4">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-xs text-gray-400">{t("result.trendPeriod", { days: trendData?.period_days || 30 })}</span>
+          <span className="text-xs text-gray-400">{t("categories.trendPeriod")}</span>
           <span className="text-xs font-semibold text-gray-400">{t("result.noData")}</span>
         </div>
       </div>
@@ -404,7 +419,7 @@ function LandingTrendCharts({ t, lang, trendData }) {
   const dateIndex = new Map(allDates.map((date, index) => [date, index]));
   const width = 220;
   const height = 156;
-  const padding = 6;
+  const padding = 2;
   const rightPadding = 48;
   const firstDate = allDates[0];
   const lastDate = allDates[allDates.length - 1];
@@ -432,10 +447,29 @@ function LandingTrendCharts({ t, lang, trendData }) {
   return (
     <div className="mt-5">
       <p className="text-[11px] text-gray-400">
-        {t("result.trendPeriod", { days: trendData?.period_days || 30 })}
+        {t("categories.trendPeriod")}
       </p>
 
       <div className="relative mt-4 h-40 w-full">
+        {chartSeries.map((item) => {
+          const firstPoint = item.chartPoints.reduce(
+            (initial, point) => (!initial || point.date < initial.date ? point : initial),
+            null
+          );
+
+          return firstPoint ? (
+            <span
+              key={`${item.key}-initial-price`}
+              className="pointer-events-none absolute z-10 -mt-1 -translate-y-full whitespace-nowrap text-[10px] font-medium tabular-nums text-gray-400"
+              style={{
+                left: `${(firstPoint.x / width) * 100}%`,
+                top: `${(firstPoint.y / height) * 100}%`,
+              }}
+            >
+              {formatPrice(firstPoint.value)}
+            </span>
+          ) : null;
+        })}
         {constructiiNoi?.points.length >= 2 && (
           <span className={`absolute right-0 top-0 z-10 rounded-lg px-2 py-1 text-xs font-bold ${constructiiNoi.chipClass}`}>
             {formatTrendPercent(constructiiNoi.trend?.change_pct)}
@@ -451,9 +485,9 @@ function LandingTrendCharts({ t, lang, trendData }) {
           preserveAspectRatio="none"
           className="absolute inset-0 h-full w-full overflow-visible"
           role="img"
-          aria-label={t("result.trendPeriod", { days: trendData?.period_days || 30 })}
+          aria-label={t("categories.trendPeriod")}
         >
-          <line x1="0" y1={height - padding} x2={width - rightPadding} y2={height - padding} stroke="#111827" strokeOpacity="0.08" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+          <line x1={padding} y1={height - padding} x2={width - rightPadding} y2={height - padding} stroke="#111827" strokeOpacity="0.08" strokeWidth="1" vectorEffect="non-scaling-stroke" />
           {chartSeries.map((item) => (
             <polyline
               key={item.key}

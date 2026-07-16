@@ -14,7 +14,7 @@ Implemented.
 - Landing mobile replaces the three large sell/buy/rent scope cards with one compact grouped card using small chips.
 - Landing marks visible rent scope labels with a localized `În curând` / `Скоро` badge until rent analysis is active.
 - Landing real estate market card keeps the desktop center column focused on the Chișinău image and market context, while the CTA still routes to the existing `/estimeaza` flow.
-- Landing mobile combines live prices and compact 60-day trend charts in one softly blurred Chișinău image-backed market card, with the city in the header, each price label above its matching green or blue chart, and analyzed-listing count at the bottom.
+- Landing mobile combines live prices and compact three-month trend charts in one softly blurred Chișinău image-backed market card, with the city in the header, each price label above its matching green or blue chart, the first known price shown above the chart's starting point, and analyzed-listing count at the bottom.
 - Landing places the 999.md link analyzer below the sell/buy/rent scope cards on desktop, and above them on mobile.
 - Landing 999.md link analyzer shows flat white paper-style feature tabs with custom line icons dropping from under the analyzer for price analysis, similar-listing comparison, duplicate checks, and price history.
 - Landing shows an all-time usage-stat card between the product scope/link analyzer and `How it works`, using the same white surface, `rounded-2xl`, emerald border, and standard landing shadow as the existing market card.

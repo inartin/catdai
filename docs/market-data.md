@@ -19,7 +19,7 @@ Implemented, depends on external parser and Supabase snapshots.
 ## Market Trends
 - App route: `GET /api/market-trends`.
 - Reads `daily_price_snapshot`.
-- Returns 60-day city trends for new builds and secondary market.
+- Returns three-month city trends for new builds and secondary market.
 - Estimate API also returns a 30-day district trend when enough points exist, with city fallback.
 - Uses Redis shared cache for 12h when reachable, with in-memory stale fallback.
 - Landing-page price and trend hooks may show localStorage data immediately, but still revalidate `/api/prices` and `/api/market-trends` on mount so the browser cache does not freeze the visible market card.

@@ -20,8 +20,10 @@ Implemented, depends on external parser and Supabase snapshots.
 - App route: `GET /api/market-trends`.
 - Reads `daily_price_snapshot`.
 - Returns three-month city trends for new builds and secondary market.
+- Accepts an optional validated `district` query parameter, for example `GET /api/market-trends?district=Botanica`, and returns district-scoped trends for both building types without city fallback when district data is insufficient.
+- Unsupported district values return HTTP 400 with `{"error":"invalid_district"}`; accepted aliases and diacritic variants are normalized to the canonical Chișinău district name.
 - Estimate API also returns a 30-day district trend when enough points exist, with city fallback.
-- Uses Redis shared cache for 12h when reachable, with in-memory stale fallback.
+- Uses separate versioned Redis and in-memory cache entries for city-wide data and each validated district for 12h when reachable, with same-scope in-memory stale fallback.
 - Landing-page price and trend hooks may show localStorage data immediately, but still revalidate `/api/prices` and `/api/market-trends` on mount so the browser cache does not freeze the visible market card.
 
 ## Known External Dependencies

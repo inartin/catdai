@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "@/context/LanguageContext";
 import { useLivePrices } from "@/lib/useLivePrices";
 import { useMarketTrends } from "@/lib/useMarketTrends";
+import { DISTRICTS_BY_CITY } from "@/lib/validation";
+import CloseIcon from "@/components/icons/CloseIcon";
 
 const TREND_ARROWS = { up: "↑", down: "↓", stable: "→" };
 const TREND_COLORS = { up: "text-emerald-400/40", down: "text-red-400/40", stable: "text-gray-300/40" };
 const REAL_ESTATE_IMAGE = "/images/cd-imobil.webp";
+const CHISINAU_DISTRICTS = DISTRICTS_BY_CITY["Chișinău"] || [];
 const MARKET_SERIES = {
   constructii_noi: {
     line: "#059669",
@@ -128,9 +132,25 @@ function MarketImagePanel({ t }) {
   );
 }
 
-function RealEstateMarketCard({ t, lang, priceData, trendData }) {
+function RealEstateMarketCard({ t, lang, priceData, trendData, onOpenDistricts }) {
+  const handleKeyDown = (event) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onOpenDistricts();
+    }
+  };
+
   return (
-    <div className="w-full overflow-hidden rounded-2xl border border-emerald-100 bg-white text-left shadow-lg transition-all duration-200 md:hover:-translate-y-1 md:hover:shadow-xl">
+    <div
+      role="button"
+      tabIndex={0}
+      aria-haspopup="dialog"
+      aria-label={t("categories.openDistrictTrends")}
+      onClick={onOpenDistricts}
+      onKeyDown={handleKeyDown}
+      className="w-full cursor-pointer overflow-hidden rounded-2xl border border-emerald-100 bg-white text-left shadow-lg outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hover:-translate-y-1 md:hover:shadow-xl"
+    >
       <div className="grid md:min-h-72 md:grid-cols-[minmax(0,1fr)_18rem_minmax(0,1fr)]">
         <MobileMarketTrendPanel
           t={t}
@@ -377,7 +397,7 @@ function MobileMarketTrendPanel({ t, lang, priceData, trendData }) {
   );
 }
 
-function LandingTrendCharts({ t, lang, trendData }) {
+function LandingTrendCharts({ t, lang, trendData, showLogo = false }) {
   const [activePoint, setActivePoint] = useState(null);
   const trends = trendData?.trends || {};
   const series = [
@@ -451,6 +471,18 @@ function LandingTrendCharts({ t, lang, trendData }) {
       </p>
 
       <div className="relative mt-4 h-40 w-full">
+        {showLogo && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center text-gray-900"
+            style={{ opacity: 0.06 }}
+          >
+            <img src="/icon0.svg" alt="" className="h-16 w-auto" />
+            <span className="mt-1 whitespace-nowrap text-[11px] font-bold tracking-wide">
+              catdai.md
+            </span>
+          </div>
+        )}
         {chartSeries.map((item) => {
           const firstPoint = item.chartPoints.reduce(
             (initial, point) => (!initial || point.date < initial.date ? point : initial),
@@ -546,21 +578,199 @@ function LandingTrendCharts({ t, lang, trendData }) {
   );
 }
 
+function DistrictTrendCard({ district, trendData, t, lang }) {
+  const trends = trendData?.trends || {};
+  const series = [
+    {
+      key: "constructii_noi",
+      label: t("categories.newConstruction"),
+      trend: trends.constructii_noi,
+      color: MARKET_SERIES.constructii_noi.line,
+    },
+    {
+      key: "secundar",
+      label: t("categories.secondary"),
+      trend: trends.secundar,
+      color: MARKET_SERIES.secundar.line,
+    },
+  ];
+
+  return (
+    <article className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
+      <h3 className="text-base font-bold text-gray-900">
+        {t(`data.district.${district}`)}
+      </h3>
+
+      <div className="mt-3 space-y-2">
+        {series.map((item) => (
+          <div key={item.key} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-xs">
+            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+            <span className="truncate font-semibold text-gray-600">{item.label}</span>
+            <span className="font-bold tabular-nums text-gray-800">
+              {formatPrice(item.trend?.end_value)}/m²
+            </span>
+          </div>
+        ))}
+      </div>
+      <LandingTrendCharts t={t} lang={lang} trendData={trendData} showLogo />
+    </article>
+  );
+}
+
+function DistrictTrendsModal({ open, onClose, t, lang }) {
+  const [districtTrends, setDistrictTrends] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const visibleDistricts = CHISINAU_DISTRICTS.filter((district) => {
+    const trends = districtTrends?.[district]?.trends || {};
+    return [trends.constructii_noi, trends.secundar]
+      .some((trend) => normalizeTrendPoints(trend).length >= 2);
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose, open]);
+
+  useEffect(() => {
+    if (!open || districtTrends || loading) return;
+
+    setLoading(true);
+    setLoadFailed(false);
+
+    Promise.all(
+      CHISINAU_DISTRICTS.map(async (district) => {
+        try {
+          const response = await fetch(
+            `/api/market-trends?district=${encodeURIComponent(district)}`,
+            { cache: "no-store" }
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return [district, await response.json()];
+        } catch {
+          return [district, null];
+        }
+      })
+    )
+      .then((entries) => {
+        setDistrictTrends(Object.fromEntries(entries));
+        setLoadFailed(entries.every(([, data]) => !data));
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoadFailed(true);
+        setLoading(false);
+      });
+  }, [districtTrends, loading, open]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-3 cursor-zoom-out sm:p-5"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="district-trends-title"
+        className="flex max-h-[92vh] w-full max-w-6xl cursor-auto flex-col overflow-hidden rounded-2xl bg-gray-50 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="relative shrink-0 border-b border-gray-200 bg-white px-5 py-4 sm:px-7 sm:py-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-emerald-700">
+            {t("categories.livePrices")}
+          </p>
+          <h2 id="district-trends-title" className="mt-1 pr-10 text-xl font-bold text-gray-900 sm:text-2xl">
+            {t("categories.districtTrendsTitle")}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            {t("categories.districtTrendsSubtitle")}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={t("categories.closeDistrictTrends")}
+            className="absolute right-3 top-3 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 sm:right-5 sm:top-5"
+          >
+            <CloseIcon size={19} />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto p-4 sm:p-6">
+          {loading && !districtTrends ? (
+            <div className="flex min-h-64 items-center justify-center text-sm font-semibold text-gray-500">
+              {t("categories.loadingDistrictTrends")}
+            </div>
+          ) : (
+            <>
+              {loadFailed && (
+                <p className="mb-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                  {t("categories.districtTrendsLoadError")}
+                </p>
+              )}
+              {visibleDistricts.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {visibleDistricts.map((district) => (
+                    <DistrictTrendCard
+                      key={district}
+                      district={district}
+                      trendData={districtTrends[district]}
+                      t={t}
+                      lang={lang}
+                    />
+                  ))}
+                </div>
+              ) : !loadFailed ? (
+                <p className="py-16 text-center text-sm font-semibold text-gray-400">
+                  {t("result.noData")}
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function CategoryCards() {
   const { t, lang } = useTranslation();
   const { data: priceData } = useLivePrices();
   const { data: trendData } = useMarketTrends();
+  const [districtModalOpen, setDistrictModalOpen] = useState(false);
 
   return (
-    <section className="pb-8 px-4">
-      <div className="max-w-4xl mx-auto grid grid-cols-1 gap-6">
-        <RealEstateMarketCard
-          t={t}
-          lang={lang}
-          priceData={priceData}
-          trendData={trendData}
-        />
-      </div>
-    </section>
+    <>
+      <section className="pb-8 px-4">
+        <div className="max-w-4xl mx-auto grid grid-cols-1 gap-6">
+          <RealEstateMarketCard
+            t={t}
+            lang={lang}
+            priceData={priceData}
+            trendData={trendData}
+            onOpenDistricts={() => setDistrictModalOpen(true)}
+          />
+        </div>
+      </section>
+      <DistrictTrendsModal
+        open={districtModalOpen}
+        onClose={() => setDistrictModalOpen(false)}
+        t={t}
+        lang={lang}
+      />
+    </>
   );
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
+import { matchDistrict, normalizeDiacritics } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,7 @@ const MARKET_TREND_DAYS = 90;
 const MIN_MARKET_TREND_POINTS = 2;
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const CACHE_TTL_SECONDS = 12 * 60 * 60;
-const CACHE_KEY = "catdai:market-trends:v2";
+const CACHE_NAMESPACE = "catdai:market-trends:v3";
 const CACHE_HEADERS = {
   "Cache-Control": "public, max-age=0, s-maxage=43200, stale-while-revalidate=86400",
 };
@@ -17,7 +18,7 @@ const BUILDING_TYPES = [
   { key: "secundar", value: "Secundar" },
 ];
 
-let cache = null;
+const cache = new Map();
 
 function isCacheFresh(cachedAt) {
   return cachedAt && Date.now() - cachedAt < CACHE_TTL_MS;
@@ -29,7 +30,13 @@ function getSinceDate() {
     .slice(0, 10);
 }
 
-function buildTrendPayload(rows, buildingType) {
+function getCacheKey(district) {
+  return district
+    ? `${CACHE_NAMESPACE}:district:${normalizeDiacritics(district).replace(/\s+/g, "-")}`
+    : `${CACHE_NAMESPACE}:city`;
+}
+
+function buildTrendPayload(rows, buildingType, district) {
   const points = rows
     .map((row) => {
       const value = Number(row.median_ppm);
@@ -50,8 +57,8 @@ function buildTrendPayload(rows, buildingType) {
   const lastCount = Number(rows[rows.length - 1]?.listing_count);
 
   return {
-    scope: "city",
-    district: null,
+    scope: district ? "district" : "city",
+    district: district || null,
     building_type: buildingType,
     period_days: MARKET_TREND_DAYS,
     metric: "median_price_per_m2",
@@ -65,29 +72,43 @@ function buildTrendPayload(rows, buildingType) {
   };
 }
 
-export async function GET() {
-  const sharedCache = await getSharedCache(CACHE_KEY);
+export async function GET(request) {
+  const districtParam = request.nextUrl.searchParams.get("district");
+  const district = districtParam === null
+    ? null
+    : matchDistrict(districtParam, "Chișinău");
+
+  if (districtParam !== null && !district) {
+    return NextResponse.json({ error: "invalid_district" }, { status: 400 });
+  }
+
+  const cacheKey = getCacheKey(district);
+  const sharedCache = await getSharedCache(cacheKey);
   if (sharedCache) {
-    cache = {
+    cache.set(cacheKey, {
       cached_at: Date.now(),
       data: sharedCache.value,
-    };
+    });
     return NextResponse.json(sharedCache.value, { headers: CACHE_HEADERS });
   }
 
-  if (cache && isCacheFresh(cache.cached_at)) {
-    return NextResponse.json(cache.data, { headers: CACHE_HEADERS });
+  const cached = cache.get(cacheKey);
+  if (cached && isCacheFresh(cached.cached_at)) {
+    return NextResponse.json(cached.data, { headers: CACHE_HEADERS });
   }
 
   try {
     const since = getSinceDate();
-    const { data, error } = await supabaseAdmin
+    const query = supabaseAdmin
       .from("daily_price_snapshot")
       .select("snapshot_date, building_type, median_ppm, listing_count")
-      .is("district", null)
       .in("building_type", BUILDING_TYPES.map((type) => type.value))
       .gte("snapshot_date", since)
       .order("snapshot_date", { ascending: true });
+
+    const { data, error } = district
+      ? await query.eq("district", district)
+      : await query.is("district", null);
 
     if (error) throw error;
 
@@ -97,7 +118,8 @@ export async function GET() {
         type.key,
         buildTrendPayload(
           rows.filter((row) => row.building_type === type.value),
-          type.value
+          type.value,
+          district
         ),
       ])
     );
@@ -111,18 +133,19 @@ export async function GET() {
       trends,
     };
 
-    cache = {
+    cache.set(cacheKey, {
       cached_at: Date.now(),
       data: payload,
-    };
-    await setSharedCache(CACHE_KEY, payload, CACHE_TTL_SECONDS);
+    });
+    await setSharedCache(cacheKey, payload, CACHE_TTL_SECONDS);
 
     return NextResponse.json(payload, { headers: CACHE_HEADERS });
   } catch (error) {
     console.error("Failed to fetch market trends:", error.message);
 
-    if (cache) {
-      return NextResponse.json(cache.data, { headers: CACHE_HEADERS });
+    const staleCache = cache.get(cacheKey);
+    if (staleCache) {
+      return NextResponse.json(staleCache.data, { headers: CACHE_HEADERS });
     }
 
     return NextResponse.json(

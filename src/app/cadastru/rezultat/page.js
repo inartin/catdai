@@ -308,7 +308,10 @@ function CadastruResultContent() {
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
   const source = searchParams.get("source") || "";
-  const isAddressPreviewHandoff = source === "address" && searchParams.get("preview") === "1";
+  const isAddressResultHandoff = source === "address" && searchParams.get("result") === "1";
+  const isAddressPreviewHandoff = source === "address" && (
+    searchParams.get("preview") === "1" || searchParams.get("result") === "1"
+  );
   const loadedRequestKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
@@ -340,6 +343,11 @@ function CadastruResultContent() {
       if (loadedRequestKey.current === requestKey) return;
 
       const preview = readAddressResultPreview();
+      if (isAddressResultHandoff && preview) {
+        loadedRequestKey.current = requestKey;
+        setState({ loading: false, error: "", data: preview });
+        return;
+      }
       if (!isAuthenticated) {
         loadedRequestKey.current = requestKey;
         setState({
@@ -444,7 +452,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAuthenticated, session?.access_token, source, t]);
+  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, session?.access_token, source, t]);
 
   useEffect(() => {
     if (isAuthenticated) setIsAuthModalOpen(false);

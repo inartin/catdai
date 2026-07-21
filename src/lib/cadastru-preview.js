@@ -18,6 +18,11 @@ function maskObjectFields(source, visibleFields = []) {
   );
 }
 
+function maskPropertyCollection(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => maskObjectFields(item, ["address"]));
+}
+
 export function buildCadastruPreviewPayload(payload, reason = "no_credit", options = {}) {
   const maskCadastralNumber = options?.maskCadastralNumber === true;
   const apartment = {
@@ -31,15 +36,22 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     construction_year:
       payload?.building?.construction_year || payload?.building_construction_year || null,
   };
+  const hasAddressProperties = Boolean(payload?.lands?.length || payload?.buildings?.length);
 
   return {
-    cadastral_number: maskCadastralNumber ? "0100201.999.01.0101" : payload?.cadastral_number,
+    cadastral_number: hasAddressProperties
+      ? payload?.cadastral_number
+      : maskCadastralNumber
+        ? "0100201.999.01.0101"
+        : payload?.cadastral_number,
     status: payload?.status,
     source: payload?.source,
     method: payload?.method,
     partial: payload?.partial,
     apartment: maskObjectFields(apartment, ["address", "floor"]),
     building: maskObjectFields(building, ["address", "classifier", "construction_year"]),
+    lands: maskPropertyCollection(payload?.lands),
+    buildings: maskPropertyCollection(payload?.buildings),
     location: maskObjectFields(payload?.location || {}, ["display_name", "road", "house_number", "suburb", "city", "postcode"]),
     matched_address: payload?.matched_address || payload?.building_address || payload?.geocoded_address || null,
     request_address: payload?.request_address || null,
@@ -49,7 +61,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     locked_sections: {
       ...(payload?.locked_sections || {}),
       cadastru_details: true,
-      ...(maskCadastralNumber ? { cadastral_number: true } : {}),
+      ...(maskCadastralNumber && !hasAddressProperties ? { cadastral_number: true } : {}),
     },
     access_limit: buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
   };

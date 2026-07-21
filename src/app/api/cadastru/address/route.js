@@ -144,7 +144,7 @@ function validateAddressFields({ street, houseNumber, apartmentNumber }) {
   if (
     street.length > STREET_MAX_LENGTH ||
     houseNumber.length > HOUSE_NUMBER_MAX_LENGTH ||
-    apartmentNumber.length > APARTMENT_NUMBER_MAX_LENGTH
+    (apartmentNumber && apartmentNumber.length > APARTMENT_NUMBER_MAX_LENGTH)
   ) {
     return { valid: false, field: "length" };
   }
@@ -153,13 +153,15 @@ function validateAddressFields({ street, houseNumber, apartmentNumber }) {
     return { valid: false, field: "house_number" };
   }
 
-  if (!APARTMENT_NUMBER_PATTERN.test(apartmentNumber)) {
+  if (apartmentNumber && !APARTMENT_NUMBER_PATTERN.test(apartmentNumber)) {
     return { valid: false, field: "apartment_number" };
   }
 
-  const apartmentNumberValue = Number(apartmentNumber);
-  if (apartmentNumberValue < 1 || apartmentNumberValue > MAX_APARTMENT_NUMBER) {
-    return { valid: false, field: "apartment_number" };
+  if (apartmentNumber) {
+    const apartmentNumberValue = Number(apartmentNumber);
+    if (apartmentNumberValue < 1 || apartmentNumberValue > MAX_APARTMENT_NUMBER) {
+      return { valid: false, field: "apartment_number" };
+    }
   }
 
   return { valid: true };
@@ -208,9 +210,9 @@ export async function POST(request) {
     );
   }
 
-  if (!street || !houseNumber || !apartmentNumber) {
+  if (!street || !houseNumber) {
     return NextResponse.json(
-      { error: "missing_fields", message: "Street, house number, and apartment number are required." },
+      { error: "missing_fields", message: "Street and house number are required." },
       { status: 400 }
     );
   }
@@ -221,13 +223,15 @@ export async function POST(request) {
       {
         error: "invalid_address_fields",
         field: fieldValidation.field,
-        message: "House number must use digits and an optional slash. Apartment number must be a realistic number.",
+        message: "House number must use digits and an optional slash. Apartment number, when provided, must be a realistic number.",
       },
       { status: 400 }
     );
   }
 
-  const rawAddress = normalizeSpaces(`${city}, ${roadType} ${street} ${houseNumber} ap ${apartmentNumber}`);
+  const rawAddress = normalizeSpaces(
+    `${city}, ${roadType} ${street} ${houseNumber}${apartmentNumber ? ` ap ${apartmentNumber}` : ""}`
+  );
   const structuredAddress = buildStructuredAddress({
     city,
     roadType: body.road_type,
@@ -286,7 +290,9 @@ export async function POST(request) {
     return response;
   }
 
-  const stored = await getCadastruRecordByAddress(rawAddress, { structuredAddress });
+  const stored = apartmentNumber
+    ? await getCadastruRecordByAddress(rawAddress, { structuredAddress })
+    : null;
   if (stored?.payload?.cadastral_number) {
     const payload = {
       ...stored.payload,
@@ -323,7 +329,7 @@ export async function POST(request) {
       road_type: body.road_type,
       street,
       house_number: houseNumber,
-      apartment_number: apartmentNumber,
+      ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}),
     });
     const payload = {
       ...externalResult,

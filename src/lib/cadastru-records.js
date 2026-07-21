@@ -261,6 +261,8 @@ function recordMatchesStructuredAddress(row, normalizedAddress, structuredAddres
     const recordApartment = cleanText(row.apartment_number, 40);
     if (recordApartment && recordApartment !== apartmentNumber) return false;
     if (!recordApartment && !numberMatchesAddress(addressText, apartmentNumber)) return false;
+  } else if (cleanText(row.apartment_number, 40)) {
+    return false;
   }
 
   if (!requestedStreet) return addressText === normalizedAddress || Boolean(houseNumber || apartmentNumber);

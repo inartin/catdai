@@ -11,15 +11,21 @@ export default function CadastralDataCard({
   forceDesktopLayout = false,
   showRevealButton = false,
 }) {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
 
   if (!cadastral) return null;
 
   const displayAddress =
     cadastral.apartment?.address ||
     cadastral.building?.address ||
+    cadastral.lands?.[0]?.address ||
+    cadastral.buildings?.[0]?.address ||
     cadastral.location?.display_name ||
     cadastral.matched_address;
+  const lands = Array.isArray(cadastral.lands) ? cadastral.lands : [];
+  const addressBuildings = Array.isArray(cadastral.buildings) ? cadastral.buildings : [];
+  const hasAddressProperties = lands.length > 0 || addressBuildings.length > 0;
+  const hasPartialAddressProperties = [...lands, ...addressBuildings].some((property) => property?.partial);
   const hasApartmentDetails = Boolean(
     cadastral.apartment?.area_m2 ||
       cadastral.apartment?.floor ||
@@ -48,8 +54,10 @@ export default function CadastralDataCard({
       cadastral.building?.gas ||
       cadastral.building?.electricity
   );
-  const hasFullDetails = hasApartmentDetails && hasBuildingDetails;
-  const hasLimitedCadastralData = Boolean(cadastral.partial || !hasApartmentDetails || !hasBuildingDetails);
+  const hasFullDetails = (hasApartmentDetails && hasBuildingDetails) || hasAddressProperties;
+  const hasLimitedCadastralData = Boolean(
+    cadastral.partial || hasPartialAddressProperties || (!hasAddressProperties && (!hasApartmentDetails || !hasBuildingDetails))
+  );
   const widthClass = hasFullDetails || forceDesktopLayout ? "w-full" : "mx-auto w-full max-w-xl";
   const detailsGridClass = hasFullDetails || forceDesktopLayout
     ? `grid gap-6 ${forceDesktopLayout ? "grid-cols-2 gap-8" : "lg:grid-cols-2 lg:gap-8"}`
@@ -96,7 +104,7 @@ export default function CadastralDataCard({
       }
     : {};
   const detailRow = (section, field, label, value) => {
-    if (!value) return null;
+    if (value === null || value === undefined || value === "") return null;
     return (
       <div className="flex items-start justify-between gap-4 text-base">
         <span className="text-gray-500">{label}</span>
@@ -114,6 +122,47 @@ export default function CadastralDataCard({
   const roomTypeValue = cadastral.apartment?.type && cadastral.apartment.type !== cadastral.apartment?.room_usage
     ? cadastral.apartment.type
     : null;
+  const formatSquareMeters = (value) => {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return value ? `${value} m²` : null;
+    return `${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 2 }).format(number)} m²`;
+  };
+  const formatEstimatedValue = (value) => (
+    value === null || value === undefined || value === "" ? null : `${value} MDL`
+  );
+  const propertyCard = (property, kind, index, count) => (
+    <div key={`${kind}-${property?.cadastral_number || index}`} className="min-w-0 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+      <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-emerald-700">
+        {kind === "land" ? t("form.cadastralLand") : t("form.cadastralConstruction")}
+        {count > 1 ? ` ${index + 1}` : ""}
+      </p>
+      <div className="space-y-2.5">
+        {detailRow(kind, "cadastral_number", t("cadastru.numberLabel"), property?.cadastral_number)}
+        {detailRow(kind, "area", t("form.cadastralArea"), property?.area)}
+        {detailRow(kind, "area_m2", t("form.cadastralAreaM2"), formatSquareMeters(property?.area_m2))}
+        {detailRow(kind, "object_type", t("form.cadastralObjectType"), property?.object_type)}
+        {detailRow(kind, "type", t("form.cadastralType"), property?.type)}
+        {detailRow(kind, "destination", t("form.cadastralDestination"), property?.destination)}
+        {detailRow(kind, "room_usage", t("form.cadastralRoomUsage"), property?.room_usage)}
+        {detailRow(kind, "use_mode", t("form.cadastralUseMode"), property?.use_mode)}
+        {detailRow(kind, "boundary_type", t("form.cadastralBoundaryType"), property?.boundary_type)}
+        {detailRow(kind, "land_use", t("form.cadastralLandUse"), kind === "land" ? property?.land_use : null)}
+        {detailRow(kind, "building_use", t("form.cadastralBuildingUse"), kind === "construction" ? property?.building_use : null)}
+        {detailRow(
+          kind,
+          "estimated_value_lei",
+          t("form.cadastralEstimatedValue"),
+          formatEstimatedValue(property?.estimated_value_lei)
+        )}
+        {detailRow(kind, "last_estimated_at", t("form.cadastralLastEstimatedAt"), property?.last_estimated_at)}
+        {detailRow(kind, "ownership_type", t("form.cadastralPropertyType"), property?.ownership_type)}
+        {detailRow(kind, "transactions_count", t("form.cadastralTransactions"), property?.transactions_count)}
+        {detailRow(kind, "real_rights", t("form.cadastralRealRights"), property?.real_rights)}
+        {detailRow(kind, "notes", t("form.cadastralNotes"), property?.notes)}
+        {detailRow(kind, "restrictions", t("form.cadastralRestrictions"), property?.restrictions)}
+      </div>
+    </div>
+  );
 
   return (
     <div className={`${className} ${widthClass} overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md`}>
@@ -211,6 +260,13 @@ export default function CadastralDataCard({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {hasAddressProperties && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            {lands.map((property, index) => propertyCard(property, "land", index, lands.length))}
+            {addressBuildings.map((property, index) => propertyCard(property, "construction", index, addressBuildings.length))}
           </div>
         )}
 

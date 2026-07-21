@@ -1,3 +1,8 @@
+import {
+  resolveCadastruCityFromAddress,
+  resolveCadastruSupportedCity,
+} from "@/lib/cadastru-supported-cities";
+
 const DEFAULT_ADDRESS = "chisinau, str Dumitru Riscanu 14 ap 20";
 const USER_AGENT = "CatDaiAddressCadastralProbe/1.0";
 const CADASTRU_USER_AGENT =
@@ -52,15 +57,16 @@ function normalizeForMatch(value) {
     .trim();
 }
 
+function containsNormalizedPhrase(value, phrase) {
+  const normalizedValue = normalizeForMatch(value);
+  const normalizedPhrase = normalizeForMatch(phrase);
+  if (!normalizedValue || !normalizedPhrase) return false;
+  const escaped = normalizedPhrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`, "i").test(normalizedValue);
+}
+
 function canonicalCity(value) {
-  const normalized = normalizeForMatch(value);
-  if (/(^|[\s,])(chisinau|kishinev|кишинев|кишинэу)([\s,]|$)/i.test(normalized)) {
-    return "Chișinău";
-  }
-  if (/(^|[\s,])(balti|bălți|beltsy|бельцы)([\s,]|$)/i.test(normalized)) {
-    return "Bălți";
-  }
-  return null;
+  return resolveCadastruCityFromAddress(value);
 }
 
 function canonicalRoadType(value) {
@@ -74,15 +80,11 @@ function canonicalRoadType(value) {
 
 function removeCityFromAddress(address, city) {
   if (!city) return address;
-  const aliases = city === "Chișinău"
-    ? ["chisinau", "chișinău", "mun chisinau", "mun. chisinau", "mun chișinău", "mun. chișinău"]
-    : ["balti", "bălți", "mun balti", "mun. balti", "mun bălți", "mun. bălți"];
-  let output = address;
-  for (const alias of aliases) {
-    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    output = output.replace(new RegExp(`(^|[,\\s])${escaped}(?=,|\\s|$)`, "ig"), " ");
+  const commaIndex = address.indexOf(",");
+  if (commaIndex !== -1 && resolveCadastruSupportedCity(address.slice(0, commaIndex)) === city) {
+    return normalizeSpaces(address.slice(commaIndex + 1));
   }
-  return normalizeSpaces(output.replace(/^[\s,]+|[\s,]+$/g, ""));
+  return address;
 }
 
 function normalizeRoadForQuery(address) {
@@ -121,30 +123,29 @@ function parseInputAddress(rawAddress) {
     /(?:^|[\s,;])(?:ap(?:artament(?:ul)?)?|apt|apart\.?|кв(?:артира)?|квартира)\.?\s*(?:nr\.?\s*)?([0-9a-zA-Z/-]+)/i
   );
 
-  if (!apartmentMatch) {
-    throw new Error("Could not find apartment marker. Use forms like `ap 59`, `ap.59`, `apt 59`, or `apartament 59`.");
-  }
-
-  const apartment = apartmentMatch[1];
-  const withoutApartment = normalizeSpaces(
-    raw
-      .slice(0, apartmentMatch.index)
-      .concat(" ", raw.slice(apartmentMatch.index + apartmentMatch[0].length))
-      .replace(/\s+,/g, ",")
-      .replace(/,+/g, ",")
-      .replace(/^,|,$/g, "")
-  );
+  const apartment = apartmentMatch?.[1] || null;
+  const withoutApartment = apartmentMatch
+    ? normalizeSpaces(
+        raw
+          .slice(0, apartmentMatch.index)
+          .concat(" ", raw.slice(apartmentMatch.index + apartmentMatch[0].length))
+          .replace(/\s+,/g, ",")
+          .replace(/,+/g, ",")
+          .replace(/^,|,$/g, "")
+      )
+    : raw;
   const city = canonicalCity(raw);
   const buildingAddress = normalizeRoadForQuery(withoutApartment);
   const buildingAddressWithoutCity = normalizeRoadForQuery(removeCityFromAddress(withoutApartment, city));
 
-  const houseMatch = buildingAddressWithoutCity.match(/\b(\d+[a-zA-Z]?(?:[/-]\d+[a-zA-Z]?)?)\b/);
+  const houseMatches = [...buildingAddressWithoutCity.matchAll(/\b(\d+[a-zA-Z]?(?:[/-]\d+[a-zA-Z]?)?)\b/g)];
+  const houseMatch = houseMatches.at(-1) || null;
   const houseNumber = houseMatch ? houseMatch[1] : null;
   const roadType = canonicalRoadType(withoutApartment);
   let streetName = null;
 
   if (houseNumber) {
-    const beforeHouse = buildingAddressWithoutCity.slice(0, buildingAddressWithoutCity.indexOf(houseNumber));
+    const beforeHouse = buildingAddressWithoutCity.slice(0, houseMatch.index);
     streetName = normalizeSpaces(
       beforeHouse
         .replace(/\b(Bulevardul|Strada|Soseaua|Aleea)\b/gi, "")
@@ -157,7 +158,7 @@ function parseInputAddress(rawAddress) {
     raw,
     city,
     apartment,
-    apartmentKey: normalizeApartmentKey(apartment),
+    apartmentKey: apartment ? normalizeApartmentKey(apartment) : null,
     buildingAddress,
     buildingAddressWithoutCity,
     houseNumber,
@@ -410,6 +411,14 @@ function normalizeAreaValue(value) {
   return match ? match[0] : null;
 }
 
+function normalizeAreaSquareMeters(value) {
+  const normalized = normalizeAreaValue(value);
+  if (!normalized) return null;
+  const area = Number(normalized);
+  if (!Number.isFinite(area)) return null;
+  return String(/\bha\b/i.test(String(value || "")) ? area * 10_000 : area);
+}
+
 function normalizeEstimatedValue(value) {
   return value ? String(value).replace(/\s*lei\s*$/i, "").trim() : null;
 }
@@ -466,6 +475,36 @@ function parseCadastruDetailHtml(html) {
       restrictions,
     },
     raw_response_preview: stripHtml(html).slice(0, 1000),
+  };
+}
+
+function parseCadastruPropertyDetailHtml(html) {
+  const rows = parseDetailTableRows(html);
+  if (!rows.size) return null;
+
+  const area = getDetailValue(rows, ["Suprafața", "Suprafata"]);
+  return {
+    cadastral_number: getDetailValue(rows, ["Numărul cadastral"]),
+    address: getDetailValue(rows, ["Adresa"]),
+    area,
+    area_m2: normalizeAreaSquareMeters(area),
+    object_type: getDetailValue(rows, ["Tipul obiectului"]),
+    type: getDetailValue(rows, ["Tipul încăperii"]),
+    destination: getDetailValue(rows, ["Destinație", "Destinatie"]),
+    room_usage: getDetailValue(rows, ["Utilizarea incaperii", "Utilizarea încăperii"]),
+    use_mode: getDetailValue(rows, ["Modul de folosință", "Modul de folosinta"]),
+    boundary_type: getDetailValue(rows, ["Tipul hotarelor"]),
+    land_use: getDetailValue(rows, ["Utilizarea terenului"]),
+    building_use: getDetailValue(rows, ["Utilizarea construcției", "Utilizarea constructiei"]),
+    estimated_value_lei: normalizeEstimatedValue(
+      getDetailValue(rows, ["Valoarea estimată a bunului imobil, lei", "Valoarea estimată, lei"])
+    ),
+    last_estimated_at: getDetailValue(rows, ["Data ultimei estimări", "Data ultimei estimari"]),
+    ownership_type: getDetailValue(rows, ["Tipul de proprietate"]),
+    transactions_count: getDetailValue(rows, ["Numărul tranzacțiilor", "Numarul tranzactiilor"]),
+    real_rights: getDetailValue(rows, ["Alte drepturi reale"]),
+    notes: getDetailValue(rows, ["Notări", "Notari"]),
+    restrictions: getDetailValue(rows, ["Interdicții", "Interdictii"]),
   };
 }
 
@@ -551,6 +590,7 @@ function extractHouseNumberFromAddress(address, parsed) {
 function addressMatchesParsedBuilding(address, parsed) {
   if (!address) return false;
   const normalizedAddress = normalizeForMatch(address);
+  if (parsed.city && !containsNormalizedPhrase(normalizedAddress, parsed.city)) return false;
   const streetNames = parsed.streetNameVariants?.length ? parsed.streetNameVariants : [parsed.streetName].filter(Boolean);
   if (streetNames.length) {
     const hasStreetMatch = streetNames.some((streetName) => {
@@ -582,8 +622,8 @@ function geocodeMatchesParsedBuilding(result, parsed) {
   }
 
   if (!parsed.city) return true;
-  const city = normalizeForMatch(address.city || address.town || address.village || result.display_name || "");
-  return city.includes(normalizeForMatch(parsed.city));
+  return [address.city, address.town, address.village, address.municipality, result.display_name]
+    .some((value) => containsNormalizedPhrase(value, parsed.city));
 }
 
 function buildCadastruSearchQueries(parsed) {
@@ -778,6 +818,65 @@ function extractCadastruSectionAddress(section) {
   return match ? stripHtml(match[1]) : null;
 }
 
+async function fetchCadastruProperty(session, link, fallbackAddress) {
+  try {
+    const rawDetail = await callCadastruApex(session, "GET_DETAIL_DATA", [link.cadastral_number, link.detail_type]);
+    const property = parseCadastruPropertyDetailHtml(responseTextToHtml(rawDetail));
+    if (property) {
+      return {
+        ...property,
+        cadastral_number: property.cadastral_number || link.cadastral_number,
+        address: property.address || fallbackAddress,
+      };
+    }
+  } catch {
+    // The cadastral number and address remain useful if detail enrichment fails.
+  }
+
+  return {
+    cadastral_number: link.cadastral_number,
+    address: fallbackAddress,
+    object_type: link.kind === "land" ? "Teren" : "Construcție",
+    partial: true,
+  };
+}
+
+async function findPropertiesViaCadastruMd(parsed) {
+  if (!parsed.streetName || !parsed.houseNumber) return null;
+
+  const session = await createCadastruSession();
+  const candidatesByCode = new Map();
+  for (const query of buildCadastruSearchQueries(parsed)) {
+    const rawSearch = await callCadastruApex(session, "jQuery_Auto", [query, "f", "25", "1"]);
+    for (const candidate of parseCadastruSearchResults(rawSearch, parsed)) {
+      if (!candidatesByCode.has(candidate.code)) candidatesByCode.set(candidate.code, candidate);
+    }
+  }
+
+  const lands = new Map();
+  const buildings = new Map();
+  for (const candidate of candidatesByCode.values()) {
+    const rawRbi = await callCadastruApex(session, "GET_INFO_RBI", [candidate.code, CADASTRU_LAYERS]);
+    for (const link of extractCadastruPropertyLinks(responseTextToHtml(rawRbi))) {
+      const collection = link.kind === "land" ? lands : buildings;
+      if (!collection.has(link.cadastral_number)) {
+        collection.set(link.cadastral_number, await fetchCadastruProperty(session, link, candidate.address));
+      }
+    }
+  }
+
+  if (!lands.size && !buildings.size) return null;
+  const firstCandidate = candidatesByCode.values().next().value;
+  return {
+    status: "success",
+    source: "cadastru_md_apex",
+    matched_address: firstCandidate?.address || parsed.buildingAddress,
+    lands: [...lands.values()],
+    buildings: [...buildings.values()],
+    parsed_input: parsed,
+  };
+}
+
 function extractCadastruApartmentLinks(section) {
   const links = [];
   const linkRe = /getDetailedInfo\(["']([0-9.]+)["']\s*,\s*3\s*\)[^>]*>\s*<i[^>]*>([\s\S]*?)<\/i>/gi;
@@ -792,6 +891,22 @@ function extractCadastruApartmentLinks(section) {
   }
 
   return links;
+}
+
+function extractCadastruPropertyLinks(html) {
+  const links = new Map();
+  const linkRe = /getDetailedInfo\(\s*["']([0-9.]+)["']\s*,\s*([12])\s*\)/gi;
+  let match;
+  while ((match = linkRe.exec(String(html || "")))) {
+    const detailType = Number(match[2]);
+    const cadastralNumber = match[1];
+    links.set(`${detailType}:${cadastralNumber}`, {
+      cadastral_number: cadastralNumber,
+      detail_type: detailType,
+      kind: detailType === 1 ? "land" : "building",
+    });
+  }
+  return [...links.values()];
 }
 
 function findApartmentInCadastruHtml(html, parsed) {
@@ -984,6 +1099,72 @@ function cadastralCodeIsUsable(value) {
   return value && !/^0+$/.test(String(value).replace(/\D/g, ""));
 }
 
+function formatLandCadastralNumber(properties = {}) {
+  const raw = String(properties.codcadastral || "");
+  const parcelValue = properties.parcelid_jur || properties.parcelid;
+  const parcel = parcelValue ? String(parcelValue).padStart(3, "0") : null;
+  return /^\d{10,11}$/.test(raw) && parcel ? `${raw.slice(0, 7)}.${parcel}` : raw;
+}
+
+function formatBuildingFeatureCadastralNumber(properties = {}) {
+  const raw = String(properties.codcadastral_complet || "");
+  const structureValue = properties.structureid || raw.split(".").at(-1);
+  const structure = structureValue ? String(structureValue).padStart(2, "0") : null;
+  const parcel = properties.parcelid ? String(properties.parcelid).padStart(3, "0") : null;
+  return /^\d{10,11}\.\d{1,2}$/.test(raw) && parcel && structure
+    ? `${raw.slice(0, 7)}.${parcel}.${structure}`
+    : raw;
+}
+
+async function findPropertiesFromExactGeocode(parsed) {
+  const geocoded = await geocodeBuilding(parsed);
+  const exactCandidates = geocoded.filter((candidate) => geocodeMatchesParsedBuilding(candidate, parsed));
+
+  for (const candidate of exactCandidates) {
+    const [landFeatures, buildingFeatures] = await Promise.all([
+      queryWfsByPoint("cad_terenuri", candidate.lon, candidate.lat),
+      queryWfsByPoint("cad_cladiri", candidate.lon, candidate.lat),
+    ]);
+    const lands = containingFeatures(landFeatures, candidate.lon, candidate.lat)
+      .filter((feature) => cadastralCodeIsUsable(feature.properties?.codcadastral))
+      .map((feature) => {
+        const areaHa = Number(feature.properties?.suprafata);
+        return {
+          cadastral_number: formatLandCadastralNumber(feature.properties),
+          raw_cadastral_number: String(feature.properties.codcadastral),
+          address: candidate.display_name,
+          object_type: "Teren",
+          area: Number.isFinite(areaHa) ? `${areaHa} ha` : null,
+          area_m2: Number.isFinite(areaHa) ? String(areaHa * 10_000) : null,
+          partial: true,
+        };
+      });
+    const buildings = containingFeatures(buildingFeatures, candidate.lon, candidate.lat)
+      .filter((feature) => cadastralCodeIsUsable(feature.properties?.codcadastral_complet))
+      .map((feature) => ({
+        cadastral_number: formatBuildingFeatureCadastralNumber(feature.properties),
+        raw_cadastral_number: String(feature.properties.codcadastral_complet),
+        address: candidate.display_name,
+        object_type: "Construcție",
+        partial: true,
+      }));
+
+    if (lands.length || buildings.length) {
+      return {
+        status: "success",
+        source: "geodata_wfs",
+        matched_address: candidate.display_name,
+        lands,
+        buildings,
+        parsed_input: parsed,
+        partial: true,
+      };
+    }
+  }
+
+  return null;
+}
+
 async function findDerivedApartmentFromExactGeocode(parsed, geocoded) {
   const exactCandidates = geocoded.filter((candidate) => geocodeMatchesParsedBuilding(candidate, parsed));
 
@@ -1038,6 +1219,17 @@ async function findDerivedApartmentFromExactGeocode(parsed, geocoded) {
 
 export async function findCadastralByAddress(rawAddress) {
   const parsed = parseInputAddress(rawAddress);
+  if (!parsed.apartment) {
+    try {
+      const cadastruResult = await findPropertiesViaCadastruMd(parsed);
+      if (cadastruResult) return cadastruResult;
+    } catch {
+      // Geodata remains available when cadastru.md cannot resolve the address.
+    }
+    const geodataResult = await findPropertiesFromExactGeocode(parsed);
+    if (geodataResult) return geodataResult;
+    throw new Error(`Could not match land or buildings for ${parsed.buildingAddress}.`);
+  }
   const geocoded = await geocodeBuilding(parsed);
 
   if (!geocoded.length) {

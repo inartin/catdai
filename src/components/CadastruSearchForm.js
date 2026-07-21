@@ -155,25 +155,27 @@ export default function CadastruSearchForm({
     const houseNumber = addressForm.houseNumber.trim();
     const apartmentNumber = addressForm.apartmentNumber.trim();
 
-    if (!street || !houseNumber || !apartmentNumber) {
+    if (!street || !houseNumber) {
       return t("cadastru.missingAddressFields");
     }
 
     if (
       street.length > STREET_MAX_LENGTH ||
       houseNumber.length > HOUSE_NUMBER_MAX_LENGTH ||
-      apartmentNumber.length > APARTMENT_NUMBER_MAX_LENGTH
+      (apartmentNumber && apartmentNumber.length > APARTMENT_NUMBER_MAX_LENGTH)
     ) {
       return t("cadastru.invalidAddressFields");
     }
 
-    if (!HOUSE_NUMBER_PATTERN.test(houseNumber) || !APARTMENT_NUMBER_PATTERN.test(apartmentNumber)) {
+    if (!HOUSE_NUMBER_PATTERN.test(houseNumber) || (apartmentNumber && !APARTMENT_NUMBER_PATTERN.test(apartmentNumber))) {
       return t("cadastru.invalidAddressFields");
     }
 
-    const apartmentNumberValue = Number(apartmentNumber);
-    if (apartmentNumberValue < 1 || apartmentNumberValue > MAX_APARTMENT_NUMBER) {
-      return t("cadastru.invalidAddressFields");
+    if (apartmentNumber) {
+      const apartmentNumberValue = Number(apartmentNumber);
+      if (apartmentNumberValue < 1 || apartmentNumberValue > MAX_APARTMENT_NUMBER) {
+        return t("cadastru.invalidAddressFields");
+      }
     }
 
     return "";
@@ -215,7 +217,7 @@ export default function CadastruSearchForm({
       road_type: addressForm.roadType,
       street: addressForm.street,
       house_number: addressForm.houseNumber,
-      apartment_number: addressForm.apartmentNumber,
+      ...(addressForm.apartmentNumber ? { apartment_number: addressForm.apartmentNumber } : {}),
       search_context: "cadastru",
     };
     writeAddressLookupRequest(requestBody);
@@ -243,7 +245,7 @@ export default function CadastruSearchForm({
       }
 
       const data = await response.json();
-      if (data?.locked_sections?.cadastral_number === true) {
+      if (data?.locked_sections?.cadastru_details === true) {
         writeAddressResultPreview(data);
         const params = new URLSearchParams({
           source: "address",
@@ -253,12 +255,22 @@ export default function CadastruSearchForm({
         return;
       }
 
-      clearAddressResultPreview();
-      clearAddressLookupRequest();
       if (data?.cadastral_number) {
+        clearAddressResultPreview();
+        clearAddressLookupRequest();
         const params = new URLSearchParams({
           cadastral_number: data.cadastral_number,
           source: "address",
+        });
+        router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
+        return;
+      }
+
+      if (data?.lands?.length || data?.buildings?.length) {
+        writeAddressResultPreview(data);
+        const params = new URLSearchParams({
+          source: "address",
+          result: "1",
         });
         router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
         return;
@@ -445,7 +457,7 @@ export default function CadastruSearchForm({
                 maxLength={HOUSE_NUMBER_MAX_LENGTH}
                 value={addressForm.houseNumber}
                 onChange={(event) => setAddressField("houseNumber", onlyHouseNumberChars(event.target.value))}
-                placeholder="18/2"
+                placeholder="ex. 18/2"
                 className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light"
               />
             </label>

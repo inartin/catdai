@@ -17,7 +17,7 @@ Implemented and active, with partial fallback.
 - `/ro/cadastru` and `/ru/cadastru` are the indexable localized search pages; direct `/cadastru` is a noindex duplicate that canonicals to the current language version.
 - `/cadastru` lets users find official cadastral data by exact address or by entering a cadastral number directly.
 - `/evaluare` without result query parameters reuses the same cadastru search form and source note, placing the compact cadastral-number quick-fill card first under the `Locație` category header.
-- Anonymous users can open the page, but search actions show the shared auth popup used by PDF export instead of calling the cadastral APIs.
+- Anonymous users can submit searches from the standalone page. The APIs perform the lookup and return the same server-masked preview used by the cadastru credit paywall; clicking a blurred value opens the shared login popup.
 - The cadastru search form persists the address and cadastral-number draft in browser storage so OAuth return to `/cadastru` restores the fields the anonymous user filled before logging in; the result page clears that draft once a result URL opens.
 - The page title and subtitle sit above the input card so the page purpose is clear before choosing a search method.
 - The page has localized route metadata, canonical and alternate language tags, and sitemap entries for both Romanian and Russian.
@@ -34,10 +34,11 @@ Implemented and active, with partial fallback.
 - The page displays a short official-source note below the main form card, linking to `geodata.gov.md`.
 - The shared header links to the localized Cadastru URL for the current language on desktop and mobile.
 - Successful cadastral-number searches and full-access address searches navigate to `/{lang}/cadastru/rezultat?cadastral_number=...`; locked address-search previews use a client-side preview handoff so the discovered cadastral number is not exposed in the URL.
-- `/cadastru/rezultat` fetches authenticated `/api/cadastral`, uses the shared back button from the estimation form, renders the shared `CadastralDataCard` component used by the evaluation result page, and is marked `noindex` because each URL is generated from a user query.
+- `/cadastru/rezultat` fetches `/api/cadastral` with an optional bearer token, uses the shared back button from the estimation form, renders the shared `CadastralDataCard` component used by the evaluation result page, and is marked `noindex` because each URL is generated from a user query.
 - The result page includes a localized "save image" action that exports the cadastral result card into a downloadable PNG using the desktop two-column layout, even when the page is opened on mobile.
-- Authenticated users without a remaining `cadastru_lookup` credit still land on the result page. Direct cadastral-number searches show the submitted number, but address-search previews replace the discovered cadastral number with a fake blurred number; address, apartment floor, and building classifier stay visible when available, while the rest of the official fields are replaced server-side with `|` placeholders and blurred behind the same package purchase popup pattern used by evaluation previews.
-- After a result is loaded, `/cadastru/rezultat` keeps the loaded result in component state and does not repeat the lookup on tab focus or auth token refresh unless the cadastral number changes. In-flight lookups are deduped so effect reruns do not create duplicate statistics rows.
+- Authenticated users without a remaining `cadastru_lookup` credit still land on the result page. Direct cadastral-number searches show the submitted number, but address-search previews replace the discovered cadastral number with a fake blurred number; address, apartment floor, building classifier, and construction year stay visible when available, while the rest of the official fields are replaced server-side with `|` placeholders and blurred behind the same package purchase popup pattern used by evaluation previews.
+- Anonymous users receive the same masked result after a standalone search. After login, the result page retries the saved address lookup or cadastral-number lookup so authenticated users can see full details when their access allows it.
+- After a result is loaded, `/cadastru/rezultat` keeps the loaded result in component state and does not repeat the lookup on tab focus; it retries when an anonymous preview becomes authenticated. In-flight cadastral-number lookups are deduped so effect reruns do not create duplicate statistics rows.
 - Valid `/cadastru` search submissions are logged to `cadastru_search_events` for admin stats with `search_type`, optional authenticated `user_id`, city when derivable, optional derived district for address searches, cadastral number when known, result type, lookup source, and timestamp. Result type is one of `no_data`, `address_only`, `apartment_only`, or `full_data`; lookup source is `api` for the external worker or `local` for the in-app backup.
 - Authenticated users can see their own cadastru search rows in `/profile` history, where the result column shows the cadastral number and details show search type, result type, city, and district when available.
 - Successful and failed signed external cadastru worker calls are counted in `external_api_usage_daily` with fire-and-forget background writes, separate from user/search analytics.
@@ -62,10 +63,10 @@ Implemented and active, with partial fallback.
 - Nominatim fallback when detailed geodata is missing.
 
 ## Access
-- Cadastral lookup is available only to authenticated Supabase users.
-- Anonymous users see the shared auth popup before lookup from `/cadastru`, `/cadastru/rezultat`, the valuation form cadastral shortcut, or the PDF dialog cadastral add-on.
-- `/api/cadastral` and `/api/cadastru/address` return `401 unauthorized` without a valid bearer token.
-- Authenticated users also need a remaining `cadastru_lookup` credit from a package or single-feature purchase for unblurred full details.
+- The standalone `/cadastru` search accepts anonymous address and cadastral-number submissions and returns a server-masked preview.
+- Blurred preview values open the shared login popup for anonymous users. Authenticated users receive full details when their `cadastru_lookup` credit or free monthly allowance permits it; authenticated users without access keep the existing package purchase preview.
+- `/api/cadastral` and `/api/cadastru/address` allow anonymous requests only when the request explicitly carries the standalone `search_context: "cadastru"`; other callers still require a valid bearer token.
+- Authenticated users need an available `cadastru_lookup` allowance or credit for unblurred full details.
 - Address search and the follow-up cadastral-number result share the cadastral-number paid idempotency key when possible, so the same lookup is not charged twice.
 
 ## Limits

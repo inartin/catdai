@@ -181,11 +181,6 @@ export async function POST(request) {
     );
   }
 
-  const access = await resolveAccessTier(request);
-  if (!access.user_id) {
-    return NextResponse.json({ error: "unauthorized", message: "Unauthorized" }, { status: 401 });
-  }
-
   let body;
   try {
     body = await request.json();
@@ -193,7 +188,11 @@ export async function POST(request) {
     return NextResponse.json({ error: "invalid_json", message: "Invalid JSON body" }, { status: 400 });
   }
 
+  const access = await resolveAccessTier(request);
   const shouldTrackCadastruSearch = body?.search_context === "cadastru";
+  if (!access.user_id && !shouldTrackCadastruSearch) {
+    return NextResponse.json({ error: "unauthorized", message: "Unauthorized" }, { status: 401 });
+  }
 
   const city = normalizeSpaces(body.city || "Chișinău");
   const roadType = normalizeRoadType(body.road_type);

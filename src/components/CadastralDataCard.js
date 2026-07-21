@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@/context/LanguageContext";
+import LockIcon from "@/components/icons/LockIcon";
 
 export default function CadastralDataCard({
   cadastral,
@@ -8,6 +9,7 @@ export default function CadastralDataCard({
   locked = false,
   onLockedClick,
   forceDesktopLayout = false,
+  showRevealButton = false,
 }) {
   const { t } = useTranslation();
 
@@ -54,10 +56,11 @@ export default function CadastralDataCard({
     : "grid gap-6";
   const detailValueClass = "min-w-0 break-words text-right font-medium text-gray-900";
   const hasLockedDetails = locked || cadastral.locked_sections?.cadastru_details === true;
+  const showLockedRevealButton = Boolean(showRevealButton && hasLockedDetails && onLockedClick);
   const isCadastralNumberLocked = hasLockedDetails && cadastral.locked_sections?.cadastral_number === true;
   const isVisibleLockedField = (section, field) => (
     (section === "apartment" && field === "floor") ||
-    (section === "building" && field === "classifier")
+    (section === "building" && (field === "classifier" || field === "construction_year"))
   );
   const isFieldLocked = (section, field) => hasLockedDetails && !isVisibleLockedField(section, field);
   const lockedValueProps = (section, field) => {
@@ -127,12 +130,24 @@ export default function CadastralDataCard({
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
               {t("cadastru.numberLabel")}
             </p>
-            <p
-              className={`mt-1 font-mono text-xl font-semibold tracking-wide text-emerald-950 ${isCadastralNumberLocked ? "select-none blur-sm cursor-pointer" : ""}`}
-              {...cadastralNumberProps}
-            >
-              {cadastral.cadastral_number}
-            </p>
+            <div className={showLockedRevealButton ? "relative mt-2 min-h-10" : "relative mt-1"}>
+              <p
+                className={`font-mono text-xl font-semibold tracking-wide text-emerald-950 ${isCadastralNumberLocked ? "select-none blur-sm cursor-pointer" : ""}`}
+                {...cadastralNumberProps}
+              >
+                {cadastral.cadastral_number}
+              </p>
+              {showLockedRevealButton && (
+                <button
+                  type="button"
+                  onClick={onLockedClick}
+                  className="absolute inset-y-0 left-1/2 inline-flex h-10 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 sm:px-5"
+                >
+                  <LockIcon size={16} strokeWidth={2.2} />
+                  {t("cadastru.unlockData")}
+                </button>
+              )}
+            </div>
           </div>
         )}
 

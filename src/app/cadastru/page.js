@@ -42,7 +42,7 @@ export default function CadastruPage() {
             </p>
           </div>
 
-          <CadastruSearchForm />
+          <CadastruSearchForm allowAnonymousSearch />
           <CadastruSourceNote />
           <InfoCallout title={t("cadastru.infoTitle")} className="mt-6">
             <span className="whitespace-pre-line">{t("cadastru.infoText")}</span>

@@ -274,6 +274,7 @@
   "cadastru.invalidAddressFields": "Nr. bloc trebuie să conțină doar cifre și opțional /",
   "cadastru.rateLimitError": "Prea multe căutări. Încearcă din nou peste puțin timp.",
   "cadastru.loginToUse": "Autentifică-te ca să cauți date cadastrale",
+  "cadastru.unlockData": "Autentifică-te pentru a debloca",
   "cadastru.resultPageTitle": "Rezultatul căutării cadastrale",
   "cadastru.resultMetaDescription": "Rezultatul unei căutări cadastrale Catdai. Pagina este generată pentru interogarea introdusă și nu este folosită ca pagină publică indexabilă.",
   "cadastru.backToSearch": "Înapoi la căutare",

@@ -20,6 +20,7 @@ const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 const MAX_APARTMENT_NUMBER = 9999;
 const DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
 const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
+const ADDRESS_LOOKUP_REQUEST_STORAGE_KEY = "catdai:cadastru-address-lookup-request:v1";
 
 function readSavedDraft() {
   if (typeof window === "undefined") return null;
@@ -59,6 +60,24 @@ function clearAddressResultPreview() {
   }
 }
 
+function writeAddressLookupRequest(requestBody) {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(ADDRESS_LOOKUP_REQUEST_STORAGE_KEY, JSON.stringify(requestBody));
+  } catch {
+    // Request persistence is best-effort for auth redirects.
+  }
+}
+
+function clearAddressLookupRequest() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(ADDRESS_LOOKUP_REQUEST_STORAGE_KEY);
+  } catch {
+    // Request cleanup is best-effort.
+  }
+}
+
 function onlyHouseNumberChars(value) {
   return value.replace(/[^\d/]/g, "").slice(0, HOUSE_NUMBER_MAX_LENGTH);
 }
@@ -72,6 +91,7 @@ export default function CadastruSearchForm({
   quickSearchPlacement = "bottom",
   showLocationHeader = false,
   locationStepNumber = 2,
+  allowAnonymousSearch = false,
 }) {
   const { lang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
@@ -113,7 +133,7 @@ export default function CadastruSearchForm({
   }, [addressForm, cadastralNumber, draftReady]);
 
   const requireAuth = () => {
-    if (isAuthenticated) return false;
+    if (allowAnonymousSearch || isAuthenticated) return false;
     writeSavedDraft({ addressForm, cadastralNumber });
     clearAuthError();
     setLookupState({ loading: false, method: null, error: "" });
@@ -185,18 +205,21 @@ export default function CadastruSearchForm({
 
     setLookupState({ loading: true, method: "address", error: "" });
 
+    const requestBody = {
+      city: "Chișinău",
+      road_type: addressForm.roadType,
+      street: addressForm.street,
+      house_number: addressForm.houseNumber,
+      apartment_number: addressForm.apartmentNumber,
+      search_context: "cadastru",
+    };
+    writeAddressLookupRequest(requestBody);
+
     try {
       const response = await fetch("/api/cadastru/address", {
         method: "POST",
         headers: requestHeaders(),
-        body: JSON.stringify({
-          city: "Chișinău",
-          road_type: addressForm.roadType,
-          street: addressForm.street,
-          house_number: addressForm.houseNumber,
-          apartment_number: addressForm.apartmentNumber,
-          search_context: "cadastru",
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -226,6 +249,7 @@ export default function CadastruSearchForm({
       }
 
       clearAddressResultPreview();
+      clearAddressLookupRequest();
       if (data?.cadastral_number) {
         const params = new URLSearchParams({
           cadastral_number: data.cadastral_number,
@@ -256,6 +280,7 @@ export default function CadastruSearchForm({
 
     setLookupState({ loading: true, method: "number", error: "" });
     clearAddressResultPreview();
+    clearAddressLookupRequest();
     const params = new URLSearchParams({
       cadastral_number: validation.value,
       source: "number",

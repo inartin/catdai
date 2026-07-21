@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 const inFlightCadastralLookups = new Map();
 const CADASTRU_DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
 const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
+const ADDRESS_LOOKUP_REQUEST_STORAGE_KEY = "catdai:cadastru-address-lookup-request:v1";
 
 function triggerCanvasDownload(canvas, fileName) {
   canvas.toBlob((blob) => {
@@ -251,7 +252,7 @@ function fetchCadastralLookup(cacheKey, body, accessToken) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
     body: JSON.stringify(body),
   }).then(async (response) => ({
@@ -279,6 +280,27 @@ function readAddressResultPreview() {
   }
 }
 
+function readAddressLookupRequest() {
+  if (typeof window === "undefined") return null;
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(ADDRESS_LOOKUP_REQUEST_STORAGE_KEY) || "null");
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearAddressLookupRequest() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(ADDRESS_LOOKUP_REQUEST_STORAGE_KEY);
+    sessionStorage.removeItem(ADDRESS_PREVIEW_STORAGE_KEY);
+  } catch {
+    // Result cleanup is best-effort.
+  }
+}
+
 function CadastruResultContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -288,14 +310,13 @@ function CadastruResultContent() {
   const source = searchParams.get("source") || "";
   const isAddressPreviewHandoff = source === "address" && searchParams.get("preview") === "1";
   const loadedRequestKey = useRef("");
-  const [authModalDismissed, setAuthModalDismissed] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
   const [state, setState] = useState({
     loading: true,
     error: "",
     data: null,
   });
-  const authRequired = !authLoading && Boolean(cadastralNumber) && !isAuthenticated;
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
   const purchaseOffer = state.data?.access_limit?.purchase || null;
   const cadastralCardRef = useRef(null);
@@ -311,32 +332,79 @@ function CadastruResultContent() {
   }, [cadastralNumber, isAddressPreviewHandoff]);
 
   useEffect(() => {
-    if (!isAddressPreviewHandoff) return;
-    const preview = readAddressResultPreview();
-    loadedRequestKey.current = "address-preview";
-    setState({
-      loading: false,
-      error: preview ? "" : t("cadastru.lookupError"),
-      data: preview,
-    });
-  }, [isAddressPreviewHandoff, t]);
-
-  useEffect(() => {
     if (authLoading) return;
-    if (!cadastralNumber) {
-      if (!isAddressPreviewHandoff) {
-        setState({ loading: false, error: "", data: null });
+
+    if (isAddressPreviewHandoff) {
+      const accessMode = session?.access_token ? "authenticated" : "anonymous";
+      const requestKey = `address-preview|${accessMode}`;
+      if (loadedRequestKey.current === requestKey) return;
+
+      const preview = readAddressResultPreview();
+      if (!isAuthenticated) {
+        loadedRequestKey.current = requestKey;
+        setState({
+          loading: false,
+          error: preview ? "" : t("cadastru.lookupError"),
+          data: preview,
+        });
+        return;
       }
+
+      const addressRequest = readAddressLookupRequest();
+      if (!addressRequest) {
+        loadedRequestKey.current = requestKey;
+        setState({
+          loading: false,
+          error: preview ? "" : t("cadastru.lookupError"),
+          data: preview,
+        });
+        return;
+      }
+
+      let active = true;
+      async function loadAddressData() {
+        setState({ loading: true, error: "", data: null });
+        try {
+          const response = await fetch("/api/cadastru/address", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(addressRequest),
+          });
+
+          if (!response.ok) {
+            if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
+            return;
+          }
+
+          const data = await response.json();
+          if (active) {
+            loadedRequestKey.current = requestKey;
+            setState({ loading: false, error: "", data });
+            if (!data?.locked_sections?.cadastru_details) clearAddressLookupRequest();
+          }
+        } catch {
+          if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
+        }
+      }
+
+      loadAddressData();
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!cadastralNumber) {
+      setState({ loading: false, error: "", data: null });
       return;
     }
 
-    if (isAddressPreviewHandoff) return;
-    if (!isAuthenticated) return;
-
     const searchSource = source === "address" || source === "number" ? source : "";
-    const requestKey = `${cadastralNumber}|${searchSource}`;
+    const accessMode = session?.access_token ? "authenticated" : "anonymous";
+    const requestKey = `${cadastralNumber}|${searchSource}|${accessMode}`;
     if (loadedRequestKey.current === requestKey) return;
-    if (!session?.access_token) return;
 
     let active = true;
 
@@ -350,7 +418,7 @@ function CadastruResultContent() {
           ...(searchSource === "address" ? { preview_origin: "address" } : {}),
         };
 
-        const response = await fetchCadastralLookup(`${requestKey}|${session.access_token}`, body, session.access_token);
+        const response = await fetchCadastralLookup(`${requestKey}|${session?.access_token || "anonymous"}`, body, session?.access_token);
 
         if (!response.ok) {
           if (response.status === 401) {
@@ -378,15 +446,19 @@ function CadastruResultContent() {
     };
   }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAuthenticated, session?.access_token, source, t]);
 
+  useEffect(() => {
+    if (isAuthenticated) setIsAuthModalOpen(false);
+  }, [isAuthenticated]);
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <AuthRequiredModal
-        open={authRequired && !authModalDismissed}
+        open={isAuthModalOpen}
         copyKey="cadastru.loginToUse"
-        onClose={() => setAuthModalDismissed(true)}
+        onClose={() => setIsAuthModalOpen(false)}
       />
       <AuthRequiredModal
-        open={isPaywallModalOpen}
+        open={isPaywallModalOpen && isAuthenticated}
         copyKey="payment.buyAccess"
         showAuthOptions={false}
         onClose={() => setIsPaywallModalOpen(false)}
@@ -411,12 +483,12 @@ function CadastruResultContent() {
             <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
               {t("cadastru.resultPageTitle")}
             </h1>
-            {state.data && (
+            {state.data && isAuthenticated && (
               <CadastruImageSaveButton cadastral={state.data} targetRef={exportCardRef} />
             )}
           </div>
 
-          {state.loading && !authRequired && (
+          {state.loading && (
             <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600 shadow-sm sm:p-8">
               {t("cadastru.searching")}
             </div>
@@ -433,7 +505,14 @@ function CadastruResultContent() {
               <CadastralDataCard
                 cadastral={state.data}
                 locked={isLockedPreview}
-                onLockedClick={isLockedPreview ? () => setIsPaywallModalOpen(true) : undefined}
+                showRevealButton={!isAuthenticated}
+                onLockedClick={isLockedPreview ? () => {
+                  if (isAuthenticated) {
+                    setIsPaywallModalOpen(true);
+                  } else {
+                    setIsAuthModalOpen(true);
+                  }
+                } : undefined}
               />
             </div>
           )}

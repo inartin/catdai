@@ -28,6 +28,8 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
   const building = {
     ...(payload?.building || {}),
     address: payload?.building?.address || payload?.building_address || null,
+    construction_year:
+      payload?.building?.construction_year || payload?.building_construction_year || null,
   };
 
   return {
@@ -37,7 +39,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     method: payload?.method,
     partial: payload?.partial,
     apartment: maskObjectFields(apartment, ["address", "floor"]),
-    building: maskObjectFields(building, ["address", "classifier"]),
+    building: maskObjectFields(building, ["address", "classifier", "construction_year"]),
     location: maskObjectFields(payload?.location || {}, ["display_name", "road", "house_number", "suburb", "city", "postcode"]),
     matched_address: payload?.matched_address || payload?.building_address || payload?.geocoded_address || null,
     request_address: payload?.request_address || null,

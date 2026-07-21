@@ -486,16 +486,17 @@ export async function POST(request) {
     );
   }
 
-  const access = await resolveAccessTier(request);
-  if (!access.user_id) {
-    return NextResponse.json({ error: "unauthorized", message: "Unauthorized" }, { status: 401 });
-  }
-
   let body;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const access = await resolveAccessTier(request);
+  const cadastruSearchType = resolveSearchContext(body);
+  if (!access.user_id && !cadastruSearchType) {
+    return NextResponse.json({ error: "unauthorized", message: "Unauthorized" }, { status: 401 });
   }
 
   const { cadastral_number } = body;
@@ -514,7 +515,6 @@ export async function POST(request) {
     );
   }
 
-  const cadastruSearchType = resolveSearchContext(body);
   const maskPreviewCadastralNumber = cadastruSearchType === "address" || body?.preview_origin === "address";
   const creditIdempotencyKey = makeCadastruLookupUsageKey(trimmed);
   const creditCheck = await checkFeatureAccess({

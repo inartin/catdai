@@ -7,6 +7,7 @@ import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { validateCadastralNumber } from "@/lib/validation";
+import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet" },
@@ -97,6 +98,7 @@ export default function CadastruSearchForm({
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const router = useRouter();
   const [addressForm, setAddressForm] = useState({
+    city: "Chișinău",
     roadType: "strada",
     street: "",
     houseNumber: "",
@@ -115,6 +117,9 @@ export default function CadastruSearchForm({
     const savedDraft = readSavedDraft();
     if (savedDraft) {
       setAddressForm({
+        city: CADASTRU_SUPPORTED_CITIES.includes(savedDraft?.addressForm?.city)
+          ? savedDraft.addressForm.city
+          : "Chișinău",
         roadType: savedDraft?.addressForm?.roadType === "bulevard" ? "bulevard" : "strada",
         street: typeof savedDraft?.addressForm?.street === "string" ? savedDraft.addressForm.street : "",
         houseNumber: typeof savedDraft?.addressForm?.houseNumber === "string" ? savedDraft.addressForm.houseNumber : "",
@@ -206,7 +211,7 @@ export default function CadastruSearchForm({
     setLookupState({ loading: true, method: "address", error: "" });
 
     const requestBody = {
-      city: "Chișinău",
+      city: addressForm.city,
       road_type: addressForm.roadType,
       street: addressForm.street,
       house_number: addressForm.houseNumber,
@@ -383,13 +388,17 @@ export default function CadastruSearchForm({
               <span className="text-sm font-semibold text-gray-700">
                 {t("cadastru.city")}
               </span>
-              <input
-                type="text"
-                value="Chișinău"
-                readOnly
-                aria-readonly="true"
-                className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-gray-100 px-4 text-base font-medium text-gray-700 outline-none"
-              />
+              <select
+                value={addressForm.city}
+                onChange={(event) => setAddressField("city", event.target.value)}
+                className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base font-medium text-gray-900 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary-light"
+              >
+                {CADASTRU_SUPPORTED_CITIES.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="block">

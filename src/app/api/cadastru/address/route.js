@@ -12,6 +12,7 @@ import {
   consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
+import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
@@ -200,9 +201,9 @@ export async function POST(request) {
   const houseNumber = normalizeSpaces(body.house_number);
   const apartmentNumber = normalizeSpaces(body.apartment_number);
 
-  if (city !== "Chișinău") {
+  if (!CADASTRU_SUPPORTED_CITIES.includes(city)) {
     return NextResponse.json(
-      { error: "unsupported_city", message: "Only Chișinău is supported for now." },
+      { error: "unsupported_city", message: "This city is not supported." },
       { status: 400 }
     );
   }

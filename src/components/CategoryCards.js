@@ -7,6 +7,7 @@ import { useLivePrices } from "@/lib/useLivePrices";
 import { useMarketTrends } from "@/lib/useMarketTrends";
 import { DISTRICTS_BY_CITY } from "@/lib/validation";
 import CloseIcon from "@/components/icons/CloseIcon";
+import { ArrowRight } from "@/components/icons/ArrowsIcons";
 
 const TREND_ARROWS = { up: "↑", down: "↓", stable: "→" };
 const TREND_COLORS = { up: "text-emerald-400/40", down: "text-red-400/40", stable: "text-gray-300/40" };
@@ -83,7 +84,7 @@ function LivePricePanel({ t, priceData }) {
   return (
     <div className="flex flex-col justify-between gap-4 p-4 sm:gap-5 sm:p-6 md:h-full">
       <div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <span className="relative inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center">
             <span
               className="absolute h-1.5 w-1.5 rounded-full"
@@ -169,7 +170,7 @@ function RealEstateMarketCard({ t, lang, priceData, trendData, onOpenDistricts }
       aria-label={t("categories.openDistrictTrends")}
       onClick={onOpenDistricts}
       onKeyDown={handleKeyDown}
-      className="w-full cursor-pointer overflow-hidden rounded-2xl border border-emerald-100 bg-white text-left shadow-lg outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hover:-translate-y-1 md:hover:shadow-xl"
+      className="group w-full cursor-pointer overflow-hidden rounded-2xl border border-emerald-100 bg-white text-left shadow-lg outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hover:-translate-y-1 md:hover:shadow-xl"
     >
       <div className="grid md:min-h-72 md:grid-cols-[minmax(0,1fr)_18rem_minmax(0,1fr)]">
         <MobileMarketTrendPanel
@@ -181,7 +182,11 @@ function RealEstateMarketCard({ t, lang, priceData, trendData, onOpenDistricts }
         <div className="hidden md:contents">
           <LivePricePanel t={t} priceData={priceData} />
           <MarketImagePanel t={t} />
-          <div className="min-h-64 border-t border-gray-100 p-4 sm:p-6 md:min-h-0 md:border-l md:border-t-0">
+          <div className="relative min-h-64 border-t border-gray-100 p-4 sm:p-6 md:min-h-0 md:border-l md:border-t-0">
+            <span className="absolute right-4 top-4 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 sm:right-6 sm:top-6">
+              {t("categories.viewDistricts")}
+              <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+            </span>
             <div className="md:pt-1">
               <LandingTrendCharts t={t} lang={lang} trendData={trendData} />
             </div>
@@ -371,21 +376,27 @@ function MobileMarketTrendPanel({ t, lang, priceData, trendData }) {
       <div className="absolute inset-0 bg-emerald-50/70" />
 
       <div className="relative z-10 flex min-h-[25.75rem] flex-col">
-        <div className="flex items-center gap-2">
-          <span className="relative inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center">
-            <span
-              className="absolute h-1.5 w-1.5 rounded-full"
-              style={{
-                backgroundColor: "#22c55e",
-                boxShadow: "0 0 6px 2px rgba(34, 197, 94, 0.45), 0 0 12px 4px rgba(34, 197, 94, 0.18)",
-                animation: "live-glow 2s ease-in-out infinite",
-              }}
-            />
-          </span>
-          <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold tracking-widest text-emerald-700">
-            <span className="uppercase">{t("categories.livePrices")}</span>
-            <span className="text-emerald-700/50">·</span>
-            <span className="tracking-normal">Chisinau</span>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="relative inline-flex h-2.5 w-2.5 shrink-0 items-center justify-center">
+              <span
+                className="absolute h-1.5 w-1.5 rounded-full"
+                style={{
+                  backgroundColor: "#22c55e",
+                  boxShadow: "0 0 6px 2px rgba(34, 197, 94, 0.45), 0 0 12px 4px rgba(34, 197, 94, 0.18)",
+                  animation: "live-glow 2s ease-in-out infinite",
+                }}
+              />
+            </span>
+            <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold tracking-widest text-emerald-700">
+              <span className="uppercase">{t("categories.livePrices")}</span>
+              <span className="text-emerald-700/50">·</span>
+              <span className="tracking-normal">Chisinau</span>
+            </span>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-emerald-700">
+            {t("categories.viewDistricts")}
+            <ArrowRight size={13} />
           </span>
         </div>
 

@@ -232,6 +232,7 @@ export async function POST(request) {
   const rawAddress = normalizeSpaces(
     `${city}, ${roadType} ${street} ${houseNumber}${apartmentNumber ? ` ap ${apartmentNumber}` : ""}`
   );
+  const skipCache = body?.skip_cache === true || body?.skipcache === true;
   const structuredAddress = buildStructuredAddress({
     city,
     roadType: body.road_type,
@@ -265,7 +266,7 @@ export async function POST(request) {
     return response;
   };
 
-  const cached = await getCachedCadastruAddress(rawAddress);
+  const cached = skipCache ? null : await getCachedCadastruAddress(rawAddress);
   if (cached) {
     const creditResponse = await consumeCadastruCredit(cached.payload, cached.lookupSource);
     if (creditResponse) return creditResponse;
@@ -290,7 +291,7 @@ export async function POST(request) {
     return response;
   }
 
-  const stored = apartmentNumber
+  const stored = !skipCache && apartmentNumber
     ? await getCadastruRecordByAddress(rawAddress, { structuredAddress })
     : null;
   if (stored?.payload?.cadastral_number) {

@@ -308,6 +308,7 @@ function CadastruResultContent() {
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
   const source = searchParams.get("source") || "";
+  const skipCache = searchParams.get("skipcache") === "true";
   const isAddressResultHandoff = source === "address" && searchParams.get("result") === "1";
   const isAddressPreviewHandoff = source === "address" && (
     searchParams.get("preview") === "1" || searchParams.get("result") === "1"
@@ -339,7 +340,7 @@ function CadastruResultContent() {
 
     if (isAddressPreviewHandoff) {
       const accessMode = session?.access_token ? "authenticated" : "anonymous";
-      const requestKey = `address-preview|${accessMode}`;
+      const requestKey = `address-preview|${accessMode}|${skipCache ? "skipcache" : "cache"}`;
       if (loadedRequestKey.current === requestKey) return;
 
       const preview = readAddressResultPreview();
@@ -411,7 +412,7 @@ function CadastruResultContent() {
 
     const searchSource = source === "address" || source === "number" ? source : "";
     const accessMode = session?.access_token ? "authenticated" : "anonymous";
-    const requestKey = `${cadastralNumber}|${searchSource}|${accessMode}`;
+    const requestKey = `${cadastralNumber}|${searchSource}|${accessMode}|${skipCache ? "skipcache" : "cache"}`;
     if (loadedRequestKey.current === requestKey) return;
 
     let active = true;
@@ -422,6 +423,7 @@ function CadastruResultContent() {
       try {
         const body = {
           cadastral_number: cadastralNumber,
+          ...(skipCache ? { skip_cache: true } : {}),
           ...(searchSource === "number" ? { search_context: "cadastru", search_type: searchSource } : {}),
           ...(searchSource === "address" ? { preview_origin: "address" } : {}),
         };
@@ -452,7 +454,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, session?.access_token, source, t]);
+  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, session?.access_token, skipCache, source, t]);
 
   useEffect(() => {
     if (isAuthenticated) setIsAuthModalOpen(false);

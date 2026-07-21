@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
 import { useTranslation } from "@/context/LanguageContext";
@@ -97,6 +97,8 @@ export default function CadastruSearchForm({
   const { lang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const skipCache = searchParams.get("skipcache") === "true";
   const [addressForm, setAddressForm] = useState({
     city: "Chișinău",
     roadType: "strada",
@@ -219,6 +221,7 @@ export default function CadastruSearchForm({
       house_number: addressForm.houseNumber,
       ...(addressForm.apartmentNumber ? { apartment_number: addressForm.apartmentNumber } : {}),
       search_context: "cadastru",
+      ...(skipCache ? { skip_cache: true } : {}),
     };
     writeAddressLookupRequest(requestBody);
 
@@ -250,6 +253,7 @@ export default function CadastruSearchForm({
         const params = new URLSearchParams({
           source: "address",
           preview: "1",
+          ...(skipCache ? { skipcache: "true" } : {}),
         });
         router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
         return;
@@ -261,6 +265,7 @@ export default function CadastruSearchForm({
         const params = new URLSearchParams({
           cadastral_number: data.cadastral_number,
           source: "address",
+          ...(skipCache ? { skipcache: "true" } : {}),
         });
         router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
         return;
@@ -271,6 +276,7 @@ export default function CadastruSearchForm({
         const params = new URLSearchParams({
           source: "address",
           result: "1",
+          ...(skipCache ? { skipcache: "true" } : {}),
         });
         router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
         return;
@@ -301,6 +307,7 @@ export default function CadastruSearchForm({
     const params = new URLSearchParams({
       cadastral_number: validation.value,
       source: "number",
+      ...(skipCache ? { skipcache: "true" } : {}),
     });
     router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
   };

@@ -515,6 +515,7 @@ export async function POST(request) {
     );
   }
 
+  const skipCache = body?.skip_cache === true || body?.skipcache === true;
   const maskPreviewCadastralNumber = cadastruSearchType === "address" || body?.preview_origin === "address";
   const creditIdempotencyKey = makeCadastruLookupUsageKey(trimmed);
   const creditCheck = await checkFeatureAccess({
@@ -585,7 +586,7 @@ export async function POST(request) {
     );
   };
 
-  const cached = await getCachedCadastralPayload(trimmed);
+  const cached = skipCache ? null : await getCachedCadastralPayload(trimmed);
   if (cached) {
     lookupSource = cached.lookupSource;
     const payload = await enrichWithCadastruMdDetails(
@@ -599,7 +600,7 @@ export async function POST(request) {
     );
   }
 
-  const stored = await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true });
+  const stored = skipCache ? null : await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true });
   if (stored) {
     lookupSource = stored.lookupSource;
     const payload = await enrichWithCadastruMdDetails(

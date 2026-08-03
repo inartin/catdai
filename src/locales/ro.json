@@ -291,6 +291,7 @@
   "cadastru.backToSearch": "Înapoi la căutare",
   "cadastru.saveImage": "Salvează",
   "cadastru.savingImage": "Se salvează...",
+  "cadastru.valuationCta": "Evaluează apartamentul",
   "cadastru.limitedDataNote": "Nu am găsit mai multe date oficiale pentru acest număr cadastral. Afișăm tot ce este disponibil în sursele verificate.",
   "cadastru.infoTitle": "Ce poți verifica în rezultatul cadastral",
   "cadastru.infoText": "Găsești numărul cadastral după adresă și poți verifica date oficiale pentru apartamente, terenuri sau construcții. Poți găsi și terenuri împreună cu toate construcțiile aflate pe ele, nu doar apartamente.\n\nRezultatul poate include suprafața, modul de folosință, valoarea cadastrală estimată, etajul, anul construcției și informații despre clădire.\n\nPoți căuta după adresă, cu numărul apartamentului opțional, sau poți introduce direct nr. cadastral pentru verificare.",

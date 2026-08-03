@@ -10,11 +10,95 @@ import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
+import { matchCity, matchDistrict, validateCadastralNumber } from "@/lib/validation";
 
 const inFlightCadastralLookups = new Map();
 const CADASTRU_DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
 const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
 const ADDRESS_LOOKUP_REQUEST_STORAGE_KEY = "catdai:cadastru-address-lookup-request:v1";
+
+function normalizeLocationText(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[șş]/gi, "s")
+    .replace(/[țţ]/gi, "t")
+    .toLowerCase();
+}
+
+function resolveValuationCity(cadastral) {
+  const locationValues = [
+    cadastral?.form_fields?.city,
+    cadastral?.parsed_input?.city,
+    cadastral?.request_address,
+    cadastral?.matched_address,
+    cadastral?.apartment?.address,
+    cadastral?.building?.address,
+    cadastral?.location?.city,
+    cadastral?.location?.display_name,
+  ].filter(Boolean);
+  const locationText = normalizeLocationText(locationValues.join(" "));
+
+  if (locationText.includes("durlesti") || locationText.includes("дурлеш")) {
+    return "Durlești";
+  }
+
+  const directCity = locationValues.map((value) => matchCity(String(value))).find(Boolean);
+  if (directCity) return directCity;
+
+  if (locationText.includes("chisinau") || locationText.includes("кишин")) {
+    return "Chișinău";
+  }
+
+  return null;
+}
+
+function hasApartmentNumber(cadastral) {
+  if (
+    cadastral?.apartment_number ||
+    cadastral?.parsed_input?.apartment ||
+    (typeof cadastral?.apartment === "string" && cadastral.apartment)
+  ) {
+    return true;
+  }
+
+  const cadastralNumber = String(cadastral?.cadastral_number || "").trim();
+  const validation = validateCadastralNumber(cadastralNumber);
+  return validation.valid && cadastralNumber.split(".").length >= 3;
+}
+
+function numericParam(value, { integer = false, min, max } = {}) {
+  if (value === null || value === undefined || value === "") return null;
+  const normalized = String(value).trim().replace(",", ".");
+  const number = integer ? Number.parseInt(normalized, 10) : Number.parseFloat(normalized);
+  if (!Number.isFinite(number)) return null;
+  if (min != null && number < min) return null;
+  if (max != null && number > max) return null;
+  return String(number);
+}
+
+function buildValuationPrefill(cadastral) {
+  if (!cadastral || cadastral.error || (cadastral.status && cadastral.status !== "success")) return null;
+  if (!hasApartmentNumber(cadastral)) return null;
+
+  const city = resolveValuationCity(cadastral);
+  if (!city) return null;
+
+  const params = new URLSearchParams({ city });
+  const district = city === "Chișinău"
+    ? matchDistrict(cadastral?.form_fields?.district, city)
+    : null;
+  const area = numericParam(cadastral?.form_fields?.area_m2 ?? cadastral?.apartment?.area_m2 ?? cadastral?.apartment_area_m2, { min: 0.01, max: 1000 });
+  const floor = numericParam(cadastral?.form_fields?.floor ?? cadastral?.apartment?.floor ?? cadastral?.apartment_floor, { integer: true, min: -1, max: 100 });
+  const totalFloors = numericParam(cadastral?.form_fields?.total_floors ?? cadastral?.building?.total_floors, { integer: true, min: 1, max: 100 });
+
+  if (district) params.set("district", district);
+  if (area) params.set("area", area);
+  if (floor) params.set("floor", floor);
+  if (totalFloors) params.set("total_floors", totalFloors);
+
+  return params;
+}
 
 function triggerCanvasDownload(canvas, fileName) {
   canvas.toBlob((blob) => {
@@ -325,6 +409,7 @@ function CadastruResultContent() {
   const purchaseOffer = state.data?.access_limit?.purchase || null;
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
+  const valuationPrefill = buildValuationPrefill(state.data);
 
   useEffect(() => {
     if (!cadastralNumber && !isAddressPreviewHandoff) return;
@@ -524,6 +609,21 @@ function CadastruResultContent() {
                   }
                 } : undefined}
               />
+            </div>
+          )}
+          {valuationPrefill && (
+            <div className="mt-8 flex justify-center">
+              <button
+                type="button"
+                onClick={() => router.push(`/estimeaza?${valuationPrefill.toString()}`)}
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 sm:w-auto"
+              >
+                {t("cadastru.valuationCta")}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+                  <path d="M5 12h14" />
+                  <path d="m13 6 6 6-6 6" />
+                </svg>
+              </button>
             </div>
           )}
           {state.data && (

@@ -1,59 +1,86 @@
-# CatDai - Project Context
+# Cât Dai?
 
-Real estate valuation app that estimates the real market value of properties (initially apartments) based on data automatically collected from 999.md and other sources.
-More options besides Real Estate will be added later, like Auto and Gadgets, for now those are unavailable.
+Cât Dai? is a Romanian/Russian real-estate analysis platform for Moldova. It estimates apartment sale and monthly-rent values from current market listings and price history, then combines those results with official cadastral data.
 
-## Core Flow
+The active valuation scope is apartments in Chișinău and Durlești. Other product categories are not active.
 
-User inputs property details (zone, m², rooms, floor, renovation, etc.) and receives:
-- Recommended market price
-- Fast sale / premium price scenarios
-- Estimated price range + confidence level
+## Available Features
 
+- **Sale and rent valuation** - guided apartment criteria, market estimate, confidence and range, price per m², district comparisons, market trends, and relevant 999.md listings.
+- **999.md listing analysis** - paste a sale-apartment link to extract its details, compare the asking price with the market, inspect price history, and find likely duplicate listings.
+- **Cadastral lookup** - search official property data by exact address or cadastral number, reuse available fields in a valuation, and export the result card as PNG.
+- **Rent-yield calculator** - estimate monthly rent, gross yield, payback period, and the effect of Moldova's optional 7% rental tax.
+- **Result tools** - compare criteria, save favorites, create read-only share links, reopen paid valuation snapshots, and generate configurable browser-side PDF reports for sale valuations.
+- **Accounts** - Google and Telegram login, profile history, favorites, credit balances, transactions, in-app notifications, Telegram linking, subscription management, and account deletion.
+- **Market content** - live Chișinău price summaries, three-month market and district trends, public news articles with authenticated upvotes, FAQ, and localized SEO pages.
+- **Access and payments** - anonymous previews, five free monthly uses per gated feature for authenticated users, Paddle one-time purchases, and the Extra monthly subscription. Standard and Pro are supported by the payment model but currently hidden on `/pricing`.
+- **Listing alerts** - alert configuration and storage are implemented. Matching and delivery run outside this repository.
+- **Localization** - the application UI is available in Romanian and Russian.
 
-## Monetization Model
+## Admin
 
-- **Free tier**: limited estimates + Adsense ads
-- **Paid tier**: full report / unlimited estimates
-- **Business plan**: for agencies - fast evaluations + PDF export / history
+The protected admin area includes application analytics, users and access grants, payment and attribution reporting, sale/rent estimation activity, cadastral and calculator usage, listing and owner exploration, price history, feedback, news publishing, image uploads, and notification broadcasts.
 
+## Tech Stack
 
-# Roadmap
-- [ ] Foloseste UTM tracking, de exemplu: 
-      https://999.md/ro/1234567?utm_source=catdai_app&utm_medium=telegram_bot
+- **Frontend:** Next.js 16.1.6 App Router, React 19.2.3, JavaScript, Tailwind CSS 4
+- **Backend:** Next.js route handlers and Supabase PostgreSQL RPCs
+- **Data and identity:** Supabase PostgreSQL, Auth, and Storage
+- **Caching:** Redis with in-memory stale fallbacks
+- **Payments:** Paddle checkout, subscriptions, webhooks, refunds, and chargebacks
+- **Content and media:** Tiptap, `sanitize-html`, Sharp, QRCode, and browser Canvas PDF generation
+- **Operations:** Node.js, PM2, and Cloudflare Tunnel
+- **External data:** 999.md parser/worker, Geodata WFS/WMS, cadastru.md, and Nominatim fallback
 
-- [ ] Some listings are in MDL, convert it to EUR
-- [ ] Case pe pamant
-- [ ] Loturi teren
-- [x] Telegram/X/Blog news cu statistica pe piata, daily sau saptamanal
-- [ ] AI specific recomandari bazanduse pe detalii aditionale de utilizator, nu din filtre.
-- [x] Cauta date cadastrale fara nr cadastral, dupa adresa fixa.
-- [ ] Cadastru cache, store raw building info in db
-- [x] Cadastru fallback3 https://claude.ai/chat/d7f31468-c730-41db-b5f7-7d1f228ffc46
-- [x] Verify Google auth in Audience tab
-- [x] Compara
-- [ ] Istoricul de prețuri favoritelor
+## Local Development
 
+Install dependencies:
 
-- [ ] Freemium
+```bash
+pnpm install
+```
 
-    The summary card (2 camere · 50m² · Râșcani)
-    The three prices (83k / 92k / 100k) but blurred
-    Show the main big estimated price
-    The market position slider — blurred
-    Example: 
-    ✅ €92.500 — the anchor
-    ✅ That one line creating uncertainty: "Prețul tău real poate fi cu până la 15% mai mare sau mai mic în funcție de starea exactă, etaj, stradă și alți factori."
-    🔒 The range (83k–100k) blurred
-    🔒 Market position blurred
-    🔒 Everything else blurred
+Configure `.env.development` for Supabase and the integrations needed by the flow you are running. The required variables are documented by domain in [`docs/`](docs/), especially [`auth-config.md`](docs/auth-config.md), [`market-data.md`](docs/market-data.md), and [`paddle-payments.md`](docs/paddle-payments.md).
 
-    Cut everything else behind the paywall. The sector comparison, the methodology breakdown, the statistics — all paid.
-    The psychological moment is perfect: they see there IS a number, they see there IS a range, they see where they sit on the spectrum — all blurred. That's the exact moment of maximum curiosity and willingness to pay.
-    Why not blur earlier:
-    If you blur before showing anything, they don't know if the tool even works. Showing the structure but not the values proves the product is real before asking for money.
-    What the CTA should say at that point:
-    Not "plătește €9" — instead something like:
-    "Descoperă prețul exact — €9, raport complet"
-    Or even softer: "Vezi estimarea completă →" and price appears only on the payment screen.
-    One more thing — "Trimite analiza" at the bottom currently, what does it do exactly?
+Start Next.js without a tunnel:
+
+```bash
+pnpm exec next dev
+```
+
+Start Next.js together with the configured `catdai` Cloudflare Tunnel:
+
+```bash
+pnpm dev
+```
+
+Production commands:
+
+```bash
+pnpm build
+pnpm start
+```
+
+Generate the demo valuation PDF:
+
+```bash
+pnpm pdf:demo
+```
+
+There is currently no automated test script. `pnpm test` starts the development server and Cloudflare Tunnel.
+
+## Project Structure
+
+```text
+src/app/       Pages and API routes
+src/components Shared product and admin UI
+src/context/   Authentication and language providers
+src/lib/       Valuation, access, payments, integrations, and utilities
+src/locales/   Romanian and Russian translations
+db/            Supabase schemas, functions, and migrations
+docs/          Living product and architecture documentation
+external/      Standalone signed external workers
+scripts/       Development and PDF utilities
+```
+
+Detailed behavior and implementation boundaries are maintained in [`docs/`](docs/).

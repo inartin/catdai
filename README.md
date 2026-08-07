@@ -1,6 +1,18 @@
 # Cât Dai?
 
-Cât Dai? is a Romanian/Russian real-estate analysis platform for Moldova. It estimates apartment sale and monthly-rent values from current market listings and price history, then combines those results with official cadastral data.
+Cât Dai? is a real-estate analysis platform for Moldova. It estimates apartment sale and monthly-rent values from current market listings and price history, then combines those results with official cadastral data.
+
+[![Next.js](https://img.shields.io/badge/Next.js-16.1.6-000000?style=flat-square&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19.2.3-20232A?style=flat-square&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Backend-3FCF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-Cache-DC382D?style=flat-square&logo=redis&logoColor=white)](https://redis.io/)
+[![Paddle](https://img.shields.io/badge/Paddle-Payments-FFCC00?style=flat-square&logo=paddle&logoColor=000000)](https://www.paddle.com/)
+[![Node.js](https://img.shields.io/badge/Node.js-Runtime-5FA04E?style=flat-square&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-Package_Manager-F69220?style=flat-square&logo=pnpm&logoColor=white)](https://pnpm.io/)
+
+---
 
 The active valuation scope is apartments in Chișinău and Durlești. Other product categories are not active.
 
@@ -20,17 +32,6 @@ The active valuation scope is apartments in Chișinău and Durlești. Other prod
 ## Admin
 
 The protected admin area includes application analytics, users and access grants, payment and attribution reporting, sale/rent estimation activity, cadastral and calculator usage, listing and owner exploration, price history, feedback, news publishing, image uploads, and notification broadcasts.
-
-## Tech Stack
-
-- **Frontend:** Next.js 16.1.6 App Router, React 19.2.3, JavaScript, Tailwind CSS 4
-- **Backend:** Next.js route handlers and Supabase PostgreSQL RPCs
-- **Data and identity:** Supabase PostgreSQL, Auth, and Storage
-- **Caching:** Redis with in-memory stale fallbacks
-- **Payments:** Paddle checkout, subscriptions, webhooks, refunds, and chargebacks
-- **Content and media:** Tiptap, `sanitize-html`, Sharp, QRCode, and browser Canvas PDF generation
-- **Operations:** Node.js, PM2, and Cloudflare Tunnel
-- **External data:** 999.md parser/worker, Geodata WFS/WMS, cadastru.md, and Nominatim fallback
 
 ## Local Development
 

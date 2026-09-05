@@ -613,17 +613,20 @@ export default function ProfilePage() {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {history.map((row) => {
-                            const isClickable = Boolean(row.href);
+                            const href = row.type === "cadastru" && row.cadastralNumber && row.resultType !== "no_data"
+                              ? `/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(row.cadastralNumber)}`
+                              : row.href;
+                            const isClickable = Boolean(href);
                             return (
                               <tr
                                 key={row.id}
                                 className={`hover:bg-gray-50 ${isClickable ? "cursor-pointer focus-within:bg-gray-50" : ""}`}
                                 tabIndex={isClickable ? 0 : undefined}
-                                onClick={isClickable ? () => router.push(row.href) : undefined}
+                                onClick={isClickable ? () => router.push(href) : undefined}
                                 onKeyDown={isClickable ? (event) => {
                                   if (event.key === "Enter" || event.key === " ") {
                                     event.preventDefault();
-                                    router.push(row.href);
+                                    router.push(href);
                                   }
                                 } : undefined}
                               >

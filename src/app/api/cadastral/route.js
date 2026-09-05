@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
@@ -6,7 +5,7 @@ import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
 import { resolveAccessTier } from "@/lib/access-tier";
-import { getSharedCache, setSharedCache } from "@/lib/cache";
+import { cadastruExpiresAt, writeCadastruCache, cleanCadastruPayload } from "@/lib/cadastru-cache";
 import {
   checkFeatureAccess,
   consumeFeatureCredit,
@@ -19,8 +18,6 @@ const limiter = rateLimit({ interval: 60_000, limit: 15 });
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 const GEODATA_TIMEOUT_MS = 10_000;
 const NOMINATIM_TIMEOUT_MS = 5_000;
-const CADASTRAL_CACHE_PREFIX = "catdai:cadastral:v1:";
-const CADASTRAL_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 const CADASTRU_MD_DETAIL_APARTMENT_FIELDS = [
   "object_type",
   "destination",
@@ -348,58 +345,10 @@ function normalizeCadastralPayload(payload, cadastralNumber, accessTier) {
   };
 }
 
-function makeCadastralCacheKey(cadastralNumber) {
-  const hash = crypto
-    .createHash("sha256")
-    .update(cadastralNumber.trim())
-    .digest("hex")
-    .slice(0, 32);
-
-  return `${CADASTRAL_CACHE_PREFIX}${hash}`;
-}
-
 function makeCadastruLookupUsageKey(cadastralNumber) {
   return makePaidFeatureUsageKey(CADASTRU_LOOKUP_FEATURE_KEY, {
     cadastral_number: String(cadastralNumber || "").trim(),
   });
-}
-
-function normalizeLookupSource(value) {
-  return value === "api" || value === "local" ? value : null;
-}
-
-function makeCacheableCadastralPayload(payload) {
-  if (!payload || typeof payload !== "object") return payload;
-  const cacheable = { ...payload };
-  delete cacheable.access_tier;
-  delete cacheable.locked_sections;
-  return cacheable;
-}
-
-function applyCadastralAccess(payload, cadastralNumber, accessTier) {
-  return normalizeCadastralPayload(payload, cadastralNumber, accessTier);
-}
-
-async function getCachedCadastralPayload(cadastralNumber) {
-  const cached = await getSharedCache(makeCadastralCacheKey(cadastralNumber));
-  const value = cached?.value;
-  if (!value?.payload) return null;
-
-  return {
-    payload: value.payload,
-    lookupSource: normalizeLookupSource(value.lookup_source),
-  };
-}
-
-async function setCachedCadastralPayload(cadastralNumber, payload, lookupSource) {
-  await setSharedCache(
-    makeCadastralCacheKey(cadastralNumber),
-    {
-      payload: makeCacheableCadastralPayload(payload),
-      lookup_source: normalizeLookupSource(lookupSource),
-    },
-    CADASTRAL_CACHE_TTL_SECONDS
-  );
 }
 
 async function buildCadastruDetailPayload(cadastralNumber, accessTier = "paid") {
@@ -536,6 +485,20 @@ export async function POST(request) {
     });
   };
   const respondWithCadastralPayload = async (payload, options = {}) => {
+    // Save the unmasked official response even when the viewer has no credit.
+    if (options.officialFetch) {
+      const saved = await persistCadastruRecord(payload, {
+        cadastralNumber: trimmed,
+        lookupSource,
+        resultType: options.resultType || classifyCadastralResult(payload),
+        countLookup: false,
+        officialFetch: true,
+      });
+      if (saved) payload = normalizeCadastralPayload(saved, trimmed, access.tier);
+      await writeCadastruCache("number", trimmed, {
+        payload: cleanCadastruPayload(payload), lookupSource, expiresAt: cadastruExpiresAt(),
+      });
+    }
     if (!creditCheck.allowed) {
       const preview = buildCadastruPreviewPayload(payload, creditCheck.reason || "no_credit", {
         maskCadastralNumber: maskPreviewCadastralNumber,
@@ -565,13 +528,13 @@ export async function POST(request) {
       return res;
     }
 
-    await setCachedCadastralPayload(trimmed, payload, lookupSource);
     await persistCadastruRecord(payload, {
       cadastralNumber: trimmed,
       lookupSource,
       resultType: options.resultType || classifyCadastralResult(payload),
       countLookup: options.countLookup !== false,
-      officialFetch: options.officialFetch === true,
+      officialFetch: false,
+      expiresAt: options.expiresAt,
     });
     await recordCadastruSearch(payload);
     const res = NextResponse.json(payload);
@@ -586,31 +549,12 @@ export async function POST(request) {
     );
   };
 
-  const cached = skipCache ? null : await getCachedCadastralPayload(trimmed);
-  if (cached) {
-    lookupSource = cached.lookupSource;
-    const payload = await enrichWithCadastruMdDetails(
-      applyCadastralAccess(cached.payload, trimmed, access.tier),
-      trimmed,
-      access.tier
-    );
-    return respondWithCadastralPayload(
-      payload,
-      { countLookup: true }
-    );
-  }
-
   const stored = skipCache ? null : await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true });
   if (stored) {
     lookupSource = stored.lookupSource;
-    const payload = await enrichWithCadastruMdDetails(
-      applyCadastralAccess(stored.payload, trimmed, access.tier),
-      trimmed,
-      access.tier
-    );
     return respondWithCadastralPayload(
-      payload,
-      { countLookup: true, resultType: stored.resultType }
+      normalizeCadastralPayload(stored.payload, trimmed, access.tier),
+      { countLookup: true, resultType: stored.resultType, expiresAt: stored.expiresAt }
     );
   }
 

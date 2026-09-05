@@ -1,18 +1,16 @@
-import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
 import { findCadastralByAddress } from "@/lib/cadastru-address-search";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
-import { getCadastruRecordByAddress, persistCadastruRecord } from "@/lib/cadastru-records";
+import { getCadastruRecordByAddress, persistCadastruAddressResult } from "@/lib/cadastru-records";
 import { resolveAccessTier } from "@/lib/access-tier";
-import { getSharedCache, setSharedCache } from "@/lib/cache";
 import {
   consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
-import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
+import { CADASTRU_SUPPORTED_CITIES, resolveCadastruSupportedCity } from "@/lib/cadastru-supported-cities";
 
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
@@ -22,8 +20,6 @@ const APARTMENT_NUMBER_MAX_LENGTH = 4;
 const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/\d{1,4})?$/;
 const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 const MAX_APARTMENT_NUMBER = 9999;
-const CADASTRU_ADDRESS_CACHE_PREFIX = "catdai:cadastru-address:v1:";
-const CADASTRU_ADDRESS_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -70,16 +66,6 @@ function resolvePayloadDistrict(payload) {
   return payload?.form_fields?.district || null;
 }
 
-function makeCadastruAddressCacheKey(rawAddress) {
-  const hash = crypto
-    .createHash("sha256")
-    .update(normalizeSpaces(rawAddress).toLowerCase())
-    .digest("hex")
-    .slice(0, 32);
-
-  return `${CADASTRU_ADDRESS_CACHE_PREFIX}${hash}`;
-}
-
 function makeCadastruAddressUsageKey(rawAddress) {
   return makePaidFeatureUsageKey(CADASTRU_LOOKUP_FEATURE_KEY, {
     address: normalizeSpaces(rawAddress).toLowerCase(),
@@ -92,31 +78,6 @@ function makeCadastruNumberUsageKey(cadastralNumber) {
   });
 }
 
-async function getCachedCadastruAddress(rawAddress) {
-  const cached = await getSharedCache(makeCadastruAddressCacheKey(rawAddress));
-  if (!cached?.value) return null;
-  if (cached.value?.payload) {
-    return {
-      payload: cached.value.payload,
-      lookupSource: cached.value.lookup_source === "api" || cached.value.lookup_source === "local"
-        ? cached.value.lookup_source
-        : null,
-    };
-  }
-  return { payload: cached.value, lookupSource: null };
-}
-
-async function setCachedCadastruAddress(rawAddress, payload, lookupSource) {
-  await setSharedCache(
-    makeCadastruAddressCacheKey(rawAddress),
-    {
-      payload,
-      lookup_source: lookupSource === "api" || lookupSource === "local" ? lookupSource : null,
-    },
-    CADASTRU_ADDRESS_CACHE_TTL_SECONDS
-  );
-}
-
 function buildStructuredAddress({ city, roadType, street, houseNumber, apartmentNumber }) {
   return {
     city,
@@ -125,19 +86,6 @@ function buildStructuredAddress({ city, roadType, street, houseNumber, apartment
     houseNumber,
     apartmentNumber,
   };
-}
-
-async function persistAddressResult(payload, options = {}) {
-  if (!payload?.cadastral_number) return;
-  await persistCadastruRecord(payload, {
-    cadastralNumber: payload.cadastral_number,
-    requestAddress: options.rawAddress,
-    structuredAddress: options.structuredAddress,
-    lookupSource: options.lookupSource,
-    resultType: "address_only",
-    officialFetch: options.officialFetch === true,
-    countLookup: options.countLookup === true,
-  });
 }
 
 function validateAddressFields({ street, houseNumber, apartmentNumber }) {
@@ -197,11 +145,12 @@ export async function POST(request) {
     return NextResponse.json({ error: "unauthorized", message: "Unauthorized" }, { status: 401 });
   }
 
-  const city = normalizeSpaces(body.city || "Chișinău");
+  const city = resolveCadastruSupportedCity(body.city || "Chișinău") || normalizeSpaces(body.city);
   const roadType = normalizeRoadType(body.road_type);
   const street = normalizeSpaces(body.street);
   const houseNumber = normalizeSpaces(body.house_number);
-  const apartmentNumber = normalizeSpaces(body.apartment_number);
+  const apartmentInput = normalizeSpaces(body.apartment_number);
+  const apartmentNumber = /^\d{1,4}$/.test(apartmentInput) ? String(Number(apartmentInput)) : apartmentInput;
 
   if (!CADASTRU_SUPPORTED_CITIES.includes(city)) {
     return NextResponse.json(
@@ -266,54 +215,14 @@ export async function POST(request) {
     return response;
   };
 
-  const cached = skipCache ? null : await getCachedCadastruAddress(rawAddress);
-  if (cached) {
-    const creditResponse = await consumeCadastruCredit(cached.payload, cached.lookupSource);
-    if (creditResponse) return creditResponse;
-
-    await persistAddressResult(cached.payload, {
-      rawAddress,
-      structuredAddress,
-      lookupSource: cached.lookupSource,
-      countLookup: false,
-    });
-    if (shouldTrackCadastruSearch) {
-      await logCadastruSearchEvent(request, "address", {
-        city,
-        cadastralNumber: cached.payload?.cadastral_number,
-        district: resolvePayloadDistrict(cached.payload),
-        resultType: classifyAddressPayload(cached.payload),
-        lookupSource: cached.lookupSource,
-      });
-    }
-    const response = NextResponse.json(cached.payload);
-    response.headers.set("X-RateLimit-Remaining", String(remaining));
-    return response;
-  }
-
-  const stored = !skipCache && apartmentNumber
-    ? await getCadastruRecordByAddress(rawAddress, { structuredAddress })
-    : null;
-  if (stored?.payload?.cadastral_number) {
-    const payload = {
-      ...stored.payload,
-      method: "address",
-      request_address: rawAddress,
-    };
+  const stored = skipCache ? null : await getCadastruRecordByAddress(rawAddress, { structuredAddress });
+  if (stored) {
+    const payload = { ...stored.payload, method: "address", request_address: rawAddress };
     const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource);
     if (creditResponse) return creditResponse;
-
-    await setCachedCadastruAddress(rawAddress, payload, stored.lookupSource);
-    await persistAddressResult(payload, {
-      rawAddress,
-      structuredAddress,
-      lookupSource: stored.lookupSource,
-      countLookup: false,
-    });
     if (shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", {
-        city,
-        cadastralNumber: payload?.cadastral_number,
+        city, cadastralNumber: payload.cadastral_number,
         district: resolvePayloadDistrict(payload),
         resultType: stored.resultType || classifyAddressPayload(payload),
         lookupSource: stored.lookupSource,
@@ -332,22 +241,20 @@ export async function POST(request) {
       house_number: houseNumber,
       ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}),
     });
-    const payload = {
+    let payload = {
       ...externalResult,
       method: "address",
       request_address: rawAddress,
     };
-    const creditResponse = await consumeCadastruCredit(payload, "api");
-    if (creditResponse) return creditResponse;
-
-    await setCachedCadastruAddress(rawAddress, payload, "api");
-    await persistAddressResult(payload, {
-      rawAddress,
+    payload = await persistCadastruAddressResult(payload, {
+      requestAddress: rawAddress,
       structuredAddress,
       lookupSource: "api",
       officialFetch: true,
-      countLookup: false,
     });
+    const creditResponse = await consumeCadastruCredit(payload, "api");
+    if (creditResponse) return creditResponse;
+
     if (shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", {
         city,
@@ -397,22 +304,20 @@ export async function POST(request) {
 
   try {
     const result = await findCadastralByAddress(rawAddress);
-    const payload = {
+    let payload = {
       ...result,
       method: "address",
       request_address: rawAddress,
     };
-    const creditResponse = await consumeCadastruCredit(payload, "local");
-    if (creditResponse) return creditResponse;
-
-    await setCachedCadastruAddress(rawAddress, payload, "local");
-    await persistAddressResult(payload, {
-      rawAddress,
+    payload = await persistCadastruAddressResult(payload, {
+      requestAddress: rawAddress,
       structuredAddress,
       lookupSource: "local",
       officialFetch: true,
-      countLookup: false,
     });
+    const creditResponse = await consumeCadastruCredit(payload, "local");
+    if (creditResponse) return creditResponse;
+
     if (shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", {
         city,

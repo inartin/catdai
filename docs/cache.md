@@ -15,8 +15,8 @@ Backend prepared and active when Redis is reachable.
 - `POST /api/estimate`: key prefix `catdai:estimate:v1:`, 30m TTL for repeated validated estimate inputs.
 - `POST /api/estimate-rent`: key prefix `catdai:estimate-rent:v7:`, 12h TTL for repeated validated rent estimate inputs.
 - `POST /api/listing-preview-images`: key prefix `catdai:listing-preview-image:v1:`, 24h TTL per listing/language. The route accepts up to 6 unique 5-12 digit numeric ids, applies a 30/min per-IP limit, and refuses upstream HTML above 512 KB before caching.
-- `POST /api/cadastral`: key prefix `catdai:cadastral:v1:`, 7d TTL for successful cadastral-number lookup responses before the long-lived DB store is checked.
-- `POST /api/cadastru/address`: key prefix `catdai:cadastru-address:v1:`, 7d TTL for successful normalized-address lookup responses before structured address fields in DB are checked.
+- `POST /api/cadastral`: key prefix `catdai:cadastru:number:v2:`, 30d TTL for successful cadastral-number lookup responses before the long-lived DB store is checked.
+- `POST /api/cadastru/address`: key prefix `catdai:cadastru:address:v2:`, 30d TTL for successful normalized-address lookup responses before structured address fields in DB are checked.
 - `GET /api/admin/ad-tracking`: key prefix `catdai:admin-ad-tracking:v1`, 10m TTL per source, journey limit, and offset; `fresh=1` bypasses the cache.
 - `POST /api/admin/auth`: key prefix `catdai:admin-login:v1:`, 15m TTL per client IP for failed-login throttling. Production admin login requires Redis and fails closed if it is unavailable.
 
@@ -25,7 +25,9 @@ Backend prepared and active when Redis is reachable.
 - Cadastru routes use Redis first; if Redis is unavailable or misses, they check `cadastru_records` before calling official sources.
 - `/api/cadastral` caches the cadastral payload without per-request access fields and restores access fields for the current authenticated request.
 - `/api/cadastral` stores the original lookup source (`api` or `local`) with the cached payload so `/cadastru` analytics keep the same source classification on cache hits.
-- Successful official cadastru payloads are also persisted in Supabase through `src/lib/cadastru-records.js` only in production. This DB store is long-lived because official cadastru data changes rarely.
+- Successful unmasked cadastru JSON payloads are persisted before preview/credit responses when production or `ENABLE_RUNTIME_PERSISTENCE=true`. Single-property number/address queries share canonical records; full address aggregates and verified spelling aliases live in `cadastru_address_aliases`. Apply `db/cadastru_address_aliases.sql`.
+- Redis and DB share an absolute 30-day freshness deadline. Cache/DB hits do not reset it or trigger live enrichment. Expired rows remain stored but are not served. Old v1 Redis keys are no longer read.
+- Address keys normalize diacritics, case, whitespace, punctuation and RO/RU street/apartment abbreviations. Source-verified address aliases handle alternate street spellings; no fuzzy property matching is used. Address aliases resolve current canonical number data, while land/building aggregates remain address-scoped.
 
 ## Estimate Cache
 - Cache keys include the normalized valuation inputs and UI language.

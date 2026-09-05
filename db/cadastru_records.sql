@@ -14,7 +14,7 @@ create table if not exists public.cadastru_records (
   raw_cadastral_number text,
   building_cadastral_number text,
 
-  full_address text not null check (length(btrim(full_address)) > 0),
+  full_address text check (length(btrim(full_address)) > 0),
   address_ro text,
   address_ru text,
   city text,
@@ -87,4 +87,21 @@ for each row execute function public.touch_cadastru_updated_at();
 
 alter table public.cadastru_records enable row level security;
 
-drop table if exists public.cadastru_address_aliases;
+-- Run after db/cadastru_records.sql. Idempotent, additive migration.
+-- Full address responses include aggregates that have no single cadastral number.
+create table if not exists public.cadastru_address_aliases (
+  address_key text primary key,
+  cadastral_number text,
+  raw_payload jsonb not null,
+  lookup_source text check (lookup_source in ('api', 'local')),
+  expires_at timestamptz not null,
+  check (jsonb_typeof(raw_payload) = 'object')
+);
+create index if not exists idx_cadastru_address_aliases_number
+  on public.cadastru_address_aliases (cadastral_number);
+create index if not exists idx_cadastru_address_aliases_expiry
+  on public.cadastru_address_aliases (expires_at);
+alter table public.cadastru_address_aliases enable row level security;
+-- No public policies: only the server service role can access unmasked payloads.
+
+alter table public.cadastru_records alter column full_address drop not null;

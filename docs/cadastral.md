@@ -8,7 +8,7 @@ Implemented and active, with partial fallback.
 - User can also add a cadastral number from the PDF export dialog when the current evaluation lacks official cadastral data.
 - PDF-dialog cadastral lookup sends the same authenticated bearer token as the result page, so authenticated users receive full cadastral details there too.
 - `/api/cadastral` requires a valid Supabase bearer token, then checks Redis, the long-lived Supabase cadastru store, the signed external cadastru worker, and finally the in-app Geodata/cadastru.md backup when the worker is unreachable.
-- Successful `/api/cadastral` responses are cached in Redis for 7 days by cadastral number and stored as one `cadastru_records` row per cadastral number for long-lived reuse. Failed/not-found responses are not cached.
+- Successful `/api/cadastral` responses are cached in Redis for 30 days by cadastral number and stored as one `cadastru_records` row per cadastral number for reuse until 30 days after the official fetch. Failed/not-found responses are not cached.
 - It autofills city, district, area, floor, total floors, building type, and bathroom count when available.
 - Result and PDF cadastral panels show official apartment and building details when IPCBI provides them.
 - Cadastral validation accepts apartment suffixes with 3 or 4 digits, including the UI example `0100201.999.01.0101`.
@@ -24,7 +24,7 @@ Implemented and active, with partial fallback.
 - The Cadastru route layout passes the URL language into `LanguageProvider`, so `/ru/cadastru` renders Russian page text in the server HTML instead of waiting for client hydration.
 - Address search posts to authenticated `/api/cadastru/address`, which checks Redis, the structured address fields in `cadastru_records`, the signed external cadastru worker, and finally the reusable in-app helper in `src/lib/cadastru-address-search.js` if the worker is unreachable.
 - Adding `skipcache=true` to the `/cadastru` URL makes that search bypass Redis and existing `cadastru_records` data for the current address or cadastral number. The fresh external/local result is then written back to the cache and persistent record when the normal persistence conditions apply; the flag is carried to the result-page lookup as needed.
-- Successful address-search responses are cached in Redis for 7 days by the normalized address. Apartment results store/update the matching `cadastru_records` row; multi-property land/building results remain in the address cache. Failed/not-found responses are not cached.
+- Successful address-search responses are cached in Redis for 30 days by the normalized address. Single-property results share a canonical `cadastru_records.raw_payload` JSONB record with number searches. Complete multi-property land/building responses are also saved as JSONB in `cadastru_address_aliases`; each contained cadastral number stores its own property separately. Failed/not-found responses are not cached.
 - It shows a city dropdown with all cities supported by the cadastru address API, a road type dropdown for `Str.` or `Bulevard`, and separate inputs for street name, house number, and optional apartment number.
 - Address input validation runs in both the browser and `/api/cadastru/address`: street is capped at 80 characters, building number accepts only digits plus one optional slash such as `18/2`, and the optional apartment number accepts only digits from `1` to `9999`.
 - Address matching must be exact for the street and house number. Similar buildings such as `bd. Moscova 9/5` are rejected when the user enters `bd. Moscova 9`.
@@ -47,7 +47,7 @@ Implemented and active, with partial fallback.
 - Successful and failed signed external cadastru worker calls are counted in `external_api_usage_daily` with fire-and-forget background writes, separate from user/search analytics.
 - Cadastru search analytics are written when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`.
 - Long-lived cadastru storage is written under the same runtime persistence rule. `cadastru_records.lookup_count` counts successful cadastral-number detail lookups.
-- `cadastru_records` keeps required `full_address`, separate city/region/district/street/house/apartment fields when derivable, typed apartment/building columns for common filters, and the full official payload in JSONB so newly discovered official fields are not lost.
+- `cadastru_records` keeps nullable `full_address` (responses without an address are still saved), separate city/region/district/street/house/apartment fields when derivable, typed apartment/building columns for common filters, and the full official payload in JSONB so newly discovered official fields are not lost.
 - `CadastralDataCard` highlights the cadastral number as the primary key before the address and uses two desktop columns for apartment plus building details, falling back to stacked sections on mobile.
 - When only one detail section is available, or only the cadastral number/address is available, the result card uses a compact centered width and keeps the available details on the full inner width instead of reserving an empty second column.
 - Partial cadastral responses use the same result card and still show the cadastral number plus any available address, while detailed apartment/building sections render only when official fields exist.
@@ -58,6 +58,16 @@ Implemented and active, with partial fallback.
 - `external/cadastru-api` contains a standalone Node.js cadastru worker intended for a Raspberry Pi behind Cloudflare Tunnel. It exposes signed `POST /v1/cadastral` and `POST /v1/cadastru/address` requests, runs the Geodata plus cadastru.md lookup externally, and returns data to the main app without Supabase/user context.
 - The external worker includes `ecosystem.config.cjs` for PM2, running one local-only process on `127.0.0.1:8787`; secrets must stay in the runtime environment or untracked `.env`, not in the PM2 config.
 - Cadastru analytics stay local to the main Catdai app through `src/lib/cadastru-search-events.js`; the external worker must not store user ids, cadastral numbers, or search events. Local analytics include `lookup_source` so admin stats can separate external API results from local backup usage.
+
+## Shared JSON Storage And Address Aliases
+- Apply `db/cadastru_address_aliases.sql` after the existing records schema. It creates the server-only address snapshot/alias table, allows records without an address, and sets expiry on existing records from their original fetch/save time. `db/cadastru_records.sql` also includes the new schema for fresh installations.
+- Save successful unmasked payloads before checking the viewer's credit, including anonymous searches. Access fields are excluded from storage; each response still applies the current user's preview/credit rules. Failed/not-found lookups are not stored.
+- Arbitrary nested fields, scalar values, arrays, and the full land/building collections survive JSONB/Redis storage. Typed columns are search indexes/projections, not the source used to reconstruct a response.
+- Both routes use `cadastru-records.js` and `cadastru-cache.js`. Redis v2 keys and DB snapshots expire after 30 days; reads do not extend that deadline. Fresh stored number results do not call live detail enrichment. Expired records remain in DB but are not served; the next search refreshes from the sources. `skipcache=true` bypasses both layers.
+- Address aliases retain the original complete address response and link single-property results to the canonical number record, so later detail updates are visible through previous address spellings. An address-only resolver response still needs a first number detail lookup when it contains no nested official details.
+- Normalization handles capitalization, whitespace, Romanian diacritics, punctuation, and RO/RU road/apartment abbreviations; supported city aliases are accepted. Verified input and returned addresses become aliases, allowing RO/RU street spellings to converge after a successful source lookup. Arbitrary misspellings and unseen street translations are not fuzzy-matched to a property.
+- Structured fallback requires the same city, street, house (including slash suffix), and apartment. The old same-house/apartment-only and substring-street fallbacks were removed. A building-wide lookup never reuses an apartment or a single member of a multi-property result.
+- Regression checks: `pnpm exec node --experimental-vm-modules scripts/test-cadastru-storage.mjs` (isolated DB/Redis/source mocks; no live writes).
 
 ## Data Sources
 - Geodata WFS lookup for parcel geometry.
@@ -74,7 +84,7 @@ Implemented and active, with partial fallback.
 
 ## Limits
 - Rate limited to 15 requests/minute per IP.
-- Successful cadastral-number and address lookup responses use Redis shared cache for 7 days before falling back to the long-lived Supabase cadastru store.
+- Successful cadastral-number and address lookup responses use Redis shared cache for 30 days before falling back to the long-lived Supabase cadastru store.
 - Upstream Geodata calls use a 10 second timeout; Nominatim fallback uses 5 seconds.
 - Timeout logs include the failing stage: `geodata_wfs`, `geodata_wms`, or `nominatim_reverse`.
 - The external cadastru worker uses HMAC headers `X-Catdai-Timestamp` and `X-Catdai-Signature` for AWS-to-worker calls and should listen on `127.0.0.1` when exposed through Cloudflare Tunnel. The main app reads `CADASTRU_EXTERNAL_API_BASE_URL` plus `CADASTRU_EXTERNAL_API_SECRET`, with `CADASTRU_EXTERNAL_API_URL` and `CADASTRU_EXTERNAL_ADDRESS_API_URL` available as explicit endpoint overrides.

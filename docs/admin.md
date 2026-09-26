@@ -41,7 +41,9 @@ Shows:
 - sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
 - Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, anonymous/user name, and a delete action with browser confirmation. Exact searched addresses are not stored for this dashboard.
 - 999 link-analysis rows show date, status, listing id/link, mapped property summary, asking price, and anonymous/user id.
-- External API usage shows aggregate signed-worker calls for 999 and cadastru, with success/failure totals counted from background writes; the card opens service totals and recent daily rows.
+- External API usage shows aggregate signed-worker calls for 999 and cadastru, with success/failure totals counted from background writes. The card opens request-level rows with All, Failed, and Successful filters; each row expands to show the endpoint, HTTP status, duration, error code/message, worker request payload, worker response payload, and a safe allowlist of diagnostic response headers (`content-type`, `retry-after`, `cf-ray`, `x-request-id`, and `x-vercel-id`).
+- Request-level external API details are stored in `external_api_usage_events` only after `db/external_api_usage_events.sql` is applied. Existing `external_api_usage_daily` history remains aggregate-only and cannot be reconstructed into request/response details.
+- External API telemetry does not store HMAC headers/secrets, the authenticated CatDai user identity, or the final local-fallback response. For 999 calls, the worker query contains the listing id rather than the visitor's exact pasted URL. These omissions are intentional because they are not needed to diagnose the signed worker call.
 - Calculator usage rows show date, property summary, total investment, estimated rent, yield, payback period, tax selection, and anonymous/user id.
 - Dashboard has a period segmented filter for 1 day, 7 days, 1 month, and All time. `/api/admin/stats` accepts `period=day|week|month|all` and filters dashboard totals, expandable recent rows, paid users, shared links, favorites, alerts, and usage cards to that window. `/api/admin/estimations` accepts the same `period` parameter for the sale/rent estimation detail lists.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?period=...&fresh=1` to bypass the 5-minute server cache for the selected period.
@@ -79,6 +81,7 @@ Shows:
 - `db/pdf_generation_events.sql`
 - `db/cadastru_search_events.sql`
 - `db/external_api_usage_daily.sql`
+- `db/external_api_usage_events.sql`
 - `db/listing_link_analysis_events.sql`
 - `db/calculator_usage_events.sql`
 - `db/market_trends_popup_events.sql`

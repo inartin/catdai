@@ -411,7 +411,31 @@ async function fetchExternalApiUsageRows(sinceDate) {
   throw new Error(`external_api_usage_daily query failed: ${error.message}`);
 }
 
-function buildExternalApiUsageStats(rows) {
+async function fetchExternalApiUsageEvents(since) {
+  const response = await applySince(
+    supabaseAdmin
+      .from("external_api_usage_events")
+      .select(
+        "id, service, status, endpoint, request_payload, response_payload, response_headers, error_code, error_message, http_status, duration_ms, created_at"
+      ),
+    "created_at",
+    since
+  )
+    .order("created_at", { ascending: false })
+    .range(0, 199);
+
+  if (!response.error) {
+    return { available: true, rows: response.data || [] };
+  }
+
+  if (isMissingRuntimeTableError(response.error)) {
+    return { available: false, rows: [] };
+  }
+
+  throw new Error(`external_api_usage_events query failed: ${response.error.message}`);
+}
+
+function buildExternalApiUsageStats(rows, events) {
   const emptyService = () => ({ success: 0, failure: 0, total: 0 });
   const byService = {
     "999_listing": emptyService(),
@@ -434,6 +458,8 @@ function buildExternalApiUsageStats(rows) {
     failure: Object.values(byService).reduce((sum, item) => sum + item.failure, 0),
     byService,
     recent: rows.slice(0, 60),
+    detailsAvailable: events.available,
+    events: events.rows,
   };
 }
 
@@ -647,6 +673,7 @@ export async function GET(request) {
       fetchListingLinkAnalysisEvents(periodSince),
       fetchCalculatorUsageEvents(periodSince),
       fetchExternalApiUsageRows(periodSinceDate),
+      fetchExternalApiUsageEvents(periodSince),
       fetchPaymentCheckoutEvents(periodSince),
       fetchMarketTrendsPopupStats(marketTrendsSinceDate),
       fetchPaidUserSummary(periodSince).catch((error) => {
@@ -670,6 +697,7 @@ export async function GET(request) {
     listingLinkAnalysisEvents,
     calculatorUsageEvents,
     externalApiUsageRows,
+    externalApiUsageEvents,
     paymentCheckoutEvents,
     marketTrendsPopup,
     paidUserSummary,
@@ -709,7 +737,7 @@ export async function GET(request) {
     cadastruSearches: buildCadastruSearchStats(cadastruSearchesWithUsers, cutoffs),
     listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
-    externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows),
+    externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiUsageEvents),
     paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
     marketTrendsPopup,
     paidUsers,

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { trackExternalApiUsage } from "@/lib/external-api-usage";
+import { getExternalApiDiagnosticHeaders, trackExternalApiUsage } from "@/lib/external-api-usage";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
 
@@ -47,6 +47,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
   const rawBody = JSON.stringify(body);
   const timestamp = Date.now();
   const signature = signBody(rawBody, secret, timestamp);
+  const startedAt = Date.now();
   let response;
 
   try {
@@ -61,23 +62,53 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
-    trackExternalApiUsage(service, "failure");
-    throw externalError(error?.message || "External cadastru API request failed", {
-      code: error?.name === "TimeoutError" ? "external_cadastru_timeout" : "external_cadastru_unreachable",
+    const code = error?.name === "TimeoutError" ? "external_cadastru_timeout" : "external_cadastru_unreachable";
+    const message = error?.message || "External cadastru API request failed";
+    trackExternalApiUsage(service, "failure", {
+      endpoint: url,
+      requestPayload: body,
+      errorCode: code,
+      errorMessage: message,
+      durationMs: Date.now() - startedAt,
+    });
+    throw externalError(message, {
+      code,
       fallbackEligible: true,
     });
   }
 
-  const payload = await response.json().catch(() => null);
+  const responseText = await response.text().catch(() => "");
+  let payload = null;
+  try {
+    payload = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    payload = responseText ? { raw_response: responseText } : null;
+  }
   if (response.ok && payload?.ok && payload?.data) {
-    trackExternalApiUsage(service, "success");
+    trackExternalApiUsage(service, "success", {
+      endpoint: url,
+      requestPayload: body,
+      responsePayload: payload,
+      responseHeaders: getExternalApiDiagnosticHeaders(response),
+      httpStatus: response.status,
+      durationMs: Date.now() - startedAt,
+    });
     return payload.data;
   }
 
   const code = payload?.error || `external_cadastru_http_${response.status}`;
   const message = payload?.message || `External cadastru API returned ${response.status}`;
   const fallbackEligible = response.status === 502 || response.status === 503 || response.status === 504;
-  trackExternalApiUsage(service, "failure");
+  trackExternalApiUsage(service, "failure", {
+    endpoint: url,
+    requestPayload: body,
+    responsePayload: payload,
+    responseHeaders: getExternalApiDiagnosticHeaders(response),
+    errorCode: code,
+    errorMessage: message,
+    httpStatus: response.status,
+    durationMs: Date.now() - startedAt,
+  });
   throw externalError(message, {
     code,
     status: response.status,

@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { trackExternalApiUsage } from "@/lib/external-api-usage";
+import { getExternalApiDiagnosticHeaders, trackExternalApiUsage } from "@/lib/external-api-usage";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 
@@ -62,8 +62,10 @@ export async function fetchExternal999Listing(externalId) {
   }
 
   const rawBody = JSON.stringify({ external_id: externalId });
+  const requestPayload = { external_id: externalId };
   const timestamp = Date.now();
   const signature = signBody(rawBody, secret, timestamp);
+  const startedAt = Date.now();
   let response;
 
   try {
@@ -78,22 +80,52 @@ export async function fetchExternal999Listing(externalId) {
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
-    trackExternalApiUsage("999_listing", "failure");
-    throw externalError(error?.message || "External 999 listing API request failed", {
-      code: error?.name === "TimeoutError" ? "external_listing999_timeout" : "external_listing999_unreachable",
+    const code = error?.name === "TimeoutError" ? "external_listing999_timeout" : "external_listing999_unreachable";
+    const message = error?.message || "External 999 listing API request failed";
+    trackExternalApiUsage("999_listing", "failure", {
+      endpoint: url,
+      requestPayload,
+      errorCode: code,
+      errorMessage: message,
+      durationMs: Date.now() - startedAt,
+    });
+    throw externalError(message, {
+      code,
       fallbackEligible: true,
     });
   }
 
-  const payload = await response.json().catch(() => null);
+  const responseText = await response.text().catch(() => "");
+  let payload = null;
+  try {
+    payload = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    payload = responseText ? { raw_response: responseText } : null;
+  }
   if (response.ok && payload?.ok && payload?.data) {
-    trackExternalApiUsage("999_listing", "success");
+    trackExternalApiUsage("999_listing", "success", {
+      endpoint: url,
+      requestPayload,
+      responsePayload: payload,
+      responseHeaders: getExternalApiDiagnosticHeaders(response),
+      httpStatus: response.status,
+      durationMs: Date.now() - startedAt,
+    });
     return payload.data;
   }
 
   const code = payload?.error || `external_listing999_http_${response.status}`;
   const message = payload?.message || `External 999 listing API returned ${response.status}`;
-  trackExternalApiUsage("999_listing", "failure");
+  trackExternalApiUsage("999_listing", "failure", {
+    endpoint: url,
+    requestPayload,
+    responsePayload: payload,
+    responseHeaders: getExternalApiDiagnosticHeaders(response),
+    errorCode: code,
+    errorMessage: message,
+    httpStatus: response.status,
+    durationMs: Date.now() - startedAt,
+  });
   throw externalError(message, {
     code,
     status: response.status,

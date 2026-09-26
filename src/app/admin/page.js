@@ -1352,10 +1352,6 @@ export default function AdminDashboard() {
                     </div>
                   ))}
                 </div>
-                <div className="border-b border-gray-100 bg-amber-50 px-5 py-3 text-xs text-amber-800">
-                  Request and response details exist only for calls made after the request-level telemetry migration was applied.
-                  {s.externalApiUsage.detailsAvailable === false && " Apply db/external_api_usage_events.sql to start collecting them."}
-                </div>
                 {filteredExternalApiEvents.length === 0 ? (
                   <div className="px-5 py-8 text-center text-gray-400">
                     {externalApiStatusFilter === "all"

@@ -85,3 +85,5 @@ scripts/       Development and PDF utilities
 ```
 
 Detailed behavior and implementation boundaries are maintained in [`docs/`](docs/).
+
+Cadastru Russian street aliases, typo matching, and worker dictionary sync: [street resolution](docs/street-resolution.md).

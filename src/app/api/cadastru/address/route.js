@@ -1,3 +1,4 @@
+import { resolveStreet } from "@/lib/cadastru-streets/street-resolver";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
@@ -181,18 +182,32 @@ export async function POST(request) {
   const rawAddress = normalizeSpaces(
     `${city}, ${roadType} ${street} ${houseNumber}${apartmentNumber ? ` ap ${apartmentNumber}` : ""}`
   );
+  const resolution = resolveStreet({ city, roadType, street });
+  if (resolution.status === "ambiguous") {
+    return NextResponse.json({ error: "ambiguous_street", suggestions: resolution.suggestions }, { status: 422 });
+  }
+  const lookupAddress = normalizeSpaces(
+    `${city}, ${roadType} ${resolution.street} ${houseNumber}${apartmentNumber ? ` ap ${apartmentNumber}` : ""}`
+  );
+  const withResolution = (payload) => ({
+    ...payload,
+    method: "address",
+    request_address: rawAddress,
+    resolved_address: lookupAddress,
+    street_resolution: { status: resolution.status, original: street, resolved: resolution.street },
+  });
   const skipCache = body?.skip_cache === true || body?.skipcache === true;
   const structuredAddress = buildStructuredAddress({
     city,
     roadType: body.road_type,
-    street,
+    street: resolution.street,
     houseNumber,
     apartmentNumber,
   });
   const consumeCadastruCredit = async (payload, lookupSource) => {
     const idempotencyKey = payload?.cadastral_number
       ? makeCadastruNumberUsageKey(payload.cadastral_number)
-      : makeCadastruAddressUsageKey(rawAddress);
+      : makeCadastruAddressUsageKey(lookupAddress);
     const creditUsage = await consumeFeatureCredit({
       userId: access.user_id,
       featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
@@ -215,9 +230,9 @@ export async function POST(request) {
     return response;
   };
 
-  const stored = skipCache ? null : await getCadastruRecordByAddress(rawAddress, { structuredAddress });
+  const stored = skipCache ? null : await getCadastruRecordByAddress(lookupAddress, { structuredAddress });
   if (stored) {
-    const payload = { ...stored.payload, method: "address", request_address: rawAddress };
+    const payload = withResolution(stored.payload);
     const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource);
     if (creditResponse) return creditResponse;
     if (shouldTrackCadastruSearch) {
@@ -237,21 +252,19 @@ export async function POST(request) {
     const externalResult = await fetchExternalCadastruAddressData({
       city,
       road_type: body.road_type,
-      street,
+      street: resolution.street,
       house_number: houseNumber,
       ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}),
     });
-    let payload = {
-      ...externalResult,
-      method: "address",
-      request_address: rawAddress,
-    };
+    let payload = withResolution(externalResult);
     payload = await persistCadastruAddressResult(payload, {
       requestAddress: rawAddress,
+      resolvedAddress: lookupAddress,
       structuredAddress,
       lookupSource: "api",
       officialFetch: true,
     });
+    payload = withResolution(payload);
     const creditResponse = await consumeCadastruCredit(payload, "api");
     if (creditResponse) return creditResponse;
 
@@ -275,6 +288,9 @@ export async function POST(request) {
       fallback: Boolean(error?.fallbackEligible),
     };
 
+    if (error?.code === "ambiguous_street" && error?.status === 422) {
+      return NextResponse.json({ error: "ambiguous_street", suggestions: error.suggestions || [] }, { status: 422 });
+    }
     if (!error?.fallbackEligible) {
       console.error("[cadastru/address] external cadastru API failed:", details);
       if (error?.status === 404 || error?.code === "not_found") {
@@ -303,18 +319,16 @@ export async function POST(request) {
   }
 
   try {
-    const result = await findCadastralByAddress(rawAddress);
-    let payload = {
-      ...result,
-      method: "address",
-      request_address: rawAddress,
-    };
+    const result = await findCadastralByAddress(lookupAddress);
+    let payload = withResolution(result);
     payload = await persistCadastruAddressResult(payload, {
       requestAddress: rawAddress,
+      resolvedAddress: lookupAddress,
       structuredAddress,
       lookupSource: "local",
       officialFetch: true,
     });
+    payload = withResolution(payload);
     const creditResponse = await consumeCadastruCredit(payload, "local");
     if (creditResponse) return creditResponse;
 

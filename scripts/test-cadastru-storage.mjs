@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import crypto from "node:crypto";
+import path from "node:path";
 
 const cache = new Map();
 const tables = { cadastru_records: [], cadastru_address_aliases: [] };
@@ -54,8 +55,8 @@ const baseMocks = {
     },
   },
 };
-async function load(entry, extraMocks = {}) {
-  const context = vm.createContext({ console, Date, URL, Request, Response, Headers, AbortSignal, setTimeout, clearTimeout });
+async function load(entry, extraMocks = {}, globals = {}) {
+  const context = vm.createContext({ console, Date, URL, Request, Response, Headers, AbortSignal, setTimeout, clearTimeout, ...globals });
   const modules = new Map(), mocks = { ...baseMocks, ...extraMocks };
   async function moduleFor(id) {
     if (modules.has(id)) return modules.get(id);
@@ -66,11 +67,15 @@ async function load(entry, extraMocks = {}) {
         for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
       }, { context });
     } else {
-      const path = id.startsWith("@/") ? `src/${id.slice(2)}.js` : id;
-      loadedModule = new vm.SourceTextModule(await fs.readFile(path, "utf8"), { context, identifier: id });
+      const file = id.startsWith("@/") ? `src/${id.slice(2)}.js` : id;
+      const source = await fs.readFile(file, "utf8");
+      loadedModule = file.endsWith(".json")
+        ? new vm.SyntheticModule(["default"], function () { this.setExport("default", JSON.parse(source)); }, { context })
+        : new vm.SourceTextModule(source, { context, identifier: file });
     }
     modules.set(id, loadedModule);
-    await loadedModule.link(moduleFor);
+    await loadedModule.link((specifier, parent) => moduleFor(specifier.startsWith(".")
+      ? path.posix.normalize(path.posix.join(path.posix.dirname(parent.identifier), specifier)) : specifier));
     return loadedModule;
   }
   const loadedModule = await moduleFor(entry);
@@ -193,3 +198,69 @@ await numberRoute.POST(request({ cadastral_number: number, skip_cache: true }));
 assert.equal(numberFetches, 2);
 assert.equal(tables.cadastru_records[0].raw_payload.apartment.area_m2, 64);
 console.log("Route regressions passed: anonymous persistence, masked previews, cross-query hits, no live enrichment on hits, skipcache.");
+
+// Street resolution happens before cache access and is shared by worker/fallback paths.
+cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;
+let streetFetches = 0, fallbackCalls = 0, externalFailure = null;
+const grenobleAddress = "Chișinău, str Grenoble 259/14 ap 18";
+const grenoblePayload = { cadastral_number: "0100201.999.01.018", apartment: { address: grenobleAddress, area_m2: 50 } };
+const streetRoute = await load("src/app/api/cadastru/address/route.js", {
+  ...routeMocks,
+  "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: async (fields) => {
+    streetFetches++;
+    assert.equal(fields.street, "Grenoble");
+    assert.equal(fields.house_number, "259/14");
+    assert.equal(fields.apartment_number, "18");
+    if (externalFailure) throw externalFailure;
+    return grenoblePayload;
+  } },
+  "@/lib/cadastru-address-search": { findCadastralByAddress: async (address) => {
+    fallbackCalls++; assert.equal(address, grenobleAddress); return grenoblePayload;
+  } },
+});
+const streetBody = { city: "Chișinău", road_type: "strada", street: "гренобля", house_number: "259/14", apartment_number: "18" };
+hasCredit = false;
+let streetResponse = await (await streetRoute.POST(request(streetBody))).json();
+assert.equal(streetResponse.street_resolution.resolved, "Grenoble");
+assert.equal(streetResponse.full_access, false);
+assert(tables.cadastru_address_aliases.some((row) => row.address_key.includes("гренобля")));
+assert(tables.cadastru_address_aliases.some((row) => row.address_key.includes("grenoble")));
+hasCredit = true;
+streetResponse = await (await streetRoute.POST(request({ ...streetBody, street: "гренобле" }))).json();
+assert.equal(streetResponse.street_resolution.original, "гренобле", "cache metadata belongs to this request");
+assert.equal(streetResponse.apartment.area_m2, 50);
+assert.equal(streetFetches, 1, "different aliases share the canonical cache");
+let ambiguous = await streetRoute.POST(request({ ...streetBody, street: "Belgra" }));
+assert.equal(ambiguous.status, 422);
+assert.deepEqual((await ambiguous.json()).suggestions, ["Belgrad", "Bulgară"]);
+assert.equal(streetFetches, 1);
+externalFailure = Object.assign(new Error("choose"), { code: "ambiguous_street", status: 422, suggestions: ["Grenoble"] });
+ambiguous = await streetRoute.POST(request({ ...streetBody, skip_cache: true }));
+assert.equal(ambiguous.status, 422);
+assert.deepEqual((await ambiguous.json()).suggestions, ["Grenoble"]);
+assert.equal(fallbackCalls, 0);
+externalFailure = Object.assign(new Error("offline"), { fallbackEligible: true });
+streetResponse = await (await streetRoute.POST(request({ ...streetBody, skip_cache: true }))).json();
+assert.equal(fallbackCalls, 1);
+assert.equal(streetResponse.resolved_address, grenobleAddress);
+assert.equal(streetResponse.street_resolution.original, "гренобля");
+console.log("Street route regressions passed: shared cache, aliases, previews, ambiguity, worker errors, canonical fallback.");
+
+const adapter = await load("@/lib/cadastru-external-api", {
+  "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => {} },
+}, {
+  process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "test-only" } },
+  fetch: async () => Response.json({ ok: false, error: "ambiguous_street", suggestions: ["Belgrad", null, 42, "Bulgară"] }, { status: 422 }),
+});
+await assert.rejects(adapter.fetchExternalCadastruAddressData(streetBody), (error) => {
+  assert.equal(error.code, "ambiguous_street");
+  assert.equal(error.status, 422);
+  assert.equal(error.fallbackEligible, false);
+  assert.deepEqual([...error.suggestions], ["Belgrad", "Bulgară"]);
+  return true;
+});
+const aliasesBeforeFailure = clone(tables.cadastru_address_aliases);
+externalFailure = Object.assign(new Error("missing"), { status: 404, code: "not_found" });
+assert.equal((await streetRoute.POST(request({ ...streetBody, skip_cache: true }))).status, 404);
+assert.deepEqual(tables.cadastru_address_aliases, aliasesBeforeFailure);
+console.log("Worker adapter regressions passed: typed suggestions, no fallback on ambiguity, no alias writes after failure.");

@@ -150,6 +150,7 @@ export default function CadastruSearchForm({
 
   const setAddressField = (field, value) => {
     setAddressForm((current) => ({ ...current, [field]: value }));
+    setLookupState((current) => current.method === "address" ? { ...current, error: "", suggestions: [] } : current);
   };
 
   const validateAddressFields = () => {
@@ -239,19 +240,29 @@ export default function CadastruSearchForm({
           setIsAuthModalOpen(true);
           return;
         }
+        const failure = await response.clone().json().catch(() => null);
         setLookupState({
           loading: false,
           method: "address",
-          error: await readErrorMessage(response),
+          suggestions: failure?.error === "ambiguous_street" && Array.isArray(failure.suggestions)
+            ? failure.suggestions.filter((value) => typeof value === "string" && value.length <= STREET_MAX_LENGTH) : [],
+          error: failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet") : await readErrorMessage(response),
         });
         return;
       }
 
       const data = await response.json();
+      const streetResolution = data?.street_resolution;
+      const resolvedStreetParams = streetResolution?.original && streetResolution?.resolved
+        && streetResolution.original !== streetResolution.resolved ? {
+          original_street: streetResolution.original,
+          resolved_street: streetResolution.resolved,
+        } : {};
       if (data?.locked_sections?.cadastru_details === true) {
         writeAddressResultPreview(data);
         const params = new URLSearchParams({
           source: "address",
+          ...resolvedStreetParams,
           preview: "1",
           ...(skipCache ? { skipcache: "true" } : {}),
         });
@@ -265,6 +276,7 @@ export default function CadastruSearchForm({
         const params = new URLSearchParams({
           cadastral_number: data.cadastral_number,
           source: "address",
+          ...resolvedStreetParams,
           ...(skipCache ? { skipcache: "true" } : {}),
         });
         router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
@@ -275,6 +287,7 @@ export default function CadastruSearchForm({
         writeAddressResultPreview(data);
         const params = new URLSearchParams({
           source: "address",
+          ...resolvedStreetParams,
           result: "1",
           ...(skipCache ? { skipcache: "true" } : {}),
         });
@@ -497,11 +510,27 @@ export default function CadastruSearchForm({
                 ? t("cadastru.searching")
                 : t("cadastru.searchButton")}
             </button>
+
+            {lookupState.method === "address" && lookupState.error && (
+              <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-4 text-red-800">
+                <p className="text-sm font-medium">{lookupState.error}</p>
+                {lookupState.suggestions?.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {lookupState.suggestions.map((street) => (
+                      <button key={street} type="button" className="cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-2 text-sm hover:bg-red-100"
+                        onClick={() => setAddressField("street", street)}>
+                        {street}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {quickSearchPlacement === "bottom" && quickSearchBlock}
 
-          {lookupState.error && (quickSearchPlacement !== "top" || lookupState.method !== "number") && (
+          {quickSearchPlacement === "bottom" && lookupState.method === "number" && lookupState.error && (
             <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-4 text-red-800">
               <p className="text-sm font-medium">{lookupState.error}</p>
             </div>

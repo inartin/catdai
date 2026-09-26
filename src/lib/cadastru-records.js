@@ -646,7 +646,7 @@ export async function persistCadastruAddressResult(payload, options = {}) {
       await writeCadastruCache("number", property.cadastral_number, { ...entry, payload: individual });
     }
   }
-  for (const address of [options.requestAddress, payload.matched_address].filter(Boolean)) {
+  for (const address of new Set([options.requestAddress, options.resolvedAddress, payload.matched_address].filter(Boolean))) {
     // Derived apartment results may carry only the building address: never alias them to the whole building.
     if (payload.cadastral_number && address !== options.requestAddress && options.structuredAddress?.apartmentNumber
       && !parseAddressParts(address).apartmentNumber) continue;

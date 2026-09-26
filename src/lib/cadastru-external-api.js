@@ -32,6 +32,7 @@ function externalError(message, options = {}) {
   error.code = options.code || "external_cadastru_failed";
   error.status = options.status || null;
   error.fallbackEligible = Boolean(options.fallbackEligible);
+  error.suggestions = Array.isArray(options.suggestions) ? options.suggestions.filter((value) => typeof value === "string" && value.length <= 80) : [];
   return error;
 }
 
@@ -112,6 +113,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
   throw externalError(message, {
     code,
     status: response.status,
+    suggestions: payload?.suggestions,
     fallbackEligible,
   });
 }

@@ -392,6 +392,8 @@ function CadastruResultContent() {
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
   const source = searchParams.get("source") || "";
+  const originalStreet = (searchParams.get("original_street") || "").slice(0, 80);
+  const resolvedStreet = (searchParams.get("resolved_street") || "").slice(0, 80);
   const skipCache = searchParams.get("skipcache") === "true";
   const isAddressResultHandoff = source === "address" && searchParams.get("result") === "1";
   const isAddressPreviewHandoff = source === "address" && (
@@ -582,6 +584,12 @@ function CadastruResultContent() {
               <CadastruImageSaveButton cadastral={state.data} targetRef={exportCardRef} />
             )}
           </div>
+
+          {state.data && source === "address" && originalStreet && resolvedStreet && originalStreet !== resolvedStreet && (
+            <p className="mb-4 rounded-xl bg-blue-50 px-4 py-3 text-sm text-blue-900">
+              {t("cadastru.resolvedStreet")} {originalStreet} → {resolvedStreet}
+            </p>
+          )}
 
           {state.loading && (
             <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600 shadow-sm sm:p-8">

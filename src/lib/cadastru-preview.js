@@ -55,6 +55,8 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     location: maskObjectFields(payload?.location || {}, ["display_name", "road", "house_number", "suburb", "city", "postcode"]),
     matched_address: payload?.matched_address || payload?.building_address || payload?.geocoded_address || null,
     request_address: payload?.request_address || null,
+    resolved_address: payload?.resolved_address || null,
+    street_resolution: payload?.street_resolution || null,
     form_fields: maskObjectFields(payload?.form_fields || {}, ["city", "district", "floor"]),
     full_access: false,
     access_tier: "free",

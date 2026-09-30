@@ -26,3 +26,9 @@ The sync script adapts only the loader and records worker source hashes in `sour
 ## Validation
 
 The isolated storage/route regression suite covers original/resolved aliases, shared cache reuse, current-request metadata, masked previews, ambiguous suggestions, worker 422 propagation and canonical local fallback. These mocks do not establish live cadastral availability or browser interaction.
+
+## Suggestions after no result
+
+After an address lookup returns `not_found` (404), the API suggests up to three streets from the existing city/road-type dictionary. The app-owned `cadastru-street-suggestions.js` ranks whole-word matches, missing first names, bounded spelling differences and Romanian/Russian transliterations. These loose matches are suggestions only; they never identify or cache a property. The synced worker resolver is unchanged.
+
+The form shows localized “Did you mean?” buttons only after that failed lookup. Clicking one updates the street and immediately retries, retaining city, road type, house, apartment and skip-cache settings. Editing fields clears suggestions and invalidates in-flight responses. Successful results, validation errors, rate limits and timeouts do not show these suggestions. Existing 422 ambiguity handling remains separate. No typing autocomplete, extra provider calls or client-side dictionary bundle is added.

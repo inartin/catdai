@@ -71,7 +71,8 @@ export default function RootLayout({ children }) {
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
                   var isAdminRoute = window.location.pathname.startsWith('/admin');
-                  if (!isAdminRoute) {
+                  var isDevCadastruRoute = ${process.env.NODE_ENV === "development"} && /^\\/(?:ro\\/|ru\\/)?cadastru(?:\\/|$)/.test(window.location.pathname);
+                  if (!isAdminRoute && !isDevCadastruRoute) {
                   var cookieConsent = localStorage.getItem('cookie_consent');
                   var googleConsent = cookieConsent === 'granted' ? 'granted' : 'denied';
                   gtag('consent', 'default', {
@@ -91,7 +92,8 @@ export default function RootLayout({ children }) {
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
                   var isAdminRoute = window.location.pathname.startsWith('/admin');
-                  if (!isAdminRoute) {
+                  var isDevCadastruRoute = ${process.env.NODE_ENV === "development"} && /^\\/(?:ro\\/|ru\\/)?cadastru(?:\\/|$)/.test(window.location.pathname);
+                  if (!isAdminRoute && !isDevCadastruRoute) {
                   gtag('js', new Date());
                   ${googleTagIds
                     .map(

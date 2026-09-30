@@ -206,15 +206,6 @@ export default function CadastralDataCard({
           </p>
         )}
 
-        {hasLimitedCadastralData && (
-          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
-            <svg viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600">
-              <path fillRule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-4a.875.875 0 1 0 0 1.75A.875.875 0 0 0 10 6Zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0v-4Z" clipRule="evenodd" />
-            </svg>
-            <p>{t("cadastru.limitedDataNote")}</p>
-          </div>
-        )}
-
         {(hasApartmentDetails || hasBuildingDetails) && (
           <div className={detailsGridClass}>
             {hasApartmentDetails && (
@@ -278,6 +269,15 @@ export default function CadastralDataCard({
             {t("result.cadastralDataSource")}
           </span>
         </div>
+
+        {hasLimitedCadastralData && (
+          <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            <svg viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-sky-500">
+              <path fillRule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-4a.875.875 0 1 0 0 1.75A.875.875 0 0 0 10 6Zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0v-4Z" clipRule="evenodd" />
+            </svg>
+            <p>{t("cadastru.limitedDataNote")}</p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 {
+  "cadastru.didYouMean": "Ați vrut să căutați această stradă?",
   "cadastru.chooseStreet": "Alegeți strada corectă, apoi căutați din nou.",
   "cadastru.resolvedStreet": "Strada identificată:",
   "nav.homeAriaLabel": "Cât Dai? – Pagina principală",
@@ -294,7 +295,7 @@
   "cadastru.saveImage": "Salvează",
   "cadastru.savingImage": "Se salvează...",
   "cadastru.valuationCta": "Evaluează apartamentul",
-  "cadastru.limitedDataNote": "Nu am găsit mai multe date oficiale pentru acest număr cadastral. Afișăm tot ce este disponibil în sursele verificate.",
+  "cadastru.limitedDataNote": "Afișăm toate datele oficiale pe care le-am găsit.",
   "cadastru.infoTitle": "Ce poți verifica în rezultatul cadastral",
   "cadastru.infoText": "Prin serviciul de Cadastru online găsești numărul cadastral după adresă și verifici date oficiale (cadastru md) pentru apartamente, terenuri sau construcții, fără căutări complicate pe un geoportal.\n\nRezultatul include date din Cadastru și geodata: suprafața, modul de folosință, valoarea cadastrală estimată, etajul, anul construcției și informații despre clădire.\n\nPoți găsi și terenuri cu toate construcțiile de pe ele. Caută după adresă (cu nr. apartament opțional) sau introdu direct nr. cadastral pentru verificare.",
   "cadastru.infoExampleLabel": "Exemplu",

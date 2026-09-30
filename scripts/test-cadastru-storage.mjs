@@ -56,7 +56,7 @@ const baseMocks = {
   },
 };
 async function load(entry, extraMocks = {}, globals = {}) {
-  const context = vm.createContext({ console, Date, URL, Request, Response, Headers, AbortSignal, setTimeout, clearTimeout, ...globals });
+  const context = vm.createContext({ console, Date, URL, Request, Response, Headers, AbortSignal, setTimeout, clearTimeout, process, ...globals });
   const modules = new Map(), mocks = { ...baseMocks, ...extraMocks };
   async function moduleFor(id) {
     if (modules.has(id)) return modules.get(id);
@@ -264,3 +264,56 @@ externalFailure = Object.assign(new Error("missing"), { status: 404, code: "not_
 assert.equal((await streetRoute.POST(request({ ...streetBody, skip_cache: true }))).status, 404);
 assert.deepEqual(tables.cadastru_address_aliases, aliasesBeforeFailure);
 console.log("Worker adapter regressions passed: typed suggestions, no fallback on ambiguity, no alias writes after failure.");
+
+// Suggestions are generated only after the actual address has no result.
+const { suggestStreets } = await load("@/lib/cadastru-street-suggestions");
+for (const street of ["Radiceva", "Radischev", "Radișcev", "Радищева", "Radishcheva"]) {
+  const suggestions = clone(suggestStreets({ city: "Balti", roadType: "str", street }));
+  assert.equal(suggestions[0], "Alexandr Radișcev", street);
+  assert(suggestions.length <= 3);
+}
+assert.deepEqual(clone(suggestStreets({ city: "Balti", roadType: "bd", street: "Radischev" })), []);
+assert.deepEqual(clone(suggestStreets({ city: "Unknown", roadType: "str", street: "Radischev" })), []);
+assert.deepEqual(clone(suggestStreets({ city: "Balti", roadType: "str", street: "xyzqwk" })), []);
+assert.deepEqual(clone(suggestStreets({ city: "Balti", roadType: "str", street: "Ra" })), []);
+assert(!suggestStreets({ city: "Balti", roadType: "str", street: "Alexandr Radișcev" }).includes("Alexandr Radișcev"));
+assert(!suggestStreets({ city: "Chișinău", roadType: "str", street: "31 August 1988" }).includes("31 August 1989"));
+
+let suggestionFailure = Object.assign(new Error("missing"), { status: 404, code: "not_found" });
+let backupFailure = new Error("Could not match land or buildings for Balti.");
+const submitted = [];
+const suggestionsRoute = await load("src/app/api/cadastru/address/route.js", {
+  ...routeMocks,
+  "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: async (fields) => {
+    submitted.push(fields);
+    if (suggestionFailure) throw suggestionFailure;
+    return { lands: [{ cadastral_number: "0300101.001", address: "Bălți, str Alexandr Radișcev 28" }] };
+  } },
+  "@/lib/cadastru-address-search": { findCadastralByAddress: async () => { throw backupFailure; } },
+});
+const baltiRequest = { city: "Bălți", road_type: "strada", street: "Radiceva", house_number: "28", apartment_number: "7", skip_cache: true, search_context: "cadastru" };
+const aliasesBeforeSuggestions = clone(tables.cadastru_address_aliases);
+let suggested = await suggestionsRoute.POST(request(baltiRequest));
+assert.equal(suggested.status, 404);
+assert.equal((await suggested.json()).suggestions[0], "Alexandr Radișcev");
+assert.equal(submitted[0].street, "Radiceva", "original spelling is attempted before suggesting alternatives");
+assert.equal(submitted.length, 1, "suggestions do not trigger speculative lookups");
+assert.deepEqual(tables.cadastru_address_aliases, aliasesBeforeSuggestions);
+suggestionFailure = null;
+suggested = await suggestionsRoute.POST(request({ ...baltiRequest, street: "Alexandr Radișcev" }));
+assert.equal(suggested.status, 200);
+assert.equal((await suggested.json()).suggestions, undefined);
+assert.equal(submitted.at(-1).house_number, "28");
+assert.equal(submitted.at(-1).apartment_number, "7");
+suggestionFailure = Object.assign(new Error("offline"), { status: 502 });
+suggested = await suggestionsRoute.POST(request(baltiRequest));
+assert.equal(suggested.status, 502);
+assert.equal((await suggested.json()).suggestions, undefined);
+suggestionFailure.fallbackEligible = true;
+suggested = await suggestionsRoute.POST(request(baltiRequest));
+assert.equal((await suggested.json()).suggestions[0], "Alexandr Radișcev");
+backupFailure = Object.assign(new Error("timeout"), { name: "TimeoutError" });
+suggested = await suggestionsRoute.POST(request(baltiRequest));
+assert.equal(suggested.status, 504);
+assert.equal((await suggested.json()).suggestions, undefined);
+console.log("Did-you-mean regressions passed: RO/RU spellings, scope, original lookup first, no-data-only suggestions, retry identity and timeout exclusion.");

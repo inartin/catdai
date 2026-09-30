@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
@@ -113,6 +113,7 @@ export default function CadastruSearchForm({
     method: null,
     error: "",
   });
+  const addressRequestId = useRef(0);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   useEffect(() => {
@@ -149,8 +150,9 @@ export default function CadastruSearchForm({
   };
 
   const setAddressField = (field, value) => {
+    addressRequestId.current += 1;
     setAddressForm((current) => ({ ...current, [field]: value }));
-    setLookupState((current) => current.method === "address" ? { ...current, error: "", suggestions: [] } : current);
+    setLookupState((current) => current.method === "address" ? { ...current, loading: false, error: "", suggestions: [] } : current);
   };
 
   const validateAddressFields = () => {
@@ -204,7 +206,8 @@ export default function CadastruSearchForm({
     ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
   });
 
-  const submitAddressSearch = async () => {
+  const submitAddressSearch = async (suggestedStreet) => {
+    const requestId = ++addressRequestId.current;
     if (requireAuth()) return;
 
     const validationError = validateAddressFields();
@@ -213,12 +216,14 @@ export default function CadastruSearchForm({
       return;
     }
 
+    const street = typeof suggestedStreet === "string" ? suggestedStreet : addressForm.street;
+    if (typeof suggestedStreet === "string") setAddressForm((current) => ({ ...current, street }));
     setLookupState({ loading: true, method: "address", error: "" });
 
     const requestBody = {
       city: addressForm.city,
       road_type: addressForm.roadType,
-      street: addressForm.street,
+      street,
       house_number: addressForm.houseNumber,
       ...(addressForm.apartmentNumber ? { apartment_number: addressForm.apartmentNumber } : {}),
       search_context: "cadastru",
@@ -233,6 +238,7 @@ export default function CadastruSearchForm({
         body: JSON.stringify(requestBody),
       });
 
+      if (requestId !== addressRequestId.current) return;
       if (!response.ok) {
         if (response.status === 401) {
           clearAuthError();
@@ -241,17 +247,21 @@ export default function CadastruSearchForm({
           return;
         }
         const failure = await response.clone().json().catch(() => null);
+        const errorMessage = failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet") : await readErrorMessage(response);
+        if (requestId !== addressRequestId.current) return;
         setLookupState({
           loading: false,
           method: "address",
-          suggestions: failure?.error === "ambiguous_street" && Array.isArray(failure.suggestions)
+          didYouMean: response.status === 404 && failure?.error === "not_found",
+          suggestions: (failure?.error === "ambiguous_street" || (response.status === 404 && failure?.error === "not_found")) && Array.isArray(failure.suggestions)
             ? failure.suggestions.filter((value) => typeof value === "string" && value.length <= STREET_MAX_LENGTH) : [],
-          error: failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet") : await readErrorMessage(response),
+          error: errorMessage,
         });
         return;
       }
 
       const data = await response.json();
+      if (requestId !== addressRequestId.current) return;
       const streetResolution = data?.street_resolution;
       const resolvedStreetParams = streetResolution?.original && streetResolution?.resolved
         && streetResolution.original !== streetResolution.resolved ? {
@@ -297,6 +307,7 @@ export default function CadastruSearchForm({
 
       setLookupState({ loading: false, method: "address", error: t("cadastru.lookupError") });
     } catch {
+      if (requestId !== addressRequestId.current) return;
       setLookupState({
         loading: false,
         method: "address",
@@ -314,6 +325,7 @@ export default function CadastruSearchForm({
       return;
     }
 
+    addressRequestId.current += 1;
     setLookupState({ loading: true, method: "number", error: "" });
     clearAddressResultPreview();
     clearAddressLookupRequest();
@@ -502,7 +514,7 @@ export default function CadastruSearchForm({
           <div className="pt-2">
             <button
               type="button"
-              onClick={submitAddressSearch}
+              onClick={() => submitAddressSearch()}
               disabled={lookupState.loading || authLoading}
               className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto"
             >
@@ -512,16 +524,20 @@ export default function CadastruSearchForm({
             </button>
 
             {lookupState.method === "address" && lookupState.error && (
-              <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-4 text-red-800">
+              <div role="status" className={`mt-4 rounded-xl border px-4 py-4 ${lookupState.suggestions?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
                 <p className="text-sm font-medium">{lookupState.error}</p>
                 {lookupState.suggestions?.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3">
+                    {lookupState.didYouMean && <p className="mb-2 text-sm font-semibold">{t("cadastru.didYouMean")}</p>}
+                    <div className="flex flex-wrap gap-2">
                     {lookupState.suggestions.map((street) => (
-                      <button key={street} type="button" className="cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-2 text-sm hover:bg-red-100"
-                        onClick={() => setAddressField("street", street)}>
+                      <button key={street} type="button" className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
+                        disabled={lookupState.loading || authLoading}
+                        onClick={() => lookupState.didYouMean ? submitAddressSearch(street) : setAddressField("street", street)}>
                         {street}
                       </button>
                     ))}
+                    </div>
                   </div>
                 )}
               </div>

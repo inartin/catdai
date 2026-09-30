@@ -36,8 +36,9 @@ function externalError(message, options = {}) {
   return error;
 }
 
-async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
+async function fetchSignedExternalCadastru(path, body, explicitUrl, service, options = {}) {
   const { url, secret, timeoutMs } = externalCadastruConfig(path, explicitUrl);
+  const shouldTrackUsage = options.trackUsage !== false;
   if (!url || !secret) {
     throw externalError("External cadastru API is not configured", {
       code: "external_cadastru_not_configured",
@@ -65,7 +66,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
   } catch (error) {
     const code = error?.name === "TimeoutError" ? "external_cadastru_timeout" : "external_cadastru_unreachable";
     const message = error?.message || "External cadastru API request failed";
-    trackExternalApiUsage(service, "failure", {
+    if (shouldTrackUsage) trackExternalApiUsage(service, "failure", {
       endpoint: url,
       requestPayload: body,
       errorCode: code,
@@ -86,7 +87,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
     payload = responseText ? { raw_response: responseText } : null;
   }
   if (response.ok && payload?.ok && payload?.data) {
-    trackExternalApiUsage(service, "success", {
+    if (shouldTrackUsage) trackExternalApiUsage(service, "success", {
       endpoint: url,
       requestPayload: body,
       responsePayload: payload,
@@ -100,7 +101,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
   const code = payload?.error || `external_cadastru_http_${response.status}`;
   const message = payload?.message || `External cadastru API returned ${response.status}`;
   const fallbackEligible = response.status === 502 || response.status === 503 || response.status === 504;
-  trackExternalApiUsage(service, "failure", {
+  if (shouldTrackUsage) trackExternalApiUsage(service, "failure", {
     endpoint: url,
     requestPayload: body,
     responsePayload: payload,
@@ -118,20 +119,22 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service) {
   });
 }
 
-export async function fetchExternalCadastralData(cadastralNumber) {
+export async function fetchExternalCadastralData(cadastralNumber, options = {}) {
   return fetchSignedExternalCadastru(
     "v1/cadastral",
     { cadastral_number: cadastralNumber },
     process.env.CADASTRU_EXTERNAL_API_URL,
-    "cadastru_number"
+    "cadastru_number",
+    options
   );
 }
 
-export async function fetchExternalCadastruAddressData(addressFields) {
+export async function fetchExternalCadastruAddressData(addressFields, options = {}) {
   return fetchSignedExternalCadastru(
     "v1/cadastru/address",
     addressFields,
     process.env.CADASTRU_EXTERNAL_ADDRESS_API_URL,
-    "cadastru_address"
+    "cadastru_address",
+    options
   );
 }

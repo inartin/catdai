@@ -508,17 +508,19 @@ export async function POST(request) {
       return res;
     }
 
-    const creditUsage = await consumeFeatureCredit({
-      userId: access.user_id,
-      featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
-      idempotencyKey: creditIdempotencyKey,
-      metadata: {
-        feature: "cadastru_lookup",
-        cadastral_number: trimmed,
-        search_context: cadastruSearchType,
-        lookup_source: lookupSource,
-      },
-    });
+    const creditUsage = process.env.NODE_ENV === "development" && cadastruSearchType
+      ? creditCheck
+      : await consumeFeatureCredit({
+        userId: access.user_id,
+        featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
+        idempotencyKey: creditIdempotencyKey,
+        metadata: {
+          feature: "cadastru_lookup",
+          cadastral_number: trimmed,
+          search_context: cadastruSearchType,
+          lookup_source: lookupSource,
+        },
+      });
     if (!creditUsage.allowed) {
       const preview = buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit", {
         maskCadastralNumber: maskPreviewCadastralNumber,
@@ -532,7 +534,7 @@ export async function POST(request) {
       cadastralNumber: trimmed,
       lookupSource,
       resultType: options.resultType || classifyCadastralResult(payload),
-      countLookup: options.countLookup !== false,
+      countLookup: options.countLookup !== false && !(process.env.NODE_ENV === "development" && cadastruSearchType),
       officialFetch: false,
       expiresAt: options.expiresAt,
     });
@@ -559,7 +561,9 @@ export async function POST(request) {
   }
 
   try {
-    const externalPayload = await fetchExternalCadastralData(trimmed);
+    const externalPayload = await fetchExternalCadastralData(trimmed, {
+      trackUsage: !(process.env.NODE_ENV === "development" && cadastruSearchType),
+    });
     lookupSource = "api";
     const payload = await enrichWithCadastruMdDetails(
       normalizeCadastralPayload(externalPayload, trimmed, access.tier),

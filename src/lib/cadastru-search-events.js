@@ -50,7 +50,7 @@ function cleanCadastralNumber(value) {
 }
 
 export async function logCadastruSearchEvent(request, searchType, options = {}) {
-  if (!shouldPersistRuntimeData()) return;
+  if (process.env.NODE_ENV === "development" || !shouldPersistRuntimeData()) return;
 
   const normalizedType = normalizeSearchType(searchType);
   if (!normalizedType) return;

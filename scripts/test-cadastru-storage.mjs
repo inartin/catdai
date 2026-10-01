@@ -57,7 +57,7 @@ const baseMocks = {
   },
 };
 async function load(entry, extraMocks = {}, globals = {}) {
-  const context = vm.createContext({ console, Date, URL, Request, Response, Headers, AbortSignal, Buffer, setTimeout, clearTimeout, process, ...globals });
+  const context = vm.createContext({ console, Date, URL, URLSearchParams, Request, Response, Headers, AbortSignal, Buffer, setTimeout, clearTimeout, process, ...globals });
   const modules = new Map(), mocks = { ...baseMocks, ...extraMocks };
   async function moduleFor(id) {
     if (modules.has(id)) return modules.get(id);
@@ -75,11 +75,12 @@ async function load(entry, extraMocks = {}, globals = {}) {
         : new vm.SourceTextModule(source, { context, identifier: file });
     }
     modules.set(id, loadedModule);
-    await loadedModule.link((specifier, parent) => moduleFor(specifier.startsWith(".")
-      ? path.posix.normalize(path.posix.join(path.posix.dirname(parent.identifier), specifier)) : specifier));
     return loadedModule;
   }
   const loadedModule = await moduleFor(entry);
+  // Let the VM link the whole graph once, including shared dependencies.
+  await loadedModule.link((specifier, parent) => moduleFor(specifier.startsWith(".")
+    ? path.posix.normalize(path.posix.join(path.posix.dirname(parent.identifier), specifier)) : specifier));
   await loadedModule.evaluate();
   return loadedModule.namespace;
 }
@@ -417,3 +418,65 @@ workerMissing = true;
 const devFailure = await (await developmentRoute.POST(request(baltiRequest))).json();
 assert.equal(devFailure.suggestion_recovery_token, undefined);
 console.log("Suggestion recovery regressions passed: failed versus successful clicks, previews, cache/local results, original status, first success, manual edits, token tampering/expiry, property identity and development suppression.");
+
+// Recorded registry addresses exercise locality validation, signing and storage.
+const localityCases = [
+  { city: "Vadul lui Vodă", street: "Mircea cel Bătrân", house_number: "6", number: "3158206.066",
+    official: "mun. Chișinău, or. Vadul lui Vodă, str. Mircea cel Bătrân 6" },
+  { city: "Tohatin", street: "Mihail Sadoveanu", house_number: "45", number: "0146114.036",
+    official: "mun. Chișinău, com. Tohatin, sat. Tohatin, str. Mihail Sadoveanu 45" },
+];
+for (const record of localityCases) {
+  let detailAddress = record.official;
+  let parentGeocode = false;
+  const lookup = await load("@/lib/cadastru-address-search", {}, {
+    fetch: async (url, options = {}) => {
+      const host = new URL(url).hostname;
+      if (host === "nominatim.openstreetmap.org") return Response.json(parentGeocode ? [{ lat: "47", lon: "28",
+        address: { village: record.city, city: "Chișinău", road: `Strada ${record.street}`, house_number: record.house_number } }] : []);
+      assert.equal(host, "www.cadastru.md", "No live upstream calls");
+      if (options.method !== "POST") return new Response('<input name="p_instance" value="12345">');
+      const body = new URLSearchParams(options.body);
+      switch (body.get("p_request")) {
+        case "APPLICATION_PROCESS=jQuery_Auto": return new Response(`${record.number.replaceAll(".", "")} : ${record.official}`);
+        case "APPLICATION_PROCESS=GET_INFO_RBI": return new Response(`<a onclick="getDetailedInfo('${record.number}',1)">Land</a><a onclick="getDetailedInfo('${record.number}.01',2)">Building</a>`);
+        case "APPLICATION_PROCESS=GET_DETAIL_DATA": return new Response(`<table><tr><td>Adresa</td><td>${detailAddress}</td></tr></table>`);
+        default: throw new Error(`Unexpected upstream: ${body}`);
+      }
+    },
+  });
+  const input = `${record.city}, str ${record.street} ${record.house_number}`;
+  const result = await lookup.findCadastralByAddress(input);
+  assert.equal(result.lands[0].cadastral_number, record.number);
+  assert.equal(result.buildings[0].cadastral_number, `${record.number}.01`);
+  parentGeocode = true;
+  await assert.rejects(lookup.findCadastralByAddress(input.replace(record.city, "Chișinău")), /Could not match/);
+  parentGeocode = false;
+  await assert.rejects(lookup.findCadastralByAddress(`${input}/1`), /Could not match/);
+  detailAddress = `mun. Chișinău, or. Orhei, str. ${record.street} ${record.house_number}`;
+  await assert.rejects(lookup.findCadastralByAddress(input), /Could not match/);
+
+  const fields = { city: record.city, road_type: "str", street: record.street, house_number: record.house_number };
+  const signedAdapter = await load("@/lib/cadastru-external-api", {
+    "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => {} },
+  }, {
+    process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "locality-only-test" } },
+    fetch: async (url, options) => {
+      assert.equal(url, "https://worker.test/v1/cadastru/address");
+      assert.equal(options.method, "POST");
+      assert.deepEqual(JSON.parse(options.body), fields);
+      const signature = crypto.createHmac("sha256", "locality-only-test")
+        .update(options.headers["X-Catdai-Timestamp"]).update("\n").update(options.body).digest("hex");
+      assert.equal(options.headers["X-Catdai-Signature"], `sha256=${signature}`);
+      return Response.json({ ok: true, data: clone(result) });
+    },
+  });
+  assert.deepEqual(clone(await signedAdapter.fetchExternalCadastruAddressData(fields, { trackUsage: false })), clone(result));
+  await storage.persistCadastruRecord({ cadastral_number: record.number, address: record.official }, { officialFetch: true });
+  const row = tables.cadastru_records.find((row) => row.cadastral_number === record.number);
+  assert.equal(row.city, record.city);
+  assert.equal(row.region, "mun. Chișinău", "settlement and parent municipality stay separate");
+}
+await storage.persistCadastruRecord({ cadastral_number: "0146114.999", address: "mun. Chișinău, sat. Unknown, str. Florilor 6" }, { officialFetch: true });
+assert.equal(tables.cadastru_records.find((row) => row.cadastral_number === "0146114.999").city, null, "unknown settlements cannot become the parent city");
+console.log("Locality regressions passed: signed worker fields, local land/building fallback, parent/suffix/detail rejection and separate stored city/region.");

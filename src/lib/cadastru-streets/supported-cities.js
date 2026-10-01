@@ -72,8 +72,6 @@ for (const definition of CITY_DEFINITIONS) {
   }
 }
 
-const CITY_ALIASES_BY_LENGTH = [...CITY_BY_ALIAS.entries()].sort(([left], [right]) => right.length - left.length);
-
 export const SUPPORTED_CITIES = Object.freeze(CITY_DEFINITIONS.map((definition) => definition.name));
 
 export function resolveSupportedCity(value) {
@@ -81,21 +79,33 @@ export function resolveSupportedCity(value) {
 }
 
 export function resolveSupportedCityFromAddress(value) {
-  const raw = String(value || "");
-  const firstSegment = raw.split(/[,;]/, 1)[0];
-  const exact = resolveSupportedCity(firstSegment);
-  if (exact) return exact;
-
-  const normalized = normalizeCityText(raw);
-  const roadMarkerIndex = normalized.search(/\b(?:strada|str|bulevardul|bulevard|bd|soseaua|sos|aleea)\b/);
+  const normalized = normalizeCityText(value);
+  const roadMarkerIndex = normalized.search(/(?<![\p{L}\p{N}])(?:strada|str|bulevardul|bulevard|bd|soseaua|sos|aleea|al|улица|ул|бульвар|бул|проспект|пр|шоссе|аллея)(?![\p{L}\p{N}])/u);
   const localityPrefix = roadMarkerIndex === -1 ? normalized : normalized.slice(0, roadMarkerIndex).trim();
+  const markers = [...localityPrefix.matchAll(/\b(municipiul|municipiu|mun|orasul|oras|or|satul|sat|comuna|com|raionul|raion|r nul|r n|sectorul|sector|sect)\s+/g)];
 
-  for (const [alias, city] of CITY_ALIASES_BY_LENGTH) {
-    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`, "u").test(localityPrefix)) return city;
+  // Registry addresses run from parent administration to the actual settlement.
+  // An unknown child must never be mistaken for its supported parent.
+  for (let index = markers.length - 1; index >= 0; index -= 1) {
+    const marker = markers[index];
+    if (/^(raionul|raion|r nul|r n|sectorul|sector|sect)$/.test(marker[1])) continue;
+    const name = localityPrefix.slice(marker.index + marker[0].length, markers[index + 1]?.index);
+    return resolveSupportedCity(name);
   }
 
-  return null;
+  // Flat user addresses and city aliases have no administrative hierarchy.
+  // A district alone is not a settlement, even if they share the same name.
+  if (markers.some((marker) => /^(raionul|raion|r nul|r n)$/.test(marker[1]))) return null;
+  return resolveSupportedCity(localityPrefix.slice(0, markers[0]?.index));
+}
+
+export function resolveSupportedCityFromGeocode(result) {
+  const address = result.address || {};
+  const locality = address.village || address.hamlet || address.town
+    || (resolveSupportedCity(address.suburb) ? address.suburb : null) || address.city;
+  if (locality) return resolveSupportedCity(locality);
+  if (result.display_name) return resolveSupportedCityFromAddress(result.display_name);
+  return resolveSupportedCity(address.municipality);
 }
 
 export function supportedCityAliases(city) {

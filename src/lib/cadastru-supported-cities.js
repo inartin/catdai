@@ -1,3 +1,5 @@
+import { resolveSupportedCityFromAddress } from "./cadastru-streets/supported-cities.js";
+
 export const CADASTRU_SUPPORTED_CITIES = [
   "Anenii Noi",
   "Bacioi",
@@ -70,6 +72,5 @@ export function resolveCadastruSupportedCity(value) {
 }
 
 export function resolveCadastruCityFromAddress(value) {
-  const firstSegment = String(value || "").split(/[,;]/, 1)[0];
-  return resolveCadastruSupportedCity(firstSegment);
+  return resolveSupportedCityFromAddress(value);
 }

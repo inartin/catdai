@@ -1,3 +1,4 @@
+import { resolveSupportedCityFromGeocode } from "./cadastru-streets/supported-cities.js";
 import {
   resolveCadastruCityFromAddress,
   resolveCadastruSupportedCity,
@@ -55,14 +56,6 @@ function normalizeForMatch(value) {
     .replace(/\bapartamentul\b|\bapartament\b|\bapt\b|\bap\b/g, "ap")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function containsNormalizedPhrase(value, phrase) {
-  const normalizedValue = normalizeForMatch(value);
-  const normalizedPhrase = normalizeForMatch(phrase);
-  if (!normalizedValue || !normalizedPhrase) return false;
-  const escaped = normalizedPhrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-  return new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`, "i").test(normalizedValue);
 }
 
 function canonicalCity(value) {
@@ -590,7 +583,7 @@ function extractHouseNumberFromAddress(address, parsed) {
 function addressMatchesParsedBuilding(address, parsed) {
   if (!address) return false;
   const normalizedAddress = normalizeForMatch(address);
-  if (parsed.city && !containsNormalizedPhrase(normalizedAddress, parsed.city)) return false;
+  if (parsed.city && canonicalCity(address) !== parsed.city) return false;
   const streetNames = parsed.streetNameVariants?.length ? parsed.streetNameVariants : [parsed.streetName].filter(Boolean);
   if (streetNames.length) {
     const hasStreetMatch = streetNames.some((streetName) => {
@@ -622,8 +615,7 @@ function geocodeMatchesParsedBuilding(result, parsed) {
   }
 
   if (!parsed.city) return true;
-  return [address.city, address.town, address.village, address.municipality, result.display_name]
-    .some((value) => containsNormalizedPhrase(value, parsed.city));
+  return resolveSupportedCityFromGeocode(result) === parsed.city;
 }
 
 function buildCadastruSearchQueries(parsed) {
@@ -860,7 +852,8 @@ async function findPropertiesViaCadastruMd(parsed) {
     for (const link of extractCadastruPropertyLinks(responseTextToHtml(rawRbi))) {
       const collection = link.kind === "land" ? lands : buildings;
       if (!collection.has(link.cadastral_number)) {
-        collection.set(link.cadastral_number, await fetchCadastruProperty(session, link, candidate.address));
+        const property = await fetchCadastruProperty(session, link, candidate.address);
+        if (addressMatchesParsedBuilding(property.address, parsed)) collection.set(link.cadastral_number, property);
       }
     }
   }

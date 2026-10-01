@@ -181,16 +181,12 @@ function resolveFullAddress(payload, requestAddress) {
 }
 
 function resolveCityFromAddress(address) {
-  const supportedCity = resolveCadastruCityFromAddress(address);
-  if (supportedCity) return supportedCity;
-  const value = stripDiacritics(address);
-  if (/mun\.?\s*chisinau|chi[sș]in[aă]u|kishinev|кишин[еэ]у/i.test(value)) return "Chișinău";
-  if (/mun\.?\s*balti|b[aă]l[tț]i|beltsy|бельцы/i.test(value)) return "Bălți";
-  return null;
+  return resolveCadastruCityFromAddress(address);
 }
 
 function resolveRegionFromAddress(address) {
-  const city = resolveCityFromAddress(address);
+  const municipality = String(address || "").match(/(?:^|[,;]\s*)(?:municipiul|municipiu|mun)\.?\s+([^,;]+?)(?=\s+(?:comuna|com|orasul|oras|or|satul|sat|sectorul|sect|strada|str|bd)\b|[,;]|$)/i);
+  const city = resolveCadastruSupportedCity(municipality?.[1]) || resolveCityFromAddress(address);
   if (city === "Chișinău") return "mun. Chișinău";
   if (city === "Bălți") return "mun. Bălți";
   return null;

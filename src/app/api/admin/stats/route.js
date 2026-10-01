@@ -40,6 +40,32 @@ function parseDashboardPeriod(value) {
   return DASHBOARD_PERIODS[value] ? value : "all";
 }
 
+async function fetchCadastruStorageStats() {
+  const byCity = new Map();
+  let total = 0;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabaseAdmin
+      .from("cadastru_records")
+      .select("city")
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`cadastru_records stats query failed: ${error.message}`);
+    const rows = data || [];
+    for (const row of rows) {
+      const city = row.city?.trim() || "Unknown city";
+      byCity.set(city, (byCity.get(city) || 0) + 1);
+    }
+    total += rows.length;
+    if (rows.length < PAGE) break;
+  }
+  return {
+    available: true,
+    total,
+    byCity: Array.from(byCity, ([city, count]) => ({ city, count }))
+      .sort((a, b) => b.count - a.count || a.city.localeCompare(b.city, "ro")),
+  };
+}
+
 function applySince(query, column, since) {
   return since ? query.gte(column, since) : query;
 }
@@ -684,6 +710,10 @@ export async function GET(request) {
         console.error("Failed to load paid user stats:", error.message);
         return { available: false, totalPaidUsers: 0, paidOrders: 0 };
       }),
+      fetchCadastruStorageStats().catch((error) => {
+        console.error("Failed to load cadastru storage stats:", error.message);
+        return { available: false };
+      }),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -705,6 +735,7 @@ export async function GET(request) {
     paymentCheckoutEvents,
     marketTrendsPopup,
     paidUserSummary,
+    cadastruStorage,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
@@ -745,6 +776,7 @@ export async function GET(request) {
     paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
     marketTrendsPopup,
     paidUsers,
+    cadastruStorage,
   };
 
   if (!bypassCache) {

@@ -15,6 +15,8 @@ Implemented as admin dashboard with direct registered-user package adjustment.
 - Protected `/api/admin/*` data routes also verify the `admin_token` cookie inside each route before returning cached data or using `SUPABASE_SERVICE_KEY`.
 
 ## Dashboard
+The separate Stored Cadastru Data section shows the total unique cadastral numbers in `cadastru_records` and their counts by city, sorted by count. It includes expired snapshots, groups missing cities as Unknown city, and is independent of the dashboard period filter. It uses the same five-minute stats cache and Hard refresh; database errors show an unavailable state rather than zero or partial counts.
+
 Shows:
 - registered users with package badge, login provider type such as Telegram or Gmail, registration date, last visit, estimation count, cadastru search count, calculator usage count, PDF report count, 999 link count, shared links, and favorites; clicking a user name opens a Romanian access popup with the same package badge and remaining-access balances, and clicking outside that popup closes it
 - paid users count in the main dashboard, aggregating distinct registered users with at least one completed Paddle payment and at least one remaining paid feature credit; clicking the card opens the paid-user list with email, registration date, latest payment, latest product, remaining paid credits, and paid-order count

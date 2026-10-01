@@ -2,6 +2,7 @@
 
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
+import NewsViewCount from "@/components/NewsViewCount";
 import Link from "next/link";
 import { useTranslation } from "@/context/LanguageContext";
 
@@ -55,23 +56,26 @@ export default function NewsListPageContent({ newsPosts }) {
                   )}
                 </div>
                 <div className="p-5">
-                  <div className="flex items-center justify-between gap-3 text-xs text-gray-400">
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-400">
                     <p>{fmtDate(post.created_at, lang)}</p>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 font-semibold text-gray-600">
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <path d="M12 5v14M5 12l7-7 7 7" />
-                      </svg>
-                      {upvoteCount(post.upvote_count)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 font-semibold text-gray-600">
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-3.5 w-3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M12 5v14M5 12l7-7 7 7" />
+                        </svg>
+                        {upvoteCount(post.upvote_count)}
+                      </span>
+                      <NewsViewCount count={post.view_count} label={t("news.uniqueViews")} />
+                    </div>
                   </div>
                   <h2 className="mt-2 text-lg font-bold leading-snug text-gray-950 group-hover:text-primary">
                     {post.title}

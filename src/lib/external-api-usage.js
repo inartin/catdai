@@ -43,12 +43,12 @@ export function trackExternalApiUsage(service, status, details = {}) {
   if (!shouldPersistRuntimeData()) return;
   if (!SERVICES.has(service) || !STATUSES.has(status)) return;
 
-  queueMicrotask(() => {
+  return Promise.resolve().then(() => {
     const counterWrite = supabaseAdmin.rpc("increment_external_api_usage", {
       p_service: service,
       p_status: status,
     });
-    const eventWrite = supabaseAdmin.from("external_api_usage_events").insert({
+    let eventWrite = supabaseAdmin.from("external_api_usage_events").insert({
       service,
       status,
       endpoint: cleanText(details.endpoint, 500),
@@ -60,8 +60,9 @@ export function trackExternalApiUsage(service, status, details = {}) {
       http_status: cleanInteger(details.httpStatus),
       duration_ms: cleanInteger(details.durationMs),
     });
+    if (details.returnEventId) eventWrite = eventWrite.select("id");
 
-    Promise.all([counterWrite, eventWrite])
+    return Promise.all([counterWrite, eventWrite])
       .then(([counterResult, eventResult]) => {
         if (counterResult.error && !isMissingSchemaError(counterResult.error)) {
           console.error("[external-api-usage] increment failed:", counterResult.error.message);
@@ -69,9 +70,10 @@ export function trackExternalApiUsage(service, status, details = {}) {
         if (eventResult.error && !isMissingSchemaError(eventResult.error)) {
           console.error("[external-api-usage] event insert failed:", eventResult.error.message);
         }
-      })
-      .catch((error) => {
-        console.error("[external-api-usage] write failed:", error?.message || String(error));
+        return eventResult.error ? null : eventResult.data?.[0]?.id ?? null;
       });
+  }).catch((error) => {
+    console.error("[external-api-usage] write failed:", error?.message || String(error));
+    return null;
   });
 }

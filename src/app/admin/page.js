@@ -1369,6 +1369,7 @@ export default function AdminDashboard() {
                           <th className="px-4 py-3 text-right">HTTP</th>
                           <th className="px-4 py-3 text-right">Duration</th>
                           <th className="px-4 py-3">Result</th>
+                          <th className="px-4 py-3">Suggestion recovery</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -1411,10 +1412,18 @@ export default function AdminDashboard() {
                                 <td className="max-w-xs truncate px-4 py-3 text-gray-600">
                                   {row.error_message || row.error_code || (row.response_payload ? "Response received" : "Completed")}
                                 </td>
+                                <td className="px-4 py-3">
+                                  {row.suggestion_recovery ? (
+                                    <div className="min-w-40">
+                                      <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Recovered with suggestion</span>
+                                      <p className="mt-1 text-xs text-gray-600">{row.suggestion_recovery.suggested_street}</p>
+                                    </div>
+                                  ) : <span className="text-gray-400">—</span>}
+                                </td>
                               </tr>
                               {expanded && (
                                 <tr>
-                                  <td colSpan={6} className="bg-gray-50 px-4 py-4">
+                                  <td colSpan={7} className="bg-gray-50 px-4 py-4">
                                     <div className="grid gap-4 lg:grid-cols-2">
                                       <div className="space-y-3">
                                         <div>
@@ -1460,6 +1469,13 @@ export default function AdminDashboard() {
                                         <div className="lg:col-span-2">
                                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Diagnostic response headers</p>
                                           <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{responseHeaders}</pre>
+                                        </div>
+                                      )}
+                                      {row.suggestion_recovery && (
+                                        <div className="lg:col-span-2">
+                                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Successful suggestion retry</p>
+                                          <p className="mt-1 text-sm text-gray-800">{row.suggestion_recovery.resolved_address}</p>
+                                          <p className="mt-1 text-xs text-gray-500">{fmtDateTime(row.suggestion_recovery.recovered_at)} · Source: {row.suggestion_recovery.lookup_source || "—"}</p>
                                         </div>
                                       )}
                                     </div>

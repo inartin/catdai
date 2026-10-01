@@ -15,8 +15,13 @@ create table if not exists public.external_api_usage_events (
   error_message    text,
   http_status      integer,
   duration_ms      integer check (duration_ms is null or duration_ms >= 0),
+  suggestion_recovery jsonb,
   created_at       timestamptz not null default now()
 );
+
+-- Also upgrade existing installations; original failure status/counters stay unchanged.
+alter table public.external_api_usage_events
+  add column if not exists suggestion_recovery jsonb;
 
 create index if not exists idx_external_api_usage_events_created
   on public.external_api_usage_events (created_at desc);

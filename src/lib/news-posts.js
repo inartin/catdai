@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { fetchNewsUpvoteCounts } from "@/lib/news-upvotes";
+import { fetchNewsViewCounts } from "@/lib/news-views";
 
 export const NEWS_POST_SELECT = "id, title, description, cover_image_url, slug, created_at";
 export const NEWS_POST_LIST_SELECT = NEWS_POST_SELECT;
@@ -97,10 +98,15 @@ export async function fetchPublishedNewsPostBySlug(slug) {
 }
 
 async function withNewsUpvoteCounts(posts) {
-  const counts = await fetchNewsUpvoteCounts(posts.map((post) => post.id));
+  const ids = posts.map((post) => post.id);
+  const [counts, views] = await Promise.all([
+    fetchNewsUpvoteCounts(ids),
+    fetchNewsViewCounts(ids),
+  ]);
   return posts.map((post) => ({
     ...post,
     upvote_count: counts[post.id] || 0,
+    view_count: views[post.id] || 0,
   }));
 }
 

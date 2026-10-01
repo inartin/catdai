@@ -2,12 +2,14 @@
 
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
+import NewsViewCount from "@/components/NewsViewCount";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { supabase } from "@/lib/supabase";
+import { recordNewsView } from "@/lib/news-view-tracking";
 
 function fmtDate(value, lang) {
   if (!value) return "";
@@ -27,10 +29,30 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
   const { session, loading: authLoading, clearAuthError } = useAuth();
   const [openImage, setOpenImage] = useState(null);
   const [count, setCount] = useState(() => upvoteCount(post.upvote_count));
+  const [views, setViews] = useState(() => ({ postId: post.id, count: post.view_count }));
   const [upvoted, setUpvoted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [upvoteMessage, setUpvoteMessage] = useState("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    function recordView() {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", recordView);
+      recordNewsView(post.id)
+        .then((payload) => {
+          if (payload && !cancelled) setViews({ postId: post.id, count: payload.count });
+        })
+        .catch(() => {});
+    }
+    document.addEventListener("visibilitychange", recordView);
+    recordView();
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", recordView);
+    };
+  }, [post.id]);
 
   useEffect(() => {
     if (!openImage) return undefined;
@@ -201,6 +223,11 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
                   {count}
                 </span>
               </button>
+              <NewsViewCount
+                count={views.postId === post.id ? views.count : post.view_count}
+                label={t("news.uniqueViews")}
+                className="min-h-10 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm"
+              />
             </div>
             {upvoteMessage && (
               <p className="mt-2 text-sm font-medium text-amber-700">{upvoteMessage}</p>
@@ -243,23 +270,26 @@ export default function NewsPostPageContent({ post, latestNewsPosts, articleHtml
                         href={`/noutati/${entry.slug}`}
                         className="group block rounded-xl border border-gray-100 p-3 transition-colors hover:border-primary/30 hover:bg-primary/5"
                       >
-                        <div className="flex items-center justify-between gap-2 text-xs text-gray-400">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-400">
                           <p>{fmtDate(entry.created_at, lang)}</p>
-                          <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-gray-500">
-                            <svg
-                              viewBox="0 0 24 24"
-                              className="h-3.5 w-3.5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              aria-hidden="true"
-                            >
-                              <path d="M12 5v14M5 12l7-7 7 7" />
-                            </svg>
-                            {upvoteCount(entry.upvote_count)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-gray-500">
+                              <svg
+                                viewBox="0 0 24 24"
+                                className="h-3.5 w-3.5"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                              >
+                                <path d="M12 5v14M5 12l7-7 7 7" />
+                              </svg>
+                              {upvoteCount(entry.upvote_count)}
+                            </span>
+                            <NewsViewCount count={entry.view_count} label={t("news.uniqueViews")} />
+                          </div>
                         </div>
                         <h3 className="mt-1 text-sm font-semibold leading-snug text-gray-900 group-hover:text-primary">
                           {entry.title}

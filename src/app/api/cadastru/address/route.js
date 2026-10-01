@@ -1,4 +1,5 @@
 import { suggestStreets } from "@/lib/cadastru-street-suggestions";
+import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSuggestionRecovery } from "@/lib/cadastru-suggestion-recovery";
 import { resolveStreet } from "@/lib/cadastru-streets/street-resolver";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
@@ -191,6 +192,22 @@ export async function POST(request) {
   const lookupAddress = normalizeSpaces(
     `${city}, ${roadType} ${resolution.street} ${houseNumber}${apartmentNumber ? ` ap ${apartmentNumber}` : ""}`
   );
+  const suggestionAddress = { city, roadType, street, houseNumber, apartmentNumber };
+  const recovery = shouldTrackCadastruSearch
+    ? readSuggestionRecoveryToken(body.suggestion_recovery_token, suggestionAddress) : null;
+  const recoverSuggestion = async (payload, lookupSource) => {
+    if (!payload?.cadastral_number && !payload?.lands?.length && !payload?.buildings?.length) return;
+    await recordSuggestionRecovery(recovery, {
+      address: { ...suggestionAddress, resolvedAddress: lookupAddress }, lookupSource,
+    });
+  };
+  let failedUsageEventId = null;
+  const noResultSuggestions = () => {
+    const suggestions = suggestStreets({ city, roadType, street, excludeStreet: resolution.street });
+    const token = shouldTrackCadastruSearch && process.env.NODE_ENV !== "development"
+      ? createSuggestionRecoveryToken(failedUsageEventId, suggestionAddress, suggestions) : null;
+    return { suggestions, ...(token ? { suggestion_recovery_token: token } : {}) };
+  };
   const withResolution = (payload) => ({
     ...payload,
     method: "address",
@@ -239,6 +256,7 @@ export async function POST(request) {
   if (stored) {
     const payload = withResolution(stored.payload);
     const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource);
+    await recoverSuggestion(payload, "cache");
     if (creditResponse) return creditResponse;
     if (shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", {
@@ -260,7 +278,10 @@ export async function POST(request) {
       street: resolution.street,
       house_number: houseNumber,
       ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}),
-    }, { trackUsage: !(process.env.NODE_ENV === "development" && shouldTrackCadastruSearch) });
+    }, {
+      trackUsage: !(process.env.NODE_ENV === "development" && shouldTrackCadastruSearch),
+      captureUsageEventId: shouldTrackCadastruSearch,
+    });
     let payload = withResolution(externalResult);
     payload = await persistCadastruAddressResult(payload, {
       requestAddress: rawAddress,
@@ -271,6 +292,7 @@ export async function POST(request) {
     });
     payload = withResolution(payload);
     const creditResponse = await consumeCadastruCredit(payload, "api");
+    await recoverSuggestion(payload, "api");
     if (creditResponse) return creditResponse;
 
     if (shouldTrackCadastruSearch) {
@@ -286,6 +308,7 @@ export async function POST(request) {
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
+    failedUsageEventId = error?.usageEventId || null;
     const details = {
       code: error?.code || error?.name || "external_cadastru_failed",
       status: error?.status || null,
@@ -305,7 +328,7 @@ export async function POST(request) {
         return NextResponse.json(
           {
             error: "not_found",
-            suggestions: suggestStreets({ city, roadType, street, excludeStreet: resolution.street }),
+            ...noResultSuggestions(),
             message: "Could not find cadastral data for this address.",
           },
           { status: 404 }
@@ -336,6 +359,7 @@ export async function POST(request) {
     });
     payload = withResolution(payload);
     const creditResponse = await consumeCadastruCredit(payload, "local");
+    await recoverSuggestion(payload, "local");
     if (creditResponse) return creditResponse;
 
     if (shouldTrackCadastruSearch) {
@@ -365,7 +389,7 @@ export async function POST(request) {
       {
         error: "not_found",
         ...(!isTimeout && /^Could not match /.test(error?.message || "") && !/fallback error:/.test(error?.message || "")
-          ? { suggestions: suggestStreets({ city, roadType, street, excludeStreet: resolution.street }) } : {}),
+          ? noResultSuggestions() : {}),
         message: "Could not find cadastral data for this address.",
       },
       { status: isTimeout ? 504 : 404 }

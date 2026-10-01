@@ -228,6 +228,8 @@ export default function CadastruSearchForm({
       ...(addressForm.apartmentNumber ? { apartment_number: addressForm.apartmentNumber } : {}),
       search_context: "cadastru",
       ...(skipCache ? { skip_cache: true } : {}),
+      ...(typeof suggestedStreet === "string" && lookupState.didYouMean && lookupState.suggestionRecoveryToken
+        ? { suggestion_recovery_token: lookupState.suggestionRecoveryToken } : {}),
     };
     writeAddressLookupRequest(requestBody);
 
@@ -253,6 +255,7 @@ export default function CadastruSearchForm({
           loading: false,
           method: "address",
           didYouMean: response.status === 404 && failure?.error === "not_found",
+          suggestionRecoveryToken: failure?.suggestion_recovery_token || null,
           suggestions: (failure?.error === "ambiguous_street" || (response.status === 404 && failure?.error === "not_found")) && Array.isArray(failure.suggestions)
             ? failure.suggestions.filter((value) => typeof value === "string" && value.length <= STREET_MAX_LENGTH) : [],
           error: errorMessage,
@@ -368,9 +371,7 @@ export default function CadastruSearchForm({
       <h2 className="text-lg font-semibold tracking-tight text-gray-950">
         {t("cadastru.numberSectionTitle")}
       </h2>
-      <p className="mt-1 text-sm text-gray-500">
-        {t("cadastru.numberSectionSubtitle")}
-      </p>
+  
 
       <div className="mt-5 grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <label className="block">

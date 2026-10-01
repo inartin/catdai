@@ -7,10 +7,11 @@ import crypto from "node:crypto";
 import path from "node:path";
 
 const cache = new Map();
-const tables = { cadastru_records: [], cadastru_address_aliases: [] };
+const tables = { cadastru_records: [], cadastru_address_aliases: [], external_api_usage_events: [] };
 let persistEnabled = true;
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const supabaseAdmin = {
+  rpc: async () => ({ error: null }),
   from(table) {
     const filters = [];
     let operation = "select", values, limit = Infinity;
@@ -26,7 +27,7 @@ const supabaseAdmin = {
         try {
           let rows = tables[table].filter((row) => filters.every((filter) => filter(row)));
           if (operation === "insert") {
-            const row = { id: tables[table].length + 1, saved_at: new Date().toISOString(), ...clone(values), cadastral_number_digits: values.cadastral_number.replace(/\D/g, "") };
+            const row = { id: tables[table].length + 1, saved_at: new Date().toISOString(), ...clone(values), ...(values.cadastral_number ? { cadastral_number_digits: values.cadastral_number.replace(/\D/g, "") } : {}) };
             tables[table].push(row); rows = [row];
           }
           if (operation === "update") rows.forEach((row) => Object.assign(row, clone(values)));
@@ -56,7 +57,7 @@ const baseMocks = {
   },
 };
 async function load(entry, extraMocks = {}, globals = {}) {
-  const context = vm.createContext({ console, Date, URL, Request, Response, Headers, AbortSignal, setTimeout, clearTimeout, process, ...globals });
+  const context = vm.createContext({ console, Date, URL, Request, Response, Headers, AbortSignal, Buffer, setTimeout, clearTimeout, process, ...globals });
   const modules = new Map(), mocks = { ...baseMocks, ...extraMocks };
   async function moduleFor(id) {
     if (modules.has(id)) return modules.get(id);
@@ -317,3 +318,102 @@ suggested = await suggestionsRoute.POST(request(baltiRequest));
 assert.equal(suggested.status, 504);
 assert.equal((await suggested.json()).suggestions, undefined);
 console.log("Did-you-mean regressions passed: RO/RU spellings, scope, original lookup first, no-data-only suggestions, retry identity and timeout exclusion.");
+
+// Exercise actual worker telemetry, signed correlation and route recovery with isolated DB/fetch mocks.
+cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;
+tables.external_api_usage_events.length = 0;
+const recoveryMocks = { ...routeMocks };
+delete recoveryMocks["@/lib/cadastru-external-api"];
+let backupHasResult = false;
+recoveryMocks["@/lib/cadastru-address-search"] = {
+  findCadastralByAddress: async () => {
+    if (!backupHasResult) throw new Error("Could not match land or buildings for Balti.");
+    return { lands: [{ cadastral_number: "0300101.001", address: "Bălți, str Alexandr Radișcev 28" }] };
+  },
+};
+const recoveryEnv = { NODE_ENV: "production", CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "test-only" };
+let workerMissing = true, workerUnavailable = false, workerRequests = 0;
+const workerFetch = async (_url, options) => {
+  workerRequests++;
+  const fields = JSON.parse(options.body);
+  assert.equal(fields.suggestion_recovery_token, undefined, "correlation is never sent to the worker");
+  if (workerUnavailable) return Response.json({ ok: false, error: "offline" }, { status: 502 });
+  if (workerMissing) return Response.json({ ok: false, error: "not_found" }, { status: 404 });
+  return Response.json({ ok: true, data: { cadastral_number: "0300101.001.01.007", apartment: { address: "Bălți, str Alexandr Radișcev 28 ap 7", area_m2: 50 } } });
+};
+const recoveryRoute = await load("src/app/api/cadastru/address/route.js", recoveryMocks, { process: { env: recoveryEnv }, fetch: workerFetch });
+const createFailure = async () => {
+  workerMissing = true;
+  const response = await recoveryRoute.POST(request(baltiRequest));
+  assert.equal(response.status, 404);
+  const failure = await response.json();
+  assert(failure.suggestion_recovery_token, "failed event exists before returning its retry token");
+  const event = tables.external_api_usage_events.at(-1);
+  assert.equal(event.status, "failure");
+  assert.equal(event.request_payload.street, "Radiceva");
+  return { failure, event };
+};
+const retryBody = (failure) => ({ ...baltiRequest, street: failure.suggestions[0], suggestion_recovery_token: failure.suggestion_recovery_token });
+let failed = await createFailure();
+let retry = await recoveryRoute.POST(request(retryBody(failed.failure)));
+assert.equal(retry.status, 404);
+assert.equal(failed.event.suggestion_recovery, undefined, "a clicked suggestion that fails is not recovery");
+workerMissing = false;
+hasCredit = false;
+retry = await recoveryRoute.POST(request(retryBody(failed.failure)));
+assert.equal(retry.status, 200);
+assert.equal((await retry.json()).full_access, false, "masked previews still count as found results");
+assert.equal(failed.event.status, "failure", "recovered rows remain in the Failed filter");
+assert.equal(failed.event.suggestion_recovery.suggested_street, "Alexandr Radișcev");
+assert.equal(failed.event.suggestion_recovery.lookup_source, "api");
+const firstRecovery = clone(failed.event.suggestion_recovery);
+await recoveryRoute.POST(request(retryBody(failed.failure)));
+assert.deepEqual(failed.event.suggestion_recovery, firstRecovery, "first successful retry is retained");
+
+failed = await createFailure();
+workerMissing = false;
+const callsBeforeCacheRetry = workerRequests;
+retry = await recoveryRoute.POST(request({ ...retryBody(failed.failure), skip_cache: false }));
+assert.equal(retry.status, 200);
+assert.equal(workerRequests, callsBeforeCacheRetry, "corrected address may come from the cache");
+assert.equal(failed.event.suggestion_recovery.lookup_source, "cache");
+
+failed = await createFailure();
+workerUnavailable = true;
+backupHasResult = true;
+retry = await recoveryRoute.POST(request(retryBody(failed.failure)));
+assert.equal(retry.status, 200);
+assert.equal(failed.event.suggestion_recovery.lookup_source, "local", "local backup success recovers the original failed call");
+workerUnavailable = false;
+backupHasResult = false;
+
+failed = await createFailure();
+workerMissing = false;
+await recoveryRoute.POST(request({ ...retryBody(failed.failure), suggestion_recovery_token: undefined }));
+assert.equal(failed.event.suggestion_recovery, undefined, "manual corrected searches do not mark the failed call");
+await recoveryRoute.POST(request({ ...retryBody(failed.failure), house_number: "29" }));
+assert.equal(failed.event.suggestion_recovery, undefined, "a different property cannot recover the failed call");
+await recoveryRoute.POST(request({ ...retryBody(failed.failure), suggestion_recovery_token: `${failed.failure.suggestion_recovery_token}x` }));
+assert.equal(failed.event.suggestion_recovery, undefined, "tampered tokens cannot annotate telemetry");
+const recoveryHelpers = await load("@/lib/cadastru-suggestion-recovery", {}, { process: { env: recoveryEnv } });
+const tokenAddress = { city: "Bălți", roadType: "str", street: "Alexandr Radișcev", houseNumber: "28", apartmentNumber: "7" };
+assert(recoveryHelpers.readSuggestionRecoveryToken(failed.failure.suggestion_recovery_token, tokenAddress));
+for (const changes of [{ city: "Chișinău" }, { roadType: "bd" }, { apartmentNumber: "8" }, { street: "Grenoble" }]) {
+  assert.equal(recoveryHelpers.readSuggestionRecoveryToken(failed.failure.suggestion_recovery_token, { ...tokenAddress, ...changes }), null);
+}
+const futureHelpers = await load("@/lib/cadastru-suggestion-recovery", {}, {
+  process: { env: recoveryEnv }, Date: class extends Date { static now() { return Date.now() + 61 * 60 * 1000; } },
+});
+assert.equal(futureHelpers.readSuggestionRecoveryToken(failed.failure.suggestion_recovery_token, tokenAddress), null, "tokens expire after one hour");
+
+const developmentRoute = await load("src/app/api/cadastru/address/route.js", recoveryMocks, {
+  process: { env: { ...recoveryEnv, NODE_ENV: "development" } }, fetch: workerFetch,
+});
+const eventsBeforeDev = tables.external_api_usage_events.length;
+await developmentRoute.POST(request(retryBody(failed.failure)));
+assert.equal(tables.external_api_usage_events.length, eventsBeforeDev);
+assert.equal(failed.event.suggestion_recovery, undefined, "development retries do not update production statistics");
+workerMissing = true;
+const devFailure = await (await developmentRoute.POST(request(baltiRequest))).json();
+assert.equal(devFailure.suggestion_recovery_token, undefined);
+console.log("Suggestion recovery regressions passed: failed versus successful clicks, previews, cache/local results, original status, first success, manual edits, token tampering/expiry, property identity and development suppression.");

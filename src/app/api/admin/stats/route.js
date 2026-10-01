@@ -412,17 +412,21 @@ async function fetchExternalApiUsageRows(sinceDate) {
 }
 
 async function fetchExternalApiUsageEvents(since) {
-  const response = await applySince(
+  const columns = "id, service, status, endpoint, request_payload, response_payload, response_headers, error_code, error_message, http_status, duration_ms, created_at";
+  const fetchEvents = (includeRecovery) => applySince(
     supabaseAdmin
       .from("external_api_usage_events")
-      .select(
-        "id, service, status, endpoint, request_payload, response_payload, response_headers, error_code, error_message, http_status, duration_ms, created_at"
-      ),
+      .select(includeRecovery ? `${columns}, suggestion_recovery` : columns),
     "created_at",
     since
   )
     .order("created_at", { ascending: false })
     .range(0, 199);
+  let response = await fetchEvents(true);
+  if (["42703", "PGRST204"].includes(String(response.error?.code))
+    && String(response.error?.message || "").includes("suggestion_recovery")) {
+    response = await fetchEvents(false);
+  }
 
   if (!response.error) {
     return { available: true, rows: response.data || [] };

@@ -7,6 +7,10 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 - News rows live in `news_posts`.
 - Fields are `slug`, `title`, `description`, `cover_image_url`, and `created_at`.
 - Authenticated article upvotes live in `news_post_upvotes` with one row per `news_post_id + user_id`.
+- Unique article views live in `news_post_views`, with a database primary key on `(news_post_id, visitor_id)` to prevent repeat/concurrent views from incrementing the count. Apply `db/news_post_views.sql` before deploying; counts start at zero, with no historical backfill.
+- Views use a server-generated UUID in the signed `catdai-news-visitor` cookie. It is HttpOnly, SameSite=Lax, Secure over HTTPS, scoped to `/api/news/views`, and renewed for one year on successful tracking. Uniqueness is per browser per article, including anonymous readers; accounts are not linked. Other browsers/devices, cookie expiry, or clearing cookies create a new visitor.
+- Cookie signatures use HMAC-SHA256 with `NEWS_VIEW_COOKIE_SECRET` when configured, otherwise the existing server-only `SUPABASE_SERVICE_KEY`, with a news-specific signing prefix. Keep the chosen secret stable; changing it invalidates existing visitor cookies. The API ignores any submitted visitor ID.
+- View rows and the `news_post_view_counts` aggregate RPC are accessible only to the server service role. Counts aggregate in PostgreSQL rather than fetching individual rows, avoiding PostgREST row-limit truncation.
 - `cover_image_url` is stored as text and is expected to be an image link.
 - `description` stores sanitized rich article HTML created in the admin editor.
 - Slugs are generated from the title at creation time and stored so article URLs stay stable after edits.
@@ -29,6 +33,10 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 ## Public Pages
 - `/noutati` server-renders all news rows as linked cards with cover image and title.
 - `/noutati` and `/noutati/[slug]` show article upvote counters.
+- An eye icon with the unique view count appears beside upvotes on news cards, article headers, and latest-news cards, with RO/RU accessible labels.
+- `POST /api/news/views` records a view only after the article is opened in a visible browser tab and returns the current total. List impressions, server renders, metadata generation, and link prefetches do not add views. Repeated opens are deduplicated by the database.
+- The first tracking request establishes the cookie without writing a view; one background retry confirms the browser accepts cookies and records the view. Later visits use one request. Requests are serialized within a tab to avoid duplicate cookie issuance on simultaneous mounts. Cookie-blocked browsers skip tracking after the one retry. Article rendering does not wait for tracking.
+- View writes follow runtime persistence rules: production or `ENABLE_RUNTIME_PERSISTENCE=true`. Default local development reads counts without adding views. The endpoint validates IDs, checks request origin, and rate-limits requests; this is a browser-based readership metric, not fraud-proof identity tracking.
 - `/noutati/[slug]` server-renders an individual news article with sanitized rich HTML, a back link to `/noutati`, a top-page upvote button, and a right sidebar with up to 5 latest other news items in the relevant-listings card style.
 - `GET /api/news/upvotes?post_id=...` returns the public count and, for authenticated users, their upvote status.
 - `POST /api/news/upvotes` requires a bearer token and inserts one upvote for the authenticated user.
@@ -55,3 +63,9 @@ Admin storage, CRUD UI, public listing, and public detail pages are prepared.
 - `src/app/sitemap.js`
 - `db/news_posts.sql`
 - `db/news_post_upvotes.sql`
+- `db/news_post_views.sql`
+- `src/lib/news-views.js`
+- `src/components/NewsViewCount.js`
+- `src/app/api/news/views/route.js`
+- `src/lib/news-visitor-cookie.js`
+- `src/lib/news-view-tracking.js`

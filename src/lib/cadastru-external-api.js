@@ -33,6 +33,7 @@ function externalError(message, options = {}) {
   error.status = options.status || null;
   error.fallbackEligible = Boolean(options.fallbackEligible);
   error.suggestions = Array.isArray(options.suggestions) ? options.suggestions.filter((value) => typeof value === "string" && value.length <= 80) : [];
+  error.usageEventId = options.usageEventId || null;
   return error;
 }
 
@@ -66,16 +67,19 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
   } catch (error) {
     const code = error?.name === "TimeoutError" ? "external_cadastru_timeout" : "external_cadastru_unreachable";
     const message = error?.message || "External cadastru API request failed";
-    if (shouldTrackUsage) trackExternalApiUsage(service, "failure", {
+    const usageWrite = shouldTrackUsage ? trackExternalApiUsage(service, "failure", {
       endpoint: url,
       requestPayload: body,
       errorCode: code,
       errorMessage: message,
       durationMs: Date.now() - startedAt,
-    });
+      returnEventId: options.captureUsageEventId === true,
+    }) : null;
+    const usageEventId = options.captureUsageEventId ? await usageWrite : null;
     throw externalError(message, {
       code,
       fallbackEligible: true,
+      usageEventId,
     });
   }
 
@@ -101,7 +105,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
   const code = payload?.error || `external_cadastru_http_${response.status}`;
   const message = payload?.message || `External cadastru API returned ${response.status}`;
   const fallbackEligible = response.status === 502 || response.status === 503 || response.status === 504;
-  if (shouldTrackUsage) trackExternalApiUsage(service, "failure", {
+  const usageWrite = shouldTrackUsage ? trackExternalApiUsage(service, "failure", {
     endpoint: url,
     requestPayload: body,
     responsePayload: payload,
@@ -110,12 +114,15 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     errorMessage: message,
     httpStatus: response.status,
     durationMs: Date.now() - startedAt,
-  });
+    returnEventId: options.captureUsageEventId === true,
+  }) : null;
+  const usageEventId = options.captureUsageEventId ? await usageWrite : null;
   throw externalError(message, {
     code,
     status: response.status,
     suggestions: payload?.suggestions,
     fallbackEligible,
+    usageEventId,
   });
 }
 

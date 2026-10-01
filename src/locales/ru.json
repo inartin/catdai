@@ -292,6 +292,7 @@
   "cadastru.loginToUse": "Войдите, чтобы искать кадастровые данные",
   "cadastru.unlockData": "Войдите, чтобы разблокировать",
   "cadastru.resultPageTitle": "Результат кадастрового поиска",
+  "cadastru.mapTitle": "Расположение объекта на карте — вид со спутника",
   "cadastru.resultMetaDescription": "Результат кадастрового поиска Catdai. Страница создается для введенного запроса и не используется как публичная индексируемая страница.",
   "cadastru.backToSearch": "Назад к поиску",
   "cadastru.saveImage": "Сохранить",

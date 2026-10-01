@@ -454,6 +454,13 @@ export async function persistCadastruRecord(payload, options = {}) {
     const now = new Date().toISOString();
     const countLookup = options.countLookup !== false;
     const shouldKeepExistingDetail = existing && isFreshCadastru(recordExpiry(existing)) && row.raw_payload.method === "address" && hasDetailedPayload(existing.raw_payload) && !hasDetailedPayload(row.raw_payload);
+    const retainedPayload = shouldKeepExistingDetail
+      ? {
+          ...existing.raw_payload,
+          ...(Object.hasOwn(row.raw_payload, "map_location") ? { map_location: row.raw_payload.map_location } : {}),
+        }
+      : null;
+    const retainedHash = retainedPayload ? hashPayload(retainedPayload) : null;
     let record = existing;
 
     if (existing) {
@@ -478,9 +485,9 @@ export async function persistCadastruRecord(payload, options = {}) {
             building_data: existing.building_data || {},
             location_data: existing.location_data || {},
             form_fields: existing.form_fields || {},
-            raw_payload: existing.raw_payload || {},
-            payload_hash: existing.payload_hash,
-            data_updated_at: existing.data_updated_at,
+            raw_payload: retainedPayload,
+            payload_hash: retainedHash,
+            data_updated_at: retainedHash === existing.payload_hash ? existing.data_updated_at : now,
             last_official_fetch_at: existing.last_official_fetch_at,
             next_refresh_after: recordExpiry(existing),
           }

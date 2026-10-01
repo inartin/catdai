@@ -90,6 +90,7 @@ const address = "Chișinău, str Ștefan cel Mare 9 ap 12";
 const structuredAddress = { city: "Chișinău", street: "Strada Ștefan cel Mare", houseNumber: "9", apartmentNumber: "12" };
 const number = "0100201.999.01.012";
 const payload = { cadastral_number: number, apartment: { address, area_m2: 64, unknown_field: { nested: [0, false, null] } }, building: { address: "Chișinău, str Ștefan cel Mare 9", construction_year: 1981 }, novel: { records: [{ value: "unexpected" }] }, access_tier: "paid", access_limit: { reason: "private" }, locked_sections: {} };
+payload.map_location = { latitude: 47.14, longitude: 28.86 };
 const expected = clone(payload);
 delete expected.access_tier; delete expected.access_limit; delete expected.locked_sections;
 await storage.persistCadastruRecord(payload, { officialFetch: true, structuredAddress });
@@ -116,9 +117,13 @@ assert.equal((await storage.getCadastruRecordByAddress(russian)).payload.apartme
 
 const aggregateAddress = "Chișinău, bd Moscova 9/5";
 const aggregate = { status: "success", matched_address: aggregateAddress, extra: { unknown: [false, 0] }, lands: [{ cadastral_number: "0100201.555", address: aggregateAddress, custom: { x: 1 } }], buildings: [{ cadastral_number: "0100201.555.01", address: aggregateAddress, unusual: [1, 2] }, { cadastral_number: "0100201.555.02", address: aggregateAddress, restrictions: "test" }] };
+aggregate.lands[0].map_location = { latitude: 47.085198405, longitude: 28.89167763 };
+aggregate.buildings[0].map_location = { latitude: 47.08525032, longitude: 28.89172716 };
 await storage.persistCadastruAddressResult(aggregate, { requestAddress: aggregateAddress, structuredAddress: { city: "Chișinău", street: "Bulevard Moscova", houseNumber: "9/5", apartmentNumber: "" }, officialFetch: true });
 cache.clear();
 assert.deepEqual(clone((await storage.getCadastruRecordByAddress(aggregateAddress)).payload), aggregate);
+assert.deepEqual(clone((await storage.getCadastruRecordByNumber(aggregate.lands[0].cadastral_number)).payload.map_location), aggregate.lands[0].map_location, "land coordinates belong to their own number record");
+assert.deepEqual(clone((await storage.getCadastruRecordByNumber(aggregate.buildings[0].cadastral_number)).payload.map_location), aggregate.buildings[0].map_location, "building coordinates belong to their own number record");
 const single = (await storage.getCadastruRecordByNumber("0100201.555.02")).payload;
 assert.equal(single.buildings.length, 1); assert.equal(single.buildings[0].restrictions, "test");
 assert.equal(single.lands, undefined, "individual numbers cannot return neighboring properties");
@@ -131,6 +136,28 @@ const numericRow = tables.cadastru_records.find((row) => row.cadastral_number ==
 assert.equal(numericRow.street, "str. 31 August 1989");
 assert.equal(numericRow.house_number, "14");
 assert.equal(numericRow.apartment_number, "7");
+
+// Address-only refreshes keep richer details while saving the latest map location.
+const coordinateNumber = "0100201.777.01.007";
+const coordinateLocation = { latitude: 47.14, longitude: 28.86 };
+await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, apartment: { area_m2: 40 } }, { officialFetch: true });
+const coordinateRow = tables.cadastru_records.find((row) => row.cadastral_number === coordinateNumber);
+const coordinateExpiry = coordinateRow.next_refresh_after;
+const originalHash = coordinateRow.payload_hash;
+await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address", map_location: coordinateLocation }, { officialFetch: true });
+cache.clear();
+let coordinatePayload = (await storage.getCadastruRecordByNumber(coordinateNumber)).payload;
+assert.deepEqual(clone(coordinatePayload.map_location), coordinateLocation, "DB retains new coordinates alongside existing details");
+assert.equal(coordinatePayload.apartment.area_m2, 40);
+assert.equal(coordinateRow.next_refresh_after, coordinateExpiry, "location update does not renew old detail freshness");
+assert.notEqual(coordinateRow.payload_hash, originalHash);
+await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address" }, { officialFetch: true });
+assert.deepEqual(clone((await storage.getCadastruRecordByNumber(coordinateNumber)).payload.map_location), coordinateLocation, "omitted coordinates preserve saved location");
+await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address", map_location: null }, { officialFetch: true });
+cache.clear();
+coordinatePayload = (await storage.getCadastruRecordByNumber(coordinateNumber)).payload;
+assert.equal(coordinatePayload.map_location, null, "explicitly unavailable location survives DB reload");
+assert.equal(coordinatePayload.apartment.area_m2, 40);
 
 await storage.persistCadastruRecord({ cadastral_number: "0100201.111", mystery: { no_address: true } }, { officialFetch: true });
 assert.equal((await storage.getCadastruRecordByNumber("0100201.111")).payload.mystery.no_address, true);
@@ -177,16 +204,19 @@ const request = (body) => new Request("http://localhost/api/cadastral", { method
 const addressBody = { city: "Chisinau", road_type: "strada", street: "Ștefan cel Mare", house_number: "9", apartment_number: "012" };
 const preview = await (await addressRoute.POST(request(addressBody))).json();
 assert.equal(preview.full_access, false);
+assert.deepEqual(preview.map_location, expected.map_location, "address previews retain map coordinates");
 assert.notEqual(preview.apartment.area_m2, 64);
 assert.equal(tables.cadastru_records[0].raw_payload.apartment.area_m2, 64, "anonymous lookups store unmasked JSON");
 assert.equal(tables.cadastru_records[0].raw_payload.access_limit, undefined);
 const numberPreview = await (await numberRoute.POST(request({ cadastral_number: number }))).json();
 assert.equal(numberPreview.full_access, false);
+assert.deepEqual(numberPreview.map_location, expected.map_location, "number previews retain stored map coordinates");
 assert.equal(numberFetches, 0, "address-saved details satisfy number lookup");
 assert.equal(enrichFetches, 0, "fresh snapshots must not call enrichment again");
 hasCredit = true;
 const full = await (await numberRoute.POST(request({ cadastral_number: number }))).json();
 assert.equal(full.apartment.area_m2, 64);
+assert.deepEqual(full.map_location, expected.map_location, "full results retain stored map coordinates");
 assert.equal(full.novel.records[0].value, "unexpected");
 await addressRoute.POST(request({ ...addressBody, street: "Stefan cel Mare" }));
 assert.equal(addressFetches, 1, "diacritic variants share a snapshot");
@@ -200,6 +230,13 @@ await numberRoute.POST(request({ cadastral_number: number, skip_cache: true }));
 assert.equal(numberFetches, 2);
 assert.equal(tables.cadastru_records[0].raw_payload.apartment.area_m2, 64);
 console.log("Route regressions passed: anonymous persistence, masked previews, cross-query hits, no live enrichment on hits, skipcache.");
+const { buildCadastruPreviewPayload } = await load("@/lib/cadastru-preview", routeMocks);
+assert.equal(buildCadastruPreviewPayload({ map_location: null }).map_location, null);
+assert.equal(buildCadastruPreviewPayload({}).map_location, null);
+const aggregatePreview = buildCadastruPreviewPayload(aggregate);
+assert.deepEqual(clone(aggregatePreview.lands[0].map_location), aggregate.lands[0].map_location, "land preview coordinates survive masking");
+assert.deepEqual(clone(aggregatePreview.buildings[0].map_location), aggregate.buildings[0].map_location, "building preview coordinates survive masking");
+assert.notEqual(aggregatePreview.lands[0].cadastral_number, aggregate.lands[0].cadastral_number, "property registry details remain masked");
 
 // Street resolution happens before cache access and is shared by worker/fallback paths.
 cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;

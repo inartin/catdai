@@ -10,6 +10,7 @@ export default function CadastralDataCard({
   onLockedClick,
   forceDesktopLayout = false,
   showRevealButton = false,
+  children,
 }) {
   const { lang, t } = useTranslation();
 
@@ -164,7 +165,7 @@ export default function CadastralDataCard({
     </div>
   );
 
-  return (
+  const card = (
     <div className={`${className} ${widthClass} overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md`}>
       <div className="flex items-center gap-2.5 bg-emerald-700 px-6 py-4">
         <svg viewBox="0 0 16 16" fill="currentColor" className="h-6 w-6 shrink-0 text-white">
@@ -281,4 +282,11 @@ export default function CadastralDataCard({
       </div>
     </div>
   );
+
+  return children ? (
+    <div className={widthClass}>
+      {card}
+      {children}
+    </div>
+  ) : card;
 }

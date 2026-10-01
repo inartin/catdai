@@ -412,6 +412,27 @@ function CadastruResultContent() {
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
   const valuationPrefill = buildValuationPrefill(state.data);
+  const mapLocation = [
+    state.data?.map_location,
+    state.data?.building?.map_location,
+    state.data?.apartment?.map_location,
+    ...(Array.isArray(state.data?.buildings) ? state.data.buildings.map((property) => property?.map_location) : []),
+    ...(Array.isArray(state.data?.lands) ? state.data.lands.map((property) => property?.map_location) : []),
+  ].find((location) => Number.isFinite(location?.latitude) && Math.abs(location.latitude) <= 90 &&
+    Number.isFinite(location?.longitude) && Math.abs(location.longitude) <= 180);
+  const hasMapLocation = Boolean(mapLocation);
+  const latitude = mapLocation?.latitude;
+  const longitude = mapLocation?.longitude;
+  const mapUrl = hasMapLocation
+    ? `https://www.google.com/maps?${new URLSearchParams({
+        q: `${latitude},${longitude}`,
+        ll: `${latitude},${longitude}`,
+        t: "k",
+        z: "18",
+        hl: lang,
+        output: "embed",
+      })}`
+    : null;
 
   useEffect(() => {
     if (!cadastralNumber && !isAddressPreviewHandoff) return;
@@ -616,7 +637,21 @@ function CadastruResultContent() {
                     setIsAuthModalOpen(true);
                   }
                 } : undefined}
-              />
+              >
+                {mapUrl && (
+                  <div className="mt-6 w-full overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md">
+                    <iframe
+                      key={mapUrl}
+                      src={mapUrl}
+                      title={t("cadastru.mapTitle")}
+                      className="block h-[360px] w-full border-0 sm:h-[440px]"
+                      loading="lazy"
+                      allowFullScreen
+                      referrerPolicy="strict-origin-when-cross-origin"
+                    />
+                  </div>
+                )}
+              </CadastralDataCard>
             </div>
           )}
           {valuationPrefill && (

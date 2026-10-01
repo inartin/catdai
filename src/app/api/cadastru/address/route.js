@@ -271,6 +271,7 @@ export async function POST(request) {
     return response;
   }
 
+  let externalUnavailable = false;
   try {
     const externalResult = await fetchExternalCadastruAddressData({
       city,
@@ -309,6 +310,7 @@ export async function POST(request) {
     return response;
   } catch (error) {
     failedUsageEventId = error?.usageEventId || null;
+    externalUnavailable = ["service_unavailable", "external_cadastru_timeout", "external_cadastru_unreachable"].includes(error?.code);
     const details = {
       code: error?.code || error?.name || "external_cadastru_failed",
       status: error?.status || null,
@@ -380,19 +382,27 @@ export async function POST(request) {
       address: rawAddress,
     });
 
-    if (shouldTrackCadastruSearch) {
+    const isUnavailable = externalUnavailable || error?.code === "service_unavailable" ||
+      error?.name === "TimeoutError" || error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT";
+    if (isUnavailable) {
+      return NextResponse.json(
+        { error: "service_unavailable", message: "Cadastral service is temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
+
+    const isNotFound = error?.code === "not_found";
+    if (isNotFound && shouldTrackCadastruSearch) {
       await logCadastruSearchEvent(request, "address", { city, resultType: "no_data", lookupSource: "local" });
     }
 
-    const isTimeout = error?.name === "TimeoutError" || error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT";
     return NextResponse.json(
       {
-        error: "not_found",
-        ...(!isTimeout && /^Could not match /.test(error?.message || "") && !/fallback error:/.test(error?.message || "")
-          ? noResultSuggestions() : {}),
-        message: "Could not find cadastral data for this address.",
+        error: isNotFound ? "not_found" : "upstream_failed",
+        ...(isNotFound ? noResultSuggestions() : {}),
+        message: isNotFound ? "Could not find cadastral data for this address." : "Cadastral lookup failed.",
       },
-      { status: isTimeout ? 504 : 404 }
+      { status: isNotFound ? 404 : 502 }
     );
   }
 }

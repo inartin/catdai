@@ -194,6 +194,7 @@ export default function CadastruSearchForm({
       if (payload?.error === "missing_fields") return t("cadastru.missingAddressFields");
       if (payload?.error === "invalid_address_fields") return t("cadastru.invalidAddressFields");
       if (payload?.error === "too_many_requests") return t("cadastru.rateLimitError");
+      if (payload?.error === "service_unavailable") return t("cadastru.serviceUnavailable");
       if (payload?.error === "not_found") return t("cadastru.lookupError");
       return payload?.message || payload?.error || t("cadastru.lookupError");
     } catch {

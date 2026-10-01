@@ -191,25 +191,42 @@ function buildNominatimRequests(parsed) {
   return requests;
 }
 
+function serviceUnavailable(message, cause) {
+  const error = new Error(message, { cause });
+  error.code = "service_unavailable";
+  error.status = 503;
+  return error;
+}
+
 async function fetchText(url, options = {}) {
-  const res = await fetch(url, {
-    ...options,
-    signal: options.signal || AbortSignal.timeout(options.timeoutMs || 15_000),
-    headers: {
-      "User-Agent": USER_AGENT,
-      ...(options.headers || {}),
-    },
-  });
-  const text = await res.text();
+  let res, text;
+  try {
+    res = await fetch(url, {
+      ...options,
+      signal: options.signal || AbortSignal.timeout(options.timeoutMs || 15_000),
+      headers: {
+        "User-Agent": USER_AGENT,
+        ...(options.headers || {}),
+      },
+    });
+    text = await res.text();
+  } catch (error) {
+    throw serviceUnavailable(`Upstream request failed: ${url}`, error);
+  }
+
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status} from ${url}: ${text.slice(0, 200)}`);
+    throw serviceUnavailable(`HTTP ${res.status} from ${url}: ${text.slice(0, 200)}`);
   }
   return { text, headers: res.headers, status: res.status, url: res.url };
 }
 
 async function fetchJson(url, options = {}) {
   const { text } = await fetchText(url, options);
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw serviceUnavailable(`Invalid JSON from ${url}`, error);
+  }
 }
 
 function nominatimUrl(request) {
@@ -299,6 +316,7 @@ async function queryOfficialHtml(lon, lat, offset = 30) {
     ENV: "mapstore_language:en",
   });
   const json = await fetchJson(`${WMS_URL}?${params.toString()}`);
+  if (!Array.isArray(json?.features)) throw serviceUnavailable("Invalid Geodata feature response");
   return (json.features || [])
     .map((feature) => ({
       id: feature.id,
@@ -319,6 +337,7 @@ async function queryWfsByPoint(typeName, lon, lat, offsetDegrees = 0.0002) {
     bbox: `${lon - offsetDegrees},${lat - offsetDegrees},${lon + offsetDegrees},${lat + offsetDegrees},EPSG:4326`,
   });
   const json = await fetchJson(`${WFS_URL}?${params.toString()}`);
+  if (!Array.isArray(json?.features)) throw serviceUnavailable("Invalid Geodata feature response");
   return json.features || [];
 }
 
@@ -734,7 +753,7 @@ async function createCadastruSession() {
     })
     .join("; ");
 
-  throw new Error(`Could not extract cadastru.md p_instance: ${details}`);
+  throw serviceUnavailable(`Could not extract cadastru.md p_instance: ${details}`);
 }
 
 async function callCadastruApex(session, procName, params) {
@@ -758,6 +777,9 @@ async function callCadastruApex(session, procName, params) {
     },
     body,
   });
+  if (/ORA-\d{5}|apex_error|<title[^>]*>[^<]*(?:error|unavailable)|"error"\s*:/i.test(text)) {
+    throw serviceUnavailable("cadastru.md returned an error response");
+  }
   return text;
 }
 
@@ -1213,103 +1235,112 @@ async function findDerivedApartmentFromExactGeocode(parsed, geocoded) {
 export async function findCadastralByAddress(rawAddress) {
   const parsed = parseInputAddress(rawAddress);
   if (!parsed.apartment) {
+    let cadastruError = null;
     try {
       const cadastruResult = await findPropertiesViaCadastruMd(parsed);
       if (cadastruResult) return cadastruResult;
-    } catch {
-      // Geodata remains available when cadastru.md cannot resolve the address.
+    } catch (error) {
+      cadastruError = error;
     }
     const geodataResult = await findPropertiesFromExactGeocode(parsed);
     if (geodataResult) return geodataResult;
-    throw new Error(`Could not match land or buildings for ${parsed.buildingAddress}.`);
+    if (cadastruError) throw cadastruError;
+    throw Object.assign(new Error(`Could not match land or buildings for ${parsed.buildingAddress}.`), { code: "not_found" });
   }
-  const geocoded = await geocodeBuilding(parsed);
+  const failures = [];
+  let geocoded = [];
+  try {
+    geocoded = await geocodeBuilding(parsed);
 
-  if (!geocoded.length) {
-    console.error(`No geocoding results for building address: ${parsed.buildingAddress}`);
-  }
+    if (!geocoded.length) {
+      console.error(`No geocoding results for building address: ${parsed.buildingAddress}`);
+    }
 
-  for (const candidate of geocoded) {
-    for (const offset of [30, 60, 100]) {
-      const officialFeatures = await queryOfficialHtml(candidate.lon, candidate.lat, offset);
-      for (const feature of officialFeatures) {
-        const { match, ambiguous, buildings, apartments } = findApartmentMatch(feature.html, parsed);
+    for (const candidate of geocoded) {
+      for (const offset of [30, 60, 100]) {
+        const officialFeatures = await queryOfficialHtml(candidate.lon, candidate.lat, offset);
+        for (const feature of officialFeatures) {
+          const { match, ambiguous, buildings, apartments } = findApartmentMatch(feature.html, parsed);
 
-        if (ambiguous) {
-          throw new Error(`Ambiguous apartment match for ap ${parsed.apartment}: ${ambiguous.map((item) => item.cadastralNumber).join(", ")}`);
+          if (ambiguous) {
+            throw new Error(`Ambiguous apartment match for ap ${parsed.apartment}: ${ambiguous.map((item) => item.cadastralNumber).join(", ")}`);
+          }
+
+          if (match) {
+            return {
+              status: "success",
+              source: "geodata_wms",
+              cadastral_number: formatCadastralNumber(match.cadastralNumber),
+              raw_cadastral_number: match.cadastralNumber,
+              matched_address: match.address,
+              apartment: parsed.apartment,
+              apartment_area_m2: match.area_m2,
+              apartment_floor: match.floor,
+              apartment_type: match.type,
+              estimated_value_lei: match.estimated_value_lei,
+              building_cadastral_number: buildings[0]?.cadastralNumber || null,
+              building_address: buildings[0]?.address || null,
+              geocoded_address: candidate.display_name,
+              geocoded_lat: candidate.lat,
+              geocoded_lon: candidate.lon,
+              geocode_score: candidate.score,
+              wms_feature_id: feature.id,
+              wms_offset_m: offset,
+              parsed_input: parsed,
+            };
+          }
+
+          const derivedMatch = findDerivedApartmentMatch(buildings, parsed);
+          if (derivedMatch) {
+            return {
+              status: "success",
+              source: "geodata_wms_derived",
+              cadastral_number: derivedMatch.cadastralNumber,
+              raw_cadastral_number: derivedMatch.cadastralNumber,
+              matched_address: derivedMatch.building.address,
+              apartment: parsed.apartment,
+              building_cadastral_number: derivedMatch.building.cadastralNumber,
+              building_address: derivedMatch.building.address,
+              geocoded_address: candidate.display_name,
+              geocoded_lat: candidate.lat,
+              geocoded_lon: candidate.lon,
+              geocode_score: candidate.score,
+              wms_feature_id: feature.id,
+              wms_offset_m: offset,
+              parsed_input: parsed,
+              partial: true,
+            };
+          }
+
+          console.error(
+            `No apartment match at ${candidate.display_name} offset=${offset}; found ${apartments.length} unit sections.`
+          );
         }
-
-        if (match) {
-          return {
-            status: "success",
-            source: "geodata_wms",
-            cadastral_number: formatCadastralNumber(match.cadastralNumber),
-            raw_cadastral_number: match.cadastralNumber,
-            matched_address: match.address,
-            apartment: parsed.apartment,
-            apartment_area_m2: match.area_m2,
-            apartment_floor: match.floor,
-            apartment_type: match.type,
-            estimated_value_lei: match.estimated_value_lei,
-            building_cadastral_number: buildings[0]?.cadastralNumber || null,
-            building_address: buildings[0]?.address || null,
-            geocoded_address: candidate.display_name,
-            geocoded_lat: candidate.lat,
-            geocoded_lon: candidate.lon,
-            geocode_score: candidate.score,
-            wms_feature_id: feature.id,
-            wms_offset_m: offset,
-            parsed_input: parsed,
-          };
-        }
-
-        const derivedMatch = findDerivedApartmentMatch(buildings, parsed);
-        if (derivedMatch) {
-          return {
-            status: "success",
-            source: "geodata_wms_derived",
-            cadastral_number: derivedMatch.cadastralNumber,
-            raw_cadastral_number: derivedMatch.cadastralNumber,
-            matched_address: derivedMatch.building.address,
-            apartment: parsed.apartment,
-            building_cadastral_number: derivedMatch.building.cadastralNumber,
-            building_address: derivedMatch.building.address,
-            geocoded_address: candidate.display_name,
-            geocoded_lat: candidate.lat,
-            geocoded_lon: candidate.lon,
-            geocode_score: candidate.score,
-            wms_feature_id: feature.id,
-            wms_offset_m: offset,
-            parsed_input: parsed,
-            partial: true,
-          };
-        }
-
-        console.error(
-          `No apartment match at ${candidate.display_name} offset=${offset}; found ${apartments.length} unit sections.`
-        );
       }
     }
-  }
 
-  const exactGeocodeDerivedMatch = await findDerivedApartmentFromExactGeocode(parsed, geocoded);
-  if (exactGeocodeDerivedMatch) {
-    return {
-      status: "success",
-      source: exactGeocodeDerivedMatch.source,
-      cadastral_number: exactGeocodeDerivedMatch.cadastralNumber,
-      raw_cadastral_number: exactGeocodeDerivedMatch.cadastralNumber,
-      matched_address: exactGeocodeDerivedMatch.candidate.display_name,
-      apartment: parsed.apartment,
-      building_cadastral_number: exactGeocodeDerivedMatch.buildingCadastralNumber,
-      parcel_cadastral_number: exactGeocodeDerivedMatch.parcelCadastralNumber || null,
-      geocoded_address: exactGeocodeDerivedMatch.candidate.display_name,
-      geocoded_lat: exactGeocodeDerivedMatch.candidate.lat,
-      geocoded_lon: exactGeocodeDerivedMatch.candidate.lon,
-      geocode_score: exactGeocodeDerivedMatch.candidate.score,
-      parsed_input: parsed,
-      partial: true,
-    };
+    const exactGeocodeDerivedMatch = await findDerivedApartmentFromExactGeocode(parsed, geocoded);
+    if (exactGeocodeDerivedMatch) {
+      return {
+        status: "success",
+        source: exactGeocodeDerivedMatch.source,
+        cadastral_number: exactGeocodeDerivedMatch.cadastralNumber,
+        raw_cadastral_number: exactGeocodeDerivedMatch.cadastralNumber,
+        matched_address: exactGeocodeDerivedMatch.candidate.display_name,
+        apartment: parsed.apartment,
+        building_cadastral_number: exactGeocodeDerivedMatch.buildingCadastralNumber,
+        parcel_cadastral_number: exactGeocodeDerivedMatch.parcelCadastralNumber || null,
+        geocoded_address: exactGeocodeDerivedMatch.candidate.display_name,
+        geocoded_lat: exactGeocodeDerivedMatch.candidate.lat,
+        geocoded_lon: exactGeocodeDerivedMatch.candidate.lon,
+        geocode_score: exactGeocodeDerivedMatch.candidate.score,
+        parsed_input: parsed,
+        partial: true,
+      };
+    }
+  } catch (error) {
+    if (error?.code !== "service_unavailable") throw error;
+    failures.push(error);
   }
 
   console.error("No geodata match; trying cadastru.md APEX search.");
@@ -1322,6 +1353,8 @@ export async function findCadastralByAddress(rawAddress) {
     console.error(`cadastru.md fallback failed: ${error.message}`);
   }
 
+  if (cadastruError) throw cadastruError;
+  if (failures.length) throw failures[0];
   const suffix = cadastruError ? ` cadastru.md fallback error: ${cadastruError.message}` : "";
-  throw new Error(`Could not match apartment ${parsed.apartment} after ${geocoded.length} geocoding candidates.${suffix}`);
+  throw Object.assign(new Error(`Could not match apartment ${parsed.apartment} after ${geocoded.length} geocoding candidates.${suffix}`), { code: "not_found" });
 }

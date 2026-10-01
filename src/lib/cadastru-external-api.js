@@ -102,9 +102,11 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     return payload.data;
   }
 
-  const code = payload?.error || `external_cadastru_http_${response.status}`;
+  const unavailable = response.status >= 500 || response.status === 429 ||
+    payload?.error === "service_unavailable" || (response.ok && (!payload?.ok || !payload?.data));
+  const code = unavailable ? "service_unavailable" : payload?.error || `external_cadastru_http_${response.status}`;
   const message = payload?.message || `External cadastru API returned ${response.status}`;
-  const fallbackEligible = response.status === 502 || response.status === 503 || response.status === 504;
+  const fallbackEligible = unavailable;
   const usageWrite = shouldTrackUsage ? trackExternalApiUsage(service, "failure", {
     endpoint: url,
     requestPayload: body,

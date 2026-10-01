@@ -285,6 +285,7 @@
   "cadastru.numberSearchButton": "Проверить кадастровый номер",
   "cadastru.searching": "Поиск...",
   "cadastru.lookupError": "Не удалось найти кадастровые данные. Проверьте введенные данные.",
+  "cadastru.serviceUnavailable": "Кадастровый сервис временно недоступен. Попробуйте позже.",
   "cadastru.missingAddressFields": "Укажите улицу и номер дома.",
   "cadastru.invalidAddressFields": "Номер дома должен содержать только цифры и при необходимости /",
   "cadastru.rateLimitError": "Слишком много запросов. Попробуйте еще раз немного позже.",

@@ -282,7 +282,7 @@ assert(!suggestStreets({ city: "Balti", roadType: "str", street: "Alexandr Radi�
 assert(!suggestStreets({ city: "Chișinău", roadType: "str", street: "31 August 1988" }).includes("31 August 1989"));
 
 let suggestionFailure = Object.assign(new Error("missing"), { status: 404, code: "not_found" });
-let backupFailure = new Error("Could not match land or buildings for Balti.");
+let backupFailure = Object.assign(new Error("Could not match land or buildings for Balti."), { code: "not_found" });
 const submitted = [];
 const suggestionsRoute = await load("src/app/api/cadastru/address/route.js", {
   ...routeMocks,
@@ -316,8 +316,10 @@ suggested = await suggestionsRoute.POST(request(baltiRequest));
 assert.equal((await suggested.json()).suggestions[0], "Alexandr Radișcev");
 backupFailure = Object.assign(new Error("timeout"), { name: "TimeoutError" });
 suggested = await suggestionsRoute.POST(request(baltiRequest));
-assert.equal(suggested.status, 504);
-assert.equal((await suggested.json()).suggestions, undefined);
+assert.equal(suggested.status, 503);
+const timeoutPayload = await suggested.json();
+assert.equal(timeoutPayload.error, "service_unavailable");
+assert.equal(timeoutPayload.suggestions, undefined);
 console.log("Did-you-mean regressions passed: RO/RU spellings, scope, original lookup first, no-data-only suggestions, retry identity and timeout exclusion.");
 
 // Exercise actual worker telemetry, signed correlation and route recovery with isolated DB/fetch mocks.
@@ -328,7 +330,7 @@ delete recoveryMocks["@/lib/cadastru-external-api"];
 let backupHasResult = false;
 recoveryMocks["@/lib/cadastru-address-search"] = {
   findCadastralByAddress: async () => {
-    if (!backupHasResult) throw new Error("Could not match land or buildings for Balti.");
+    if (!backupHasResult) throw Object.assign(new Error("Could not match land or buildings for Balti."), { code: "not_found" });
     return { lands: [{ cadastral_number: "0300101.001", address: "Bălți, str Alexandr Radișcev 28" }] };
   },
 };
@@ -352,10 +354,14 @@ const createFailure = async () => {
   const event = tables.external_api_usage_events.at(-1);
   assert.equal(event.status, "failure");
   assert.equal(event.request_payload.street, "Radiceva");
+  assert.equal(event.request_payload.apartment_number, "7", "failed worker logs retain the submitted apartment number");
   return { failure, event };
 };
 const retryBody = (failure) => ({ ...baltiRequest, street: failure.suggestions[0], suggestion_recovery_token: failure.suggestion_recovery_token });
 let failed = await createFailure();
+const buildingFailure = await recoveryRoute.POST(request({ ...baltiRequest, apartment_number: "" }));
+assert.equal(buildingFailure.status, 404);
+assert.equal(Object.hasOwn(tables.external_api_usage_events.at(-1).request_payload, "apartment_number"), false, "building-only failures omit an apartment that was not entered");
 let retry = await recoveryRoute.POST(request(retryBody(failed.failure)));
 assert.equal(retry.status, 404);
 assert.equal(failed.event.suggestion_recovery, undefined, "a clicked suggestion that fails is not recovery");
@@ -480,3 +486,56 @@ for (const record of localityCases) {
 await storage.persistCadastruRecord({ cadastral_number: "0146114.999", address: "mun. Chișinău, sat. Unknown, str. Florilor 6" }, { officialFetch: true });
 assert.equal(tables.cadastru_records.find((row) => row.cadastral_number === "0146114.999").city, null, "unknown settlements cannot become the parent city");
 console.log("Locality regressions passed: signed worker fields, local land/building fallback, parent/suffix/detail rejection and separate stored city/region.");
+
+// Worker outages must stay distinct from confirmed empty local lookups.
+for (const mode of ["http503", "gateway", "network", "timeout", "invalid"]) {
+  const outageRoute = await load("src/app/api/cadastru/address/route.js", {
+    ...recoveryMocks,
+    "@/lib/cadastru-address-search": { findCadastralByAddress: async () => {
+      throw Object.assign(new Error("Could not match apartment 59."), { code: "not_found" });
+    } },
+  }, {
+    process: { env: recoveryEnv }, fetch: async () => {
+      if (mode === "network") throw new TypeError("fetch failed");
+      if (mode === "timeout") throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+      if (mode === "invalid") return new Response("<html>Maintenance</html>");
+      if (mode === "gateway") return new Response("Bad Gateway", { status: 502 });
+      return Response.json({ ok: false, error: "service_unavailable" }, { status: 503 });
+    },
+  });
+  const response = await outageRoute.POST(request({ city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63", apartment_number: "59", search_context: "cadastru", skip_cache: true }));
+  const payload = await response.json();
+  assert.equal(response.status, 503, mode);
+  assert.equal(payload.error, "service_unavailable");
+  assert.equal(payload.suggestions, undefined);
+  assert.equal(payload.suggestion_recovery_token, undefined);
+  assert.equal(tables.external_api_usage_events.at(-1).request_payload.apartment_number, "59");
+}
+
+// Exercise actual local upstream handling, not only the route's error mapping.
+for (const mode of ["empty", "http503", "timeout", "session", "apex", "geodata", "fallback"]) {
+  const localLookup = await load("@/lib/cadastru-address-search", {}, {
+    fetch: async (url, options = {}) => {
+      const host = new URL(url).hostname;
+      if (host === "nominatim.openstreetmap.org") return Response.json(["geodata", "fallback"].includes(mode) ? [{ lat: "47", lon: "28.8",
+        display_name: "63, Bulevardul Decebal, Chișinău", address: { city: "Chișinău", road: "Bulevardul Decebal", house_number: "63" } }] : []);
+      if (host === "geodata.gov.md") return new Response("Bad Gateway", { status: 502 });
+      assert.equal(host, "www.cadastru.md");
+      if (mode === "http503") return new Response("Unavailable", { status: 503 });
+      if (mode === "timeout") throw Object.assign(new Error("timed out"), { name: "TimeoutError" });
+      if (options.method !== "POST") return new Response(mode === "session" ? "<html>Maintenance</html>" : '<input name="p_instance" value="12345">');
+      if (mode === "apex") return new Response("ORA-12541: TNS:no listener");
+      const body = new URLSearchParams(options.body);
+      if (body.get("p_request") === "APPLICATION_PROCESS=jQuery_Auto") return new Response(mode === "fallback" ? "0100106.131: mun. Chișinău, bd. Decebal 63" : "");
+      return new Response('<div class="infoConstr">Adresa: mun. Chișinău, bd. Decebal 63<br><a onclick="getDetailedInfo(\'0100106.131.01.059\',3)"><i>59</i></a></div>');
+    },
+  });
+  if (mode === "fallback") {
+    assert.equal((await localLookup.findCadastralByAddress("Chișinău, bd Decebal 63 ap 59")).cadastral_number, "0100106.131.01.059");
+  } else {
+    for (const address of ["Chișinău, bd Decebal 63", "Chișinău, bd Decebal 63 ap 59"]) {
+      await assert.rejects(localLookup.findCadastralByAddress(address), (error) => error.code === (mode === "empty" ? "not_found" : "service_unavailable"), `${mode}: ${address}`);
+    }
+  }
+}
+console.log("Outage regressions passed: real no-data, provider failures, worker transport, apartment telemetry, no suggestions and successful fallback.");

@@ -6,11 +6,13 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BackButton from "@/components/BackButton";
 import CadastralDataCard from "@/components/CadastralDataCard";
+import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { matchCity, matchDistrict, validateCadastralNumber } from "@/lib/validation";
+import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
 
 const inFlightCadastralLookups = new Map();
 const CADASTRU_DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
@@ -399,8 +401,11 @@ function CadastruResultContent() {
   const isAddressPreviewHandoff = source === "address" && (
     searchParams.get("preview") === "1" || searchParams.get("result") === "1"
   );
+  const savedAddress = getSavedCadastruAddress(searchParams);
+  const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
   const loadedRequestKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalCopyKey, setAuthModalCopyKey] = useState("cadastru.loginToUse");
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
   const [state, setState] = useState({
     loading: true,
@@ -412,6 +417,17 @@ function CadastruResultContent() {
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
   const valuationPrefill = buildValuationPrefill(state.data);
+  const favoritePath = state.data ? getCadastruFavoritePath({
+    lang,
+    cadastralNumber,
+    cadastral: state.data,
+    savedAddress,
+    addressRequest: isAddressPreviewHandoff ? readAddressLookupRequest() : null,
+  }) : null;
+  const favoriteNumber = cadastralNumber || (!isLockedPreview ? state.data?.cadastral_number : "");
+  const favoriteAddress = state.data?.resolved_address || state.data?.request_address ||
+    state.data?.matched_address || state.data?.apartment?.address || state.data?.building?.address;
+  const favoriteLabel = [t("nav.cadastru"), favoriteNumber, favoriteAddress].filter(Boolean).join(" · ");
   const mapLocation = [
     state.data?.map_location,
     state.data?.building?.map_location,
@@ -435,29 +451,29 @@ function CadastruResultContent() {
     : null;
 
   useEffect(() => {
-    if (!cadastralNumber && !isAddressPreviewHandoff) return;
+    if (!cadastralNumber && !isAddressPreviewHandoff && !savedAddressKey) return;
     try {
       localStorage.removeItem(CADASTRU_DRAFT_STORAGE_KEY);
     } catch {
       // Draft cleanup is best-effort after the result page opens.
     }
-  }, [cadastralNumber, isAddressPreviewHandoff]);
+  }, [cadastralNumber, isAddressPreviewHandoff, savedAddressKey]);
 
   useEffect(() => {
     if (authLoading) return;
 
-    if (isAddressPreviewHandoff) {
+    if (isAddressPreviewHandoff || savedAddressKey) {
       const accessMode = session?.access_token ? "authenticated" : "anonymous";
-      const requestKey = `address-preview|${accessMode}|${skipCache ? "skipcache" : "cache"}`;
+      const requestKey = `address-preview|${savedAddressKey}|${accessMode}|${skipCache ? "skipcache" : "cache"}`;
       if (loadedRequestKey.current === requestKey) return;
 
-      const preview = readAddressResultPreview();
+      const preview = savedAddressKey ? null : readAddressResultPreview();
       if (isAddressResultHandoff && preview) {
         loadedRequestKey.current = requestKey;
         setState({ loading: false, error: "", data: preview });
         return;
       }
-      if (!isAuthenticated) {
+      if (!isAuthenticated && !savedAddressKey) {
         loadedRequestKey.current = requestKey;
         setState({
           loading: false,
@@ -467,7 +483,9 @@ function CadastruResultContent() {
         return;
       }
 
-      const addressRequest = readAddressLookupRequest();
+      const addressRequest = savedAddressKey
+        ? { ...getSavedCadastruAddress(new URLSearchParams(savedAddressKey)), search_context: "cadastru" }
+        : readAddressLookupRequest();
       if (!addressRequest) {
         loadedRequestKey.current = requestKey;
         setState({
@@ -486,9 +504,9 @@ function CadastruResultContent() {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${session.access_token}`,
+              ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
             },
-            body: JSON.stringify(addressRequest),
+            body: JSON.stringify({ ...addressRequest, ...(skipCache ? { skip_cache: true } : {}) }),
           });
 
           if (!response.ok) {
@@ -500,7 +518,7 @@ function CadastruResultContent() {
           if (active) {
             loadedRequestKey.current = requestKey;
             setState({ loading: false, error: "", data });
-            if (!data?.locked_sections?.cadastru_details) clearAddressLookupRequest();
+            if (!savedAddressKey && !data?.locked_sections?.cadastru_details && data?.cadastral_number) clearAddressLookupRequest();
           }
         } catch {
           if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
@@ -562,7 +580,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, session?.access_token, skipCache, source, t]);
+  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, savedAddressKey, session?.access_token, skipCache, source, t]);
 
   useEffect(() => {
     if (isAuthenticated) setIsAuthModalOpen(false);
@@ -572,7 +590,7 @@ function CadastruResultContent() {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <AuthRequiredModal
         open={isAuthModalOpen}
-        copyKey="cadastru.loginToUse"
+        copyKey={authModalCopyKey}
         onClose={() => setIsAuthModalOpen(false)}
       />
       <AuthRequiredModal
@@ -601,8 +619,22 @@ function CadastruResultContent() {
             <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
               {t("cadastru.resultPageTitle")}
             </h1>
-            {state.data && isAuthenticated && (
-              <CadastruImageSaveButton cadastral={state.data} targetRef={exportCardRef} />
+            {state.data && (
+              <div className="flex shrink-0 items-center gap-2">
+                {favoritePath && (
+                  <CadastruFavoriteButton
+                    key={`${session?.user?.id || "anonymous"}:${favoritePath}`}
+                    urlPath={favoritePath}
+                    label={favoriteLabel}
+                    onAuthRequired={() => {
+                      setAuthModalCopyKey("result.loginToFavorite");
+                      clearAuthError();
+                      setIsAuthModalOpen(true);
+                    }}
+                  />
+                )}
+                {isAuthenticated && <CadastruImageSaveButton cadastral={state.data} targetRef={exportCardRef} />}
+              </div>
             )}
           </div>
 
@@ -634,6 +666,7 @@ function CadastruResultContent() {
                   if (isAuthenticated) {
                     setIsPaywallModalOpen(true);
                   } else {
+                    setAuthModalCopyKey("cadastru.loginToUse");
                     setIsAuthModalOpen(true);
                   }
                 } : undefined}

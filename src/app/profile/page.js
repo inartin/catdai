@@ -522,7 +522,7 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("favorites")}
-                className={`flex flex-none items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors sm:flex-1 ${activeTab === "favorites"
+                className={`flex flex-none cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors sm:flex-1 ${activeTab === "favorites"
                   ? "bg-primary text-white"
                   : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
                 }`}
@@ -579,7 +579,7 @@ export default function ProfilePage() {
                         <button
                           type="button"
                           onClick={() => handleRemoveFavorite(fav.url_path)}
-                          className="shrink-0 rounded-lg p-1.5 text-primary opacity-0 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+                          className="shrink-0 cursor-pointer rounded-lg p-1.5 text-primary opacity-0 transition-colors hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
                           title={t("result.removeFavorite")}
                         >
                           <BookmarkIcon size={16} filled />

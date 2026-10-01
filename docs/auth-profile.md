@@ -21,7 +21,7 @@ Implemented and active.
 - Telegram app-managed placeholder emails like `telegram-<id>@auth.catdai.md` are hidden; Telegram username is shown when available.
 - logout
 - free monthly balances for all six gated features plus purchased feature-credit balances, including remaining, used, and granted counts per feature, shown in the top profile card above `Setări`; free allowance cards use a separate free badge
-- favorites
+- saved valuation and cadastru results in `Salvate` (RO) / `Сохранённые` (RU), with links to reopen each result and a removal action
 - paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus search type, result type, city, and district when available
 - Successful cadastru history rows with a cadastral number are clickable (including Enter/Space) and open the localized cadastru result page. It reuses the existing Redis/DB lookup and access rules, refreshing expired data normally. Failed searches and rows without a cadastral number remain non-clickable.
 - paid sale/rent evaluation usage rows are shown in history when a saved paid snapshot exists; if the same action also has an `estimate_log` row, history hides the ordinary row and keeps only the paid snapshot row. Paid rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation

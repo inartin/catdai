@@ -4,6 +4,7 @@ import { isValidNewsPostId } from "@/lib/news-upvotes";
 import { fetchNewsViewCounts } from "@/lib/news-views";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
+import { getCanonicalSiteUrl } from "@/lib/seo";
 import {
   createNewsVisitorCookie,
   readNewsVisitorCookie,
@@ -27,7 +28,9 @@ function setVisitorCookie(response, token, request) {
 
 export async function POST(request) {
   const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin) {
+  // The reverse proxy can expose the public HTTPS site while request.url
+  // contains the internal HTTP origin. Keep the configured public origin valid.
+  if (origin && origin !== new URL(request.url).origin && origin !== getCanonicalSiteUrl()) {
     return NextResponse.json({ error: "Invalid origin." }, { status: 403 });
   }
 

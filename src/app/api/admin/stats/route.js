@@ -653,6 +653,38 @@ async function fetchPaidUserSummary(since) {
   };
 }
 
+export async function DELETE(request) {
+  const unauthorized = requireAdminApiAuth(request);
+  if (unauthorized) return unauthorized;
+
+  const params = request.nextUrl.searchParams;
+  const idValue = params.get("failedApiEventId");
+  const deleteAll = params.get("allFailedApiEvents") === "1";
+  const id = Number(idValue);
+  if ((deleteAll && params.has("failedApiEventId"))
+    || (!deleteAll && (!Number.isSafeInteger(id) || id <= 0))) {
+    return NextResponse.json({ error: "Specify a failed API log id or all failed logs." }, { status: 400 });
+  }
+
+  try {
+    const { error } = await supabaseAdmin.rpc("delete_failed_external_api_logs", {
+      p_event_id: deleteAll ? null : id,
+    });
+    if (error) {
+      if (["42883", "PGRST202"].includes(String(error.code))) {
+        return NextResponse.json({ error: "Apply db/external_api_usage_events.sql before deleting API logs." }, { status: 503 });
+      }
+      throw new Error(error.message);
+    }
+
+    cache = { data: null, ts: 0 };
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[admin-stats] failed API log deletion failed:", error.message);
+    return NextResponse.json({ error: "Failed to delete failed API logs." }, { status: 500 });
+  }
+}
+
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;

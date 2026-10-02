@@ -36,3 +36,41 @@ alter table public.external_api_usage_events enable row level security;
 
 grant all on public.external_api_usage_events to service_role;
 grant usage, select on sequence public.external_api_usage_events_id_seq to service_role;
+
+-- Delete request details and adjust counters in one transaction.
+-- NULL means all failed logs, including aggregate-only history.
+create or replace function public.delete_failed_external_api_logs(p_event_id bigint default null)
+returns bigint
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  deleted_count bigint;
+  deleted_service text;
+  deleted_date date;
+begin
+  if p_event_id is null then
+    delete from public.external_api_usage_events where status = 'failure';
+    get diagnostics deleted_count = row_count;
+    delete from public.external_api_usage_daily where status = 'failure';
+  else
+    if p_event_id <= 0 then
+      raise exception 'Invalid failed API log id';
+    end if;
+    delete from public.external_api_usage_events
+      where id = p_event_id and status = 'failure'
+      returning service, created_at::date into deleted_service, deleted_date;
+    get diagnostics deleted_count = row_count;
+    if deleted_count > 0 then
+      update public.external_api_usage_daily
+        set count = greatest(count - 1, 0), updated_at = now()
+        where service = deleted_service and usage_date = deleted_date and status = 'failure';
+    end if;
+  end if;
+  return deleted_count;
+end;
+$$;
+
+revoke all on function public.delete_failed_external_api_logs(bigint) from public, anon, authenticated;
+grant execute on function public.delete_failed_external_api_logs(bigint) to service_role;

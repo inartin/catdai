@@ -355,6 +355,8 @@ export default function AdminDashboard() {
   const [showExternalApiUsageList, setShowExternalApiUsageList] = useState(false);
   const [externalApiStatusFilter, setExternalApiStatusFilter] = useState("all");
   const [expandedExternalApiEventId, setExpandedExternalApiEventId] = useState(null);
+  const [deletingExternalApiEventId, setDeletingExternalApiEventId] = useState(null);
+  const [externalApiDeleteError, setExternalApiDeleteError] = useState(null);
   const [showCalculatorUsageList, setShowCalculatorUsageList] = useState(false);
   const selectedUserPopupRef = useRef(null);
 
@@ -583,6 +585,40 @@ export default function AdminDashboard() {
       setCadastruSearchDeleteError(err.message || "Failed to delete cadastru search");
     } finally {
       setDeletingCadastruSearchId(null);
+    }
+  };
+
+  const deleteFailedExternalApiLogs = async (row = null) => {
+    if (deletingExternalApiEventId !== null || (row && row.status !== "failure")) return;
+    const confirmed = window.confirm(row
+      ? "Permanently delete this failed API log and its request/response details? The failed count and total will decrease by one."
+      : "Permanently delete ALL failed API logs across all dates, including logs outside the current table, and reset all failed usage counts to zero?");
+    if (!confirmed) return;
+
+    setDeletingExternalApiEventId(row ? row.id : "all");
+    setExternalApiDeleteError(null);
+    try {
+      const params = new URLSearchParams(row
+        ? { failedApiEventId: row.id }
+        : { allFailedApiEvents: "1" });
+      const res = await fetch(`/api/admin/stats?${params.toString()}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setExpandedExternalApiEventId(null);
+      setStats((current) => ({
+        ...current,
+        externalApiUsage: {
+          ...current.externalApiUsage,
+          events: (current.externalApiUsage.events || []).filter((event) => row
+            ? event.id !== row.id
+            : event.status !== "failure"),
+        },
+      }));
+      await loadStats({ fresh: true });
+    } catch (err) {
+      setExternalApiDeleteError(err.message || "Failed to delete failed API logs");
+    } finally {
+      setDeletingExternalApiEventId(null);
     }
   };
 
@@ -1335,6 +1371,23 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {externalApiStatusFilter === "failure" && (
+              <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => deleteFailedExternalApiLogs()}
+                  disabled={deletingExternalApiEventId !== null || !s.externalApiUsage?.detailsAvailable}
+                  className="cursor-pointer rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingExternalApiEventId === "all" ? "Deleting..." : "Delete all failed logs"}
+                </button>
+                <span className="text-xs text-gray-500">All dates · Resets failed counts to zero</span>
+              </div>
+            )}
+            {externalApiDeleteError && (
+              <p role="alert" className="px-5 py-3 text-sm text-red-600">{externalApiDeleteError}</p>
+            )}
+
             {!s.externalApiUsage?.total && externalApiEvents.length === 0 ? (
               <div className="px-5 py-8 text-center text-gray-400">No external API calls found</div>
             ) : (
@@ -1370,6 +1423,7 @@ export default function AdminDashboard() {
                           <th className="px-4 py-3 text-right">Duration</th>
                           <th className="px-4 py-3">Result</th>
                           <th className="px-4 py-3">Suggestion recovery</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
@@ -1420,10 +1474,27 @@ export default function AdminDashboard() {
                                     </div>
                                   ) : <span className="text-gray-400">—</span>}
                                 </td>
+                                <td className="px-4 py-3 text-right">
+                                  {row.status === "failure" && (
+                                    <button
+                                      type="button"
+                                      aria-label={`Delete failed API log ${row.id}`}
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        deleteFailedExternalApiLogs(row);
+                                      }}
+                                      onKeyDown={(event) => event.stopPropagation()}
+                                      disabled={deletingExternalApiEventId !== null}
+                                      className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                      {deletingExternalApiEventId === row.id ? "Deleting..." : "Delete"}
+                                    </button>
+                                  )}
+                                </td>
                               </tr>
                               {expanded && (
                                 <tr>
-                                  <td colSpan={7} className="bg-gray-50 px-4 py-4">
+                                  <td colSpan={8} className="bg-gray-50 px-4 py-4">
                                     <div className="grid gap-4 lg:grid-cols-2">
                                       <div className="space-y-3">
                                         <div>

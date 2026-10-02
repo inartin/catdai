@@ -56,7 +56,9 @@ export function suggestStreets({ city, roadType, street, excludeStreet = street 
         remaining.forEach((candidate, i) => {
           const edits = distance(token, candidate);
           const limit = /\d/.test(token) || token.length < 4 ? 0 : token.length < 6 ? 1 : 2;
-          const next = edits <= limit ? edits / Math.max(token.length, candidate.length) : Infinity;
+          // A given-name initial can match a full word in suggestion-only ranking.
+          const initial = /^\p{L}$/u.test(token) && /^\p{L}{2,}$/u.test(candidate) && candidate.startsWith(token);
+          const next = initial ? 0.15 : edits <= limit ? edits / Math.max(token.length, candidate.length) : Infinity;
           if (next < cost) { cost = next; index = i; }
         });
         if (index === -1) { score = Infinity; break; }

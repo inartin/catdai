@@ -311,6 +311,12 @@ for (const street of ["Radiceva", "Radischev", "Radișcev", "Радищева", 
   assert.equal(suggestions[0], "Alexandr Radișcev", street);
   assert(suggestions.length <= 3);
 }
+for (const street of ["G. Cosbuc", "G Cosbuc", "G. Coșbuk", "Д. Кошбука"]) {
+  assert.equal(suggestStreets({ city: "Balti", roadType: "str", street })[0], "George Coșbuc", street);
+}
+assert(!suggestStreets({ city: "Balti", roadType: "str", street: "X. Cosbuc" }).includes("George Coșbuc"));
+assert.deepEqual(clone(suggestStreets({ city: "Balti", roadType: "bd", street: "G. Cosbuc" })), []);
+assert.deepEqual(clone(suggestStreets({ city: "Unknown", roadType: "str", street: "G. Cosbuc" })), []);
 assert.deepEqual(clone(suggestStreets({ city: "Balti", roadType: "bd", street: "Radischev" })), []);
 assert.deepEqual(clone(suggestStreets({ city: "Unknown", roadType: "str", street: "Radischev" })), []);
 assert.deepEqual(clone(suggestStreets({ city: "Balti", roadType: "str", street: "xyzqwk" })), []);
@@ -326,11 +332,26 @@ const suggestionsRoute = await load("src/app/api/cadastru/address/route.js", {
   "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: async (fields) => {
     submitted.push(fields);
     if (suggestionFailure) throw suggestionFailure;
-    return { lands: [{ cadastral_number: "0300101.001", address: "Bălți, str Alexandr Radișcev 28" }] };
+    return { lands: [{ cadastral_number: "0300101.001", address: `Bălți, str ${fields.street} ${fields.house_number}` }] };
   } },
   "@/lib/cadastru-address-search": { findCadastralByAddress: async () => { throw backupFailure; } },
 });
 const baltiRequest = { city: "Bălți", road_type: "strada", street: "Radiceva", house_number: "28", apartment_number: "7", skip_cache: true, search_context: "cadastru" };
+const abbreviatedBody = { ...baltiRequest, street: "G. Cosbuc", house_number: "13", apartment_number: "18" };
+let abbreviated = await suggestionsRoute.POST(request(abbreviatedBody));
+assert.equal(abbreviated.status, 404);
+assert.equal(submitted.at(-1).street, "George Coșbuc", "initials expand before the external lookup");
+assert.equal(submitted.at(-1).house_number, "13");
+assert.equal(submitted.at(-1).apartment_number, "18");
+suggestionFailure = null;
+abbreviated = await suggestionsRoute.POST(request(abbreviatedBody));
+assert.equal(abbreviated.status, 200);
+const abbreviatedPayload = await abbreviated.json();
+assert.equal(abbreviatedPayload.request_address, "Bălți, str G. Cosbuc 13 ap 18");
+assert.equal(abbreviatedPayload.resolved_address, "Bălți, str George Coșbuc 13 ap 18");
+assert.equal(abbreviatedPayload.street_resolution.status, "abbreviation");
+suggestionFailure = Object.assign(new Error("missing"), { status: 404, code: "not_found" });
+submitted.length = 0;
 const aliasesBeforeSuggestions = clone(tables.cadastru_address_aliases);
 let suggested = await suggestionsRoute.POST(request(baltiRequest));
 assert.equal(suggested.status, 404);
@@ -358,6 +379,22 @@ const timeoutPayload = await suggested.json();
 assert.equal(timeoutPayload.error, "service_unavailable");
 assert.equal(timeoutPayload.suggestions, undefined);
 console.log("Did-you-mean regressions passed: RO/RU spellings, scope, original lookup first, no-data-only suggestions, retry identity and timeout exclusion.");
+
+// Ambiguous initials must offer full names before any cache or provider lookup.
+const { createStreetResolver, normalizeStreetName } = await load("@/lib/cadastru-streets/street-resolver");
+const initialsResolver = createStreetResolver([
+  { city: "Bălți", road_type: "str", street: "George Coșbuc" },
+  { city: "Bălți", road_type: "str", street: "Gheorghe Coșbuc" },
+]);
+const ambiguousInitialsRoute = await load("src/app/api/cadastru/address/route.js", {
+  ...routeMocks,
+  "@/lib/cadastru-streets/street-resolver": { resolveStreet: initialsResolver, normalizeStreetName },
+  "@/lib/cadastru-records": { getCadastruRecordByAddress: () => { throw new Error("Ambiguity must not read cache"); }, persistCadastruAddressResult: () => { throw new Error("Ambiguity must not write cache"); } },
+  "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: () => { throw new Error("Ambiguity must not query worker"); } },
+});
+const ambiguousInitials = await ambiguousInitialsRoute.POST(request(abbreviatedBody));
+assert.equal(ambiguousInitials.status, 422);
+assert.deepEqual((await ambiguousInitials.json()).suggestions, ["George Coșbuc", "Gheorghe Coșbuc"]);
 
 // Exercise actual worker telemetry, signed correlation and route recovery with isolated DB/fetch mocks.
 cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;

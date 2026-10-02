@@ -7,13 +7,15 @@ const readData = (name) => name === "streets.json" ? streets : corrections;
 export function normalizeStreetName(value) {
   return String(value || "").normalize("NFD").replace(/(\p{Script=Latin})\p{M}+/gu, "$1").normalize("NFC")
     .toLowerCase().replace(/ё/g, "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim()
-    .replace(/^(?:strada|str|улица|ул|bulevardul|bulevard|bd|бульвар|бул|проспект|пр|șoseaua|soseaua|sos|шоссе|aleea|al|аллея)\s+/u, "")
+    .replace(/^(?:strada|str|bul|улица|ул|bulevardul|bulevard|bd|бульвар|бул|проспект|пр|șoseaua|soseaua|sos|шоссе|aleea|al|аллея)\s+/u, "")
     .replace(/\s+/g, " ");
 }
 
 function roadKey(value) {
   const key = String(value || "").toLowerCase().replace(/\.$/, "");
-  return /^(bd|bulevard|bulevardul)$/.test(key) ? "bd" : "str";
+  if (/^(bd|bul|bulevard|bulevardul|бульвар|бул|проспект|пр)$/.test(key)) return "bd";
+  if (/^(str|strada|улица|ул)$/.test(key)) return "str";
+  return key;
 }
 
 // Optimal string alignment distance: includes an adjacent-letter transposition.
@@ -31,6 +33,24 @@ function distance(a, b) {
     }
   }
   return rows[a.length][b.length];
+}
+
+function matchesInitials(input, name) {
+  const tokens = input.split(" ");
+  const words = name.split(" ");
+  // Keep the final name in full, preserve word order and never shorten numbers.
+  if (tokens.length !== words.length || !/^\p{L}{2,}$/u.test(tokens.at(-1))) return false;
+  let expanded = false;
+  const matches = tokens.every((token, index) => {
+    if (token === words[index]) return true;
+    if (index < tokens.length - 1 && /^\p{L}$/u.test(token)
+      && /^\p{L}{2,}$/u.test(words[index]) && words[index].startsWith(token)) {
+      expanded = true;
+      return true;
+    }
+    return false;
+  });
+  return matches && expanded;
 }
 
 export function createStreetResolver(entries) {
@@ -51,15 +71,26 @@ export function createStreetResolver(entries) {
     }
   }
 
-  return ({ city, roadType, street }) => {
+  return ({ city, roadType, street, exactOnly = false, includeAliases = false }) => {
     const scope = scopes.get(`${resolveSupportedCity(city)}|${roadKey(roadType)}`);
     const input = normalizeStreetName(street);
     const unchanged = { status: "unresolved", street };
     if (!scope || !input) return unchanged;
+    const result = (entry, status) => ({
+      status,
+      street: entry.street,
+      ...(includeAliases ? { aliases: [...entry.names].filter((name) =>
+        [...scope.values()].filter((candidate) => candidate.names.has(name)).length === 1
+      ) } : {}),
+    });
     const exact = [...scope.values()].filter((entry) => entry.names.has(input));
-    if (exact.length === 1) return { status: "exact", street: exact[0].street };
+    if (exact.length === 1) return result(exact[0], "exact");
     if (exact.length > 1) return { status: "ambiguous", street, suggestions: exact.map((x) => x.street).sort() };
-    if (input.length < 6 || input.length > 80) return unchanged;
+    if (exactOnly || input.length > 80) return unchanged;
+    const initials = [...scope.values()].filter((entry) => [...entry.names].some((name) => matchesInitials(input, name)));
+    if (initials.length === 1) return result(initials[0], "abbreviation");
+    if (initials.length > 1) return { status: "ambiguous", street, suggestions: initials.map((x) => x.street).sort() };
+    if (input.length < 6) return unchanged;
     const numbers = input.match(/\d+/g)?.join("|") || "";
     const ranked = [...scope.values()].map((entry) => ({
       street: entry.street,
@@ -72,7 +103,7 @@ export function createStreetResolver(entries) {
     if (!ranked.length || ranked[0].distance > 1) return unchanged;
     // A second street within two edits makes a one-edit correction uncertain.
     if (ranked.length > 1) return { status: "ambiguous", street, suggestions: ranked.map((x) => x.street) };
-    return { status: "typo", street: ranked[0].street };
+    return result(scope.get(normalizeStreetName(ranked[0].street)), "typo");
   };
 }
 

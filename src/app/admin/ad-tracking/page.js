@@ -342,7 +342,7 @@ export default function AdTrackingPage() {
 
           {ad.purchaseTrackingAvailable === false && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-              Payment attribution is unavailable because Paddle order data could not be loaded.
+              Payment attribution is unavailable because payment order data could not be loaded.
             </div>
           )}
 

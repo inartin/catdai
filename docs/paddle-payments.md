@@ -1,5 +1,7 @@
 # Paddle Payments
 
+> New purchases default to MAIB. Set `PAYMENT_PROVIDER=paddle` to restore this original checkout and Extra subscription behavior. Paddle checkout pages, configuration, transactions, webhooks, renewals, cancellation, and refund servicing remain intact. Never remove the MAIB migration on rollback: existing grants and reconciliation still require it. See [MAIB payments](maib-payments.md).
+
 ## Stage
 Paddle payment flow is connected for one-time packages, the Extra monthly subscription, evaluation limit popups, and single-feature products.
 

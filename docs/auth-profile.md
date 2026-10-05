@@ -25,8 +25,8 @@ Implemented and active.
 - paginated history tab for the authenticated user's own valuation rows from `estimate_log` and cadastru search rows from `cadastru_search_events`; sale shows `Evaluare`, rent shows `Evaluare Chirie`, and cadastru shows the cadastral number as the result plus search type, result type, city, and district when available
 - Successful cadastru history rows with a cadastral number are clickable (including Enter/Space) and open the localized cadastru result page. It reuses the existing Redis/DB lookup and access rules, refreshing expired data normally. Failed searches and rows without a cadastral number remain non-clickable.
 - paid sale/rent evaluation usage rows are shown in history when a saved paid snapshot exists; if the same action also has an `estimate_log` row, history hides the ordinary row and keeps only the paid snapshot row. Paid rows have a green left marker with a paid-result tooltip, open `/evaluare?snapshot_id=...`, and render the stored result instead of recomputing the valuation
-- paginated transactions tab for the authenticated user's own rows from `paddle_payment_orders`; it shows product, status, amount, Paddle transaction/subscription id when available, and the internal order id for support lookup
-- refunded and chargeback Paddle orders remain visible in transaction history, but they are not treated as active paid packages
+- paginated transactions tab for the authenticated user's own rows from `payment_orders_all`; it shows provider, sandbox label, product, status, amount, refund progress, provider transaction/subscription id when available, and the internal order id. The cursor uses timestamp, order id, and provider for stable pagination
+- refunded MAIB/Paddle and chargeback Paddle orders remain visible in transaction history, but they are not treated as active paid packages
 - closed `Setări` panel with account deletion and an Extra subscription cancellation action when the user has an active Extra subscription; cancellation is scheduled for the next billing period and visible subscription dates use full capitalized month names
 - localized browser title from `nav.profile`
 
@@ -68,3 +68,6 @@ Implemented and active.
 - `src/app/api/notifications/route.js`
 - `src/lib/system-notifications.js`
 - `src/app/api/auth/telegram/route.js`
+
+## MAIB credits
+Profile balances aggregate legacy credits and per-order MAIB grants. Package badges include paid/partially-refunded orders from both providers; full refunds remove paid-package eligibility. MAIB Extra is a one-time purchase and does not create a subscription or cancellation control. Existing Paddle subscription controls remain available. See [MAIB payments](maib-payments.md).

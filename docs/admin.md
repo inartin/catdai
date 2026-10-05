@@ -19,7 +19,7 @@ The separate Stored Cadastru Data section shows the total unique cadastral numbe
 
 Shows:
 - registered users with package badge, login provider type such as Telegram or Gmail, registration date, last visit, estimation count, cadastru search count, calculator usage count, PDF report count, 999 link count, shared links, and favorites; clicking a user name opens a Romanian access popup with the same package badge and remaining-access balances, and clicking outside that popup closes it
-- paid users count in the main dashboard, aggregating distinct registered users with at least one completed Paddle payment and at least one remaining paid feature credit; clicking the card opens the paid-user list with email, registration date, latest payment, latest product, remaining paid credits, and paid-order count
+- paid users count in the main dashboard, aggregating distinct registered users with at least one paid or partially refunded production MAIB or legacy Paddle payment and at least one remaining paid feature credit; clicking the card opens the paid-user list with email, registration date, latest payment, latest product, remaining paid credits, and paid-order count
 - refunded and chargeback Paddle orders show in the user payment list, but refunded/chargeback orders are excluded from the paid package badge and paid-user aggregation
 - checkout popup opens, checkout page opens, and standalone pricing page opens as separate dashboard cards, each showing total opens plus unique user/device visitors for the selected period
 - landing market-trends popup opens appear as a simple dashboard count for the selected period, summed from one aggregate row per Chișinău calendar day
@@ -31,7 +31,7 @@ Shows:
 - Registered type cells show the user's email in the shared tooltip component when Supabase has an email for that user.
 - The user admin API includes a response version in its short cache so table schema changes do not reuse stale in-memory rows.
 - `/api/admin/users` includes paid feature credits and current-month free balances for all six gated features in the user detail popup.
-- `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, deletes `user_feature_credits` for Start, and otherwise upserts `user_feature_credits` with `remaining_uses = total_granted` and `total_used = 0` for each paid feature.
+- `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, calls `override_payment_credits` to atomically override both legacy and MAIB balances. Start clears paid balances; package changes/reset restore the configured package counts with usage reset. Bulk balance overrides preserve usage totals and metadata. Paddle subscription servicing only changes legacy balances.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows
@@ -69,7 +69,7 @@ Shows:
 - Owners list with search and pagination.
 - Owner detail with profile fields and listings.
 - Dashboard registered users and recent sale/rent estimations are inline expandable tables.
-- `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows source tabs for `/?src=zdg`, `/?utm_source=reddit`, and `/?utm_source=vtememd` tracking grouped by visitor session, with a 1 day / 7 days / 1 month / All time period filter, closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, source session/device/funnel totals in the top cards, paid-user attribution for tracked users with completed Paddle payments after their first source event in the selected period, paged visitor journeys that load more while scrolling, and a `Hard refresh` button that bypasses the 10-minute Redis cache for the selected source and period.
+- `/admin/ad-tracking` is linked from the left menu as `Ad tracking` and shows source tabs for `/?src=zdg`, `/?utm_source=reddit`, and `/?utm_source=vtememd` tracking grouped by visitor session, with a 1 day / 7 days / 1 month / All time period filter, closed-by-default action timelines, repeated actions collapsed into counters, readable event names, registered user identity when a tracked visitor logs in, source session/device/funnel totals in the top cards, paid-user attribution for tracked users with paid production MAIB or legacy Paddle payments after their first source event in the selected period, paged visitor journeys that load more while scrolling, and a `Hard refresh` button that bypasses the 10-minute Redis cache for the selected source and period.
 - `/api/admin/feedback` returns the 100 latest `user_feedback` rows and deletes individual rows after route-level admin cookie verification.
 - `/api/admin/news` and `/api/admin/news/[id]` manage `news_posts` rows after route-level admin cookie verification.
 - `/api/admin/uploads` stores images in the configured Supabase Storage bucket and returns `public_url` plus the storage path after route-level admin cookie verification.
@@ -91,3 +91,6 @@ Shows:
 - `db/calculator_usage_events.sql`
 - `db/market_trends_popup_events.sql`
 - `db/user_notifications.sql`
+
+## MAIB refunds
+The user transaction list includes both processors and labels sandbox rows. MAIB rows support full refunds with reason and amount confirmation, plus status refresh. The API requires the admin session and same-origin requests, calculates the remaining refundable amount, and reserves an attempt before contacting MAIB. Created/Requested stay pending; Accepted removes only unused credits from that order. Rejected allows a deliberate new attempt; Manual/unknown require review and block resubmission. External partial refunds are recorded without reducing credits until fully refunded. Production paid-user and attribution reports exclude MAIB sandbox rows. See [MAIB payments](maib-payments.md).

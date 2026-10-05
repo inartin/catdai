@@ -94,9 +94,9 @@ async function fetchPaidPackageRows() {
 
   while (true) {
     const { data, error } = await supabaseAdmin
-      .from("paddle_payment_orders")
+      .from("payment_orders_all")
       .select("user_id, product_key, paid_at, created_at")
-      .eq("status", "paid")
+      .in("status", ["paid", "partially_refunded"])
       .in("product_key", Array.from(PACKAGE_PRODUCT_KEYS))
       .not("user_id", "is", null)
       .order("created_at", { ascending: false })
@@ -104,7 +104,7 @@ async function fetchPaidPackageRows() {
 
     if (error) {
       if (isMissingSchemaError(error)) return [];
-      throw new Error(`paddle_payment_orders package query failed: ${error.message}`);
+      throw new Error(`payment_orders_all package query failed: ${error.message}`);
     }
 
     if (!data || data.length === 0) break;
@@ -122,7 +122,7 @@ async function fetchFeatureCreditRows() {
 
   while (true) {
     const { data, error } = await supabaseAdmin
-      .from("user_feature_credits")
+      .from("user_feature_credit_balances")
       .select("user_id, feature_key, remaining_uses, total_granted, total_used")
       .not("user_id", "is", null)
       .range(from, from + PAGE - 1);

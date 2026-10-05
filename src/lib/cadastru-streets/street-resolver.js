@@ -111,3 +111,26 @@ export const resolveStreet = createStreetResolver([
   ...readData("streets.json").streets,
   ...readData("street-corrections.json"),
 ]);
+
+export function inspectStreetAddress({ city, roadType, street, houseNumber }) {
+  const unchanged = { status: "unchanged", street };
+  // Check complete names first: dates and numbered streets must retain their digits.
+  if (resolveStreet({ city, roadType, street, exactOnly: true }).status !== "unresolved") return unchanged;
+  let candidate = String(street || "").trim().replace(/[.,;]+$/, "").trim();
+  const house = candidate.match(/(?:^|[\s,;])(?:nr\.?\s*)?(\d{1,4}(?:\/\d{1,4})?)$/i);
+  if (house) candidate = candidate.slice(0, house.index).trim();
+  const markers = { str: "strada|str|улица|ул", bd: "bulevardul|bulevard|bd|bul|бульвар|бул|проспект|пр" }[roadKey(roadType)];
+  if (!markers) return unchanged;
+  candidate = candidate.replace(new RegExp(`^(?:${markers})(?:[.,]\\s*|\\s+)`, "iu"), "")
+    .replace(new RegExp(`[,;\\s]+(?:${markers})\\.?$`, "iu"), "")
+    .replace(/^[,;\s]+|[,;\s]+$/g, "");
+  const resolved = resolveStreet({ city, roadType, street: candidate, exactOnly: true });
+  // A marker for another road type must not disappear through name normalization.
+  if (/^(?:strada|str|bulevardul|bulevard|bd|bul|улица|ул|бульвар|бул|проспект|пр|soseaua|șoseaua|sos|шоссе|aleea|al|аллея)(?:[.,]|\s)/iu.test(candidate)) return unchanged;
+  if (resolved.status !== "exact") return unchanged;
+  if (house && house[1] !== houseNumber) {
+    return { status: "conflict", street: resolved.street, embeddedHouseNumber: house[1],
+      corrections: [house[1], houseNumber].map((number) => ({ street: resolved.street, house_number: number })) };
+  }
+  return { status: "cleaned", street: resolved.street };
+}

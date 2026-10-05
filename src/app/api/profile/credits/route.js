@@ -57,7 +57,7 @@ export async function GET(request) {
   }
 
   const { data, error } = await supabaseAdmin
-    .from("user_feature_credits")
+    .from("user_feature_credit_balances")
     .select("feature_key, remaining_uses, total_granted, total_used")
     .eq("user_id", access.user_id);
 

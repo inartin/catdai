@@ -1,3 +1,5 @@
+import { getPaymentProvider } from "@/lib/payment-provider";
+import { maibProduct } from "@/lib/maib/products.mjs";
 import { getPricingConfig } from "@/lib/pricing-config";
 
 export const PAYMENT_FEATURE_KEYS = [
@@ -113,6 +115,12 @@ export function getPaymentProduct(productKey) {
   const product = getPaymentProducts()[key];
   if (!product) return null;
 
+  if (getPaymentProvider() === "maib") {
+    const maib = maibProduct(key);
+    if (!maib) return null;
+    return { key, ...product, billingMode: "one_time", grants: maib.grants,
+      amountMinor: maib.amount_minor, amountMdl: maib.amount_mdl, amountEur: maib.amount_mdl / 20 };
+  }
   const sharedListingAnalysisPriceEur = getListingAnalysisSinglePriceEur();
   const amountEur = product.useSharedEvaluationPrice
     ? sharedListingAnalysisPriceEur

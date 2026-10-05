@@ -1,3 +1,4 @@
+import { getPaymentProvider } from "@/lib/payment-provider";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { rateLimit } from "@/lib/rate-limit";
@@ -143,6 +144,7 @@ function buildCheckoutUrl(request, orderId, transactionId, returnTo, lang) {
 }
 
 export async function POST(request) {
+  if (getPaymentProvider() !== "paddle") return NextResponse.json({ error: "Paddle checkout is inactive." }, { status: 409 });
   const limit = limiter.check(getClientIp(request));
   if (!limit.allowed) {
     return NextResponse.json(

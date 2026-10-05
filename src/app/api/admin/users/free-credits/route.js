@@ -23,35 +23,6 @@ async function listAllUsers() {
   return users;
 }
 
-async function fetchCreditRows(userIds) {
-  if (!userIds.length) return [];
-
-  let rows = [];
-  for (let i = 0; i < userIds.length; i += PAGE) {
-    const ids = userIds.slice(i, i + PAGE);
-    const { data, error } = await supabaseAdmin
-      .from("user_feature_credits")
-      .select("user_id, feature_key, remaining_uses, total_granted, total_used")
-      .in("user_id", ids);
-
-    if (error) throw error;
-    rows = rows.concat(data || []);
-  }
-
-  return rows;
-}
-
-async function upsertRows(rows) {
-  for (let i = 0; i < rows.length; i += PAGE) {
-    const chunk = rows.slice(i, i + PAGE);
-    const { error } = await supabaseAdmin
-      .from("user_feature_credits")
-      .upsert(chunk, { onConflict: "user_id,feature_key" });
-
-    if (error) throw error;
-  }
-}
-
 function parseAmount(value) {
   const amount = Number(value);
   if (!Number.isInteger(amount) || amount < 0 || amount > MAX_CREDITS) return null;
@@ -72,33 +43,19 @@ export async function POST(request) {
 
     const users = await listAllUsers();
     const userIds = users.map((user) => user.id).filter(Boolean);
-    const existingRows = await fetchCreditRows(userIds);
-    const existingByKey = new Map(
-      existingRows.map((row) => [`${row.user_id}:${row.feature_key}`, row])
-    );
-
-    const rows = userIds.flatMap((userId) =>
-      PAYMENT_FEATURE_KEYS.map((featureKey) => {
-        const current = existingByKey.get(`${userId}:${featureKey}`) || {};
-        const totalUsed = Math.max(Number(current.total_used) || 0, 0);
-
-        return {
-          user_id: userId,
-          feature_key: featureKey,
-          remaining_uses: amount,
-          total_granted: totalUsed + amount,
-          total_used: totalUsed,
-        };
-      })
-    );
-
-    await upsertRows(rows);
+    const grants = Object.fromEntries(PAYMENT_FEATURE_KEYS.map(key => [key, amount]));
+    for (const userId of userIds) {
+      const { error } = await supabaseAdmin.rpc("override_payment_credits", {
+        p_user_id: userId, p_grants: grants, p_preserve_used: true, p_clear: false,
+      });
+      if (error) throw error;
+    }
 
     return NextResponse.json({
       ok: true,
       amount,
       usersUpdated: userIds.length,
-      rowsUpdated: rows.length,
+      rowsUpdated: userIds.length * PAYMENT_FEATURE_KEYS.length,
     });
   } catch (error) {
     console.error("[admin-free-credits] update failed:", error);

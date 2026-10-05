@@ -152,13 +152,13 @@ export default function CadastruSearchForm({
   const setAddressField = (field, value) => {
     addressRequestId.current += 1;
     setAddressForm((current) => ({ ...current, [field]: value }));
-    setLookupState((current) => current.method === "address" ? { ...current, loading: false, error: "", suggestions: [] } : current);
+    setLookupState((current) => current.method === "address" ? { ...current, loading: false, error: "", suggestions: [], addressCorrections: [], suggestionRecoveryToken: null } : current);
   };
 
-  const validateAddressFields = () => {
-    const street = addressForm.street.trim();
-    const houseNumber = addressForm.houseNumber.trim();
-    const apartmentNumber = addressForm.apartmentNumber.trim();
+  const validateAddressFields = (form = addressForm) => {
+    const street = form.street.trim();
+    const houseNumber = form.houseNumber.trim();
+    const apartmentNumber = form.apartmentNumber.trim();
 
     if (!street || !houseNumber) {
       return t("cadastru.missingAddressFields");
@@ -211,21 +211,27 @@ export default function CadastruSearchForm({
     const requestId = ++addressRequestId.current;
     if (requireAuth()) return;
 
-    const validationError = validateAddressFields();
+    const correction = suggestedStreet && typeof suggestedStreet === "object" ? suggestedStreet : null;
+    const searchForm = {
+      ...addressForm,
+      ...(typeof suggestedStreet === "string" ? { street: suggestedStreet } : {}),
+      ...(correction ? { street: correction.street, houseNumber: correction.house_number } : {}),
+    };
+    const validationError = validateAddressFields(searchForm);
     if (validationError) {
       setLookupState({ loading: false, method: "address", error: validationError });
       return;
     }
 
-    const street = typeof suggestedStreet === "string" ? suggestedStreet : addressForm.street;
-    if (typeof suggestedStreet === "string") setAddressForm((current) => ({ ...current, street }));
+    const street = searchForm.street;
+    if (typeof suggestedStreet === "string" || correction) setAddressForm(searchForm);
     setLookupState({ loading: true, method: "address", error: "" });
 
     const requestBody = {
       city: addressForm.city,
       road_type: addressForm.roadType,
       street,
-      house_number: addressForm.houseNumber,
+      house_number: searchForm.houseNumber,
       ...(addressForm.apartmentNumber ? { apartment_number: addressForm.apartmentNumber } : {}),
       search_context: "cadastru",
       ...(skipCache ? { skip_cache: true } : {}),
@@ -250,13 +256,18 @@ export default function CadastruSearchForm({
           return;
         }
         const failure = await response.clone().json().catch(() => null);
-        const errorMessage = failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet") : await readErrorMessage(response);
+        const errorMessage = failure?.error === "address_fields_conflict"
+          ? t("cadastru.addressFieldsConflict", { embedded: failure.embedded_house_number, house: failure.house_number })
+          : failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet") : await readErrorMessage(response);
         if (requestId !== addressRequestId.current) return;
         setLookupState({
           loading: false,
           method: "address",
           didYouMean: response.status === 404 && failure?.error === "not_found",
           suggestionRecoveryToken: failure?.suggestion_recovery_token || null,
+          addressCorrections: failure?.error === "address_fields_conflict" && Array.isArray(failure.corrections)
+            ? failure.corrections.filter((value) => typeof value?.street === "string" && value.street.length <= STREET_MAX_LENGTH
+              && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)) : [],
           suggestions: (failure?.error === "ambiguous_street" || (response.status === 404 && failure?.error === "not_found")) && Array.isArray(failure.suggestions)
             ? failure.suggestions.filter((value) => typeof value === "string" && value.length <= STREET_MAX_LENGTH) : [],
           error: errorMessage,
@@ -526,8 +537,20 @@ export default function CadastruSearchForm({
             </button>
 
             {lookupState.method === "address" && lookupState.error && (
-              <div role="status" className={`mt-4 rounded-xl border px-4 py-4 ${lookupState.suggestions?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
+              <div role="status" className={`mt-4 rounded-xl border px-4 py-4 ${lookupState.suggestions?.length || lookupState.addressCorrections?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
                 <p className="text-sm font-medium">{lookupState.error}</p>
+                {lookupState.addressCorrections?.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {lookupState.addressCorrections.map((correction) => (
+                      <button key={`${correction.street}:${correction.house_number}`} type="button"
+                        className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
+                        disabled={lookupState.loading || authLoading}
+                        onClick={() => submitAddressSearch(correction)}>
+                        {t("cadastru.useAddressCorrection", { street: correction.street, house: correction.house_number })}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {lookupState.suggestions?.length > 0 && (
                   <div className="mt-3">
                     {lookupState.didYouMean && <p className="mb-2 text-sm font-semibold">{t("cadastru.didYouMean")}</p>}

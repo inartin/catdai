@@ -1,15 +1,16 @@
 # Access And Paywall
 
 ## Stage
-Preview paywall implemented. Paddle checkout is connected for packages, evaluation limit popups, and paid feature credits.
+Preview paywall implemented. Shared checkout selects MAIB by default, with Paddle retained as backup and for existing subscription servicing. See [MAIB payments](maib-payments.md).
 
 ## Current Access Rule
 - Anonymous users are `free`.
 - Authenticated Supabase users are `free` by default; authentication and paid access are separate.
 - Authenticated free users receive 5 unique uses per feature per UTC month across sale/rent estimates, 999 analysis, cadastru, yield calculator, and PDF reports.
-- Paid package and single-feature access is tracked in `user_feature_credits`.
-- Standard and Pro grant 2 and 10 non-expiring uses for each paid feature. Extra is a monthly Paddle subscription that resets to 50 uses for each paid feature on each paid billing period, and failed or inactive renewal states clear remaining Extra credits.
+- Legacy credits remain in `user_feature_credits`; MAIB purchases have per-order `maib_credit_grants`. Reads aggregate both through `user_feature_credit_balances`; the transactional consumption RPC uses legacy credits first, then oldest MAIB grants.
+- Standard and Pro grant 2 and 10 non-expiring uses for each paid feature. MAIB Extra adds 50 non-expiring uses per feature, including repeat purchases. Paddle Extra is a monthly subscription that resets to 50 uses for each paid feature on each paid billing period, and failed or inactive renewal states clear remaining Extra credits.
 - Approved full Paddle refunds and chargebacks mark the local payment as refunded/chargeback and remove remaining paid credits from that payment; already consumed credits remain visible in usage totals.
+- Full MAIB refunds revoke only that order’s unused credits after bank confirmation. External partial refunds leave credits unchanged.
 - Each gated feature consumes paid credits first, then the free monthly allowance when the user has never received a paid grant for that feature.
 - Free usage is recorded in `user_feature_usage_events` with `source = 'free_monthly'`; repeated loads of the same normalized request in the same month reuse the same idempotency key.
 - `/api/profile/credits` returns the current UTC-month allowance for all six features alongside paid credits, with a separate free badge in `Acces rămas`.
@@ -18,13 +19,13 @@ Preview paywall implemented. Paddle checkout is connected for packages, evaluati
 - Paynet is not used whatsoever and must not be connected to checkout. The old Paynet API routes now return disabled responses.
 - `db/paynet_payments.sql` still contains shared credit tables/helpers used by the current free monthly usage limit and by Paddle grants.
 - `db/paddle_payments.sql` prepares Paddle payment orders, Extra subscription state, webhook audit rows, one-time grants, and idempotent monthly subscription resets into the same feature-credit system.
-- `POST /api/payments/paddle/create` and `POST /api/paddle/webhooks` create Paddle transactions and grant or reset credits only after verified `transaction.completed` notifications.
+- `POST /api/payments/paddle/create` (only with `PAYMENT_PROVIDER=paddle`) and `POST /api/paddle/webhooks` create Paddle transactions and grant or reset credits only after verified `transaction.completed` notifications.
 - `POST /api/paddle/webhooks` also handles approved full Paddle refund/chargeback adjustments and revokes remaining credits so refunded orders no longer keep paid access.
 - Locked sale and rent evaluation popups and result action columns show the same reusable feature-pricing checkout action.
 - In the desktop result sidebar, the Extra unlock card appears above the PDF/share/compare actions; the unlock button is green and the PDF action is black.
 - Limit-reached blurred-value popups say the free monthly evaluation was used and show Extra as the default package action with a secondary link to `/pricing`.
 - Paddle checkout and status pages use the CatDai-branded RO/RU payment shell and preserve the selected language through the checkout/status redirect.
-- Sale and rent evaluation single-access checkouts use the same Paddle price ID from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE`, display the euro amount from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` plus `≈ MDL` at 20 MDL per EUR, and grant one `sale_estimate` or `rent_estimate` credit after Paddle confirms payment.
+- Sale and rent evaluation single-access checkouts charge 20 MDL each through MAIB. When Paddle is selected, they use the same Paddle price ID from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE`, display the euro amount from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` plus `≈ MDL` at 20 MDL per EUR, and grant one `sale_estimate` or `rent_estimate` credit after Paddle confirms payment.
 - Authenticated users consume matching paid feature credits before the free monthly allowance. Users who have ever received paid credits for a feature do not receive an additional free allowance for that same feature after paid credits run out.
 - When a paid sale/rent credit is used, `user_feature_usage_events.metadata.evaluation_snapshot` stores the immutable full result for profile history replay by `snapshot_id`.
 - Repeated loads of the same paid feature result reuse stable paid idempotency keys so refreshes do not consume another credit.
@@ -34,7 +35,7 @@ Sale/buy estimate results return a preview for anonymous users:
 - the main market estimate is removed from `/api/estimate` before the JSON response and rendered as a blurred fake value
 - locked values are removed from `/api/estimate` before the JSON response
 - the UI shows blurred placeholder values with a lock icon and the shared tooltip
-- clicking a blurred value opens the shared package popup; anonymous checkout continues on `/payment/paddle/checkout` with login methods in the checkout panel before Paddle loads
+- clicking a blurred value opens the shared package popup; anonymous checkout continues on `/payment/checkout` with product/language/return URL preserved through login
 - when the monthly free limit is reached, blurred values use the unlock-evaluation tooltip instead of the login tooltip
 
 Locked preview sections include fast/target prices, price per m2, range numbers, market stats, district comparison values, seller breakdown, and listing details.

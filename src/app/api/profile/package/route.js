@@ -43,10 +43,10 @@ export async function GET(request) {
     }
 
     const orderResult = await supabaseAdmin
-      .from("paddle_payment_orders")
+      .from("payment_orders_all")
       .select("product_key")
       .eq("user_id", access.user_id)
-      .eq("status", "paid")
+      .in("status", ["paid", "partially_refunded"])
       .in("product_key", ["standard_pack", "pro_pack", "extra_pack"])
       .order("paid_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })

@@ -381,20 +381,58 @@ assert.equal(timeoutPayload.suggestions, undefined);
 console.log("Did-you-mean regressions passed: RO/RU spellings, scope, original lookup first, no-data-only suggestions, retry identity and timeout exclusion.");
 
 // Ambiguous initials must offer full names before any cache or provider lookup.
-const { createStreetResolver, normalizeStreetName } = await load("@/lib/cadastru-streets/street-resolver");
+const { createStreetResolver, normalizeStreetName, inspectStreetAddress } = await load("@/lib/cadastru-streets/street-resolver");
 const initialsResolver = createStreetResolver([
   { city: "Bălți", road_type: "str", street: "George Coșbuc" },
   { city: "Bălți", road_type: "str", street: "Gheorghe Coșbuc" },
 ]);
 const ambiguousInitialsRoute = await load("src/app/api/cadastru/address/route.js", {
   ...routeMocks,
-  "@/lib/cadastru-streets/street-resolver": { resolveStreet: initialsResolver, normalizeStreetName },
+  "@/lib/cadastru-streets/street-resolver": { resolveStreet: initialsResolver, normalizeStreetName, inspectStreetAddress },
   "@/lib/cadastru-records": { getCadastruRecordByAddress: () => { throw new Error("Ambiguity must not read cache"); }, persistCadastruAddressResult: () => { throw new Error("Ambiguity must not write cache"); } },
   "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: () => { throw new Error("Ambiguity must not query worker"); } },
 });
 const ambiguousInitials = await ambiguousInitialsRoute.POST(request(abbreviatedBody));
 assert.equal(ambiguousInitials.status, 422);
 assert.deepEqual((await ambiguousInitials.json()).suggestions, ["George Coșbuc", "Gheorghe Coșbuc"]);
+
+// Pasted street/house conflicts are input errors, before cache and provider calls.
+let inputConflictPending = true;
+const inputSubmissions = [];
+const inputRoute = await load("src/app/api/cadastru/address/route.js", {
+  ...routeMocks,
+  "@/lib/cadastru-records": {
+    getCadastruRecordByAddress: async () => { assert.equal(inputConflictPending, false, "conflict must not read cache"); return null; },
+    persistCadastruAddressResult: async (payload) => { assert.equal(inputConflictPending, false, "conflict must not save aliases"); return payload; },
+  },
+  "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: async (fields) => {
+    assert.equal(inputConflictPending, false, "conflict must not call provider");
+    inputSubmissions.push(fields);
+    return { cadastral_number: "0100111.083.01.016", apartment: { address: `Chișinău, bd Dacia ${fields.house_number} ap 16`, area_m2: 60 } };
+  } },
+});
+const pastedBody = { city: "Chișinău", road_type: "bulevard", street: "DACIA BD. 47/2", house_number: "47", apartment_number: "16", search_context: "cadastru" };
+let inputResponse = await inputRoute.POST(request(pastedBody));
+assert.equal(inputResponse.status, 422);
+const inputConflict = await inputResponse.json();
+assert.equal(inputConflict.error, "address_fields_conflict");
+assert.deepEqual(inputConflict.corrections, [{ street: "Dacia", house_number: "47/2" }, { street: "Dacia", house_number: "47" }]);
+assert.equal(inputSubmissions.length, 0);
+inputConflictPending = false;
+for (const correction of inputConflict.corrections) {
+  inputResponse = await inputRoute.POST(request({ ...pastedBody, ...correction, skip_cache: true }));
+  assert.equal(inputResponse.status, 200);
+  assert.equal(inputSubmissions.at(-1).street, "Dacia");
+  assert.equal(inputSubmissions.at(-1).house_number, correction.house_number);
+  assert.equal(inputSubmissions.at(-1).apartment_number, "16");
+}
+inputResponse = await inputRoute.POST(request({ ...pastedBody, house_number: "47/2", skip_cache: true }));
+const cleanedInput = await inputResponse.json();
+assert.equal(inputResponse.status, 200);
+assert.equal(cleanedInput.street_resolution.status, "cleaned");
+assert.equal(cleanedInput.request_address, "Chișinău, bd DACIA BD. 47/2 47/2 ap 16");
+assert.equal(cleanedInput.resolved_address, "Chișinău, bd Dacia 47/2 ap 16");
+console.log("Pasted address regressions passed: no calls/cache on conflict, explicit choices, unchanged apartments, redundant cleanup.");
 
 // Exercise actual worker telemetry, signed correlation and route recovery with isolated DB/fetch mocks.
 cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;

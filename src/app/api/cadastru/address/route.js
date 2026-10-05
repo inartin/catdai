@@ -1,6 +1,6 @@
 import { suggestStreets } from "@/lib/cadastru-street-suggestions";
 import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSuggestionRecovery } from "@/lib/cadastru-suggestion-recovery";
-import { resolveStreet } from "@/lib/cadastru-streets/street-resolver";
+import { resolveStreet, inspectStreetAddress } from "@/lib/cadastru-streets/street-resolver";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
@@ -185,7 +185,14 @@ export async function POST(request) {
   const rawAddress = normalizeSpaces(
     `${city}, ${roadType} ${street} ${houseNumber}${apartmentNumber ? ` ap ${apartmentNumber}` : ""}`
   );
-  const resolution = resolveStreet({ city, roadType, street });
+  const streetInput = inspectStreetAddress({ city, roadType, street, houseNumber });
+  if (streetInput.status === "conflict") {
+    return NextResponse.json({ error: "address_fields_conflict", field: "house_number",
+      embedded_house_number: streetInput.embeddedHouseNumber, house_number: houseNumber,
+      corrections: streetInput.corrections }, { status: 422 });
+  }
+  const resolution = streetInput.status === "cleaned"
+    ? streetInput : resolveStreet({ city, roadType, street });
   if (resolution.status === "ambiguous") {
     return NextResponse.json({ error: "ambiguous_street", suggestions: resolution.suggestions }, { status: 422 });
   }
@@ -282,6 +289,7 @@ export async function POST(request) {
     }, {
       trackUsage: !(process.env.NODE_ENV === "development" && shouldTrackCadastruSearch),
       captureUsageEventId: shouldTrackCadastruSearch,
+      userId: access.user_id || null,
     });
     let payload = withResolution(externalResult);
     payload = await persistCadastruAddressResult(payload, {

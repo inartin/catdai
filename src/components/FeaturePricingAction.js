@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import usePaymentProvider from "@/components/usePaymentProvider";
+import { maibProduct } from "@/lib/maib/products.mjs";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
@@ -27,7 +29,7 @@ function getReturnPath() {
 }
 
 function buildPendingCheckoutUrl(productKey, lang) {
-  const url = new URL("/payment/paddle/checkout", window.location.origin);
+  const url = new URL("/payment/checkout", window.location.origin);
   url.searchParams.set("product_key", productKey);
   url.searchParams.set("lang", lang);
   const returnPath = getReturnPath();
@@ -40,18 +42,18 @@ export default function FeaturePricingAction({
   className = "",
   trackPopupOpen = false,
   onCheckoutStart,
-  onCheckoutError,
 }) {
   const { t, lang } = useTranslation();
   const { session, loading: authLoading } = useAuth();
+  const provider = usePaymentProvider();
   const [status, setStatus] = useState("idle");
-  const [message, setMessage] = useState("");
+
   const popupTrackedRef = useRef(false);
 
   const packageOffer = {
     product_key: "extra_pack",
-    price_eur: process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_COST || 25,
-    price_mdl: process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499,
+    price_eur: provider === "maib" ? maibProduct("extra_pack").amount_mdl / 20 : process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_COST || 25,
+    price_mdl: provider === "maib" ? maibProduct("extra_pack").amount_mdl : process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499,
   };
   const includedFeatures = [
     t("pricing.featureSale"),
@@ -75,58 +77,17 @@ export default function FeaturePricingAction({
 
   if (!offer?.product_key) return null;
 
-  const startCheckout = async () => {
-    if (!session?.access_token) {
-      setStatus("redirecting");
-      window.location.href = buildPendingCheckoutUrl(packageOffer.product_key, lang);
-      return;
-    }
-
-    setStatus("loading");
-    setMessage("");
+  const startCheckout = () => {
+    setStatus("redirecting");
     onCheckoutStart?.();
-
-    try {
-      const response = await fetch("/api/payments/paddle/create", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product_key: packageOffer.product_key,
-          lang,
-          return_to: getReturnPath(),
-        }),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload?.error || t("payment.checkoutError"));
-      }
-
-      const checkoutUrl = payload?.checkout?.url;
-      if (!checkoutUrl) throw new Error(t("payment.checkoutError"));
-
-      try {
-        sessionStorage.setItem(`catdai:paddle-product:${payload.order_id}`, JSON.stringify(payload.product || {}));
-      } catch {}
-
-      setStatus("redirecting");
-      window.location.href = checkoutUrl;
-    } catch (error) {
-      const errorMessage = error?.message || t("payment.checkoutError");
-      setStatus("error");
-      setMessage(errorMessage);
-      onCheckoutError?.(errorMessage);
-    }
+    window.location.href = buildPendingCheckoutUrl(packageOffer.product_key, lang);
   };
 
   return (
     <div className={`rounded-2xl border border-gray-200 bg-white p-4 shadow-sm ${className}`}>
       <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-4 py-4 text-left">
         <p className="text-lg font-extrabold tracking-tight text-gray-950">
-          {t("payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl) })}
+          {t(provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl) })}
         </p>
         <p className="mt-1 text-sm font-semibold text-gray-500">
           {formatEuroApprox(packageOffer.price_eur)}
@@ -163,9 +124,6 @@ export default function FeaturePricingAction({
       >
         {t("payment.showAllPackages")}
       </Link>
-      {message && (
-        <p className="mt-2 text-xs font-medium text-red-600">{message}</p>
-      )}
     </div>
   );
 }

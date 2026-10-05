@@ -131,7 +131,7 @@ function getProfileAccessBadge({ transactions, credits, creditsLoading, t }) {
   }
 
   const paidPackage = (transactions || []).find((row) =>
-    row.status === "paid" && PACKAGE_PRODUCT_KEYS.includes(row.productKey)
+    ["paid", "partially_refunded"].includes(row.status) && PACKAGE_PRODUCT_KEYS.includes(row.productKey)
   );
   if (paidPackage) {
     return { label: formatPaymentProduct(paidPackage.productKey, t), tone: "paid" };

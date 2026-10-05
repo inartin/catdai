@@ -66,7 +66,7 @@ const sections = [
     ],
     bullets: [
       "furnizori de servicii tehnice, găzduire, infrastructură, analiză, monitorizare sau suport;",
-      "Paddle, procesatorul de plăți folosit de CatDai, pentru inițierea, autorizarea, confirmarea și reconcilierea plăților;",
+      "maib pentru plățile noi și Paddle pentru tranzacțiile și abonamentele existente, pentru inițierea, autorizarea, confirmarea și reconcilierea plăților;",
       "furnizori de autentificare, atunci când alegi să te conectezi printr-un serviciu terț;",
       "consultanți, contabili, avocați sau auditori, dacă este necesar;",
       "autorități publice sau instituții competente, atunci când există o obligație legală;",
@@ -76,7 +76,7 @@ const sections = [
   {
     title: "8. Plăți și date de card",
     paragraphs: [
-      "Plățile sunt procesate prin Paddle. CatDai nu colectează și nu stochează numărul complet al cardului, codul CVV/CVC sau alte date sensibile ale instrumentului de plată.",
+      "Plățile noi sunt procesate prin maib; tranzacțiile Paddle existente rămân gestionate prin Paddle. CatDai nu colectează și nu stochează numărul complet al cardului, codul CVV/CVC sau alte date sensibile ale instrumentului de plată.",
       "Pentru verificarea și suportul tranzacțiilor, CatDai poate primi și păstra date limitate despre plată, cum ar fi identificatorul tranzacției, numărul intern al comenzii, suma, moneda, statusul plății, data plății și răspunsurile tehnice ale procesatorului.",
       "Procesatorul de plăți prelucrează datele de plată conform propriilor reguli și obligații legale aplicabile.",
     ],

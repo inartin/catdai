@@ -84,6 +84,30 @@ for(const role of ['anon','authenticated']) {
   assert.equal((await q("select has_table_privilege($1,'maib_payment_orders','SELECT') ok",[role]))[0].ok,false);
   assert.equal((await q("select has_table_privilege($1,'user_feature_credit_balances','SELECT') ok",[role]))[0].ok,false);
   assert.equal((await q("select has_function_privilege($1,'apply_maib_payment(uuid,text,uuid,uuid,integer,text,text,integer,timestamptz)','EXECUTE') ok",[role]))[0].ok,false);
+  assert.equal((await q("select has_table_privilege($1,'maib_payment_receipts','SELECT') ok",[role]))[0].ok,false);
+  assert.equal((await q("select has_function_privilege($1,'claim_maib_receipts(text,integer)','EXECUTE') ok",[role]))[0].ok,false);
 }
+
+// Receipts are queued atomically with verified payments, never on checkout or redirect.
+const mailOrder=await order();
+await q("update maib_payment_orders set receipt_email='buyer@example.com',product_title='Pachet Standard',terms_version='2026-10-05',terms_accepted_at=now() where id=$1",[mailOrder.id]);
+assert.equal((await q('select * from maib_payment_receipts')).length,0);
+await apply(mailOrder);await apply(mailOrder);
+assert.equal((await q('select * from maib_payment_receipts')).length,1,'one receipt per verified order');
+assert.equal((await q("select * from claim_maib_receipts('production',1)")).length,0,'receipt environment isolated');
+const [mailClaim]=await q("select * from claim_maib_receipts('sandbox',1)");
+assert.equal(mailClaim.order_id,mailOrder.id);assert.equal(mailClaim.attempts,1);assert.ok(mailClaim.lease_token);
+assert.equal((await q("select * from claim_maib_receipts('sandbox',1)")).length,0,'active delivery cannot be claimed twice');
+await q("update maib_payment_receipts set lease_until=now()-interval '1 second' where order_id=$1",[mailOrder.id]);
+assert.equal((await q("select * from claim_maib_receipts('sandbox',1)")).length,0,'expired delivery is not blindly resent');
+assert.equal((await q('select status from maib_payment_receipts where order_id=$1',[mailOrder.id]))[0].status,'unknown');
+await q("update maib_payment_receipts set status='failed',next_attempt_at=now()+interval '1 hour' where order_id=$1",[mailOrder.id]);
+assert.equal((await q("select * from claim_maib_receipts('sandbox',1)")).length,0,'retry backoff respected');
+await q("update maib_payment_receipts set next_attempt_at=now() where order_id=$1",[mailOrder.id]);
+assert.equal((await q("select * from claim_maib_receipts('sandbox',1)"))[0].attempts,2,'definite failures may retry');
+await q("update maib_payment_receipts set status='sent',sent_at=now(),lease_until=null,lease_token=null where order_id=$1",[mailOrder.id]);
+await apply(mailOrder);await apply(mailOrder,'refunded',9900);
+assert.equal((await q("select * from claim_maib_receipts('sandbox',1)")).length,0,'callbacks and refunds do not resend a sent receipt');
+assert.equal((await q("select relrowsecurity from pg_class where oid='maib_payment_receipts'::regclass"))[0].relrowsecurity,true);
 await db.close();
 console.log('MAIB PostgreSQL regression checks passed.');

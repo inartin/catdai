@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import CloseIcon from "@/components/icons/CloseIcon";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
+import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 
 const MAX_CUSTOM_REQUEST_LENGTH = 500;
 const MAX_CUSTOM_REQUEST_BODY_LENGTH = 340;
@@ -105,7 +106,7 @@ function getReturnPath() {
 }
 
 function buildPendingCheckoutUrl(productKey, lang) {
-  const url = new URL("/payment/checkout", window.location.origin);
+  const url = new URL("/payment/checkout", paymentSiteOrigin(window.location.origin));
   url.searchParams.set("product_key", productKey);
   url.searchParams.set("lang", lang);
   const returnPath = getReturnPath();
@@ -596,6 +597,7 @@ export default function Pricing({
             />
           ))}
         </div>
+        {provider === 'maib' && <div className="mx-auto mt-6 max-w-3xl space-y-2 text-center text-sm text-gray-600"><p>{t('maib.delivery')}</p></div>}
         <CustomRequestCard onOpen={() => setCustomRequestOpen(true)} />
       </div>
       <CustomRequestModal

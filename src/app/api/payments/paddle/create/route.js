@@ -1,4 +1,5 @@
 import { getPaymentProvider } from "@/lib/payment-provider";
+import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { rateLimit } from "@/lib/rate-limit";
@@ -135,7 +136,7 @@ function isExpectedPaddleTransaction(transaction, product) {
 
 function buildCheckoutUrl(request, orderId, transactionId, returnTo, lang) {
   const checkoutUrl = getPaddleCheckoutUrl();
-  const url = new URL(checkoutUrl || "/payment/paddle/checkout", request.url);
+  const url = new URL(checkoutUrl || "/payment/paddle/checkout", paymentSiteOrigin(new URL(request.url).origin));
   url.searchParams.set("order_id", orderId);
   url.searchParams.set("_ptxn", transactionId);
   url.searchParams.set("lang", lang);

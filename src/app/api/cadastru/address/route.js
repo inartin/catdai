@@ -39,11 +39,13 @@ function normalizeSpaces(value) {
 
 function normalizeRoadType(value) {
   if (value === "bulevard") return "bd";
+  if (value === "str-la") return "str-la";
   return "str";
 }
 
 function displayRoadType(value) {
   if (value === "bulevard") return "Bulevard";
+  if (value === "str-la") return "Str-la";
   return "Strada";
 }
 

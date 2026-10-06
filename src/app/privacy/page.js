@@ -1,5 +1,6 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { MERCHANT } from "@/lib/merchant.mjs";
 
 const sections = [
   {
@@ -12,7 +13,10 @@ const sections = [
   {
     title: "2. Cine este operatorul",
     paragraphs: [
-      "E-mail de contact: info@catdai.md",
+      `Operator: ${MERCHANT.legalName}, pentru serviciul CatDai (catdai.md).`,
+      `IDNO: ${MERCHANT.idno}`,
+      `Adresă: ${MERCHANT.address}`,
+      `E-mail de contact: ${MERCHANT.email}`,
     ],
   },
   {
@@ -23,6 +27,7 @@ const sections = [
     bullets: [
       "date introduse direct de utilizator, cum ar fi criteriile proprietății, preferințele de filtrare și alte informații furnizate în formulare;",
       "date de cont, cum ar fi identificatorul de utilizator, numele, adresa de e-mail sau datele furnizate de serviciile de autentificare folosite;",
+      "adresa de e-mail indicată pentru confirmarea plății, versiunea Termenilor și Condițiilor acceptați și data acceptării lor;",
       "date necesare pentru plăți și acces plătit, cum ar fi produsul cumpărat, suma, moneda, numărul intern al facturii/comenzii, statusul tranzacției, identificatorul tranzacției primit de la procesatorul de plăți și informații de contact necesare pentru confirmare sau suport;",
       "date tehnice, cum ar fi adresa IP, tipul browserului, sistemul de operare, limba browserului, paginile accesate, data și ora accesării;",
       "date privind utilizarea serviciului, inclusiv interacțiunea cu paginile, funcțiile folosite și erorile tehnice;",
@@ -66,6 +71,7 @@ const sections = [
     ],
     bullets: [
       "furnizori de servicii tehnice, găzduire, infrastructură, analiză, monitorizare sau suport;",
+      "furnizorul serviciului de e-mail, pentru expedierea confirmărilor de plată, cu adresa destinatarului și detaliile comenzii necesare confirmării;",
       "maib pentru plățile noi și Paddle pentru tranzacțiile și abonamentele existente, pentru inițierea, autorizarea, confirmarea și reconcilierea plăților;",
       "furnizori de autentificare, atunci când alegi să te conectezi printr-un serviciu terț;",
       "consultanți, contabili, avocați sau auditori, dacă este necesar;",
@@ -137,7 +143,7 @@ const sections = [
       "Pentru întrebări, solicitări sau reclamații privind protecția datelor, ne poți contacta la:",
       "info@catdai.md",
       "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
-      "Data intrării în vigoare: 10 Iunie 2026",
+      "Data ultimei actualizări: 5 Octombrie 2026",
     ],
   },
 ];

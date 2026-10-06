@@ -103,6 +103,9 @@ export default function Footer() {
           <Link href="/privacy" className="hover:text-foreground transition-colors">
             {t("footer.privacy")}
           </Link>
+          <Link href="/refund" className="hover:text-foreground transition-colors">
+            {t("footer.refund")}
+          </Link>
           <Link href={faqHref} className="hover:text-foreground transition-colors">
             {t("footer.faq")}
           </Link>
@@ -138,7 +141,7 @@ export default function Footer() {
               unoptimized
             />
           ))}
-          {provider === "maib" && <span className="text-xl font-bold tracking-tight text-[#008f8c]">maib</span>}
+          {provider === "maib" && <Image src="/brands/maib.png" alt="maib" width={156} height={44} className="h-6 w-auto object-contain sm:h-7" unoptimized />}
         </div>
       </div>
     </footer>

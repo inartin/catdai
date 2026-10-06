@@ -3,9 +3,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import { maibProduct } from '../src/lib/maib/products.mjs';
+import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '../src/lib/maib/purchase.mjs';
 import * as client from '../src/lib/maib/client.mjs';
 import { getPaymentProvider } from '../src/lib/payment-provider.js';
 import { encodePaymentCursor, decodePaymentCursor } from '../src/lib/payment-history.js';
+import { paymentSiteOrigin, paymentAppLink } from '../src/lib/payment-urls.mjs';
+import { getPaddleCheckoutUrl, normalizePaddleLang, buildPaddleCustomerSnapshot, extractPaddleTransactionSummary } from '../src/lib/paddle.js';
 process.env.MAIB_ENVIRONMENT='sandbox';
 process.env.MAIB_SIGNATURE_KEY='test-signature-key';
 process.env.MAIB_CLIENT_ID='test-client'; process.env.MAIB_CLIENT_SECRET='test-secret';
@@ -62,6 +65,28 @@ async function loadRoute(file,mocks) {
   await routeModule.evaluate();return routeModule.namespace;
 }
 const next={'next/server':{NextResponse:{json:Response.json}}};
+const savedUrlEnv = Object.fromEntries(['NODE_ENV','MAIB_PUBLIC_URL','PADDLE_CHECKOUT_URL'].map(key => [key,process.env[key]]));
+const http = await loadRoute('src/lib/maib/http.js', {
+  ...next, '@/lib/supabase-admin':{supabaseAdmin:{}}, '@/lib/payment-urls.mjs':{paymentSiteOrigin},
+});
+process.env.NODE_ENV='development';
+process.env.MAIB_PUBLIC_URL='https://catdai.md';
+process.env.PADDLE_CHECKOUT_URL='https://catdai.md/payment/paddle/checkout?existing=1';
+assert.equal(http.paymentOrigin(),'https://dev.catdai.md','development overrides production MAIB URLs');
+assert.equal(paymentSiteOrigin('http://localhost:3000'),'https://dev.catdai.md');
+assert.equal(paymentAppLink('/profile?tab=transactions'),'https://dev.catdai.md/profile?tab=transactions');
+assert.equal(getPaddleCheckoutUrl(),'https://dev.catdai.md/payment/paddle/checkout?existing=1');
+delete process.env.PADDLE_CHECKOUT_URL;
+assert.equal(getPaddleCheckoutUrl(),'https://dev.catdai.md/payment/paddle/checkout');
+process.env.NODE_ENV='production';
+assert.equal(http.paymentOrigin(),'https://catdai.md');
+process.env.MAIB_PUBLIC_URL='https://payments.catdai.md/base';
+assert.equal(http.paymentOrigin(),'https://payments.catdai.md','production keeps configured origin');
+assert.equal(paymentAppLink('/profile?tab=transactions'),'/profile?tab=transactions');
+assert.equal(getPaddleCheckoutUrl(),null);
+process.env.MAIB_PUBLIC_URL='http://untrusted.test';
+assert.throws(()=>http.paymentOrigin(),/HTTPS/);
+for (const [key,value] of Object.entries(savedUrlEnv)) { if(value===undefined)delete process.env[key];else process.env[key]=value; }
 const uuid=/^[\da-f]{8}-[\da-f-]{27}$/i;
 let user=null, lookupCount=0, queryUser=null;
 const status=await loadRoute('src/app/api/payments/maib/status/route.js',{
@@ -139,24 +164,28 @@ console.log('MAIB pending, accepted, rejected, manual and uncertain-refund check
 let redirectedTo;
 const entry=await loadRoute('src/app/payment/checkout/page.js',{
   'next/navigation':{redirect:value=>{redirectedTo=value;}},'@/lib/payment-provider':{getPaymentProvider},
+  '@/lib/payment-urls.mjs':{paymentAppLink},
 });
-for(const provider of ['maib','paddle']) {
+for(const mode of ['development','production']) for(const provider of ['maib','paddle']) {
+  process.env.NODE_ENV=mode;
   process.env.PAYMENT_PROVIDER=provider;
   await entry.default({searchParams:Promise.resolve({product_key:'extra_pack',lang:'ru',return_to:'/evaluare?a=1',injected:'discard'})});
   const parsed=new URL(redirectedTo,'https://catdai.test');
   assert.equal(parsed.pathname,`/payment/${provider}/checkout`);
+  assert.equal(parsed.origin,mode==='development'?'https://dev.catdai.md':'https://catdai.test');
   assert.equal(parsed.searchParams.get('lang'),'ru');assert.equal(parsed.searchParams.get('product_key'),'extra_pack');
   assert.equal(parsed.searchParams.get('return_to'),'/evaluare?a=1');assert.equal(parsed.searchParams.has('injected'),false);
 }
 delete process.env.PAYMENT_PROVIDER;
-let insertSnapshot, createUser=null, bankCreates=0;
+let insertSnapshot, createUser=null, bankCreates=0, bankPayload;
 const createDb={from(){let single=false;const query={select(){return query;},eq(){return query;},in(){return query;},update(){return query;},insert(row){insertSnapshot={...row,id,created_at:new Date().toISOString(),status:'pending'};return query;},maybeSingle(){return Promise.resolve({data:null});},single(){single=true;return query;},then(resolve,reject){return Promise.resolve({data:single?insertSnapshot:null}).then(resolve,reject);}};return query;}};
 const create=await loadRoute('src/app/api/payments/maib/create/route.js',{
   ...next,'@/lib/supabase-admin':{supabaseAdmin:createDb},'@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
   '@/lib/payment-provider':{getPaymentProvider},'@/lib/maib/products.mjs':{maibProduct},
-  '@/lib/maib/client.mjs':{...client,maibRequest:async(path,{body})=>{bankCreates++;assert.equal(body.amount,99);assert.equal(body.currency,'MDL');return {checkoutId,checkoutUrl:`https://checkout-sandbox.maib.md/${checkoutId}`};}},
+  '@/lib/maib/purchase.mjs':{MAIB_TERMS_VERSION,receiptEmail,maibProductTitle},
+  '@/lib/maib/client.mjs':{...client,maibRequest:async(path,{body})=>{bankPayload=body;bankCreates++;assert.equal(body.amount,99);assert.equal(body.currency,'MDL');return {checkoutId,checkoutUrl:`https://checkout-sandbox.maib.md/${checkoutId}`};}},
   '@/lib/maib/service.mjs':{checked:async query=>(await query).data,publicOrder:x=>x},
-  '@/lib/maib/http':{UUID:uuid,requestUser:async()=>createUser,paymentOrigin:()=> 'https://catdai.test',paymentError:()=>Response.json({},{status:502})},
+  '@/lib/maib/http':{UUID:uuid,requestUser:async()=>createUser,paymentOrigin:http.paymentOrigin,paymentError:()=>Response.json({},{status:502})},
 });
 const createRequest=(payload)=>new Request('https://catdai.test/api/payments/maib/create',{method:'POST',body:JSON.stringify(payload)});
 assert.equal((await create.POST(createRequest({}))).status,401);
@@ -164,12 +193,61 @@ createUser={id:crypto.randomUUID()};
 assert.equal((await create.POST(createRequest({product_key:'invalid',request_key:id}))).status,400);
 assert.equal((await create.POST(createRequest({product_key:'standard_pack',request_key:'bad'}))).status,400);
 assert.equal(bankCreates,0);
-assert.equal((await create.POST(createRequest({product_key:'standard_pack',request_key:id,amount_minor:1,grants:{sale_estimate:999},return_to:'//evil.test',lang:'ru'}))).status,200);
+const purchaseBody={product_key:'standard_pack',request_key:id,terms_accepted:true,terms_version:MAIB_TERMS_VERSION,receipt_email:'buyer@example.com'};
+for(const invalid of [{terms_accepted:false},{terms_accepted:'true'},{terms_version:'old'},{receipt_email:''},{receipt_email:'telegram-123@auth.catdai.md'},{receipt_email:'a@example.com\r\nBcc: other@example.com'}]) {
+  assert.equal((await create.POST(createRequest({...purchaseBody,...invalid}))).status,400);
+}
+assert.equal(bankCreates,0,'invalid consent or email never contacts the bank');
+assert.equal((await create.POST(createRequest({...purchaseBody,amount_minor:1,grants:{sale_estimate:999},return_to:'//evil.test',lang:'ru'}))).status,200);
 assert.equal(insertSnapshot.amount_minor,9900);assert.equal(insertSnapshot.return_to,'/profile');assert.equal(insertSnapshot.language,'ru');
 assert.deepEqual(insertSnapshot.grants,maibProduct('standard_pack').grants);
+assert.equal(insertSnapshot.receipt_email,'buyer@example.com');
+assert.equal(insertSnapshot.terms_version,MAIB_TERMS_VERSION);assert.ok(Date.parse(insertSnapshot.terms_accepted_at));
+assert.equal(insertSnapshot.product_title,maibProductTitle('standard_pack','ru'));
+const publicSnapshot=service.publicOrder({...insertSnapshot,paid_at:'2026-10-05T12:00:00Z'});
+assert.equal(publicSnapshot.paid_at,'2026-10-05T12:00:00Z');assert.equal(publicSnapshot.quantity,1);
+assert.deepEqual(publicSnapshot.grants,insertSnapshot.grants);assert.equal(publicSnapshot.receipt_email,undefined);
+for (const mode of ['development','production']) {
+  process.env.NODE_ENV=mode;
+  process.env.MAIB_PUBLIC_URL='https://catdai.md';
+  assert.equal((await create.POST(createRequest(purchaseBody))).status,200);
+  const expectedOrigin=mode==='development'?'https://dev.catdai.md':'https://catdai.md';
+  assert.equal(bankPayload.callbackUrl,`${expectedOrigin}/api/maib/callback`);
+  assert.equal(bankPayload.successUrl,`${expectedOrigin}/payment/maib/success?order_id=${id}&lang=ro`);
+  assert.equal(bankPayload.failUrl,bankPayload.successUrl);
+}
+for (const [key,value] of Object.entries(savedUrlEnv)) { if(value===undefined)delete process.env[key];else process.env[key]=value; }
 process.env.PAYMENT_PROVIDER='paddle';assert.equal((await create.POST(createRequest({}))).status,409);delete process.env.PAYMENT_PROVIDER;
 for(const lang of ['ro','ru']) {
   const messages=JSON.parse(await fs.readFile(`src/locales/${lang}.json`,'utf8'));
   for(const key of ['maib.hosted','maib.oneTime','maib.extraMobileDesc','maib.sandbox','payment.currencyNote.maib','payment.currencyNote.paddle'])assert.ok(messages[key],`${lang}: ${key}`);
 }
 console.log('MAIB checkout input, login boundary, RO/RU and provider rollback checks passed.');
+
+// Paddle rollback checkout must also stay on the development merchant domain.
+const paddleProduct={key:'standard_pack',priceReference:'pri_test',priceId:'pri_test',billingMode:'one_time'};
+const paddleDb={auth:{getUser:async()=>({data:{user:{id,email:'buyer@example.com'}}})},from(){const query={insert(){return query;},select(){return query;},single:async()=>({data:{id}}),update(){return query;},eq:async()=>({error:null})};return query;}};
+const paddleCreate=await loadRoute('src/app/api/payments/paddle/create/route.js',{
+  ...next, '@/lib/payment-provider':{getPaymentProvider}, '@/lib/payment-urls.mjs':{paymentSiteOrigin},
+  '@/lib/supabase-admin':{supabaseAdmin:paddleDb}, '@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
+  '@/lib/paddle-products':{getPaddleProduct:()=>paddleProduct,isValidPaddlePriceId:()=>true,resolvePaddleCatalogPrice:async product=>product},
+  '@/lib/paddle':{getPaddleCheckoutUrl,normalizePaddleLang,buildPaddleCustomerSnapshot,extractPaddleTransactionSummary,
+    createPaddleTransaction:async()=>({raw:{},transaction:{id:'txn_test',items:[{price:{id:'pri_test'}}],checkout:{url:'https://catdai.md/payment/paddle/checkout?_ptxn=txn_test'}}})},
+});
+process.env.PAYMENT_PROVIDER='paddle';
+for (const mode of ['development','production']) {
+  process.env.NODE_ENV=mode;
+  process.env.PADDLE_CHECKOUT_URL='https://catdai.md/payment/paddle/checkout?existing=1';
+  const response=await paddleCreate.POST(new Request('http://localhost:3000/api/payments/paddle/create',{method:'POST',headers:{Authorization:'Bearer test'},body:JSON.stringify({product_key:'standard_pack',lang:'ru',return_to:'/evaluare?foo=1'})}));
+  assert.equal(response.status,200);
+  const checkout=new URL((await response.json()).checkout.url);
+  assert.equal(checkout.origin,mode==='development'?'https://dev.catdai.md':'https://catdai.md');
+  assert.equal(checkout.searchParams.get('order_id'),id);
+  assert.equal(checkout.searchParams.get('_ptxn'),'txn_test');
+  assert.equal(checkout.searchParams.get('lang'),'ru');
+  assert.equal(checkout.searchParams.get('return_to'),'/evaluare?foo=1');
+  assert.equal(checkout.searchParams.get('existing'),'1');
+}
+delete process.env.PAYMENT_PROVIDER;
+for (const [key,value] of Object.entries(savedUrlEnv)) { if(value===undefined)delete process.env[key];else process.env[key]=value; }
+console.log('Development/production payment origins, MAIB callback/return URLs and Paddle checkout URLs passed.');

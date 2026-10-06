@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { paymentSiteOrigin } from './payment-urls.mjs';
 
 const DEFAULT_PADDLE_VERSION = "1";
 const DEFAULT_WEBHOOK_TOLERANCE_SECONDS = 300;
@@ -59,9 +60,13 @@ export function getPaddleWebhookSecretKey() {
 
 export function getPaddleCheckoutUrl() {
   const raw = String(process.env.PADDLE_CHECKOUT_URL || "").trim();
-  if (!raw) return null;
+  if (!raw && process.env.NODE_ENV !== 'development') return null;
 
   try {
+    if (process.env.NODE_ENV === 'development') {
+      const configured = new URL(raw || '/payment/paddle/checkout', paymentSiteOrigin());
+      return new URL(`${configured.pathname}${configured.search}${configured.hash}`, paymentSiteOrigin()).toString();
+    }
     const url = new URL(raw);
     return url.protocol === "https:" ? url.toString() : null;
   } catch {

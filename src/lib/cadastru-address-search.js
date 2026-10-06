@@ -64,6 +64,7 @@ function canonicalCity(value) {
 
 function canonicalRoadType(value) {
   const normalized = normalizeForMatch(value);
+  if (/\bstr-la\b/.test(normalized)) return "Str-la";
   if (/\bbd\b/.test(normalized)) return "Bulevardul";
   if (/\bstr\b/.test(normalized)) return "Strada";
   if (/\bsos\b/.test(normalized)) return "Soseaua";
@@ -85,7 +86,7 @@ function normalizeRoadForQuery(address) {
     .replace(/\bb-dul\.?\b/gi, "Bulevardul")
     .replace(/\bbd\.?\b/gi, "Bulevardul")
     .replace(/\bbul\.?\b/gi, "Bulevardul")
-    .replace(/\bstr\.?\b/gi, "Strada")
+    .replace(/\bstr\.?\b(?!-la)/gi, "Strada")
     .replace(/\bsos\.?\b/gi, "Soseaua");
 }
 
@@ -141,7 +142,7 @@ function parseInputAddress(rawAddress) {
     const beforeHouse = buildingAddressWithoutCity.slice(0, houseMatch.index);
     streetName = normalizeSpaces(
       beforeHouse
-        .replace(/\b(Bulevardul|Strada|Soseaua|Aleea)\b/gi, "")
+        .replace(/\b(Bulevardul|Str-la|Strada|Soseaua|Aleea)\b/gi, "")
         .replace(/[,]/g, " ")
     );
   }
@@ -570,6 +571,7 @@ function normalizeHouseNumber(value) {
 
 function shortRoadType(roadType) {
   if (roadType === "Bulevardul") return "bd";
+  if (roadType === "Str-la") return "str-la";
   if (roadType === "Strada") return "str";
   if (roadType === "Soseaua") return "sos";
   if (roadType === "Aleea") return "al";

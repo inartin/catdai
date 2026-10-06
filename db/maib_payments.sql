@@ -28,6 +28,11 @@ create table if not exists public.maib_payment_orders (
 );
 create index if not exists maib_orders_reconcile on public.maib_payment_orders(environment,next_check_at);
 create index if not exists maib_orders_user on public.maib_payment_orders(user_id,created_at desc,id desc);
+-- Nullable for historical orders; new checkout snapshots these before contacting the bank.
+alter table public.maib_payment_orders add column if not exists product_title text;
+alter table public.maib_payment_orders add column if not exists receipt_email text;
+alter table public.maib_payment_orders add column if not exists terms_version text;
+alter table public.maib_payment_orders add column if not exists terms_accepted_at timestamptz;
 create table if not exists public.maib_credit_grants (
   order_id uuid not null references public.maib_payment_orders(id),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -65,6 +70,19 @@ create table if not exists public.maib_refund_attempts (
 create index if not exists maib_refund_order on public.maib_refund_attempts(order_id,created_at desc);
 create unique index if not exists maib_one_open_refund on public.maib_refund_attempts(order_id)
   where status in ('submitting','unknown','Created','Requested','Manual');
+
+create table if not exists public.maib_payment_receipts (
+  order_id uuid primary key references public.maib_payment_orders(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending','sending','sent','failed','unknown')),
+  attempts integer not null default 0,
+  next_attempt_at timestamptz not null default now(),
+  lease_until timestamptz,
+  lease_token uuid,
+  sent_at timestamptz,
+  last_error text
+);
+create index if not exists maib_receipts_pending on public.maib_payment_receipts(next_attempt_at)
+  where status in ('pending','failed');
 
 -- Unified read interfaces. Never write through these views.
 create or replace view public.payment_orders_all with (security_invoker=true) as
@@ -133,11 +151,32 @@ begin
       when greatest(refunded_minor,p_refunded_minor)>0 then 'partially_refunded' else 'paid' end,
     refunded_minor=greatest(refunded_minor,p_refunded_minor),paid_at=coalesce(paid_at,p_paid_at,now()),
     updated_at=now(),last_error=null where id=o.id;
+  if o.receipt_email is not null then
+    insert into public.maib_payment_receipts(order_id) values(o.id) on conflict do nothing;
+  end if;
   if p_status='refunded' then
     update public.maib_credit_grants set remaining_uses=0 where order_id=o.id;
     update public.maib_refund_attempts set status='Accepted',updated_at=now()
       where order_id=o.id and status in ('submitting','unknown','Created','Requested','Manual');
   end if;
+end $$;
+
+create or replace function public.claim_maib_receipts(p_environment text,p_limit integer default 10)
+returns setof public.maib_payment_receipts language plpgsql set search_path=public as $$
+begin
+  -- SMTP may have accepted the email before a worker stopped. Never resend an uncertain delivery.
+  update public.maib_payment_receipts r set status='unknown',lease_until=null,lease_token=null,
+    last_error='Delivery outcome unknown; inspect SMTP logs before retrying.'
+    where r.status='sending' and r.lease_until<now()
+      and exists(select 1 from public.maib_payment_orders o where o.id=r.order_id and o.environment=p_environment);
+  return query update public.maib_payment_receipts r set status='sending',attempts=r.attempts+1,
+    lease_until=now()+interval '5 minutes',lease_token=gen_random_uuid(),last_error=null
+    where r.order_id in (
+      select q.order_id from public.maib_payment_receipts q
+      where q.status in ('pending','failed') and q.next_attempt_at<=now()
+        and exists(select 1 from public.maib_payment_orders o where o.id=q.order_id and o.environment=p_environment and o.paid_at is not null)
+      order by q.next_attempt_at limit least(greatest(p_limit,1),10) for update skip locked
+    ) returning r.*;
 end $$;
 
 create or replace function public.reserve_maib_refund(p_order_id uuid,p_amount_minor integer,p_reason text)
@@ -219,7 +258,7 @@ begin
 end $$;
 
 do $$ declare t text; sig text; begin
-  foreach t in array array['maib_payment_orders','maib_credit_grants','maib_callback_events','maib_refund_attempts'] loop
+  foreach t in array array['maib_payment_orders','maib_credit_grants','maib_callback_events','maib_refund_attempts','maib_payment_receipts'] loop
     execute format('alter table public.%I enable row level security',t);
     execute format('revoke all on public.%I from public,anon,authenticated',t);
     execute format('grant all on public.%I to service_role',t);
@@ -230,7 +269,7 @@ do $$ declare t text; sig text; begin
   end loop;
   foreach sig in array array[
     'apply_maib_payment(uuid,text,uuid,uuid,integer,text,text,integer,timestamptz)',
-    'reserve_maib_refund(uuid,integer,text)','claim_maib_orders(text,integer)',
+    'reserve_maib_refund(uuid,integer,text)','claim_maib_orders(text,integer)','claim_maib_receipts(text,integer)',
     'consume_user_feature_credit(uuid,text,text,jsonb)','override_payment_credits(uuid,jsonb,boolean,boolean)'
   ] loop
     execute 'revoke all on function public.'||sig||' from public,anon,authenticated';

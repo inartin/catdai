@@ -6,6 +6,7 @@ Implemented and active.
 ## Login
 - Supabase OAuth is used.
 - UI currently exposes Google and Telegram login.
+- Development additionally exposes a password form for one MAIB verification user (`maib-test`). Production has no form and rejects the test-login endpoint. Configuration/provisioning is described in [Auth Config](auth-config.md).
 - Navbar login uses the compact dropdown on desktop and a centered popup on mobile so the provider choices are not nested inside the mobile menu.
 - Telegram login uses Telegram's current OAuth popup ID token through `/api/auth/telegram`, then signs the browser into Supabase with an app-managed Telegram account.
 - Telegram does not use Supabase's hosted OIDC callback because Telegram lacks a UserInfo endpoint and that callback can fail with `Error getting user profile from external provider`.

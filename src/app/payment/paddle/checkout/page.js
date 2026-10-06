@@ -7,6 +7,7 @@ import { useTranslation } from "@/context/LanguageContext";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import AuthOptions from "@/components/AuthOptions";
 import LockIcon from "@/components/icons/LockIcon";
+import { paymentSiteOrigin, paymentAppLink } from "@/lib/payment-urls.mjs";
 
 const PADDLE_SCRIPT_SRC = "https://cdn.paddle.com/paddle/v2/paddle.js";
 const PADDLE_INLINE_FRAME_TARGET = "paddle-inline-checkout";
@@ -290,7 +291,7 @@ export default function PaddleCheckoutPage() {
       if (redirected || typeof window === "undefined") return;
       redirected = true;
 
-      const url = new URL("/payment/paddle/success", window.location.origin);
+      const url = new URL("/payment/paddle/success", paymentSiteOrigin(window.location.origin));
       if (params.orderId) url.searchParams.set("order_id", params.orderId);
       url.searchParams.set("transaction_id", eventTransactionId || params.transactionId);
       url.searchParams.set("checkout", result);
@@ -385,7 +386,7 @@ export default function PaddleCheckoutPage() {
     };
   }, [authLoading, checkoutEmail, lang, params.lang, params.orderId, params.productKey, params.returnTo, params.transactionId, session?.access_token, setLang]);
 
-  const returnHref = normalizeReturnTo(params.returnTo);
+  const returnHref = paymentAppLink(normalizeReturnTo(params.returnTo));
   const isError = status === "error";
   const isAuthRequired = status === "auth_required";
   const productSummary = getProductSummary(product, t);
@@ -394,7 +395,7 @@ export default function PaddleCheckoutPage() {
     <div className="min-h-screen bg-[#f7f8f5] text-gray-950">
       <header className="border-b border-gray-100 bg-white sticky top-0 z-50">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link href="/" aria-label={t("nav.homeAriaLabel")} className="flex items-center gap-3">
+          <Link href={paymentAppLink("/")} aria-label={t("nav.homeAriaLabel")} className="flex items-center gap-3">
             <img src="/icon0.svg" alt="" className="h-11 w-auto object-contain" />
             <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
           </Link>

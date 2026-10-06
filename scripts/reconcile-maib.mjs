@@ -4,6 +4,9 @@ nextEnv.loadEnvConfig(process.cwd(), process.env.NODE_ENV !== 'production');
 const { supabaseAdmin: db } = await import('../src/lib/supabase-admin.js');
 const { checked, reconcileOrder } = await import('../src/lib/maib/service.mjs');
 const { environment } = await import('../src/lib/maib/client.mjs');
+const { deliverReceipts, receiptConfig } = await import('../src/lib/maib/receipts.mjs');
+const mailConfig = receiptConfig();
+if (!mailConfig) console.warn('[maib-worker] Payment receipt delivery is disabled: configure MAIB_SMTP_* / MAIB_RECEIPT_FROM / MAIB_MERCHANT_NAME.');
 let stopped = false;
 let wake;
 for (const signal of ['SIGTERM','SIGINT']) process.on(signal, () => { stopped = true; wake?.(); });
@@ -25,6 +28,8 @@ while (!stopped) {
       await checked(db.from('maib_payment_orders').update({ last_error: lastError, next_check_at: new Date(Date.now() + delay).toISOString(), lease_until: null, lease_token: null }).eq('id', order.id).eq('lease_token', order.lease_token));
     }
   } catch (error) { console.error('[maib-worker]', error.code || error.name || 'reconciliation_failed'); }
+  try { await deliverReceipts(db, environment(), { config: mailConfig }); }
+  catch (error) { console.error('[maib-receipts]', error.code || error.name || 'receipt_delivery_failed'); }
   if (process.argv.includes('--once')) break;
   if (!stopped) await new Promise(resolve => { const timer = setTimeout(resolve, 60_000); wake = () => { clearTimeout(timer); resolve(); }; });
 }

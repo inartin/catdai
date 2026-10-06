@@ -14,6 +14,8 @@ export async function getOrder(id, userId) {
 export function publicOrder(order) {
   return { order_id: order.id, product_key: order.product_key, status: order.status,
     amount_minor: order.amount_minor, currency_code: order.currency_code, environment: order.environment,
+    product_title: order.product_title, grants: order.grants, quantity: 1,
+    paid_at: order.paid_at, created_at: order.created_at,
     return_to: order.return_to, language: order.language, refunded_minor: order.refunded_minor,
     checkout: order.checkout_url && ['pending','registered','creation_unknown'].includes(order.status) ? { url: order.checkout_url } : null };
 }

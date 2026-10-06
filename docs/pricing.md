@@ -23,6 +23,7 @@ Implemented as a reusable UI section. New purchases use the server-selected proc
 - Pro keeps the highlight badge; MAIB Extra shows a one-time-payment badge. Paddle Extra retains its monthly-payment badge.
 - MAIB Extra adds 50 non-expiring actions per feature on every purchase. Existing/new Paddle Extra subscriptions retain monthly resets and cancellation behavior.
 - Each card enumerates usage per feature: sale estimate, rent estimate, 999 analysis, cadastru lookup, yield calculator, and PDF report.
+- MAIB pricing includes digital delivery/activation and browser/account requirements. Checkout describes each purchased feature and lists its exact included uses; the PDF description distinguishes report download from the underlying analysis.
 - Free shows `0 lei` and 5 monthly uses for every feature, using the same feature-count layout as paid tiers.
 - Free monthly limits are enforced for authenticated users across sale/rent estimates, 999 analysis, cadastru, yield calculator, and PDF reports.
 - Free card note explains that the included actions renew monthly; no per-feature prices appear in the card.

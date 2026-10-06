@@ -306,7 +306,11 @@ export async function POST(request) {
   };
 
   let parsed = await getCachedListing(externalId);
-  if (!parsed || !hasExactListingAddress(getParsedListingAddress(parsed))) {
+  if (
+    !parsed ||
+    !hasExactListingAddress(getParsedListingAddress(parsed)) ||
+    !pickFeature(parsed.features || {}, FEATURE_KEYS.rooms)
+  ) {
     const result = await fetchAndParseListing(externalId, listingUrl, { userId });
     if (result.error === "blocked") {
       const fallback = buildFallbackCachedPayload(externalId, parsed);

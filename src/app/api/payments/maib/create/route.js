@@ -4,6 +4,7 @@ import { rateLimit } from '@/lib/rate-limit';
 import { getPaymentProvider } from '@/lib/payment-provider';
 import { environment, maibRequest, safeReturnTo, validateCheckoutUrl } from '@/lib/maib/client.mjs';
 import { maibProduct } from '@/lib/maib/products.mjs';
+import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '@/lib/maib/purchase.mjs';
 import { checked, publicOrder } from '@/lib/maib/service.mjs';
 import { UUID, requestUser, paymentOrigin, paymentError } from '@/lib/maib/http';
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
@@ -15,6 +16,9 @@ export async function POST(request) {
   const body = await request.json().catch(() => null);
   const product = maibProduct(body?.product_key);
   if (!product || !UUID.test(body?.request_key || '')) return NextResponse.json({ error: 'Invalid product or request key.' }, { status: 400 });
+  if (body.terms_accepted !== true || body.terms_version !== MAIB_TERMS_VERSION) return NextResponse.json({ error: 'Accept the current Terms and Conditions.' }, { status: 400 });
+  const email = receiptEmail(body.receipt_email);
+  if (!email) return NextResponse.json({ error: 'A valid receipt email is required.' }, { status: 400 });
   try {
     if (!process.env.MAIB_SIGNATURE_KEY) throw new Error('MAIB callback signature key is missing');
     const existing = await checked(db.from('maib_payment_orders').select('*').eq('user_id', user.id)
@@ -27,17 +31,18 @@ export async function POST(request) {
     const order = await checked(db.from('maib_payment_orders').insert({
       user_id: user.id, environment: environment(), request_key: body.request_key, product_key: product.key,
       amount_minor: product.amount_minor, currency_code: 'MDL', grants: product.grants, language: lang,
+      product_title: maibProductTitle(product.key, lang), receipt_email: email,
+      terms_version: MAIB_TERMS_VERSION, terms_accepted_at: new Date().toISOString(),
       return_to: safeReturnTo(body.return_to), next_check_at: new Date(Date.now() + 60_000).toISOString(),
     }).select('*').single());
     const origin = paymentOrigin();
     const returnUrl = `${origin}/payment/maib/success?order_id=${order.id}&lang=${lang}`;
-    const email = user.email && !/^telegram-\d+@auth\.catdai\.md$/i.test(user.email) ? user.email : undefined;
     try {
       const result = await maibRequest('/v2/checkouts', { method: 'POST', body: {
         amount: product.amount_mdl, currency: 'MDL', language: lang,
-        orderInfo: { id: order.id, description: `CatDai ${product.key}`, date: order.created_at,
-          orderAmount: product.amount_mdl, orderCurrency: 'MDL', items: [{ externalId: product.key, title: `CatDai ${product.key}`, amount: product.amount_mdl, currency: 'MDL', quantity: 1 }] },
-        payerInfo: { ...(email ? { email } : {}) },
+        orderInfo: { id: order.id, description: `CatDai — ${order.product_title}`, date: order.created_at,
+          orderAmount: product.amount_mdl, orderCurrency: 'MDL', items: [{ externalId: product.key, title: order.product_title, amount: product.amount_mdl, currency: 'MDL', quantity: 1 }] },
+        payerInfo: { email: order.receipt_email },
         callbackUrl: `${origin}/api/maib/callback`, successUrl: returnUrl, failUrl: returnUrl,
       }});
       if (!UUID.test(result.checkoutId || '')) throw new Error('Invalid checkout id');

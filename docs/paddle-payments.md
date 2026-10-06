@@ -104,6 +104,8 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
 - Canceling Extra from `/profile` requires `subscription.write`.
 
 ## Environment
+When `NODE_ENV=development`, the configured CatDai checkout path and query are kept but its origin is forced to `https://dev.catdai.md`; without a configured URL, `/payment/paddle/checkout` on that origin is used. Payment entry points and success/result navigation use the same development origin. Production retains the existing configured/hosted checkout behavior. The shared resolver is `src/lib/payment-urls.mjs`; this rule does not change Paddle's API environment.
+
 ```env
 PADDLE_ENVIRONMENT=sandbox
 PADDLE_API_KEY=

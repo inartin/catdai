@@ -11,6 +11,7 @@ import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet" },
+  { value: "str-la", label: "cadastru.roadTypeLane" },
   { value: "bulevard", label: "cadastru.roadTypeBoulevard" },
 ];
 const STREET_MAX_LENGTH = 80;
@@ -123,7 +124,9 @@ export default function CadastruSearchForm({
         city: CADASTRU_SUPPORTED_CITIES.includes(savedDraft?.addressForm?.city)
           ? savedDraft.addressForm.city
           : "Chișinău",
-        roadType: savedDraft?.addressForm?.roadType === "bulevard" ? "bulevard" : "strada",
+        roadType: roadTypes.some(({ value }) => value === savedDraft?.addressForm?.roadType)
+          ? savedDraft.addressForm.roadType
+          : "strada",
         street: typeof savedDraft?.addressForm?.street === "string" ? savedDraft.addressForm.street : "",
         houseNumber: typeof savedDraft?.addressForm?.houseNumber === "string" ? savedDraft.addressForm.houseNumber : "",
         apartmentNumber: typeof savedDraft?.addressForm?.apartmentNumber === "string" ? savedDraft.addressForm.apartmentNumber : "",

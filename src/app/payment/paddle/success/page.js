@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { paymentAppLink } from "@/lib/payment-urls.mjs";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import LockIcon from "@/components/icons/LockIcon";
@@ -206,7 +207,7 @@ export default function PaddlePaymentSuccessPage() {
   const display = getDisplayState({ loading: loading && !immediateError, error: immediateError || error, order, checkout: params.checkout });
   const accentClass = display.tone === "success" ? "bg-emerald-500" : display.tone === "error" ? "bg-red-500" : "bg-primary";
   const statusPillClass = display.tone === "success" ? "bg-emerald-50 text-emerald-700" : display.tone === "error" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600";
-  const returnHref = normalizeReturnTo(params.returnTo);
+  const returnHref = paymentAppLink(normalizeReturnTo(params.returnTo));
   const displayMessage = display.message || t(display.messageKey);
   const localizedStatus = order?.status ? t(PAYMENT_STATUS_KEYS[order.status] || "payment.orderStatusUnknown") : "";
 
@@ -214,7 +215,7 @@ export default function PaddlePaymentSuccessPage() {
     <div className="min-h-screen bg-[#f7f8f5] text-gray-950">
       <header className="border-b border-gray-100 bg-white sticky top-0 z-50">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <Link href="/" aria-label={t("nav.homeAriaLabel")} className="flex items-center gap-3">
+          <Link href={paymentAppLink("/")} aria-label={t("nav.homeAriaLabel")} className="flex items-center gap-3">
             <img src="/icon0.svg" alt="" className="h-11 w-auto object-contain" />
             <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
           </Link>

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
+import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 
 function formatMdl(value) {
   const amount = Number(value);
@@ -29,7 +30,7 @@ function getReturnPath() {
 }
 
 function buildPendingCheckoutUrl(productKey, lang) {
-  const url = new URL("/payment/checkout", window.location.origin);
+  const url = new URL("/payment/checkout", paymentSiteOrigin(window.location.origin));
   url.searchParams.set("product_key", productKey);
   url.searchParams.set("lang", lang);
   const returnPath = getReturnPath();

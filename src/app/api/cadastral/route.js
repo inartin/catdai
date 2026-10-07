@@ -563,6 +563,7 @@ export async function POST(request) {
   try {
     const externalPayload = await fetchExternalCadastralData(trimmed, {
       trackUsage: !(process.env.NODE_ENV === "development" && cadastruSearchType),
+      userId: access.user_id || null,
     });
     lookupSource = "api";
     const payload = await enrichWithCadastruMdDetails(

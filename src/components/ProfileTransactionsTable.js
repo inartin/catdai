@@ -1,4 +1,5 @@
 "use client";
+import MaibRefundAction from "@/components/MaibRefundAction";
 
 const DEFAULT_LABELS = {
   empty: "Nu ai plăți încă",
@@ -54,6 +55,8 @@ export default function ProfileTransactionsTable({
   loadingMore = false,
   onLoadMore = null,
   isDarkMode = false,
+  allowRefund = false,
+  onPaymentUpdate,
 }) {
   const copy = { ...DEFAULT_LABELS, ...labels };
 
@@ -76,7 +79,7 @@ export default function ProfileTransactionsTable({
           </thead>
           <tbody className={isDarkMode ? "divide-y divide-[#2a2f42]" : "divide-y divide-gray-100"}>
             {transactions.map((row) => (
-              <tr key={row.id} className={isDarkMode ? "hover:bg-[#2a2f42]" : "hover:bg-gray-50"}>
+              <tr key={`${row.provider}:${row.id}`} className={isDarkMode ? "hover:bg-[#2a2f42]" : "hover:bg-gray-50"}>
                 <td className={`whitespace-nowrap px-4 py-3 ${isDarkMode ? "text-[#9ca3af]" : "text-gray-600"}`}>
                   {formatHistoryDate(row.paidAt || row.createdAt, lang)}
                 </td>
@@ -84,13 +87,17 @@ export default function ProfileTransactionsTable({
                   <div>{formatProduct ? formatProduct(row.productKey) : row.productKey || "—"}</div>
                   <div className={`mt-0.5 text-xs font-normal ${isDarkMode ? "text-[#9ca3af]" : "text-gray-500"}`}>
                     {copy.paymentOrderId}: {row.id}
+                    <span className="ml-2 uppercase">{row.provider}{row.environment === "sandbox" ? " · TEST" : ""}</span>
                   </div>
                 </td>
                 <td className={`whitespace-nowrap px-4 py-3 ${isDarkMode ? "text-[#e2e8f0]" : "text-gray-700"}`}>
                   {formatStatus ? formatStatus(row.status) : row.status || "—"}
+                  {row.refundStatus && <div className="text-xs">{row.refundStatus}</div>}
+                  {allowRefund && row.provider === "maib" && <MaibRefundAction order={row} onUpdate={onPaymentUpdate} />}
                 </td>
                 <td className={`whitespace-nowrap px-4 py-3 text-right font-semibold ${isDarkMode ? "text-[#e2e8f0]" : "text-gray-900"}`}>
                   {formatPaymentAmount(row.amountMinor, row.currencyCode, lang)}
+                  {row.refundedMinor > 0 && <div className="text-xs font-normal">−{formatPaymentAmount(row.refundedMinor, row.currencyCode, lang)}</div>}
                 </td>
                 <td className={`whitespace-nowrap px-4 py-3 font-mono text-xs ${isDarkMode ? "text-[#9ca3af]" : "text-gray-600"}`}>
                   {row.transactionId || "—"}

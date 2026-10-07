@@ -142,7 +142,8 @@ function normalizeAddressText(value) {
 export function hasExactListingAddress(value) {
   const address = normalizeAddressText(value);
   if (!address) return false;
-  const hasStreet = /\b(strada|str\.?|bd\.?|bulevardul|bulevard|blvd|aleea|sos\.?|soseaua)\b/i.test(address);
+  const normalized = address.normalize("NFD").replace(/\p{M}/gu, "");
+  const hasStreet = /\b(strada|str\.?|bd\.?|bulevardul|bulevard|blvd|aleea|sos\.?|soseaua)\b/i.test(normalized);
   const hasHouse = /\b\d+[a-z]?(?:\s*\/\s*(?:\d+[a-z]?|[a-z]))?\b/i.test(address);
   return hasStreet && hasHouse;
 }
@@ -165,17 +166,17 @@ export function getParsedListingAddress(parsed) {
 
 function extractFeatures(html) {
   const features = {};
-  const liRe = /<li class="styles_group__feature__[^"]*">([\s\S]*?)<\/li>/gi;
+  const liRe = /<li\b[^>]*class="[^"]*(?:styles_group__feature__|__group__feature)[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
   let match;
   while ((match = liRe.exec(html))) {
     const li = match[1];
-    const keyMatch = li.match(/styles_group__key__[^"]*">([^<]*)<\/span>/i);
+    const keyMatch = li.match(/(?:styles_group__key__|__group__key)[^"]*"[^>]*>([^<]*)<\/span>/i);
     if (!keyMatch) continue;
     const key = decodeEntities(keyMatch[1]).trim();
     if (!key) continue;
-    let valueMatch = li.match(/styles_group__value__[^"]*">([^<]*)<\/span>/i);
+    let valueMatch = li.match(/(?:styles_group__value__|__group__value)[^"]*"[^>]*>([^<]*)<\/span>/i);
     if (!valueMatch) {
-      valueMatch = li.match(/styles_group__link__[^"]*"[^>]*>([^<]*)<\/a>/i);
+      valueMatch = li.match(/(?:styles_group__link__|__group__link)[^"]*"[^>]*>([^<]*)<\/a>/i);
     }
     features[key] = valueMatch ? decodeEntities(valueMatch[1]).trim() : "";
   }

@@ -18,7 +18,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - Reads the seller-selected attributes only; the free-text description is ignored.
 - Price/currency/external id come from `product:*` meta tags; location from JSON-LD `name`.
 - Page title is kept only as a fallback signal for category/deal-type rejection.
-- Features are read from the `styles_group__feature__*` list items.
+- Features are read from both legacy `styles_group__*` and current CSS-module `__group__*` feature rows.
 - Deal type can also be recovered from compact visible text when 999.md does not render it as a regular feature row.
 - Returns `null` when the page is not a parseable listing.
 
@@ -28,7 +28,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - Requires district + room count; missing essentials return `insufficient_data`.
 - Optional fields (area, building type, renovation, floor, total floors, bathrooms, balconies) are mapped when present and within bounds.
 - Returns `external_id`, `listing_price`, `listing_currency`, parsed `listing_address`, `listing_url`, and the mapped `params`.
-- `listing_address` is built from 999.md embedded region/city/district/street/house fields when available; stale cached parses that only contain a broad location are refreshed before returning.
+- `listing_address` is built from 999.md embedded region/city/district/street/house fields when available; stale cached parses with a broad location or missing room count are refreshed before returning.
 
 ## Analytics
 - Each parse attempt with a valid 999 listing id writes to `listing_link_analysis_events` when the table exists.

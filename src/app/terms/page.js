@@ -1,10 +1,13 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import Link from "next/link";
+import { MERCHANT } from "@/lib/merchant.mjs";
 
 const sections = [
   {
     title: "1. Despre serviciu",
     paragraphs: [
+      `Serviciul CatDai (catdai.md) este operat de ${MERCHANT.legalName}, IDNO ${MERCHANT.idno}, adresă: ${MERCHANT.address}.`,
       "CatDai este un serviciu informativ care oferă analiză de piață și estimări orientative de preț pentru proprietăți și alte categorii care pot fi disponibile în platformă la un moment dat.",
       "CatDai nu este agenție imobiliară, broker, evaluator autorizat, consultant financiar sau consultant juridic.",
     ],
@@ -78,26 +81,48 @@ const sections = [
     title: "10. Conturi, produse plătite și plată",
     paragraphs: [
       "Anumite funcții CatDai pot fi disponibile gratuit, iar altele pot necesita autentificare și plată. Produsele plătite sunt cumpărate ca acces sau credite de utilizare unică pentru funcțiile indicate pe pagina de prețuri sau în ecranul de plată.",
-      "Prețul, moneda, produsul ales și beneficiile incluse sunt afișate înainte de inițierea plății. Plata este procesată prin Paddle.",
+      "Prețul, moneda, produsul ales și beneficiile incluse sunt afișate înainte de inițierea plății. Plățile noi sunt procesate prin maib; tranzacțiile Paddle existente rămân gestionate prin Paddle.",
+      "Pentru o comandă maib, te autentifici în CatDai, alegi produsul, verifici utilizările incluse și suma în MDL, furnizezi o adresă reală de e-mail pentru confirmare și bifezi acceptarea acestor termeni. Continui apoi pe pagina securizată maib pentru plata cu cardul bancar acceptat de procesator.",
+      "Pachetele maib sunt achitate o singură dată, nu creează abonamente și adaugă credite fără expirare. Pachetele includ câte 5 sau 20 de utilizări pentru fiecare dintre cele 6 funcții afișate. Produsul individual include o singură utilizare a funcției selectate înainte de plată. Beneficiile și prețul exact sunt afișate înainte de plată.",
       "CatDai nu colectează și nu stochează datele cardului bancar. Datele de card și autorizarea plății sunt gestionate de procesatorul de plăți.",
+      "Plățile maib sunt efectuate în MDL. Dacă moneda contului de card diferă, conversia și eventualele comisioane sunt stabilite de banca emitentă a cardului.",
       "Accesul plătit sau creditele sunt activate numai după confirmarea plății de către procesatorul de plăți și verificarea tranzacției de către sistemele CatDai.",
       "Înainte de plată, utilizatorul trebuie să confirme că acceptă acești Termeni și Condiții și că a verificat produsul, prețul și datele afișate în ecranul de confirmare.",
     ],
   },
   {
+    title: "10.1. Prestarea și livrarea serviciilor digitale",
+    paragraphs: [
+      "Serviciile sunt prestate online, fără livrare fizică și fără costuri de transport. Ai nevoie de un cont CatDai, conexiune la internet și un browser actualizat (Chrome, Safari, Firefox sau Edge), cu JavaScript activat. Nu este necesară instalarea unui program.",
+      "După verificarea confirmării maib, creditele sunt adăugate în cont, de regulă în câteva minute. Activarea nu depinde numai de redirecționarea de la bancă. Rezultatele analizelor sunt afișate în platformă la utilizarea funcțiilor cumpărate; rapoartele PDF se descarcă din CatDai. Creditele disponibile pot fi verificate în profil.",
+      "Generarea unei analize și descărcarea raportului PDF aferent sunt funcții distincte și pot consuma fiecare utilizarea corespunzătoare. Timpul de generare și conținutul rezultatelor depind de datele introduse și de disponibilitatea surselor externe. Dacă plata este confirmată, dar accesul lipsește, contactează info@catdai.md cu numărul comenzii.",
+    ],
+  },
+  {
+    title: "10.2. Protecția datelor personale și confidențialitatea",
+    paragraphs: [
+      "Pentru comenzi prelucrăm datele de cont, adresa de e-mail pentru confirmarea plății, produsul, suma, moneda, identificatorii și statusul tranzacției, precum și versiunea termenilor și data acceptării lor. Aceste date sunt folosite pentru executarea comenzii, confirmare, suport, reconciliere și obligații legale.",
+      "Datele necesare inițierii și confirmării plății sunt transmise către maib; informațiile necesare expedierii confirmării sunt prelucrate de furnizorul serviciului de e-mail. CatDai nu colectează datele sensibile ale cardului. Detaliile privind prelucrarea, păstrarea și drepturile tale sunt descrise în Politica de Confidențialitate.",
+    ],
+    links: [{ href: '/privacy', label: 'Politica de Confidențialitate' }],
+  },
+  {
     title: "11. Anulare, returnări și rambursări",
     paragraphs: [
       "Dacă plata este anulată, respinsă, expirată sau neconfirmată, accesul plătit ori creditele aferente nu sunt acordate.",
-      "Produsele digitale CatDai sunt livrate electronic. După confirmarea plății și acordarea accesului sau a creditelor, rambursarea poate fi limitată atunci când serviciul a fost deja furnizat sau creditul a fost consumat, în măsura permisă de lege.",
+      "Produsele digitale CatDai sunt livrate electronic. Simpla activare a accesului sau adăugarea creditelor în cont nu reprezintă renunțarea la dreptul legal de retragere. Orice limitare a rambursării pentru servicii deja prestate se aplică numai în condițiile prevăzute de lege; acceptarea generală a acestor termeni nu este un acord separat de renunțare la acest drept.",
       "Dacă a fost efectuată o plată eronată, dublă sau dacă accesul plătit nu a fost acordat după confirmarea tranzacției, ne poți contacta la info@catdai.md cu detaliile plății pentru verificare.",
-      "Orice rambursare aprobată se face, de regulă, prin aceeași metodă de plată folosită la cumpărare, conform regulilor procesatorului de plăți și legislației aplicabile.",
+      "Rambursările pentru plățile maib se efectuează pe același card folosit la achitare. Rambursările tranzacțiilor Paddle sunt gestionate conform regulilor Paddle și legislației aplicabile.",
+      "Pentru solicitare, trimite numărul comenzii, adresa de e-mail folosită la plată, produsul, suma, data aproximativă a plății și motivul, dacă este relevant, la info@catdai.md. Ne propunem să răspundem în 5 zile lucrătoare, fără a prelungi termenele legale obligatorii. După aprobarea rambursării, timpul de creditare a cardului depinde de procesator și de banca emitentă.",
       "Regulile generale privind eligibilitatea, procesul și termenele de rambursare sunt descrise și în pagina separată /refund.",
     ],
+    links: [{ href: '/refund', label: 'Politica de Rambursare' }],
   },
   {
     title: "12. Confirmări, suport și evidența tranzacțiilor",
     paragraphs: [
       "După inițierea sau finalizarea unei plăți, CatDai poate afișa o pagină de confirmare, anulare sau status al tranzacției. Redirecționarea către o pagină de succes nu reprezintă singură confirmarea definitivă a plății.",
+      "Pagina de revenire afișează numărul comenzii, produsul, cantitatea, utilizările incluse, suma, moneda și, după confirmare, data achitării. Confirmarea plății este expediată la adresa de e-mail furnizată în checkout.",
       "Pentru întrebări privind plățile, accesul plătit, anulările sau rambursările, ne poți contacta la info@catdai.md. Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
       "Datele minime despre tranzacție pot fi păstrate pentru reconciliere, suport, prevenirea fraudelor, contabilitate și obligații legale.",
     ],
@@ -146,10 +171,12 @@ const sections = [
   {
     title: "19. Datele operatorului",
     paragraphs: [
-      "Operator: CatDai",
-      "E-mail de contact: info@catdai.md",
+      `Operator / comerciant: ${MERCHANT.legalName}`,
+      `IDNO: ${MERCHANT.idno}`,
+      `Adresă: ${MERCHANT.address}`,
+      `Website: catdai.md. E-mail de contact: ${MERCHANT.email}`,
       "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
-      "Data intrării în vigoare: 11 Iunie 2026",
+      "Data ultimei actualizări: 6 Octombrie 2026",
     ],
   },
 ];
@@ -165,9 +192,8 @@ export default function TermsPage() {
               Termeni și Condiții
             </h1>
             <p className="mt-4 text-base sm:text-lg text-gray-600">
-              Această pagină descrie condițiile generale de utilizare ale serviciului
-              CatDai. Textul de mai jos are rol informativ și operațional pentru
-              utilizatorii platformei.
+              Acești Termeni și Condiții reglementează utilizarea serviciului
+              CatDai și comenzile pentru serviciile digitale cumpărate prin catdai.md.
             </p>
 
             <div className="mt-10 space-y-8">
@@ -182,6 +208,8 @@ export default function TermsPage() {
                       <p key={paragraph}>{paragraph}</p>
                     ))}
                   </div>
+
+                  {section.links?.map(link => <p key={link.href} className="mt-3"><Link href={link.href} className="text-primary underline">{link.label}</Link></p>)}
 
                   {section.bullets ? (
                     <ul className="mt-4 list-disc pl-5 space-y-2 text-gray-600">

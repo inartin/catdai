@@ -1,3 +1,5 @@
+import { getPaymentProvider } from "@/lib/payment-provider";
+import { maibProduct } from "@/lib/maib/products.mjs";
 import { getPricingConfig } from "@/lib/pricing-config";
 
 export const PAYMENT_FEATURE_KEYS = [
@@ -44,6 +46,36 @@ const SINGLE_PRODUCTS = {
     description: "One cadastru lookup",
     amountMdl: 19,
     grants: { cadastru_lookup: 1 },
+  },
+  cadastru_lookup_5: {
+    title: "5 verificări cadastrale",
+    description: "Five cadastru lookups",
+    maibOnly: true,
+    grants: { cadastru_lookup: 5 },
+  },
+  cadastru_lookup_20: {
+    title: "20 de verificări cadastrale",
+    description: "Twenty cadastru lookups",
+    maibOnly: true,
+    grants: { cadastru_lookup: 20 },
+  },
+  all_features_20: {
+    title: "20 de utilizări pentru fiecare funcție",
+    description: "Twenty uses of each feature",
+    maibOnly: true,
+    grants: Object.fromEntries(PAYMENT_FEATURE_KEYS.map((feature) => [feature, 20])),
+  },
+  all_features_5: {
+    title: "5 utilizări pentru fiecare funcție",
+    description: "Five uses of each feature",
+    maibOnly: true,
+    grants: Object.fromEntries(PAYMENT_FEATURE_KEYS.map((feature) => [feature, 5])),
+  },
+  property_combo_1: {
+    title: "Pachet complet",
+    description: "One cadastru lookup, sale estimate and PDF report",
+    maibOnly: true,
+    grants: { cadastru_lookup: 1, sale_estimate: 1, pdf_report: 1 },
   },
   yield_calculator_single: {
     title: "Calculator randament",
@@ -113,6 +145,13 @@ export function getPaymentProduct(productKey) {
   const product = getPaymentProducts()[key];
   if (!product) return null;
 
+  if (getPaymentProvider() === "maib") {
+    const maib = maibProduct(key);
+    if (!maib) return null;
+    return { key, ...product, billingMode: "one_time", grants: maib.grants,
+      amountMinor: maib.amount_minor, amountMdl: maib.amount_mdl, amountEur: maib.amount_mdl / 20 };
+  }
+  if (product.maibOnly) return null;
   const sharedListingAnalysisPriceEur = getListingAnalysisSinglePriceEur();
   const amountEur = product.useSharedEvaluationPrice
     ? sharedListingAnalysisPriceEur

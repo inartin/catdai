@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { getPaymentProvider } from "@/lib/payment-provider";
 
 const limiter = rateLimit({ interval: 60_000, limit: 120, namespace: "payment-checkout-events" });
-const ALLOWED_EVENTS = new Set(["checkout_popup_opened", "checkout_page_opened", "pricing_page_opened"]);
+const ALLOWED_EVENTS = new Set(["checkout_popup_opened", "checkout_page_opened", "pricing_page_opened", "checkout_order_created"]);
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");
@@ -63,12 +64,16 @@ export async function POST(request) {
   }
 
   const access = await resolveAccessTier(request);
+  const provider = ["maib", "paddle"].includes(body.provider) ? body.provider
+    : String(body.path || "").startsWith("/payment/paddle/") ? "paddle" : getPaymentProvider();
   const row = {
     event_type: eventType,
     user_id: access.user_id || null,
     device_id: cleanText(body.device_id, 80),
     session_id: cleanText(body.session_id, 80),
-    order_id: cleanUuid(body.order_id),
+    provider,
+    order_id: provider === "maib" ? null : cleanUuid(body.order_id),
+    maib_order_id: provider === "maib" ? cleanUuid(body.order_id) : null,
     paddle_transaction_id: cleanPaddleTransactionId(body.paddle_transaction_id),
     product_key: cleanText(body.product_key, 80),
     source_product_key: cleanText(body.source_product_key, 80),
@@ -77,8 +82,9 @@ export async function POST(request) {
   };
 
   let { error } = await supabaseAdmin.from("payment_checkout_events").insert(row);
-  if (error?.code === "23503" && row.order_id) {
+  if (error?.code === "23503" && (row.order_id || row.maib_order_id)) {
     row.order_id = null;
+    row.maib_order_id = null;
     ({ error } = await supabaseAdmin.from("payment_checkout_events").insert(row));
   }
   if (error) {

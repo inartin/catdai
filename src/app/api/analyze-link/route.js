@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
+import { resolveAccessTier } from "@/lib/access-tier";
 import { getCachedListing, setCachedListing } from "@/lib/listing-cache";
 import { fetchExternal999Listing } from "@/lib/listing999-external-api";
 import { logListingLinkAnalysisEvent } from "@/lib/listing-link-analysis-events";
@@ -247,9 +248,9 @@ function buildFallbackCachedPayload(externalId, parsed) {
   return { parsed, params: mapped.params, payload: buildSuccessPayload(externalId, parsed, mapped.params) };
 }
 
-async function fetchAndParseListing(externalId, listingUrl) {
+async function fetchAndParseListing(externalId, listingUrl, options = {}) {
   try {
-    const parsed = await fetchExternal999Listing(externalId);
+    const parsed = await fetchExternal999Listing(externalId, options);
     return parsed ? { parsed, source: "external" } : { error: "not_a_listing" };
   } catch (error) {
     if (!error?.fallbackEligible) return { error: error?.code || "fetch_failed" };
@@ -275,6 +276,14 @@ export async function POST(request) {
     );
   }
 
+  let userId = null;
+  try {
+    const access = await resolveAccessTier(request);
+    userId = access.user_id || null;
+  } catch {
+    // ignore
+  }
+
   let body;
   try {
     body = await request.json();
@@ -297,8 +306,12 @@ export async function POST(request) {
   };
 
   let parsed = await getCachedListing(externalId);
-  if (!parsed || !hasExactListingAddress(getParsedListingAddress(parsed))) {
-    const result = await fetchAndParseListing(externalId, listingUrl);
+  if (
+    !parsed ||
+    !hasExactListingAddress(getParsedListingAddress(parsed)) ||
+    !pickFeature(parsed.features || {}, FEATURE_KEYS.rooms)
+  ) {
+    const result = await fetchAndParseListing(externalId, listingUrl, { userId });
     if (result.error === "blocked") {
       const fallback = buildFallbackCachedPayload(externalId, parsed);
       if (fallback) {

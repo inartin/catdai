@@ -48,7 +48,7 @@ function externalError(message, options = {}) {
   return error;
 }
 
-export async function fetchExternal999Listing(externalId) {
+export async function fetchExternal999Listing(externalId, options = {}) {
   const { url, secret, timeoutMs } = externalListing999Config(
     "v1/999/listing",
     process.env.LISTING999_EXTERNAL_API_URL
@@ -88,6 +88,7 @@ export async function fetchExternal999Listing(externalId) {
       errorCode: code,
       errorMessage: message,
       durationMs: Date.now() - startedAt,
+      userId: options.userId ?? null,
     });
     throw externalError(message, {
       code,
@@ -110,6 +111,7 @@ export async function fetchExternal999Listing(externalId) {
       responseHeaders: getExternalApiDiagnosticHeaders(response),
       httpStatus: response.status,
       durationMs: Date.now() - startedAt,
+      userId: options.userId ?? null,
     });
     return payload.data;
   }
@@ -125,6 +127,7 @@ export async function fetchExternal999Listing(externalId) {
     errorMessage: message,
     httpStatus: response.status,
     durationMs: Date.now() - startedAt,
+    userId: options.userId ?? null,
   });
   throw externalError(message, {
     code,

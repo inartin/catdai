@@ -418,20 +418,33 @@ async function fetchExternalApiUsageRows(sinceDate) {
 }
 
 async function fetchExternalApiUsageEvents(since) {
-  const columns = "id, service, status, endpoint, request_payload, response_payload, response_headers, error_code, error_message, http_status, duration_ms, created_at";
-  const fetchEvents = (includeRecovery) => applySince(
-    supabaseAdmin
-      .from("external_api_usage_events")
-      .select(includeRecovery ? `${columns}, suggestion_recovery` : columns),
-    "created_at",
-    since
-  )
-    .order("created_at", { ascending: false })
-    .range(0, 199);
-  let response = await fetchEvents(true);
-  if (["42703", "PGRST204"].includes(String(response.error?.code))
-    && String(response.error?.message || "").includes("suggestion_recovery")) {
-    response = await fetchEvents(false);
+  const baseColumns = "id, service, status, endpoint, request_payload, response_payload, response_headers, error_code, error_message, http_status, duration_ms, created_at";
+  const fetchEvents = (includeUserId, includeRecovery) => {
+    let cols = baseColumns;
+    if (includeUserId) cols += ", user_id";
+    if (includeRecovery) cols += ", suggestion_recovery";
+    return applySince(
+      supabaseAdmin
+        .from("external_api_usage_events")
+        .select(cols),
+      "created_at",
+      since
+    )
+      .order("created_at", { ascending: false })
+      .range(0, 199);
+  };
+
+  let response = await fetchEvents(true, true);
+  if (["42703", "PGRST204"].includes(String(response.error?.code))) {
+    const message = String(response.error?.message || "");
+    const missingUserId = message.includes("user_id");
+    const missingRecovery = message.includes("suggestion_recovery");
+    if (missingUserId || missingRecovery) {
+      response = await fetchEvents(!missingUserId, !missingRecovery);
+      if (["42703", "PGRST204"].includes(String(response.error?.code))) {
+        response = await fetchEvents(false, false);
+      }
+    }
   }
 
   if (!response.error) {
@@ -443,6 +456,40 @@ async function fetchExternalApiUsageEvents(since) {
   }
 
   throw new Error(`external_api_usage_events query failed: ${response.error.message}`);
+}
+
+function correlateExternalApiUsers(events, { cadastruSearchEvents = [], listingLinkAnalysisEvents = [] }) {
+  if (!Array.isArray(events) || events.length === 0) return [];
+  return events.map((event) => {
+    if (event.user_id) return event;
+    const eventTime = event.created_at ? new Date(event.created_at).getTime() : 0;
+    if (!eventTime) return event;
+
+    if (event.service === "cadastru_number") {
+      const cadNum = event.request_payload?.cadastral_number;
+      if (cadNum) {
+        const match = cadastruSearchEvents.find(
+          (s) => s.cadastral_number === cadNum && Math.abs(new Date(s.created_at).getTime() - eventTime) <= 15000 && s.user_id
+        );
+        if (match) return { ...event, user_id: match.user_id };
+      }
+    } else if (event.service === "cadastru_address") {
+      const match = cadastruSearchEvents.find(
+        (s) => s.search_type === "address" && Math.abs(new Date(s.created_at).getTime() - eventTime) <= 15000 && s.user_id
+      );
+      if (match) return { ...event, user_id: match.user_id };
+    } else if (event.service === "999_listing") {
+      const extId = String(event.request_payload?.external_id || "");
+      if (extId) {
+        const match = listingLinkAnalysisEvents.find(
+          (a) => String(a.external_id) === extId && Math.abs(new Date(a.created_at).getTime() - eventTime) <= 15000 && a.user_id
+        );
+        if (match) return { ...event, user_id: match.user_id };
+      }
+    }
+
+    return event;
+  });
 }
 
 function buildExternalApiUsageStats(rows, events) {
@@ -563,9 +610,9 @@ async function fetchPaidUserSummary(since) {
   const paidOrders = await fetchAllRows(() =>
     applySince(
       supabaseAdmin
-        .from("paddle_payment_orders")
+        .from("reporting_payment_orders")
         .select("user_id, product_key, paid_at, created_at")
-        .eq("status", "paid")
+        .in("status", ["paid", "partially_refunded"])
         .not("user_id", "is", null),
       "created_at",
       since
@@ -574,7 +621,7 @@ async function fetchPaidUserSummary(since) {
   );
   const activeCredits = await fetchAllRows(() =>
     supabaseAdmin
-      .from("user_feature_credits")
+      .from("reporting_feature_credit_balances")
       .select("user_id, remaining_uses")
       .gt("remaining_uses", 0)
       .not("user_id", "is", null)
@@ -748,6 +795,14 @@ export async function GET(request) {
   const authUsersById = new Map(users.map((user) => [user.id, user]));
   const filteredUsers = filterRowsSince(users, "created_at", periodSince);
   const cadastruSearchesWithUsers = attachUserNames(cadastruSearchEvents, usersById);
+  const correlatedExternalApiEvents = correlateExternalApiUsers(externalApiUsageEvents.rows || [], {
+    cadastruSearchEvents,
+    listingLinkAnalysisEvents,
+  });
+  const externalApiEventsWithUsers = {
+    ...externalApiUsageEvents,
+    rows: attachUserNames(correlatedExternalApiEvents, usersById),
+  };
   const paidUsers = {
     ...paidUserSummary,
     users: (paidUserSummary.users || []).map((item) => {
@@ -779,7 +834,7 @@ export async function GET(request) {
     cadastruSearches: buildCadastruSearchStats(cadastruSearchesWithUsers, cutoffs),
     listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
-    externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiUsageEvents),
+    externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiEventsWithUsers),
     paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
     marketTrendsPopup,
     paidUsers,

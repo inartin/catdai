@@ -1,19 +1,20 @@
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { MERCHANT } from "@/lib/merchant.mjs";
 
 const sections = [
   {
     title: "1. Domeniu",
     paragraphs: [
       "Aceasta Politica de Rambursare se aplica produselor digitale CatDai, inclusiv accesului platit, creditelor de utilizare si rapoartelor sau analizelor generate in platforma.",
-      "Platile sunt procesate prin Paddle.",
+      "Plățile noi sunt procesate prin maib. Tranzacțiile și abonamentele Paddle existente sunt gestionate în continuare prin Paddle.",
     ],
   },
   {
     title: "2. Produse digitale",
     paragraphs: [
       "Serviciile CatDai sunt livrate electronic. Dupa confirmarea platii, accesul sau creditele cumparate sunt adaugate in contul utilizatorului ori folosite pentru functia selectata.",
-      "Pentru ca serviciul poate fi livrat imediat, rambursarea poate fi limitata dupa ce accesul a fost acordat, creditul a fost consumat sau raportul/analiza a fost generat(a), in masura permisa de lege.",
+      "Simpla activare a accesului sau adăugarea creditelor în cont nu reprezintă renunțarea la dreptul legal de retragere. Orice limitare a rambursării pentru servicii deja prestate se aplică numai în condițiile prevăzute de lege; acceptarea Termenilor și Condițiilor nu este un acord separat de renunțare la acest drept.",
     ],
   },
   {
@@ -26,22 +27,22 @@ const sections = [
   {
     title: "4. Cand rambursarea poate fi refuzata",
     paragraphs: [
-      "Rambursarea poate fi refuzata daca produsul digital a fost deja livrat si utilizat, daca un credit a fost consumat pentru generarea unei analize sau daca solicitarea nu contine suficiente informatii pentru verificarea platii.",
-      "Nu oferim rambursari pentru rezultate orientative cu care utilizatorul nu este de acord, deoarece estimarile CatDai sunt informative si depind de datele introduse si de semnalele de piata disponibile.",
+      "În măsura permisă de lege, putem refuza cererile discreționare de rambursare pentru servicii deja prestate și utilizate. Consumul unui credit nu anulează automat drepturile obligatorii ale consumatorului. Dacă informațiile nu permit identificarea plății, vom solicita detalii suplimentare.",
+      "Dezacordul cu o estimare orientativă nu constituie, singur, un motiv comercial de rambursare. Aceasta nu limitează dreptul legal de retragere sau remediile pentru un serviciu neconform.",
     ],
   },
   {
     title: "5. Cum soliciti o rambursare",
     paragraphs: [
-      "Pentru o solicitare de rambursare, scrie la info@catdai.md si include adresa de e-mail folosita la plata, data aproximativa a tranzactiei, produsul cumparat, suma platita si motivul solicitarii.",
+      "Pentru o solicitare de rambursare sau notificarea retragerii din contract, scrie la info@catdai.md și include numărul comenzii, adresa de e-mail folosită la plată, data aproximativă a tranzacției, produsul cumpărat și suma. Poți preciza motivul, dacă este relevant; nu solicităm justificarea exercitării unui drept legal de retragere.",
       "Putem cere informatii suplimentare pentru a identifica tranzactia si pentru a verifica daca produsul a fost livrat sau utilizat.",
     ],
   },
   {
     title: "6. Timp de procesare",
     paragraphs: [
-      "Vom incerca sa raspundem solicitarilor de rambursare in termen de 5 zile lucratoare.",
-      "Daca rambursarea este aprobata, suma este returnata de regula prin aceeasi metoda de plata folosita la cumparare. Timpul pana la aparitia banilor in cont depinde de procesatorul de plati, banca emitenta si metoda de plata.",
+      "Ne propunem să răspundem solicitărilor de rambursare în 5 zile lucrătoare, fără a prelungi termenele legale obligatorii.",
+      "Rambursările pentru plățile maib se efectuează pe același card folosit la achitare. Rambursările tranzacțiilor Paddle sunt gestionate conform regulilor Paddle. Timpul până la apariția banilor în cont depinde de procesator și de banca emitentă.",
     ],
   },
   {
@@ -54,9 +55,12 @@ const sections = [
   {
     title: "8. Contact",
     paragraphs: [
-      "E-mail: info@catdai.md",
+      `Comerciant: ${MERCHANT.legalName}`,
+      `IDNO: ${MERCHANT.idno}`,
+      `Adresă: ${MERCHANT.address}`,
+      `E-mail: ${MERCHANT.email}`,
       "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
-      "Data intrarii in vigoare: 11 Iunie 2026",
+      "Data ultimei actualizări: 5 Octombrie 2026",
     ],
   },
 ];

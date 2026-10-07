@@ -1,10 +1,13 @@
 "use client";
+import usePaymentProvider from "@/components/usePaymentProvider";
+import { maibProduct } from "@/lib/maib/products.mjs";
 
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import CloseIcon from "@/components/icons/CloseIcon";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
+import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 
 const MAX_CUSTOM_REQUEST_LENGTH = 500;
 const MAX_CUSTOM_REQUEST_BODY_LENGTH = 340;
@@ -103,7 +106,7 @@ function getReturnPath() {
 }
 
 function buildPendingCheckoutUrl(productKey, lang) {
-  const url = new URL("/payment/paddle/checkout", window.location.origin);
+  const url = new URL("/payment/checkout", paymentSiteOrigin(window.location.origin));
   url.searchParams.set("product_key", productKey);
   url.searchParams.set("lang", lang);
   const returnPath = getReturnPath();
@@ -230,7 +233,7 @@ function PriceCard({ plan, featured = false, active = false, checkoutState, onCh
   );
 }
 
-function CustomRequestCard({ onOpen }) {
+export function CustomRequestCard({ onOpen }) {
   const { t } = useTranslation();
 
   return (
@@ -254,7 +257,7 @@ function CustomRequestCard({ onOpen }) {
   );
 }
 
-function CustomRequestModal({ open, onClose }) {
+export function CustomRequestModal({ open, onClose }) {
   const { t } = useTranslation();
   const { session } = useAuth();
   const [message, setMessage] = useState("");
@@ -429,6 +432,12 @@ function CustomRequestModal({ open, onClose }) {
   );
 }
 
+export function PaymentCurrencyNote() {
+  const { t } = useTranslation();
+  const provider = usePaymentProvider();
+  return <p className="mx-auto max-w-6xl my-10 px-4 pb-8 text-center text-xs font-medium text-gray-500">{t(`payment.currencyNote.${provider}`)}</p>;
+}
+
 export default function Pricing({
   prices,
   compact = false,
@@ -442,6 +451,7 @@ export default function Pricing({
     productKey: null,
     message: "",
   });
+  const provider = usePaymentProvider();
   const [customRequestOpen, setCustomRequestOpen] = useState(false);
   const [activePlanKey, setActivePlanKey] = useState(null);
   const pageTrackedRef = useRef(false);
@@ -510,8 +520,8 @@ export default function Pricing({
     {
       key: "standard",
       productKey: "standard_pack",
-      price: prices.standard.mdl,
-      eurPrice: prices.standard.eur,
+      price: provider === "maib" ? maibProduct("standard_pack").amount_mdl : prices.standard.mdl,
+      eurPrice: provider === "maib" ? maibProduct("standard_pack").amount_mdl / 20 : prices.standard.eur,
       title: t("pricing.standardTitle"),
       description: t("pricing.standardDesc"),
       mobileDescription: t("pricing.standardMobileDesc"),
@@ -523,8 +533,8 @@ export default function Pricing({
     {
       key: "pro",
       productKey: "pro_pack",
-      price: prices.pro.mdl,
-      eurPrice: prices.pro.eur,
+      price: provider === "maib" ? maibProduct("pro_pack").amount_mdl : prices.pro.mdl,
+      eurPrice: provider === "maib" ? maibProduct("pro_pack").amount_mdl / 20 : prices.pro.eur,
       title: t("pricing.proTitle"),
       description: t("pricing.proDesc"),
       mobileDescription: t("pricing.proMobileDesc"),
@@ -537,13 +547,13 @@ export default function Pricing({
     {
       key: "extra",
       productKey: "extra_pack",
-      price: prices.extra.mdl,
-      eurPrice: prices.extra.eur,
+      price: provider === "maib" ? maibProduct("extra_pack").amount_mdl : prices.extra.mdl,
+      eurPrice: provider === "maib" ? maibProduct("extra_pack").amount_mdl / 20 : prices.extra.eur,
       title: t("pricing.extraTitle"),
       description: t("pricing.extraDesc"),
-      mobileDescription: t("pricing.extraMobileDesc"),
-      badge: t("pricing.extraBadge"),
-      note: t("pricing.extraPackageNote"),
+      mobileDescription: t(provider === "maib" ? "maib.extraMobileDesc" : "pricing.extraMobileDesc"),
+      badge: t(provider === "maib" ? "maib.extraBadge" : "pricing.extraBadge"),
+      note: t(provider === "maib" ? "pricing.paidPackageNote" : "pricing.extraPackageNote"),
       features: makeFeatures("50"),
       actionLabel: t("pricing.choosePlan", { plan: t("pricing.extraTitle") }),
       loadingLabel: t("payment.checkoutLoading"),
@@ -552,50 +562,9 @@ export default function Pricing({
   const visiblePlans = plans.filter((plan) => !hiddenPlanKeys.includes(plan.key));
   const activePlan = plans.find((plan) => plan.key === activePlanKey) || null;
 
-  const startCheckout = async (productKey) => {
-    if (!session?.access_token) {
-      setCheckoutState({ status: "redirecting", productKey, message: "" });
-      window.location.href = buildPendingCheckoutUrl(productKey, lang);
-      return;
-    }
-
-    setCheckoutState({ status: "loading", productKey, message: "" });
-
-    try {
-      const response = await fetch("/api/payments/paddle/create", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          product_key: productKey,
-          lang,
-          return_to: getReturnPath(),
-        }),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload?.error || t("payment.checkoutError"));
-      }
-
-      const checkoutUrl = payload?.checkout?.url;
-      if (!checkoutUrl) throw new Error(t("payment.checkoutError"));
-
-      try {
-        sessionStorage.setItem(`catdai:paddle-product:${payload.order_id}`, JSON.stringify(payload.product || {}));
-      } catch {}
-
-      setCheckoutState({ status: "redirecting", productKey, message: "" });
-      window.location.href = checkoutUrl;
-    } catch (error) {
-      setCheckoutState({
-        status: "error",
-        productKey,
-        message: error?.message || t("payment.checkoutError"),
-      });
-    }
+  const startCheckout = (productKey) => {
+    setCheckoutState({ status: "redirecting", productKey, message: "" });
+    window.location.href = buildPendingCheckoutUrl(productKey, lang);
   };
 
   return (
@@ -628,6 +597,7 @@ export default function Pricing({
             />
           ))}
         </div>
+        {provider === 'maib' && <div className="mx-auto mt-6 max-w-3xl space-y-2 text-center text-sm text-gray-600"><p>{t('maib.delivery')}</p></div>}
         <CustomRequestCard onOpen={() => setCustomRequestOpen(true)} />
       </div>
       <CustomRequestModal

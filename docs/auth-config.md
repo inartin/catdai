@@ -7,6 +7,19 @@ Implemented for Google and Telegram login.
 
 Telegram login uses Telegram's current OAuth popup to get an ID token, verifies that token on the app backend, then signs the user into Supabase with an app-managed Telegram account. Do not use Supabase's hosted Telegram OIDC callback here because Telegram's OIDC discovery has no UserInfo endpoint and Supabase can fail with `Error getting user profile from external provider`. Do not pass Telegram popup ID tokens directly to Supabase `signInWithIdToken`; Supabase can reject those tokens as `Bad ID token`.
 
+## MAIB verification login (development only)
+`AuthOptions` adds a RO/RU username/password form only with `NODE_ENV=development`. The username is `maib-test`; `POST /api/auth/maib-test` returns 404 in every other environment even when settings exist. It checks same-origin requests, throttles attempts, verifies the server-only password, and allows exactly the configured user ID with the dedicated email and trusted `app_metadata.maib_verification` marker. No signup or arbitrary-user password login is added.
+
+Provision the single ordinary account once with:
+```sh
+NODE_ENV=development pnpm exec node scripts/setup-maib-test-user.mjs
+```
+The script writes `MAIB_TEST_USER_ID` and a generated `MAIB_TEST_PASSWORD` to ignored `.env.development.local`, plus reviewer credentials to ignored `tmp/maib-test-credentials.txt` (mode 0600). Reruns reuse the configured account. Restart the development server after setup. Copy these two **server-only** settings to the environment serving `https://dev.catdai.md`; never use `NEXT_PUBLIC_` for either setting.
+
+The review password is checked by CatDai, not configured as a Supabase password. After validation, the server generates and immediately consumes a Supabase login token for that one confirmed account; no authentication email is sent. The browser installs the normal Supabase session, preserving the current page and normal ownership/credit rules. No admin access or paid credits are granted. Delete the private password setting to disable new review logins after verification; revoke the account's sessions when retiring it.
+
+Checks: `pnpm exec node --experimental-vm-modules scripts/test-maib-test-auth.mjs`.
+
 ## Required Env
 
 ```env

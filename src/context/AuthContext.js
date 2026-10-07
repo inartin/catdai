@@ -412,6 +412,28 @@ export function AuthProvider({ children }) {
     return { error: null };
   }, []);
 
+  const signInWithMaibTest = useCallback(async (username, password) => {
+    if (process.env.NODE_ENV !== 'development') return { error: new Error('Test login unavailable.') };
+    setActiveProvider('maib-test');
+    setError(null);
+    try {
+      const response = await fetch('/api/auth/maib-test', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.session?.access_token || !payload.session?.refresh_token) throw new Error(payload.error || 'Test login failed.');
+      persistAuthReturnTo();
+      const { error: sessionError } = await supabase.auth.setSession(payload.session);
+      if (sessionError) throw sessionError;
+      return { error: null };
+    } catch (loginError) {
+      setError(loginError.message || 'Test login failed.');
+      return { error: loginError };
+    } finally {
+      setActiveProvider(null);
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       session,
@@ -422,6 +444,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: !!session,
       signInWithGoogle,
       signInWithTelegram,
+      signInWithMaibTest,
       signOut,
       clearAuthError: () => setError(null),
     }),
@@ -433,6 +456,7 @@ export function AuthProvider({ children }) {
       activeProvider,
       signInWithGoogle,
       signInWithTelegram,
+      signInWithMaibTest,
       signOut,
     ]
   );

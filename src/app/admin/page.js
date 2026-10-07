@@ -96,6 +96,9 @@ const PAYMENT_STATUS_LABELS_RO = {
   paid: "Achitat",
   refund_pending: "Rambursare în așteptare",
   refunded: "Rambursat",
+  partially_refunded: "Rambursat parțial",
+  creation_unknown: "În curs de verificare",
+  expired: "Expirat",
   chargeback: "Chargeback",
   canceled: "Anulat",
   payment_failed: "Eșuat",
@@ -795,6 +798,11 @@ export default function AdminDashboard() {
                 ) : (
                   <ProfileTransactionsTable
                     transactions={selectedUserTransactions}
+                    allowRefund
+                    onPaymentUpdate={async () => {
+                      const response = await fetch(`/api/admin/users/${selectedUser.id}/transactions`);
+                      if (response.ok) { const data = await response.json(); setSelectedUserTransactions(data.transactions || []); }
+                    }}
                     lang="ro"
                     formatProduct={(productKey) => PAYMENT_PRODUCT_LABELS_RO[productKey] || productKey || "—"}
                     formatStatus={(status) => PAYMENT_STATUS_LABELS_RO[status] || status || "—"}
@@ -1427,6 +1435,7 @@ export default function AdminDashboard() {
                           <th className="px-4 py-3 text-right">Duration</th>
                           <th className="px-4 py-3">Result</th>
                           <th className="px-4 py-3">Suggestion recovery</th>
+                          <th className="px-4 py-3">User</th>
                           <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                       </thead>
@@ -1478,6 +1487,9 @@ export default function AdminDashboard() {
                                     </div>
                                   ) : <span className="text-gray-400">—</span>}
                                 </td>
+                                <td className="px-4 py-3 text-gray-600 break-all">
+                                  {row.user_name || "Anonymous"}
+                                </td>
                                 <td className="px-4 py-3 text-right">
                                   {row.status === "failure" && (
                                     <button
@@ -1498,12 +1510,16 @@ export default function AdminDashboard() {
                               </tr>
                               {expanded && (
                                 <tr>
-                                  <td colSpan={8} className="bg-gray-50 px-4 py-4">
+                                  <td colSpan={9} className="bg-gray-50 px-4 py-4">
                                     <div className="grid gap-4 lg:grid-cols-2">
                                       <div className="space-y-3">
                                         <div>
                                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Endpoint</p>
                                           <p className="mt-1 break-all text-sm text-gray-800">{row.endpoint || "Not recorded"}</p>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">User</p>
+                                          <p className="mt-1 break-all text-sm text-gray-800">{row.user_name || "Anonymous"}</p>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                           <div>

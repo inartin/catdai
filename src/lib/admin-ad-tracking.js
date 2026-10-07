@@ -4,7 +4,7 @@ const PAGE = 1000;
 const DEFAULT_JOURNEY_LIMIT = 50;
 const MAX_JOURNEY_LIMIT = 100;
 const LANDING_EVENT_NAMES = new Set(["source_landing_visit"]);
-const PAID_PAYMENT_STATUSES = new Set(["paid"]);
+const PAID_PAYMENT_STATUSES = new Set(["paid", "partially_refunded"]);
 
 export const AD_TRACKING_SOURCES = {
   zdg: {
@@ -113,7 +113,7 @@ async function fetchPaidOrdersForUsers(userIds, since) {
   for (let i = 0; i < uniqueIds.length; i += 200) {
     const chunk = uniqueIds.slice(i, i + 200);
     let query = supabaseAdmin
-      .from("paddle_payment_orders")
+      .from("reporting_payment_orders")
       .select("id, user_id, product_key, status, paid_at, created_at, amount_minor, currency_code")
       .in("user_id", chunk)
       .in("status", Array.from(PAID_PAYMENT_STATUSES));

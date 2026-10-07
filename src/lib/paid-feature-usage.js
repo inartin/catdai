@@ -45,80 +45,6 @@ function isMissingPaidUsageRpc(error) {
   return code === "42883" || code === "PGRST202" || message.includes("consume_user_feature_credit");
 }
 
-async function consumePaidFeatureCreditFallback({ userId, featureKey, idempotencyKey, metadata }) {
-  const { data: existing, error: existingError } = await supabaseAdmin
-    .from("user_feature_usage_events")
-    .select("id, source")
-    .eq("user_id", userId)
-    .eq("feature_key", featureKey)
-    .eq("idempotency_key", idempotencyKey)
-    .maybeSingle();
-
-  if (existingError) throw existingError;
-  if (existing) {
-    return {
-      allowed: true,
-      usage_event_id: existing.id,
-      source: existing.source,
-      remaining_uses: null,
-      reason: "already_consumed",
-    };
-  }
-
-  const { data: credit, error: creditError } = await supabaseAdmin
-    .from("user_feature_credits")
-    .select("remaining_uses, total_used")
-    .eq("user_id", userId)
-    .eq("feature_key", featureKey)
-    .gt("remaining_uses", 0)
-    .maybeSingle();
-
-  if (creditError) throw creditError;
-  if (!credit?.remaining_uses) {
-    return {
-      allowed: false,
-      usage_event_id: null,
-      source: null,
-      remaining_uses: 0,
-      reason: "no_credit",
-    };
-  }
-
-  const nextRemaining = Math.max(Number(credit.remaining_uses) - 1, 0);
-  const { error: updateError } = await supabaseAdmin
-    .from("user_feature_credits")
-    .update({
-      remaining_uses: nextRemaining,
-      total_used: Math.max(Number(credit.total_used) || 0, 0) + 1,
-    })
-    .eq("user_id", userId)
-    .eq("feature_key", featureKey);
-
-  if (updateError) throw updateError;
-
-  const { data: usage, error: usageError } = await supabaseAdmin
-    .from("user_feature_usage_events")
-    .insert({
-      user_id: userId,
-      feature_key: featureKey,
-      source: "paid_credit",
-      idempotency_key: idempotencyKey,
-      metadata: metadata || {},
-    })
-    .select("id")
-    .single();
-
-  if (usageError) throw usageError;
-
-  return {
-    allowed: true,
-    usage_event_id: usage?.id || null,
-    source: "paid_credit",
-    remaining_uses: nextRemaining,
-    reason: "consumed",
-  };
-}
-
 export async function getPaidFeatureUsageEvent({ userId, featureKey, idempotencyKey }) {
   if (!userId || !featureKey || !idempotencyKey || !shouldPersistRuntimeData()) return null;
 
@@ -144,7 +70,7 @@ export async function getUserFeatureCreditBalance({ userId, featureKey }) {
   }
 
   const { data, error } = await supabaseAdmin
-    .from("user_feature_credits")
+    .from("user_feature_credit_balances")
     .select("remaining_uses, total_granted, total_used")
     .eq("user_id", userId)
     .eq("feature_key", featureKey)
@@ -253,12 +179,7 @@ export async function consumePaidFeatureCredit({
   let result;
 
   if (error && isMissingPaidUsageRpc(error)) {
-    result = await consumePaidFeatureCreditFallback({
-      userId,
-      featureKey,
-      idempotencyKey,
-      metadata,
-    });
+    throw new Error("Payment credit schema incomplete: apply db/maib_payments.sql.");
   } else if (error) {
     throw error;
   } else {

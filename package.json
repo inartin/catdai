@@ -13,6 +13,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@next/env": "16.1.6",
     "@supabase/supabase-js": "^2.98.0",
     "@tiptap/extension-image": "^3.25.0",
     "@tiptap/extension-link": "^3.25.0",
@@ -21,6 +22,7 @@
     "@tiptap/react": "^3.25.0",
     "@tiptap/starter-kit": "^3.25.0",
     "next": "16.1.6",
+    "nodemailer": "10.0.15",
     "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -29,6 +31,7 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/postcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",

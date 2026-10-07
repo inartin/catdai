@@ -4,6 +4,12 @@ The address API resolves `street` before cache access, using the same city/type-
 
 Initials such as `G. Coșbuc`, `M Eminescu`, and `I.L. Caragiale` expand before lookup only when exactly one street matches the selected city/type. Word order and count must match; the final name and numeric tokens stay exact. Collisions return 422 with the full names as suggestions. Resolution status is `abbreviation`, and the existing result notice shows the submitted and full names. Official address checks do not infer initials.
 
+## Pasted addresses in the street field
+
+Before cache access or provider calls, the shared resolver checks for pasted road markers and a trailing house number. Cleanup requires an exact, unique dictionary street in the selected city/type; complete numbered names such as `31 August 1989` are checked first. Matching house numbers are redundant and are removed with `street_resolution.status: "cleaned"`. Unknown names retain the original lookup.
+
+Conflicting numbers return 422 `address_fields_conflict` with two corrected street/house choices. The form asks which house to use and retries only after a choice, preserving city, road type, apartment and skip-cache. Field edits clear stale choices, and request IDs discard outdated responses. These choices are input validation, separate from no-result street suggestions and recovery telemetry. The dictionary remains server-side. Both the app API and signed worker enforce the check.
+
 ## Implementation
 
 - `src/lib/cadastru-streets/` is a generated copy of the worker resolver, supported-city definitions and data. JSON imports replace the worker filesystem loader for Next.js bundling; matching logic is unchanged. Do not hand-edit these copies.
@@ -27,7 +33,7 @@ The sync script adapts only the loader and records worker source hashes in `sour
 
 ## Validation
 
-The isolated storage/route regression suite covers original/resolved aliases, shared cache reuse, current-request metadata, masked previews, ambiguous suggestions, worker 422 propagation and canonical local fallback. These mocks do not establish live cadastral availability or browser interaction.
+The isolated storage/route regression suite covers original/resolved aliases, shared cache reuse, current-request metadata, masked previews, ambiguous suggestions, worker 422 propagation and canonical local fallback. It also checks pasted-address conflicts before cache/provider calls and redundant-input cleanup. `pnpm exec node --experimental-vm-modules scripts/test-cadastru-address-form.mjs` checks both localized house choices, retries preserving the other fields, and stale-response rejection using isolated form hooks and compiled JSX. These mocks do not establish live cadastral availability or browser interaction.
 
 ## Suggestions after no result
 

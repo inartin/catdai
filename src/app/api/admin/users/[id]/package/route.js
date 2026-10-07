@@ -20,32 +20,9 @@ function packageGrants(packageKey) {
 }
 
 async function resetUserCredits({ userId, grants }) {
-  const isEmptyGrant = PAYMENT_FEATURE_KEYS.every((featureKey) => Math.max(Number(grants[featureKey]) || 0, 0) === 0);
-  if (isEmptyGrant) {
-    const { error } = await supabaseAdmin
-      .from("user_feature_credits")
-      .delete()
-      .eq("user_id", userId);
-
-    if (error) throw error;
-    return;
-  }
-
-  const rows = PAYMENT_FEATURE_KEYS.map((featureKey) => {
-    const uses = Math.max(Number(grants[featureKey]) || 0, 0);
-    return {
-      user_id: userId,
-      feature_key: featureKey,
-      remaining_uses: uses,
-      total_granted: uses,
-      total_used: 0,
-    };
+  const { error } = await supabaseAdmin.rpc("override_payment_credits", {
+    p_user_id: userId, p_grants: grants, p_clear: PAYMENT_FEATURE_KEYS.every(key => !grants[key]), p_preserve_used: false,
   });
-
-  const { error } = await supabaseAdmin
-    .from("user_feature_credits")
-    .upsert(rows, { onConflict: "user_id,feature_key" });
-
   if (error) throw error;
 }
 

@@ -3,6 +3,9 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 
 export const FREE_MONTHLY_FEATURE_LIMIT = 5;
+export function getFreeMonthlyFeatureLimit(featureKey) {
+  return featureKey === "cadastru_lookup" ? 0 : FREE_MONTHLY_FEATURE_LIMIT;
+}
 export const FREE_MONTHLY_FEATURE_KEYS = [
   "sale_estimate",
   "rent_estimate",
@@ -49,6 +52,7 @@ export async function checkFreeMonthlyFeatureUsage({
   limit = FREE_MONTHLY_FEATURE_LIMIT,
 }) {
   const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
+  const featureLimit = Math.min(limit, getFreeMonthlyFeatureLimit(featureKey));
 
   if (!userId) {
     return { allowed: false, reason: "unauthorized", remaining_uses: 0 };
@@ -58,8 +62,12 @@ export async function checkFreeMonthlyFeatureUsage({
     return { allowed: false, reason: "unknown_feature", remaining_uses: 0 };
   }
 
+  if (featureLimit <= 0) {
+    return { allowed: false, reason: "free_monthly_limit_reached", remaining_uses: 0 };
+  }
+
   if (!shouldPersistRuntimeData()) {
-    return { allowed: true, reason: "runtime_persistence_disabled", remaining_uses: limit };
+    return { allowed: true, reason: "runtime_persistence_disabled", remaining_uses: featureLimit };
   }
 
   const { data: existing, error: existingError } = await supabaseAdmin
@@ -93,8 +101,8 @@ export async function checkFreeMonthlyFeatureUsage({
   if (countError) throw countError;
 
   const used = count || 0;
-  return used < limit
-    ? { allowed: true, reason: "has_free_credit", remaining_uses: limit - used }
+  return used < featureLimit
+    ? { allowed: true, reason: "has_free_credit", remaining_uses: featureLimit - used }
     : { allowed: false, reason: "free_monthly_limit_reached", remaining_uses: 0 };
 }
 
@@ -185,12 +193,13 @@ export async function consumeFreeMonthlyFeatureUsage({
 }) {
   const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
   const resetAt = endIso;
+  const featureLimit = Math.min(limit, getFreeMonthlyFeatureLimit(featureKey));
 
   if (!userId) {
     return {
       allowed: false,
       reason: "unauthorized",
-      limit,
+      limit: featureLimit,
       used_count: 0,
       remaining_uses: 0,
       reset_at: resetAt,
@@ -201,7 +210,18 @@ export async function consumeFreeMonthlyFeatureUsage({
     return {
       allowed: false,
       reason: "unknown_feature",
-      limit,
+      limit: featureLimit,
+      used_count: 0,
+      remaining_uses: 0,
+      reset_at: resetAt,
+    };
+  }
+
+  if (featureLimit <= 0) {
+    return {
+      allowed: false,
+      reason: "free_monthly_limit_reached",
+      limit: 0,
       used_count: 0,
       remaining_uses: 0,
       reset_at: resetAt,
@@ -213,9 +233,9 @@ export async function consumeFreeMonthlyFeatureUsage({
       allowed: true,
       reason: "runtime_persistence_disabled",
       source: "free_monthly",
-      limit,
+      limit: featureLimit,
       used_count: 0,
-      remaining_uses: limit,
+      remaining_uses: featureLimit,
       reset_at: resetAt,
     };
   }
@@ -226,7 +246,7 @@ export async function consumeFreeMonthlyFeatureUsage({
     p_idempotency_key: idempotencyKey,
     p_month_start: startIso,
     p_month_end: endIso,
-    p_limit: limit,
+    p_limit: featureLimit,
     p_metadata: metadata || {},
   };
 
@@ -238,7 +258,7 @@ export async function consumeFreeMonthlyFeatureUsage({
       userId,
       featureKey,
       idempotencyKey,
-      limit,
+      limit: featureLimit,
       metadata,
       monthStart: startIso,
       monthEnd: endIso,
@@ -254,7 +274,7 @@ export async function consumeFreeMonthlyFeatureUsage({
     usage_event_id: result?.usage_event_id || null,
     source: result?.source || "free_monthly",
     reason: result?.reason || null,
-    limit,
+    limit: featureLimit,
     used_count: Number(result?.used_count) || 0,
     remaining_uses: Math.max(Number(result?.remaining_uses) || 0, 0),
     reset_at: resetAt,

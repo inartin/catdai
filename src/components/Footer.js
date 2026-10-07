@@ -1,5 +1,6 @@
 "use client";
 
+import usePaymentProvider from "@/components/usePaymentProvider";
 import Image from "next/image";
 import Link from "next/link";
 import { useTranslation } from "@/context/LanguageContext";
@@ -80,6 +81,7 @@ const paymentLogos = [
 
 export default function Footer() {
   const { lang, t } = useTranslation();
+  const provider = usePaymentProvider();
   const faqHref = lang === "ru" ? "/ru/faq" : "/ro/faq";
 
   return (
@@ -100,6 +102,9 @@ export default function Footer() {
           </Link>
           <Link href="/privacy" className="hover:text-foreground transition-colors">
             {t("footer.privacy")}
+          </Link>
+          <Link href="/refund" className="hover:text-foreground transition-colors">
+            {t("footer.refund")}
           </Link>
           <Link href={faqHref} className="hover:text-foreground transition-colors">
             {t("footer.faq")}
@@ -124,7 +129,7 @@ export default function Footer() {
         </p>
 
         <div className="mt-4 flex items-center justify-center gap-4" aria-label="Payment systems">
-          {paymentLogos.map((logo) => (
+          {paymentLogos.filter(logo => provider === "paddle" || logo.alt !== "Paddle").map((logo) => (
             <Image
               key={logo.alt}
               src={logo.src}
@@ -136,6 +141,7 @@ export default function Footer() {
               unoptimized
             />
           ))}
+          {provider === "maib" && <Image src="/brands/maib.png" alt="maib" width={156} height={44} className="h-6 w-auto object-contain sm:h-7" unoptimized />}
         </div>
       </div>
     </footer>

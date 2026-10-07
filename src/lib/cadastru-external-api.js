@@ -74,6 +74,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
       errorMessage: message,
       durationMs: Date.now() - startedAt,
       returnEventId: options.captureUsageEventId === true,
+      userId: options.userId ?? null,
     }) : null;
     const usageEventId = options.captureUsageEventId ? await usageWrite : null;
     throw externalError(message, {
@@ -98,6 +99,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
       responseHeaders: getExternalApiDiagnosticHeaders(response),
       httpStatus: response.status,
       durationMs: Date.now() - startedAt,
+      userId: options.userId ?? null,
     });
     return payload.data;
   }
@@ -117,6 +119,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     httpStatus: response.status,
     durationMs: Date.now() - startedAt,
     returnEventId: options.captureUsageEventId === true,
+    userId: options.userId ?? null,
   }) : null;
   const usageEventId = options.captureUsageEventId ? await usageWrite : null;
   throw externalError(message, {

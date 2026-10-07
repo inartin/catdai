@@ -18,6 +18,7 @@ tmp/
 demo-valuation-report.pdf
 /external
 CLAUDE.md
+.claude
 
 # next.js
 /.next/

@@ -60,9 +60,10 @@ export default function CadastralQuickSearchCard({
   successText = "",
   partialText = "",
   className = "",
+  defaultOpen = false,
 }) {
   const { t } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const canSearch = !loading && !disabled && String(value || "").trim();
 
   return (

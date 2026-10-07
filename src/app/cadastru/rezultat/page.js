@@ -11,8 +11,9 @@ import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
-import { matchCity, matchDistrict, validateCadastralNumber } from "@/lib/validation";
+import { matchCity, validateCadastralNumber } from "@/lib/validation";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
+import { resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
 
 const inFlightCadastralLookups = new Map();
 const CADASTRU_DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
@@ -79,7 +80,7 @@ function numericParam(value, { integer = false, min, max } = {}) {
   return String(number);
 }
 
-function buildValuationPrefill(cadastral) {
+function buildValuationPrefill(cadastral, addressDistrict) {
   if (!cadastral || cadastral.error || (cadastral.status && cadastral.status !== "success")) return null;
   if (!hasApartmentNumber(cadastral)) return null;
 
@@ -87,9 +88,7 @@ function buildValuationPrefill(cadastral) {
   if (!city) return null;
 
   const params = new URLSearchParams({ city });
-  const district = city === "Chișinău"
-    ? matchDistrict(cadastral?.form_fields?.district, city)
-    : null;
+  const district = resolveValuationDistrict(cadastral, city, addressDistrict);
   const area = numericParam(cadastral?.form_fields?.area_m2 ?? cadastral?.apartment?.area_m2 ?? cadastral?.apartment_area_m2, { min: 0.01, max: 1000 });
   const floor = numericParam(cadastral?.form_fields?.floor ?? cadastral?.apartment?.floor ?? cadastral?.apartment_floor, { integer: true, min: -1, max: 100 });
   const totalFloors = numericParam(cadastral?.form_fields?.total_floors ?? cadastral?.building?.total_floors, { integer: true, min: 1, max: 100 });
@@ -98,6 +97,10 @@ function buildValuationPrefill(cadastral) {
   if (area) params.set("area", area);
   if (floor) params.set("floor", floor);
   if (totalFloors) params.set("total_floors", totalFloors);
+  if (!cadastral?.locked_sections?.cadastral_number) {
+    const number = validateCadastralNumber(String(cadastral?.cadastral_number || "").trim());
+    if (number.valid) params.set("cadastral_number", number.value);
+  }
 
   return params;
 }
@@ -416,7 +419,7 @@ function CadastruResultContent() {
   const purchaseOffer = state.data?.access_limit?.purchase || null;
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
-  const valuationPrefill = buildValuationPrefill(state.data);
+  const valuationPrefill = buildValuationPrefill(state.data, source === "address" ? searchParams.get("district") : null);
   const evaluationToken = searchParams.get("cadastru_evaluation") || state.data?.cadastru_evaluation_token;
   const favoritePath = state.data ? getCadastruFavoritePath({
     lang,

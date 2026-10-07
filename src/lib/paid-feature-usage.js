@@ -131,19 +131,17 @@ export async function checkPaidFeatureAccess({ userId, featureKey, idempotencyKe
 
 export async function checkFeatureAccess({ userId, featureKey, idempotencyKey }) {
   const paidAccess = await checkPaidFeatureAccess({ userId, featureKey, idempotencyKey });
-  if (paidAccess.allowed || paidAccess.reason !== "no_credit") return paidAccess;
-
-  const balance = await getUserFeatureCreditBalance({ userId, featureKey });
-  if (balance.total_granted > 0) return paidAccess;
+  if (paidAccess.reason === "already_consumed" || (!paidAccess.allowed && paidAccess.reason !== "no_credit")) {
+    return paidAccess;
+  }
 
   const freeAccess = await checkFreeMonthlyFeatureUsage({
     userId,
     featureKey,
     idempotencyKey: makeMonthlyFeatureUsageKey(featureKey, { idempotencyKey }),
   });
-  return freeAccess.reason === "free_monthly_limit_reached"
-    ? { ...freeAccess, reason: "no_credit" }
-    : freeAccess;
+  if (freeAccess.allowed || freeAccess.reason !== "free_monthly_limit_reached") return freeAccess;
+  return paidAccess.allowed ? paidAccess : { ...freeAccess, reason: "no_credit" };
 }
 
 export async function consumePaidFeatureCredit({
@@ -203,18 +201,19 @@ export async function consumeFeatureCredit({
   idempotencyKey,
   metadata = {},
 }) {
-  const paidUsage = await consumePaidFeatureCredit({
-    userId,
-    featureKey,
-    idempotencyKey,
-    metadata,
-  });
-  if (paidUsage.allowed || !["no_credit", "runtime_persistence_disabled"].includes(paidUsage.reason)) {
-    return paidUsage;
-  }
+  if (!userId) return { allowed: false, reason: "unauthorized", remaining_uses: 0 };
+  if (!isKnownPaymentFeature(featureKey)) return { allowed: false, reason: "unknown_feature", remaining_uses: 0 };
 
-  const balance = await getUserFeatureCreditBalance({ userId, featureKey });
-  if (balance.total_granted > 0) return paidUsage;
+  const existing = await getPaidFeatureUsageEvent({ userId, featureKey, idempotencyKey });
+  if (existing) {
+    return {
+      allowed: true,
+      reason: "already_consumed",
+      source: existing.source,
+      usage_event_id: existing.id,
+      remaining_uses: null,
+    };
+  }
 
   const freeUsage = await consumeFreeMonthlyFeatureUsage({
     userId,
@@ -222,7 +221,15 @@ export async function consumeFeatureCredit({
     idempotencyKey: makeMonthlyFeatureUsageKey(featureKey, { idempotencyKey }),
     metadata,
   });
-  return freeUsage.reason === "free_monthly_limit_reached"
-    ? { ...freeUsage, reason: "no_credit" }
-    : freeUsage;
+  if (freeUsage.allowed || freeUsage.reason !== "free_monthly_limit_reached") return freeUsage;
+
+  const paidUsage = await consumePaidFeatureCredit({
+    userId,
+    featureKey,
+    idempotencyKey,
+    metadata,
+  });
+  return ["no_credit", "runtime_persistence_disabled"].includes(paidUsage.reason)
+    ? { ...paidUsage, reason: "no_credit" }
+    : paidUsage;
 }

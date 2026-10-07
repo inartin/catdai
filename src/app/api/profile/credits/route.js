@@ -27,9 +27,8 @@ function normalizeCreditRows(rows) {
   });
 }
 
-function normalizeFreeMonthlyRows({ usageRows = [], paidCreditRows = [] } = {}) {
+function normalizeFreeMonthlyRows({ usageRows = [] } = {}) {
   const usedByFeature = new Map();
-  const paidCreditsByFeature = new Map((paidCreditRows || []).map((row) => [row.feature_key, row]));
 
   for (const row of usageRows || []) {
     usedByFeature.set(row.feature_key, (usedByFeature.get(row.feature_key) || 0) + 1);
@@ -37,16 +36,14 @@ function normalizeFreeMonthlyRows({ usageRows = [], paidCreditRows = [] } = {}) 
 
   return FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
     const featureLimit = getFreeMonthlyFeatureLimit(featureKey);
-    const paidCreditRow = paidCreditsByFeature.get(featureKey);
-    const hasPaidGrant = Number(paidCreditRow?.total_granted) > 0;
-    const used = hasPaidGrant ? featureLimit : usedByFeature.get(featureKey) || 0;
+    const used = usedByFeature.get(featureKey) || 0;
     return {
       featureKey,
       remainingUses: Math.max(featureLimit - used, 0),
       totalGranted: featureLimit,
       totalUsed: Math.min(used, featureLimit),
       source: "free_monthly",
-      eligible: featureLimit > 0 && !hasPaidGrant,
+      eligible: featureLimit > 0,
     };
   });
 }
@@ -95,7 +92,6 @@ export async function GET(request) {
     credits: normalizeCreditRows(data || []),
     freeMonthlyCredits: normalizeFreeMonthlyRows({
       usageRows: freeUsageError ? [] : freeUsageData || [],
-      paidCreditRows: data || [],
     }),
   });
 }

@@ -17,7 +17,7 @@ The standalone `/pricing` page sells individual feature uses and all-feature pac
 - 99 MDL (`all_features_5`) grants 5 uses of each of the six features; 299 MDL (`all_features_20`) grants 20 each. Credits are feature-specific, non-expiring, and additive.
 - Prices and grants come from the MAIB catalog. Confirmed payments add credits to the buyer account, visible in profile; duplicate callbacks do not grant twice. New all-feature pack keys are MAIB-only. Historical orders retain their saved prices and grants.
 - MAIB feature lock popups offer one use of the relevant feature for 25 MDL and link here for packs. Paddle retains its existing offers.
-- Cadastru has no free monthly full-detail uses; other features retain five per UTC month.
+- Each feature, including full Cadastru details, has one free use per UTC month regardless of purchased credits.
 - The existing custom-package request card and feedback modal remain below the offers.
 
 ## Env

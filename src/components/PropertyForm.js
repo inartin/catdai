@@ -275,7 +275,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   const [showOptional, setShowOptional] = useState(
     !!((!initialFirstFloor && !initialLastFloor && initialValues?.floor) || initialFirstFloor || initialLastFloor || initialValues?.total_floors || initialValues?.bathrooms_count || initialValues?.balconies_count)
   );
-  const [cadastralInput, setCadastralInput] = useState("");
+  const [cadastralInput, setCadastralInput] = useState(initialValues?.cadastral_number ?? "");
   const [rentDistricts, setRentDistricts] = useState(
     Array.isArray(initialValues?.districts) && initialValues.districts.length > 0
       ? initialValues.districts
@@ -532,6 +532,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   const renderCadastralQuickSearch = (className = "") => (
     <CadastralQuickSearchCard
       value={cadastralInput}
+      defaultOpen={Boolean(initialValues?.cadastral_number)}
       onChange={(value) => {
         setCadastralInput(value);
         if (cadastralError) setCadastralError(null);

@@ -13,6 +13,7 @@ import {
   checkFeatureAccess,
   consumeFeatureCredit,
   consumePaidFeatureCredit,
+  getPaidFeatureUsageEvent,
   getUserFeatureCreditBalance,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
@@ -565,17 +566,47 @@ async function resolveRentEstimateAccess(request, body, params) {
   }
 
   if (!hasFullAccess && access.user_id) {
-    const idempotencyKey = makePaidFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
-    paidCreditUsage = await consumePaidFeatureCredit({
+    const paidKey = makePaidFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
+    const existingPaidUsage = await getPaidFeatureUsageEvent({
       userId: access.user_id,
       featureKey: RENT_EVALUATION_FEATURE_KEY,
-      idempotencyKey,
-      metadata: buildRentUsageMetadata({ params, body }),
+      idempotencyKey: paidKey,
     });
-
-    if (paidCreditUsage.allowed) {
+    if (existingPaidUsage) {
+      paidCreditUsage = {
+        allowed: true,
+        reason: "already_consumed",
+        source: existingPaidUsage.source,
+        usage_event_id: existingPaidUsage.id,
+        remaining_uses: null,
+      };
       hasFullAccess = true;
       accessSource = "paid_credit";
+    } else {
+      const metadata = buildRentUsageMetadata({ params, body });
+      freeMonthlyUsage = await consumeFreeMonthlyFeatureUsage({
+        userId: access.user_id,
+        featureKey: RENT_EVALUATION_FEATURE_KEY,
+        idempotencyKey: makeMonthlyFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params),
+        metadata,
+        limit: FREE_MONTHLY_FEATURE_LIMIT,
+      });
+
+      if (freeMonthlyUsage.allowed) {
+        hasFullAccess = true;
+        accessSource = freeMonthlyUsage.source || "free_monthly";
+      } else if (freeMonthlyUsage.reason === "free_monthly_limit_reached") {
+        paidCreditUsage = await consumePaidFeatureCredit({
+          userId: access.user_id,
+          featureKey: RENT_EVALUATION_FEATURE_KEY,
+          idempotencyKey: paidKey,
+          metadata,
+        });
+        if (paidCreditUsage.allowed) {
+          hasFullAccess = true;
+          accessSource = "paid_credit";
+        }
+      }
     }
   }
 
@@ -584,22 +615,6 @@ async function resolveRentEstimateAccess(request, body, params) {
       userId: access.user_id,
       featureKey: RENT_EVALUATION_FEATURE_KEY,
     });
-  }
-
-  if (!hasFullAccess && access.user_id && Number(paidCreditBalance?.total_granted) <= 0) {
-    const idempotencyKey = makeMonthlyFeatureUsageKey(RENT_EVALUATION_FEATURE_KEY, params);
-    freeMonthlyUsage = await consumeFreeMonthlyFeatureUsage({
-      userId: access.user_id,
-      featureKey: RENT_EVALUATION_FEATURE_KEY,
-      idempotencyKey,
-      metadata: buildRentUsageMetadata({ params, body }),
-      limit: FREE_MONTHLY_FEATURE_LIMIT,
-    });
-
-    if (freeMonthlyUsage.allowed) {
-      hasFullAccess = true;
-      accessSource = freeMonthlyUsage.source || "free_monthly";
-    }
   }
 
   return { access, hasFullAccess, accessSource, freeMonthlyUsage, paidCreditUsage, paidCreditBalance, sharedLink };

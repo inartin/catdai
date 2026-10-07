@@ -48,6 +48,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     source: payload?.source,
     method: payload?.method,
     partial: payload?.partial,
+    district: payload?.district || null,
     map_location: payload?.map_location || null,
     apartment: maskObjectFields(apartment, ["address", "floor", "map_location"]),
     building: maskObjectFields(building, ["address", "classifier", "construction_year", "map_location"]),

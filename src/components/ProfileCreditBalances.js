@@ -13,7 +13,6 @@ const DEFAULT_LABELS = {
   title: "Acces rămas",
   description: "Utilizări gratuite și cumpărate disponibile în cont.",
   remaining: "Rămas",
-  freeBadge: "Gratuit",
   used: ({ used, total }) => `${used}/${total} folosite`,
   feature: (featureKey) => CREDIT_FEATURE_LABELS_RO[featureKey] || featureKey || "—",
 };
@@ -34,12 +33,27 @@ export default function ProfileCreditBalances({
   isDarkMode = false,
 }) {
   const copy = { ...DEFAULT_LABELS, ...labels };
-  const rows = [
-    ...freeMonthlyCredits.filter((row) => row.eligible !== false),
-    ...credits
-      .filter((row) => Number(row.totalGranted) > 0)
-      .map((row) => ({ ...row, source: "paid_credit" })),
-  ];
+  const rowsByFeature = new Map();
+  for (const row of freeMonthlyCredits) {
+    if (!row.featureKey || row.eligible === false) continue;
+    rowsByFeature.set(row.featureKey, {
+      featureKey: row.featureKey,
+      remainingUses: Number(row.remainingUses) || 0,
+      totalUsed: Number(row.totalUsed) || 0,
+      totalGranted: Number(row.totalGranted) || 0,
+    });
+  }
+  for (const row of credits) {
+    if (!row.featureKey || Number(row.totalGranted) <= 0) continue;
+    const current = rowsByFeature.get(row.featureKey);
+    rowsByFeature.set(row.featureKey, {
+      featureKey: row.featureKey,
+      remainingUses: (current?.remainingUses || 0) + (Number(row.remainingUses) || 0),
+      totalUsed: (current?.totalUsed || 0) + (Number(row.totalUsed) || 0),
+      totalGranted: (current?.totalGranted || 0) + (Number(row.totalGranted) || 0),
+    });
+  }
+  const rows = [...rowsByFeature.values()];
 
   return (
     <div className={`rounded-2xl border p-4 ${isDarkMode ? "border-[#2a2f42] bg-[#1a1d23]" : "border-gray-100 bg-gray-50"} ${className}`}>
@@ -57,18 +71,13 @@ export default function ProfileCreditBalances({
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((row) => (
             <div
-              key={`${row.source}-${row.featureKey}`}
+              key={row.featureKey}
               className={`rounded-xl border px-3 py-3 ${isDarkMode ? "border-[#2a2f42] bg-[#22263a]" : "border-gray-100 bg-white"}`}
             >
               <div className="flex min-h-10 items-start justify-between gap-2">
                 <p className={`text-sm font-semibold leading-5 ${isDarkMode ? "text-[#e2e8f0]" : "text-gray-900"}`}>
                   {copy.feature(row.featureKey)}
                 </p>
-                {row.source === "free_monthly" && (
-                  <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${isDarkMode ? "border-[#10b981]/40 bg-[#10b981]/15 text-[#10b981]" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-                    {copy.freeBadge}
-                  </span>
-                )}
               </div>
               <div className="mt-2 flex items-end justify-between gap-2">
                 <div>

@@ -346,6 +346,7 @@ function buildRecordRow(payload, options = {}, existing = null) {
   const region = cleanText(options.structuredAddress?.region || location.region || resolveRegionFromAddress(fullAddress), 120);
   const district = cleanText(
     options.structuredAddress?.district ||
+      storagePayload.district ||
       formFields.district ||
       resolveDistrictFromAddress(fullAddress) ||
       resolveDistrictFromLocation(location),
@@ -458,6 +459,8 @@ export async function persistCadastruRecord(payload, options = {}) {
       ? {
           ...existing.raw_payload,
           ...(Object.hasOwn(row.raw_payload, "map_location") ? { map_location: row.raw_payload.map_location } : {}),
+          ...(cleanText(row.raw_payload.district) ? { district: row.raw_payload.district } : {}),
+          ...(row.raw_payload.district_lookup_checked === true ? { district_lookup_checked: true } : {}),
         }
       : null;
     const retainedHash = retainedPayload ? hashPayload(retainedPayload) : null;
@@ -472,7 +475,7 @@ export async function persistCadastruRecord(payload, options = {}) {
             address_ru: existing.address_ru || row.address_ru,
             city: existing.city || row.city,
             region: existing.region || row.region,
-            district: existing.district || row.district,
+            district: cleanText(row.raw_payload.district) ? row.district : existing.district || row.district,
             result_type: existing.result_type,
             source: existing.source,
             partial: existing.partial,

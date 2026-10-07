@@ -144,10 +144,12 @@ await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, apartm
 const coordinateRow = tables.cadastru_records.find((row) => row.cadastral_number === coordinateNumber);
 const coordinateExpiry = coordinateRow.next_refresh_after;
 const originalHash = coordinateRow.payload_hash;
-await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address", map_location: coordinateLocation }, { officialFetch: true });
+await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address", district: "bOTANICA", map_location: coordinateLocation }, { officialFetch: true });
 cache.clear();
 let coordinatePayload = (await storage.getCadastruRecordByNumber(coordinateNumber)).payload;
 assert.deepEqual(clone(coordinatePayload.map_location), coordinateLocation, "DB retains new coordinates alongside existing details");
+assert.equal(coordinatePayload.district, "bOTANICA", "DB retains the worker district alongside existing details");
+assert.equal(coordinateRow.district, "bOTANICA", "DB indexes the fresh worker district");
 assert.equal(coordinatePayload.apartment.area_m2, 40);
 assert.equal(coordinateRow.next_refresh_after, coordinateExpiry, "location update does not renew old detail freshness");
 assert.notEqual(coordinateRow.payload_hash, originalHash);
@@ -178,6 +180,7 @@ console.log("Storage regressions passed: full JSON, number/address parity, aggre
 cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;
 let addressFetches = 0, numberFetches = 0, enrichFetches = 0;
 let hasCredit = false;
+let workerDistrict = "bOTANICA", workerError = null;
 const routeMocks = {
   "next/server": { NextResponse: { json: (data, init) => Response.json(data, init) } },
   "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true, remaining: 14 }) }) },
@@ -190,7 +193,11 @@ const routeMocks = {
   },
   "@/lib/cadastru-search-events": { logCadastruSearchEvent: async () => {} },
   "@/lib/cadastru-external-api": {
-    fetchExternalCadastruAddressData: async () => { addressFetches++; return { ...expected, matched_address: address }; },
+    fetchExternalCadastruAddressData: async () => {
+      addressFetches++;
+      if (workerError) throw workerError;
+      return { ...expected, ...(workerDistrict ? { district: workerDistrict } : {}), matched_address: address };
+    },
     fetchExternalCadastralData: async () => { numberFetches++; return expected; },
   },
   "@/lib/cadastru-address-search": {
@@ -202,8 +209,14 @@ const addressRoute = await load("src/app/api/cadastru/address/route.js", routeMo
 const numberRoute = await load("src/app/api/cadastral/route.js", routeMocks);
 const request = (body) => new Request("http://localhost/api/cadastral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ search_context: "cadastru", ...body }) });
 const addressBody = { city: "Chisinau", road_type: "strada", street: "Ștefan cel Mare", house_number: "9", apartment_number: "012" };
+await storage.persistCadastruAddressResult({ ...expected, method: "address", request_address: address }, {
+  requestAddress: address, resolvedAddress: address, structuredAddress, lookupSource: "api", officialFetch: true,
+});
 const preview = await (await addressRoute.POST(request(addressBody))).json();
 assert.equal(preview.full_access, false);
+assert.equal(preview.district, "bOTANICA", "address previews retain the worker district for valuation prefill");
+assert.equal(addressFetches, 1, "legacy cached apartment results without a district refresh once");
+assert.equal((await storage.getCadastruRecordByNumber(number)).payload.district_lookup_checked, true);
 assert.deepEqual(preview.map_location, expected.map_location, "address previews retain map coordinates");
 assert.notEqual(preview.apartment.area_m2, 64);
 assert.equal(tables.cadastru_records[0].raw_payload.apartment.area_m2, 64, "anonymous lookups store unmasked JSON");
@@ -216,6 +229,7 @@ assert.equal(enrichFetches, 0, "fresh snapshots must not call enrichment again")
 hasCredit = true;
 const full = await (await numberRoute.POST(request({ cadastral_number: number }))).json();
 assert.equal(full.apartment.area_m2, 64);
+assert.equal(full.district_lookup_checked, undefined, "internal district refresh state is not exposed");
 assert.deepEqual(full.map_location, expected.map_location, "full results retain stored map coordinates");
 assert.equal(full.novel.records[0].value, "unexpected");
 await addressRoute.POST(request({ ...addressBody, street: "Stefan cel Mare" }));
@@ -230,6 +244,24 @@ await numberRoute.POST(request({ cadastral_number: number, skip_cache: true }));
 assert.equal(numberFetches, 2);
 assert.equal(tables.cadastru_records[0].raw_payload.apartment.area_m2, 64);
 console.log("Route regressions passed: anonymous persistence, masked previews, cross-query hits, no live enrichment on hits, skipcache.");
+cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;
+await storage.persistCadastruAddressResult({ ...expected, method: "address", request_address: address }, {
+  requestAddress: address, resolvedAddress: address, structuredAddress, lookupSource: "api", officialFetch: true,
+});
+workerDistrict = null;
+const missingDistrictPreview = await (await addressRoute.POST(request(addressBody))).json();
+assert.equal(missingDistrictPreview.district, null);
+const fetchesAfterMissingDistrict = addressFetches;
+await addressRoute.POST(request(addressBody));
+assert.equal(addressFetches, fetchesAfterMissingDistrict, "a checked result without a district does not refresh repeatedly");
+cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;
+await storage.persistCadastruAddressResult({ ...expected, method: "address", request_address: address }, {
+  requestAddress: address, resolvedAddress: address, structuredAddress, lookupSource: "api", officialFetch: true,
+});
+workerError = Object.assign(new Error("offline"), { code: "service_unavailable", fallbackEligible: true });
+const staleFallback = await addressRoute.POST(request(addressBody));
+assert.equal(staleFallback.status, 200, "a failed district refresh still serves the stored result");
+workerDistrict = "bOTANICA"; workerError = null;
 const { buildCadastruPreviewPayload } = await load("@/lib/cadastru-preview", routeMocks);
 assert.equal(buildCadastruPreviewPayload({ map_location: null }).map_location, null);
 assert.equal(buildCadastruPreviewPayload({}).map_location, null);

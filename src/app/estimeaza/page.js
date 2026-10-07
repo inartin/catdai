@@ -48,6 +48,7 @@ function EstimeazaContent() {
       renovation: searchParams.get("renovation") || "",
       bathrooms_count: searchParams.get("bathrooms") || null,
       balconies_count: searchParams.get("balconies") || null,
+      cadastral_number: searchParams.get("cadastral_number") || "",
     };
   }, [searchParams]);
 

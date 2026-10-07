@@ -250,12 +250,78 @@ const freeUsage=await loadRoute('src/lib/free-monthly-feature-usage.js',{
   '@/lib/supabase-admin':{supabaseAdmin:{from(){freeDbCalls++;throw Error('Unexpected free usage query');}}},
   '@/lib/runtime-persistence':{shouldPersistRuntimeData:()=>false},
 });
-assert.equal(freeUsage.getFreeMonthlyFeatureLimit('cadastru_lookup'),0);
-assert.equal(freeUsage.getFreeMonthlyFeatureLimit('sale_estimate'),5);
-assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,false);
-assert.equal((await freeUsage.consumeFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,false);
+assert.equal(freeUsage.getFreeMonthlyFeatureLimit('cadastru_lookup'),1);
+assert.equal(freeUsage.getFreeMonthlyFeatureLimit('sale_estimate'),1);
+assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,true);
+assert.equal((await freeUsage.consumeFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,true);
 assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'sale_estimate',idempotencyKey:'one'})).allowed,true);
-assert.equal(freeDbCalls,0,'zero Cadastru allowance cannot reach the free usage RPC');
+assert.equal(freeDbCalls,0,'development mode does not persist free usage');
+let freeUses=1, paidUses=2, paidConsumptionCalls=0;
+const paidEvents=new Map();
+const freeEvents=new Set();
+const paidFeature=await loadRoute('src/lib/paid-feature-usage.js',{
+  'node:crypto':{default:crypto},
+  '@/lib/supabase-admin':{supabaseAdmin:{
+    from(table){const filters=new Map();const query={select(){return query;},eq(key,value){filters.set(key,value);return query;},async maybeSingle(){
+      if(table==='user_feature_usage_events')return {data:paidEvents.get(filters.get('idempotency_key'))||null,error:null};
+      if(table==='user_feature_credit_balances')return {data:{remaining_uses:paidUses,total_granted:2,total_used:2-paidUses},error:null};
+      throw Error(`Unexpected table ${table}`);
+    }};return query;},
+    async rpc(name,args){assert.equal(name,'consume_user_feature_credit');paidConsumptionCalls++;
+      const existing=paidEvents.get(args.p_idempotency_key);
+      if(existing)return {data:{allowed:true,reason:'already_consumed',source:existing.source,usage_event_id:existing.id,remaining_uses:paidUses},error:null};
+      if(paidUses===0)return {data:{allowed:false,reason:'no_credit',remaining_uses:0},error:null};
+      paidUses--;const event={id:crypto.randomUUID(),source:'paid_credit'};paidEvents.set(args.p_idempotency_key,event);
+      return {data:{allowed:true,reason:'consumed',source:event.source,usage_event_id:event.id,remaining_uses:paidUses},error:null};
+    },
+  }},
+  '@/lib/free-monthly-feature-usage':{
+    makeMonthlyFeatureUsageKey:(feature,{idempotencyKey})=>`${feature}:${idempotencyKey}`,
+    checkFreeMonthlyFeatureUsage:async({idempotencyKey})=>freeEvents.has(idempotencyKey)?{allowed:true,reason:'already_consumed',source:'free_monthly'}:freeUses>0?{allowed:true,reason:'has_free_credit',remaining_uses:freeUses}:{allowed:false,reason:'free_monthly_limit_reached',remaining_uses:0},
+    consumeFreeMonthlyFeatureUsage:async({idempotencyKey})=>{
+      if(freeEvents.has(idempotencyKey))return {allowed:true,reason:'already_consumed',source:'free_monthly',remaining_uses:freeUses};
+      if(freeUses===0)return {allowed:false,reason:'free_monthly_limit_reached',remaining_uses:0};
+      freeEvents.add(idempotencyKey);freeUses--;return {allowed:true,reason:'consumed',source:'free_monthly',remaining_uses:freeUses};
+    },
+  },
+  '@/lib/runtime-persistence':{shouldPersistRuntimeData:()=>true},
+  '@/lib/payment-products':{getFeaturePurchaseOffer:()=>({}),isKnownPaymentFeature:()=>true},
+});
+const featureRequest=key=>({userId:id,featureKey:'sale_estimate',idempotencyKey:key});
+assert.equal((await paidFeature.checkFeatureAccess(featureRequest('first'))).reason,'has_free_credit','buyers keep their monthly free use');
+assert.equal((await paidFeature.consumeFeatureCredit(featureRequest('first'))).source,'free_monthly');
+assert.equal((await paidFeature.consumeFeatureCredit(featureRequest('first'))).reason,'already_consumed','reloading a free result does not spend a paid credit');
+assert.equal(paidUses,2,'the monthly use is spent before paid credits');
+assert.equal((await paidFeature.checkFeatureAccess(featureRequest('second'))).reason,'has_credit');
+assert.equal((await paidFeature.consumeFeatureCredit(featureRequest('second'))).source,'paid_credit');
+assert.equal((await paidFeature.consumeFeatureCredit(featureRequest('second'))).reason,'already_consumed');
+assert.equal(paidUses,1,'reloading a paid result does not spend another credit');
+assert.equal(paidConsumptionCalls,1,'paid idempotency is checked before free usage');
+freeUses=1;paidUses=0;freeEvents.clear();
+assert.equal((await paidFeature.consumeFeatureCredit(featureRequest('third'))).source,'free_monthly','past purchases do not suppress next month\'s free use');
+let reportedFreeEvents=[];
+const profileCredits=await loadRoute('src/app/api/profile/credits/route.js',{
+  ...next,
+  '@/lib/access-tier':{resolveAccessTier:async()=>({user_id:id})},
+  '@/lib/free-monthly-feature-usage':{
+    FREE_MONTHLY_FEATURE_KEYS:freeUsage.FREE_MONTHLY_FEATURE_KEYS,
+    getFreeMonthlyFeatureLimit:freeUsage.getFreeMonthlyFeatureLimit,
+    getFreeMonthlyFeatureUsageWindow:freeUsage.getFreeMonthlyFeatureUsageWindow,
+  },
+  '@/lib/payment-products':{PAYMENT_FEATURE_KEYS:['sale_estimate','cadastru_lookup']},
+  '@/lib/supabase-admin':{supabaseAdmin:{from(table){const query={select(){return query;},eq(){return query;},in(){return query;},gte(){return query;},lt(){return query;},then(resolve,reject){
+    const data=table==='user_feature_credit_balances'?[{feature_key:'sale_estimate',remaining_uses:2,total_granted:2,total_used:0}]:reportedFreeEvents;
+    return Promise.resolve({data,error:null}).then(resolve,reject);
+  }};return query;}}},
+});
+const profilePayload=await (await profileCredits.GET(new Request('https://catdai.test/api/profile/credits'))).json();
+const saleFree=profilePayload.freeMonthlyCredits.find(row=>row.featureKey==='sale_estimate');
+assert.equal(saleFree.remainingUses,1,'a paid buyer still sees the monthly free use');
+assert.equal(saleFree.eligible,true);
+assert.equal(profilePayload.freeMonthlyCredits.find(row=>row.featureKey==='cadastru_lookup').totalGranted,1);
+reportedFreeEvents=[{feature_key:'sale_estimate'}];
+const usedProfilePayload=await (await profileCredits.GET(new Request('https://catdai.test/api/profile/credits'))).json();
+assert.equal(usedProfilePayload.freeMonthlyCredits.find(row=>row.featureKey==='sale_estimate').remainingUses,0,'free usage is counted independently of paid credits');
 for (const [key,value] of Object.entries(savedUrlEnv)) { if(value===undefined)delete process.env[key];else process.env[key]=value; }
 process.env.PAYMENT_PROVIDER='paddle';assert.equal((await create.POST(createRequest({}))).status,409);delete process.env.PAYMENT_PROVIDER;
 for(const lang of ['ro','ru']) {

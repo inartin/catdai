@@ -490,7 +490,7 @@ export default function AdminDashboard() {
         packageKey: data.packageKey,
         packageSource: "admin",
         credits: Array.isArray(data.credits) ? data.credits : selectedUser.credits,
-        freeMonthlyCredits: data.packageKey === "free" ? selectedUser.freeMonthlyCredits : [],
+        freeMonthlyCredits: selectedUser.freeMonthlyCredits,
       };
 
       setSelectedUser(updatedUser);
@@ -524,7 +524,7 @@ export default function AdminDashboard() {
         packageKey: data.packageKey,
         packageSource: "admin",
         credits: Array.isArray(data.credits) ? data.credits : selectedUser.credits,
-        freeMonthlyCredits: data.packageKey === "free" ? selectedUser.freeMonthlyCredits : [],
+        freeMonthlyCredits: selectedUser.freeMonthlyCredits,
       };
 
       setSelectedUser(updatedUser);

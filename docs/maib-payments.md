@@ -50,7 +50,7 @@ Set the required email settings above on the worker. `MAIB_RECEIPT_FROM` is a pl
 MAIB rejects bodyless GET requests carrying `Content-Type: application/json`; only JSON POSTs send that header. Hosted checkout uses `checkout.maib.md` or `checkout-sandbox.maib.md`.
 
 ## Credits and reporting
-`maib_credit_grants` keeps one row per order/feature. `user_feature_credit_balances` aggregates legacy and MAIB balances. Consumption is transactional and idempotent, taking legacy balances first, then oldest MAIB grants. The existing paid-before-free rule remains: an exhausted paid feature does not regain the free monthly allowance. Paddle resets/cancellation affect only legacy balances. Explicit admin package resets/balance overrides use `override_payment_credits` to replace both sources atomically; bulk overrides retain consumed counts.
+`maib_credit_grants` keeps one row per order/feature. `user_feature_credit_balances` aggregates legacy and MAIB balances. Paid-credit consumption is transactional and idempotent, taking legacy balances first, then oldest MAIB grants. Each feature uses its monthly free allowance before paid credits, regardless of prior purchases. Paddle resets/cancellation affect only legacy balances. Explicit admin package resets/balance overrides use `override_payment_credits` to replace both sources atomically; bulk overrides retain consumed counts.
 
 `payment_orders_all` unifies histories with provider identity and sandbox labels. Profile pagination uses timestamp (including microseconds), id, and provider. `reporting_payment_orders` and `reporting_feature_credit_balances` exclude MAIB sandbox records from paid-user/advertising reports. Checkout analytics keep Paddle references and separate MAIB order references.
 

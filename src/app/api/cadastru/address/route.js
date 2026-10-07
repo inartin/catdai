@@ -224,6 +224,10 @@ export async function POST(request) {
     resolved_address: lookupAddress,
     street_resolution: { status: resolution.status, original: street, resolved: resolution.street },
   });
+  const publicPayload = (payload) => {
+    const { district_lookup_checked, ...data } = payload;
+    return data;
+  };
   const skipCache = body?.skip_cache === true || body?.skipcache === true;
   const structuredAddress = buildStructuredAddress({
     city,
@@ -274,16 +278,19 @@ export async function POST(request) {
   };
 
   const stored = skipCache ? null : await getCadastruRecordByAddress(lookupAddress, { structuredAddress });
-  if (stored) {
+  const shouldRefreshStoredDistrict = Boolean(stored && city === "Chișinău" && apartmentNumber &&
+    !stored.payload?.district && !stored.payload?.form_fields?.district && !stored.payload?.district_lookup_checked);
+  const respondWithStored = async () => {
     const payload = withResolution(stored.payload);
     const evaluationToken = await recordAddressSearch(payload, stored.lookupSource, stored.resultType || classifyAddressPayload(payload));
     const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource, evaluationToken);
     await recoverSuggestion(payload, "cache");
     if (creditResponse) return creditResponse;
-    const response = NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
+    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
-  }
+  };
+  if (stored && !shouldRefreshStoredDistrict) return respondWithStored();
 
   let externalUnavailable = false;
   try {
@@ -298,7 +305,7 @@ export async function POST(request) {
       captureUsageEventId: shouldTrackCadastruSearch,
       userId: access.user_id || null,
     });
-    let payload = withResolution(externalResult);
+    let payload = withResolution({ ...externalResult, district_lookup_checked: true });
     payload = await persistCadastruAddressResult(payload, {
       requestAddress: rawAddress,
       resolvedAddress: lookupAddress,
@@ -312,10 +319,11 @@ export async function POST(request) {
     await recoverSuggestion(payload, "api");
     if (creditResponse) return creditResponse;
 
-    const response = NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
+    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
+    if (shouldRefreshStoredDistrict) return respondWithStored();
     failedUsageEventId = error?.usageEventId || null;
     externalUnavailable = ["service_unavailable", "external_cadastru_timeout", "external_cadastru_unreachable"].includes(error?.code);
     const details = {
@@ -372,7 +380,7 @@ export async function POST(request) {
     await recoverSuggestion(payload, "local");
     if (creditResponse) return creditResponse;
 
-    const response = NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
+    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {

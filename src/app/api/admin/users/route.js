@@ -3,7 +3,7 @@ import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 import {
   FREE_MONTHLY_FEATURE_KEYS,
-  FREE_MONTHLY_FEATURE_LIMIT,
+  getFreeMonthlyFeatureLimit,
   getFreeMonthlyFeatureUsageWindow,
 } from "@/lib/free-monthly-feature-usage";
 import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
@@ -290,25 +290,23 @@ function normalizeCreditRows(rows) {
   });
 }
 
-function normalizeFreeMonthlyRows({ usageRows = [], paidCreditRows = [] } = {}) {
+function normalizeFreeMonthlyRows({ usageRows = [] } = {}) {
   const usedByFeature = new Map();
-  const paidCreditsByFeature = new Map((paidCreditRows || []).map((row) => [row.feature_key, row]));
 
   for (const row of usageRows || []) {
     usedByFeature.set(row.feature_key, (usedByFeature.get(row.feature_key) || 0) + 1);
   }
 
   return FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
-    const paidCreditRow = paidCreditsByFeature.get(featureKey);
-    const hasPaidGrant = Number(paidCreditRow?.total_granted) > 0;
-    const used = hasPaidGrant ? FREE_MONTHLY_FEATURE_LIMIT : usedByFeature.get(featureKey) || 0;
+    const featureLimit = getFreeMonthlyFeatureLimit(featureKey);
+    const used = usedByFeature.get(featureKey) || 0;
     return {
       featureKey,
-      remainingUses: Math.max(FREE_MONTHLY_FEATURE_LIMIT - used, 0),
-      totalGranted: FREE_MONTHLY_FEATURE_LIMIT,
-      totalUsed: Math.min(used, FREE_MONTHLY_FEATURE_LIMIT),
+      remainingUses: Math.max(featureLimit - used, 0),
+      totalGranted: featureLimit,
+      totalUsed: Math.min(used, featureLimit),
       source: "free_monthly",
-      eligible: !hasPaidGrant,
+      eligible: featureLimit > 0,
     };
   });
 }
@@ -385,7 +383,6 @@ export async function GET(request) {
           credits: normalizeCreditRows(userCredits),
           freeMonthlyCredits: normalizeFreeMonthlyRows({
             usageRows: freeMonthlyUsageByUser.get(user.id) || [],
-            paidCreditRows: userCredits,
           }),
           registeredAt: userRegisteredAt(user),
           totalEstimations: estimationsByUser.get(user.id) || 0,

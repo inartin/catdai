@@ -539,7 +539,8 @@ export async function POST(request) {
       officialFetch: false,
       expiresAt: options.expiresAt,
     });
-    const res = NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
+    const { district_lookup_checked, ...publicPayload } = payload;
+    const res = NextResponse.json({ ...publicPayload, cadastru_evaluation_token: evaluationToken });
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     return res;
   };

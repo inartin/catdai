@@ -7,6 +7,7 @@ import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { validateCadastralNumber } from "@/lib/validation";
+import { buildFullAccessAddressResultParams } from "@/lib/cadastru-valuation-handoff";
 import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 
 const roadTypes = [
@@ -301,12 +302,10 @@ export default function CadastruSearchForm({
       if (data?.cadastral_number) {
         clearAddressResultPreview();
         clearAddressLookupRequest();
-        const params = new URLSearchParams({
-          cadastral_number: data.cadastral_number,
-          source: "address",
-          ...(data.cadastru_evaluation_token ? { cadastru_evaluation: data.cadastru_evaluation_token } : {}),
-          ...resolvedStreetParams,
-          ...(skipCache ? { skipcache: "true" } : {}),
+        const params = buildFullAccessAddressResultParams(data, {
+          city: addressForm.city,
+          resolvedStreetParams,
+          skipCache,
         });
         router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
         return;

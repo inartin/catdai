@@ -2,9 +2,9 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 
-export const FREE_MONTHLY_FEATURE_LIMIT = 5;
-export function getFreeMonthlyFeatureLimit(featureKey) {
-  return featureKey === "cadastru_lookup" ? 0 : FREE_MONTHLY_FEATURE_LIMIT;
+export const FREE_MONTHLY_FEATURE_LIMIT = 1;
+export function getFreeMonthlyFeatureLimit() {
+  return FREE_MONTHLY_FEATURE_LIMIT;
 }
 export const FREE_MONTHLY_FEATURE_KEYS = [
   "sale_estimate",

@@ -445,7 +445,6 @@ export default function ProfilePage() {
                   title: t("profile.creditBalances"),
                   description: t("profile.creditBalanceDesc"),
                   remaining: t("profile.creditRemaining"),
-                  freeBadge: t("profile.creditBadgeFree"),
                   used: ({ used, total }) => t("profile.creditUsed", { used, total }),
                   feature: (featureKey) => formatCreditFeature(featureKey, t),
                 }}

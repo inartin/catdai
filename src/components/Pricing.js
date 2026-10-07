@@ -233,7 +233,7 @@ function PriceCard({ plan, featured = false, active = false, checkoutState, onCh
   );
 }
 
-function CustomRequestCard({ onOpen }) {
+export function CustomRequestCard({ onOpen }) {
   const { t } = useTranslation();
 
   return (
@@ -257,7 +257,7 @@ function CustomRequestCard({ onOpen }) {
   );
 }
 
-function CustomRequestModal({ open, onClose }) {
+export function CustomRequestModal({ open, onClose }) {
   const { t } = useTranslation();
   const { session } = useAuth();
   const [message, setMessage] = useState("");

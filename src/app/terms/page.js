@@ -83,7 +83,7 @@ const sections = [
       "Anumite funcții CatDai pot fi disponibile gratuit, iar altele pot necesita autentificare și plată. Produsele plătite sunt cumpărate ca acces sau credite de utilizare unică pentru funcțiile indicate pe pagina de prețuri sau în ecranul de plată.",
       "Prețul, moneda, produsul ales și beneficiile incluse sunt afișate înainte de inițierea plății. Plățile noi sunt procesate prin maib; tranzacțiile Paddle existente rămân gestionate prin Paddle.",
       "Pentru o comandă maib, te autentifici în CatDai, alegi produsul, verifici utilizările incluse și suma în MDL, furnizezi o adresă reală de e-mail pentru confirmare și bifezi acceptarea acestor termeni. Continui apoi pe pagina securizată maib pentru plata cu cardul bancar acceptat de procesator.",
-      "Pachetele maib sunt achitate o singură dată, nu creează abonamente și adaugă credite fără expirare. Standard include câte 2 utilizări pentru fiecare funcție, Pro câte 10, iar Extra câte 50. Produsele individuale includ o utilizare a funcției indicate. Beneficiile și prețul exact sunt afișate înainte de plată.",
+      "Pachetele maib sunt achitate o singură dată, nu creează abonamente și adaugă credite fără expirare. Pachetele includ câte 5 sau 20 de utilizări pentru fiecare dintre cele 6 funcții afișate. Produsul individual include o singură utilizare a funcției selectate înainte de plată. Beneficiile și prețul exact sunt afișate înainte de plată.",
       "CatDai nu colectează și nu stochează datele cardului bancar. Datele de card și autorizarea plății sunt gestionate de procesatorul de plăți.",
       "Plățile maib sunt efectuate în MDL. Dacă moneda contului de card diferă, conversia și eventualele comisioane sunt stabilite de banca emitentă a cardului.",
       "Accesul plătit sau creditele sunt activate numai după confirmarea plății de către procesatorul de plăți și verificarea tranzacției de către sistemele CatDai.",
@@ -176,7 +176,7 @@ const sections = [
       `Adresă: ${MERCHANT.address}`,
       `Website: catdai.md. E-mail de contact: ${MERCHANT.email}`,
       "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
-      "Data ultimei actualizări: 5 Octombrie 2026",
+      "Data ultimei actualizări: 6 Octombrie 2026",
     ],
   },
 ];

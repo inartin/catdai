@@ -14,9 +14,25 @@ process.env.MAIB_SIGNATURE_KEY='test-signature-key';
 process.env.MAIB_CLIENT_ID='test-client'; process.env.MAIB_CLIENT_SECRET='test-secret';
 assert.equal(getPaymentProvider(),'maib');
 process.env.PAYMENT_PROVIDER='paddle'; assert.equal(getPaymentProvider(),'paddle'); delete process.env.PAYMENT_PROVIDER;
-for (const [key,amount,uses] of [['standard_pack',99,2],['pro_pack',199,10],['extra_pack',499,50],['sale_estimate_single',20,1],['rent_estimate_single',20,1],['listing_analysis_single',29,1],['cadastru_lookup_single',19,1],['yield_calculator_single',29,1],['pdf_report_single',29,1]]) {
+for (const [key,amount,uses] of [['standard_pack',99,2],['pro_pack',199,10],['extra_pack',499,50],['sale_estimate_single',25,1],['rent_estimate_single',25,1],['listing_analysis_single',25,1],['cadastru_lookup_single',25,1],['yield_calculator_single',25,1],['pdf_report_single',25,1]]) {
   const p=maibProduct(key);assert.equal(p.amount_minor,amount*100);assert.equal(p.billingMode,'one_time');
   assert.deepEqual(Object.values(p.grants),Array(key.endsWith('_pack')?6:1).fill(uses));
+}
+for (const [key, amount, grants] of [
+  ['cadastru_lookup_5', 99, { cadastru_lookup: 5 }],
+  ['cadastru_lookup_20', 299, { cadastru_lookup: 20 }],
+  ['property_combo_1', 59, { cadastru_lookup: 1, sale_estimate: 1, pdf_report: 1 }],
+]) {
+  const product = maibProduct(key);
+  assert.equal(product.amount_minor, amount * 100);
+  assert.deepEqual(product.grants, grants);
+  for (const lang of ['ro', 'ru']) assert.ok(maibProductTitle(key, lang));
+}
+for (const [key, count, amount] of [['all_features_5', 5, 99], ['all_features_20', 20, 299]]) {
+  const product = maibProduct(key);
+  assert.equal(product.amount_minor, amount * 100);
+  assert.deepEqual(product.grants, { sale_estimate: count, rent_estimate: count, listing_analysis: count, cadastru_lookup: count, yield_calculator: count, pdf_report: count });
+  for (const lang of ['ro', 'ru']) assert.ok(maibProductTitle(key, lang));
 }
 for(const key of ['__proto__','constructor','',null,{}]) assert.equal(maibProduct(key),null);
 for(const path of ['https://evil.test','//evil.test','/\\evil.test','/\n/evil.test']) assert.equal(client.safeReturnTo(path),'/profile');
@@ -177,13 +193,13 @@ for(const mode of ['development','production']) for(const provider of ['maib','p
   assert.equal(parsed.searchParams.get('return_to'),'/evaluare?a=1');assert.equal(parsed.searchParams.has('injected'),false);
 }
 delete process.env.PAYMENT_PROVIDER;
-let insertSnapshot, createUser=null, bankCreates=0, bankPayload;
+let insertSnapshot, createUser=null, bankCreates=0, bankPayload, expectedBankAmount=99;
 const createDb={from(){let single=false;const query={select(){return query;},eq(){return query;},in(){return query;},update(){return query;},insert(row){insertSnapshot={...row,id,created_at:new Date().toISOString(),status:'pending'};return query;},maybeSingle(){return Promise.resolve({data:null});},single(){single=true;return query;},then(resolve,reject){return Promise.resolve({data:single?insertSnapshot:null}).then(resolve,reject);}};return query;}};
 const create=await loadRoute('src/app/api/payments/maib/create/route.js',{
   ...next,'@/lib/supabase-admin':{supabaseAdmin:createDb},'@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
   '@/lib/payment-provider':{getPaymentProvider},'@/lib/maib/products.mjs':{maibProduct},
   '@/lib/maib/purchase.mjs':{MAIB_TERMS_VERSION,receiptEmail,maibProductTitle},
-  '@/lib/maib/client.mjs':{...client,maibRequest:async(path,{body})=>{bankPayload=body;bankCreates++;assert.equal(body.amount,99);assert.equal(body.currency,'MDL');return {checkoutId,checkoutUrl:`https://checkout-sandbox.maib.md/${checkoutId}`};}},
+  '@/lib/maib/client.mjs':{...client,maibRequest:async(path,{body})=>{bankPayload=body;bankCreates++;assert.equal(body.amount,expectedBankAmount);assert.equal(body.currency,'MDL');return {checkoutId,checkoutUrl:`https://checkout-sandbox.maib.md/${checkoutId}`};}},
   '@/lib/maib/service.mjs':{checked:async query=>(await query).data,publicOrder:x=>x},
   '@/lib/maib/http':{UUID:uuid,requestUser:async()=>createUser,paymentOrigin:http.paymentOrigin,paymentError:()=>Response.json({},{status:502})},
 });
@@ -216,6 +232,30 @@ for (const mode of ['development','production']) {
   assert.equal(bankPayload.successUrl,`${expectedOrigin}/payment/maib/success?order_id=${id}&lang=ro`);
   assert.equal(bankPayload.failUrl,bankPayload.successUrl);
 }
+expectedBankAmount=59;
+assert.equal((await create.POST(createRequest({...purchaseBody,product_key:'property_combo_1',request_key:crypto.randomUUID()}))).status,200);
+assert.equal(insertSnapshot.amount_minor,5900);
+assert.deepEqual(insertSnapshot.grants,{cadastru_lookup:1,sale_estimate:1,pdf_report:1});
+assert.equal(insertSnapshot.product_title,maibProductTitle('property_combo_1','ro'));
+for (const key of ['all_features_5', 'all_features_20', 'pdf_report_single']) {
+  const product = maibProduct(key);
+  expectedBankAmount = product.amount_mdl;
+  assert.equal((await create.POST(createRequest({...purchaseBody, product_key:key, request_key:crypto.randomUUID(), grants:{pdf_report:999}, amount_minor:1}))).status,200);
+  assert.equal(insertSnapshot.amount_minor, product.amount_minor);
+  assert.deepEqual(insertSnapshot.grants, product.grants, 'checkout snapshots server grants for the selected offer');
+}
+let freeDbCalls=0;
+const freeUsage=await loadRoute('src/lib/free-monthly-feature-usage.js',{
+  'node:crypto':{default:crypto},
+  '@/lib/supabase-admin':{supabaseAdmin:{from(){freeDbCalls++;throw Error('Unexpected free usage query');}}},
+  '@/lib/runtime-persistence':{shouldPersistRuntimeData:()=>false},
+});
+assert.equal(freeUsage.getFreeMonthlyFeatureLimit('cadastru_lookup'),0);
+assert.equal(freeUsage.getFreeMonthlyFeatureLimit('sale_estimate'),5);
+assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,false);
+assert.equal((await freeUsage.consumeFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,false);
+assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'sale_estimate',idempotencyKey:'one'})).allowed,true);
+assert.equal(freeDbCalls,0,'zero Cadastru allowance cannot reach the free usage RPC');
 for (const [key,value] of Object.entries(savedUrlEnv)) { if(value===undefined)delete process.env[key];else process.env[key]=value; }
 process.env.PAYMENT_PROVIDER='paddle';assert.equal((await create.POST(createRequest({}))).status,409);delete process.env.PAYMENT_PROVIDER;
 for(const lang of ['ro','ru']) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import {
   FREE_MONTHLY_FEATURE_KEYS,
-  FREE_MONTHLY_FEATURE_LIMIT,
+  getFreeMonthlyFeatureLimit,
   getFreeMonthlyFeatureUsageWindow,
 } from "@/lib/free-monthly-feature-usage";
 import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
@@ -36,16 +36,17 @@ function normalizeFreeMonthlyRows({ usageRows = [], paidCreditRows = [] } = {}) 
   }
 
   return FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
+    const featureLimit = getFreeMonthlyFeatureLimit(featureKey);
     const paidCreditRow = paidCreditsByFeature.get(featureKey);
     const hasPaidGrant = Number(paidCreditRow?.total_granted) > 0;
-    const used = hasPaidGrant ? FREE_MONTHLY_FEATURE_LIMIT : usedByFeature.get(featureKey) || 0;
+    const used = hasPaidGrant ? featureLimit : usedByFeature.get(featureKey) || 0;
     return {
       featureKey,
-      remainingUses: Math.max(FREE_MONTHLY_FEATURE_LIMIT - used, 0),
-      totalGranted: FREE_MONTHLY_FEATURE_LIMIT,
-      totalUsed: Math.min(used, FREE_MONTHLY_FEATURE_LIMIT),
+      remainingUses: Math.max(featureLimit - used, 0),
+      totalGranted: featureLimit,
+      totalUsed: Math.min(used, featureLimit),
       source: "free_monthly",
-      eligible: !hasPaidGrant,
+      eligible: featureLimit > 0 && !hasPaidGrant,
     };
   });
 }

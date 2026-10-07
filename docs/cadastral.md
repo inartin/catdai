@@ -84,7 +84,7 @@ Implemented and active, with partial fallback.
 
 ## Access
 - The standalone `/cadastru` search accepts anonymous address and cadastral-number submissions and returns a server-masked preview.
-- Blurred preview values open the shared login popup for anonymous users. Authenticated users receive full details when their `cadastru_lookup` credit or free monthly allowance permits it; authenticated users without access keep the existing package purchase preview.
+- Blurred preview values open the shared login popup for anonymous users. Authenticated users receive full details with a `cadastru_lookup` credit or an already-consumed lookup. New lookups have no free monthly full-detail allowance; locked previews offer the 25 MDL single result and link to the pricing page.
 - `/api/cadastral` and `/api/cadastru/address` allow anonymous requests only when the request explicitly carries the standalone `search_context: "cadastru"`; other callers still require a valid bearer token.
 - Authenticated users need an available `cadastru_lookup` allowance or credit for unblurred full details.
 - Address search and the follow-up cadastral-number result share the cadastral-number paid idempotency key when possible, so the same lookup is not charged twice.

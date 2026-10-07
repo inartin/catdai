@@ -1,7 +1,7 @@
 import ro from '../../locales/ro.json' with { type: 'json' };
 import ru from '../../locales/ru.json' with { type: 'json' };
 
-export const MAIB_TERMS_VERSION = '2026-10-05';
+export const MAIB_TERMS_VERSION = '2026-10-06';
 export const MAIB_FEATURE_LABELS = {
   sale_estimate: 'pricing.featureSale', rent_estimate: 'pricing.featureRent',
   listing_analysis: 'pricing.feature999', cadastru_lookup: 'pricing.featureCadastru',

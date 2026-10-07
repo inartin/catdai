@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
+import { maibProduct } from '../src/lib/maib/products.mjs';
 const { PGlite } = await import(process.env.MAIB_TEST_PGLITE_MODULE || '@electric-sql/pglite');
 const db = new PGlite();
 await db.exec('create schema auth; create table auth.users(id uuid primary key); create role anon; create role authenticated; create role service_role;');
@@ -109,5 +110,41 @@ await q("update maib_payment_receipts set status='sent',sent_at=now(),lease_unti
 await apply(mailOrder);await apply(mailOrder,'refunded',9900);
 assert.equal((await q("select * from claim_maib_receipts('sandbox',1)")).length,0,'callbacks and refunds do not resend a sent receipt');
 assert.equal((await q("select relrowsecurity from pg_class where oid='maib_payment_receipts'::regclass"))[0].relrowsecurity,true);
+const bundleUser=crypto.randomUUID();
+await q('insert into auth.users values($1)',[bundleUser]);
+async function purchaseProduct(key, buyer = bundleUser) {
+  const product=maibProduct(key);
+  const [placed]=await q(`insert into maib_payment_orders(user_id,environment,request_key,product_key,amount_minor,grants)
+    values($1,'sandbox',$2,$3,$4,$5) returning *`,[buyer,crypto.randomUUID(),key,product.amount_minor,JSON.stringify(product.grants)]);
+  const checkout=crypto.randomUUID(), payment=crypto.randomUUID();
+  const args=[placed.id,'sandbox',checkout,payment,product.amount_minor,'MDL','paid',0];
+  await q('select apply_maib_payment($1,$2,$3,$4,$5,$6,$7,$8,now())',args);
+  await q('select apply_maib_payment($1,$2,$3,$4,$5,$6,$7,$8,now())',args);
+  return {...placed,checkout,payment};
+}
+await purchaseProduct('cadastru_lookup_5');
+const largePack=await purchaseProduct('cadastru_lookup_20');
+const combo=await purchaseProduct('property_combo_1');
+const bundleBalance=async feature => (await q('select remaining_uses from user_feature_credit_balances where user_id=$1 and feature_key=$2',[bundleUser,feature]))[0]?.remaining_uses;
+assert.equal(await bundleBalance('cadastru_lookup'),26,'5, 20 and combo Cadastru credits stack exactly once');
+assert.equal(await bundleBalance('sale_estimate'),1,'combo grants one market estimate');
+assert.equal(await bundleBalance('pdf_report'),1,'combo grants one PDF report');
+await q("select consume_user_feature_credit($1,'cadastru_lookup',$2,'{}')",[bundleUser,'bundle-cadastru']);
+assert.equal(await bundleBalance('cadastru_lookup'),25,'new pack credits are consumable');
+await q('select apply_maib_payment($1,$2,$3,$4,$5,$6,$7,$8,now())',[largePack.id,'sandbox',largePack.checkout,largePack.payment,29900,'MDL','refunded',29900]);
+assert.equal(await bundleBalance('cadastru_lookup'),5,'refund removes unused credits from its own pack');
+await q('select apply_maib_payment($1,$2,$3,$4,$5,$6,$7,$8,now())',[combo.id,'sandbox',combo.checkout,combo.payment,5900,'MDL','refunded',5900]);
+assert.equal(await bundleBalance('sale_estimate'),0,'combo refund revokes unused estimate');
+assert.equal(await bundleBalance('pdf_report'),0,'combo refund revokes unused PDF');
+const allFeaturesUser=crypto.randomUUID();
+await q('insert into auth.users values($1)',[allFeaturesUser]);
+await purchaseProduct('all_features_5', allFeaturesUser);
+const allTwenty=await purchaseProduct('all_features_20', allFeaturesUser);
+const allBalances=async () => q('select feature_key,remaining_uses from user_feature_credit_balances where user_id=$1 order by feature_key',[allFeaturesUser]);
+assert.equal((await allBalances()).length,6,'all-feature packs grant every feature');
+assert.ok((await allBalances()).every(row=>row.remaining_uses===25),'5 and 20 uses stack per feature, despite duplicate payment confirmations');
+await q("select consume_user_feature_credit($1,'sale_estimate',$2,'{}')",[allFeaturesUser,'all-feature-sale']);
+await q('select apply_maib_payment($1,$2,$3,$4,$5,$6,$7,$8,now())',[allTwenty.id,'sandbox',allTwenty.checkout,allTwenty.payment,29900,'MDL','refunded',29900]);
+for(const row of await allBalances()) assert.equal(row.remaining_uses,row.feature_key==='sale_estimate'?4:5,'refund preserves the other pack and consumed usage');
 await db.close();
 console.log('MAIB PostgreSQL regression checks passed.');

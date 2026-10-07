@@ -40,32 +40,6 @@ function parseDashboardPeriod(value) {
   return DASHBOARD_PERIODS[value] ? value : "all";
 }
 
-async function fetchCadastruStorageStats() {
-  const byCity = new Map();
-  let total = 0;
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabaseAdmin
-      .from("cadastru_records")
-      .select("city")
-      .order("id", { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) throw new Error(`cadastru_records stats query failed: ${error.message}`);
-    const rows = data || [];
-    for (const row of rows) {
-      const city = row.city?.trim() || "Unknown city";
-      byCity.set(city, (byCity.get(city) || 0) + 1);
-    }
-    total += rows.length;
-    if (rows.length < PAGE) break;
-  }
-  return {
-    available: true,
-    total,
-    byCity: Array.from(byCity, ([city, count]) => ({ city, count }))
-      .sort((a, b) => b.count - a.count || a.city.localeCompare(b.city, "ro")),
-  };
-}
-
 function applySince(query, column, since) {
   return since ? query.gte(column, since) : query;
 }
@@ -224,7 +198,9 @@ function isMissingCadastruColumnError(error) {
     message.includes("district") ||
     message.includes("cadastral_number") ||
     message.includes("result_type") ||
-    message.includes("lookup_source")
+    message.includes("lookup_source") ||
+    message.includes("valuation_clicked_at") ||
+    message.includes("valuation_completed_at")
   );
 }
 
@@ -252,24 +228,28 @@ async function fetchCadastruRows(columns, defaults = {}, since) {
 async function fetchCadastruSearchEvents(since) {
   const columnAttempts = [
     {
-      columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, created_at",
+      columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
       defaults: {},
     },
     {
+      columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, created_at",
+      defaults: { valuation_clicked_at: null, valuation_completed_at: null },
+    },
+    {
       columns: "id, search_type, user_id, district, cadastral_number, result_type, created_at",
-      defaults: { lookup_source: null },
+      defaults: { lookup_source: null, valuation_clicked_at: null, valuation_completed_at: null },
     },
     {
       columns: "id, search_type, user_id, district, created_at",
-      defaults: { cadastral_number: null, result_type: null, lookup_source: null },
+      defaults: { cadastral_number: null, result_type: null, lookup_source: null, valuation_clicked_at: null, valuation_completed_at: null },
     },
     {
       columns: "id, search_type, user_id, cadastral_number, result_type, created_at",
-      defaults: { district: null, lookup_source: null },
+      defaults: { district: null, lookup_source: null, valuation_clicked_at: null, valuation_completed_at: null },
     },
     {
       columns: "id, search_type, user_id, created_at",
-      defaults: { district: null, cadastral_number: null, result_type: null, lookup_source: null },
+      defaults: { district: null, cadastral_number: null, result_type: null, lookup_source: null, valuation_clicked_at: null, valuation_completed_at: null },
     },
   ];
 
@@ -742,10 +722,6 @@ export async function GET(request) {
         console.error("Failed to load paid user stats:", error.message);
         return { available: false, totalPaidUsers: 0, paidOrders: 0 };
       }),
-      fetchCadastruStorageStats().catch((error) => {
-        console.error("Failed to load cadastru storage stats:", error.message);
-        return { available: false };
-      }),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -767,7 +743,6 @@ export async function GET(request) {
     paymentCheckoutEvents,
     marketTrendsPopup,
     paidUserSummary,
-    cadastruStorage,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
@@ -808,7 +783,6 @@ export async function GET(request) {
     paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
     marketTrendsPopup,
     paidUsers,
-    cadastruStorage,
   };
 
   if (!bypassCache) {

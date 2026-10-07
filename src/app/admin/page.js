@@ -325,7 +325,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [statsRefreshing, setStatsRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
-  const [dashboardPeriod, setDashboardPeriod] = useState("all");
+  const [dashboardPeriod, setDashboardPeriod] = useState("month");
   const [error, setError] = useState(null);
   const [showUsersList, setShowUsersList] = useState(false);
   const [showPaidUsersList, setShowPaidUsersList] = useState(false);
@@ -1232,6 +1232,7 @@ export default function AdminDashboard() {
                       <th className="px-4 py-3">Source</th>
                       <th className="px-4 py-3">Cadastral number</th>
                       <th className="px-4 py-3">District</th>
+                      <th className="px-4 py-3">Evaluation</th>
                       <th className="px-4 py-3">User</th>
                       <th className="px-4 py-3 text-right">Action</th>
                     </tr>
@@ -1256,6 +1257,9 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {row.district || "\u2014"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                          {row.valuation_completed_at ? "Completed" : row.valuation_clicked_at ? "Started" : "\u2014"}
                         </td>
                         <td className="px-4 py-3 text-gray-600 break-all">
                           {row.user_name || "Anonymous"}
@@ -1697,43 +1701,6 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      <section className="space-y-3" aria-labelledby="cadastru-storage-heading">
-        <div>
-          <h2 id="cadastru-storage-heading" className="text-lg font-semibold text-gray-900">Stored Cadastru Data</h2>
-          <p className="mt-1 text-sm text-gray-500">All stored records, including expired snapshots. Independent of the period filter.</p>
-        </div>
-        {s.cadastruStorage?.available ? (
-          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-3">
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-5">
-              <p className="text-sm font-medium text-gray-600">Total stored cadastral numbers</p>
-              <p className="mt-3 text-3xl font-bold tabular-nums text-gray-900">{fmtNum(s.cadastruStorage.total)}</p>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white md:col-span-2">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
-                  <tr>
-                    <th scope="col" className="px-5 py-3 text-left font-semibold">City</th>
-                    <th scope="col" className="px-5 py-3 text-right font-semibold">Stored cadastral numbers</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {s.cadastruStorage.byCity.map((row) => (
-                    <tr key={row.city}>
-                      <td className="px-5 py-3 text-gray-700">{row.city}</td>
-                      <td className="px-5 py-3 text-right font-semibold tabular-nums text-gray-900">{fmtNum(row.count)}</td>
-                    </tr>
-                  ))}
-                  {s.cadastruStorage.byCity.length === 0 && (
-                    <tr><td colSpan={2} className="px-5 py-6 text-center text-gray-500">No cadastru data stored yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <p className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-500">Stored cadastru statistics are temporarily unavailable.</p>
-        )}
-      </section>
     </div>
   );
 }

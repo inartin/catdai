@@ -311,6 +311,8 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
             balconies_count: v.balconies_count ?? null,
             ...(isPrimary && shareSlug ? { share_slug: shareSlug } : {}),
             ...(listingAnalysis ? { listing_analysis: listingAnalysis } : {}),
+            ...(isPrimary && !shareSlug && !listingAnalysis && sourceParams.get("cadastru_evaluation")
+              ? { cadastru_evaluation_token: sourceParams.get("cadastru_evaluation") } : {}),
             ...trackingData,
           };
 

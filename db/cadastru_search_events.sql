@@ -12,6 +12,8 @@ create table if not exists cadastru_search_events (
   cadastral_number text,
   result_type      text check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
   lookup_source    text check (lookup_source in ('api', 'local')),
+  valuation_clicked_at timestamptz,
+  valuation_completed_at timestamptz,
   created_at       timestamptz not null default now()
 );
 
@@ -29,6 +31,12 @@ alter table if exists cadastru_search_events
 
 alter table if exists cadastru_search_events
   add column if not exists lookup_source text;
+
+alter table if exists cadastru_search_events
+  add column if not exists valuation_clicked_at timestamptz;
+
+alter table if exists cadastru_search_events
+  add column if not exists valuation_completed_at timestamptz;
 
 do $$
 begin

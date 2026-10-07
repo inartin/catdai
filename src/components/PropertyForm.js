@@ -240,7 +240,7 @@ function isTrueValue(value) {
   return value === true || value === "true" || value === "1";
 }
 
-export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit, variant = "estimate" }) {
+export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit, cadastruEvaluationToken, variant = "estimate" }) {
   const router = useRouter();
   const { t } = useTranslation();
   const { session, isAuthenticated, clearAuthError } = useAuth();
@@ -462,6 +462,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
       }
     }
     params.set("_new", "1");
+    if (cadastruEvaluationToken && !isRentMode) params.set("cadastru_evaluation", cadastruEvaluationToken);
 
     if (onSubmit) {
       onValidSubmit?.();

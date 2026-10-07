@@ -10,6 +10,7 @@ Implemented and active for apartments.
 - The sale/buy tab uses `Estimare apartament` / `Оценка квартиры`; the rent tab uses `Estimare de piață` / `Рыночная оценка`, lets users select multiple sectors/zones and optionally multiple construction types, and hides the cadastral shortcut, total floors, first/last-floor filters, balconies, and budget fields.
 - `/estimeaza` collects city, district, rooms, building type, renovation, optional area, optional floor, optional first-floor/last-floor filters, bathrooms, balconies, cadastral number.
 - `/estimeaza` accepts the city, district, area, floor, and total-floor query presets handed off by qualifying Chișinău or Durlești apartment results from `/cadastru/rezultat`; all other criteria remain empty for the user to complete.
+- That Cadastru handoff carries a signed search-event token through the form to `/api/estimate`. A successful full-access sale result marks the originating search as having produced an evaluation; a preview or failed request does not.
 - `/evaluare` reads URL params and calls `/api/estimate`; anonymous sale/buy users can submit the form and see only a preview result.
 - `/evaluare` without valuation query params shows the reusable cadastru search form from `/cadastru` instead of redirecting to the homepage.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.

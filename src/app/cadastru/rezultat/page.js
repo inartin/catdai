@@ -417,6 +417,7 @@ function CadastruResultContent() {
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
   const valuationPrefill = buildValuationPrefill(state.data);
+  const evaluationToken = searchParams.get("cadastru_evaluation") || state.data?.cadastru_evaluation_token;
   const favoritePath = state.data ? getCadastruFavoritePath({
     lang,
     cadastralNumber,
@@ -691,7 +692,22 @@ function CadastruResultContent() {
             <div className="mt-8 flex justify-center">
               <button
                 type="button"
-                onClick={() => router.push(`/estimeaza?${valuationPrefill.toString()}`)}
+                onClick={async () => {
+                  const params = new URLSearchParams(valuationPrefill);
+                  if (evaluationToken) {
+                    params.set("cadastru_evaluation", evaluationToken);
+                    try {
+                      await fetch("/api/cadastru/evaluation", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ token: evaluationToken }),
+                      });
+                    } catch {
+                      // Navigation is still available if analytics fails.
+                    }
+                  }
+                  router.push(`/estimeaza?${params.toString()}`);
+                }}
                 className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 sm:w-auto"
               >
                 {t("cadastru.valuationCta")}

@@ -1,6 +1,7 @@
 import { resolveAccessTier } from "@/lib/access-tier";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { createCadastruEvaluationToken } from "@/lib/cadastru-evaluation-tracking";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
 const RESULT_TYPES = new Set(["no_data", "address_only", "apartment_only", "full_data"]);
@@ -74,7 +75,7 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
       lookup_source: normalizeLookupSource(options.lookupSource),
     };
 
-    let { error } = await supabaseAdmin.from("cadastru_search_events").insert(row);
+    let { data, error } = await supabaseAdmin.from("cadastru_search_events").insert(row).select("id").single();
 
     for (let attempt = 0; attempt < 5 && error; attempt++) {
       const missingColumn = ["city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
@@ -82,12 +83,13 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
       );
       if (!missingColumn) break;
       delete row[missingColumn];
-      ({ error } = await supabaseAdmin.from("cadastru_search_events").insert(row));
+      ({ data, error } = await supabaseAdmin.from("cadastru_search_events").insert(row).select("id").single());
     }
 
     if (error && !isMissingSchemaError(error)) {
       console.error("[cadastru-search-events] insert failed:", error.message);
     }
+    return error ? null : createCadastruEvaluationToken(data?.id);
   } catch (error) {
     console.error("[cadastru-search-events] insert failed:", error?.message || String(error));
   }

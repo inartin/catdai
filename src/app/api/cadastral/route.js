@@ -499,11 +499,12 @@ export async function POST(request) {
         payload: cleanCadastruPayload(payload), lookupSource, expiresAt: cadastruExpiresAt(),
       });
     }
+    const evaluationToken = await recordCadastruSearch(payload);
     if (!creditCheck.allowed) {
       const preview = buildCadastruPreviewPayload(payload, creditCheck.reason || "no_credit", {
         maskCadastralNumber: maskPreviewCadastralNumber,
       });
-      const res = NextResponse.json(preview);
+      const res = NextResponse.json({ ...preview, cadastru_evaluation_token: evaluationToken });
       res.headers.set("X-RateLimit-Remaining", String(remaining));
       return res;
     }
@@ -525,7 +526,7 @@ export async function POST(request) {
       const preview = buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit", {
         maskCadastralNumber: maskPreviewCadastralNumber,
       });
-      const res = NextResponse.json(preview);
+      const res = NextResponse.json({ ...preview, cadastru_evaluation_token: evaluationToken });
       res.headers.set("X-RateLimit-Remaining", String(remaining));
       return res;
     }
@@ -538,8 +539,7 @@ export async function POST(request) {
       officialFetch: false,
       expiresAt: options.expiresAt,
     });
-    await recordCadastruSearch(payload);
-    const res = NextResponse.json(payload);
+    const res = NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     return res;
   };

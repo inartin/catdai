@@ -290,6 +290,7 @@ export default function CadastruSearchForm({
         const params = new URLSearchParams({
           cadastral_number: data.cadastral_number,
           source: "address",
+          ...(data.cadastru_evaluation_token ? { cadastru_evaluation: data.cadastru_evaluation_token } : {}),
           ...resolvedStreetParams,
           ...(skipCache ? { skipcache: "true" } : {}),
         });

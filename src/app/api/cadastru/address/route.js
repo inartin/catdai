@@ -223,7 +223,16 @@ export async function POST(request) {
     houseNumber,
     apartmentNumber,
   });
-  const consumeCadastruCredit = async (payload, lookupSource) => {
+  const recordAddressSearch = (payload, lookupSource, resultType) => shouldTrackCadastruSearch
+    ? logCadastruSearchEvent(request, "address", {
+        city,
+        cadastralNumber: payload?.cadastral_number,
+        district: resolvePayloadDistrict(payload),
+        resultType,
+        lookupSource,
+      })
+    : null;
+  const consumeCadastruCredit = async (payload, lookupSource, evaluationToken) => {
     const idempotencyKey = payload?.cadastral_number
       ? makeCadastruNumberUsageKey(payload.cadastral_number)
       : makeCadastruAddressUsageKey(lookupAddress);
@@ -244,9 +253,12 @@ export async function POST(request) {
       : await consumeFeatureCredit(creditArgs);
     if (creditUsage.allowed) return null;
     const response = NextResponse.json(
-      buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit", {
-        maskCadastralNumber: true,
-      })
+      {
+        ...buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit", {
+          maskCadastralNumber: true,
+        }),
+        cadastru_evaluation_token: evaluationToken,
+      }
     );
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
@@ -255,18 +267,11 @@ export async function POST(request) {
   const stored = skipCache ? null : await getCadastruRecordByAddress(lookupAddress, { structuredAddress });
   if (stored) {
     const payload = withResolution(stored.payload);
-    const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource);
+    const evaluationToken = await recordAddressSearch(payload, stored.lookupSource, stored.resultType || classifyAddressPayload(payload));
+    const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource, evaluationToken);
     await recoverSuggestion(payload, "cache");
     if (creditResponse) return creditResponse;
-    if (shouldTrackCadastruSearch) {
-      await logCadastruSearchEvent(request, "address", {
-        city, cadastralNumber: payload.cadastral_number,
-        district: resolvePayloadDistrict(payload),
-        resultType: stored.resultType || classifyAddressPayload(payload),
-        lookupSource: stored.lookupSource,
-      });
-    }
-    const response = NextResponse.json(payload);
+    const response = NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   }
@@ -292,20 +297,12 @@ export async function POST(request) {
       officialFetch: true,
     });
     payload = withResolution(payload);
-    const creditResponse = await consumeCadastruCredit(payload, "api");
+    const evaluationToken = await recordAddressSearch(payload, "api", classifyAddressPayload(payload));
+    const creditResponse = await consumeCadastruCredit(payload, "api", evaluationToken);
     await recoverSuggestion(payload, "api");
     if (creditResponse) return creditResponse;
 
-    if (shouldTrackCadastruSearch) {
-      await logCadastruSearchEvent(request, "address", {
-        city,
-        cadastralNumber: payload?.cadastral_number,
-        district: resolvePayloadDistrict(payload),
-        resultType: classifyAddressPayload(payload),
-        lookupSource: "api",
-      });
-    }
-    const response = NextResponse.json(payload);
+    const response = NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
@@ -360,20 +357,12 @@ export async function POST(request) {
       officialFetch: true,
     });
     payload = withResolution(payload);
-    const creditResponse = await consumeCadastruCredit(payload, "local");
+    const evaluationToken = await recordAddressSearch(payload, "local", classifyAddressPayload(payload));
+    const creditResponse = await consumeCadastruCredit(payload, "local", evaluationToken);
     await recoverSuggestion(payload, "local");
     if (creditResponse) return creditResponse;
 
-    if (shouldTrackCadastruSearch) {
-      await logCadastruSearchEvent(request, "address", {
-        city,
-        cadastralNumber: payload?.cadastral_number,
-        district: resolvePayloadDistrict(payload),
-        resultType: classifyAddressPayload(payload),
-        lookupSource: "local",
-      });
-    }
-    const response = NextResponse.json(payload);
+    const response = NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {

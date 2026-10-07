@@ -18,6 +18,7 @@ import {
 import { getEvaluationPurchaseOffer, getFeaturePurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
+import { recordCadastruEvaluationStep } from "@/lib/cadastru-evaluation-tracking";
 import { validateEstimateInput } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
@@ -1032,6 +1033,9 @@ export async function POST(request) {
       responseTimeMs,
       validationData: v,
     });
+    if (responsePayload.full_access && body.cadastru_evaluation_token && !listingAnalysisAccess) {
+      await recordCadastruEvaluationStep(body.cadastru_evaluation_token, "complete");
+    }
 
     const res = NextResponse.json(responsePayload);
     res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -1172,6 +1176,9 @@ export async function POST(request) {
     responseTimeMs,
     validationData: v,
   });
+  if (responsePayload.full_access && body.cadastru_evaluation_token && !listingAnalysisAccess) {
+    await recordCadastruEvaluationStep(body.cadastru_evaluation_token, "complete");
+  }
 
   const res = NextResponse.json(responsePayload);
   res.headers.set("X-RateLimit-Remaining", String(remaining));

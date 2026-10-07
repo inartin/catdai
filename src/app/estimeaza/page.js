@@ -77,6 +77,7 @@ function EstimeazaContent() {
     <PropertyForm
       onBack={() => router.push("/")}
       initialValues={prefill}
+      cadastruEvaluationToken={searchParams.get("cadastru_evaluation")}
       onValidSubmit={trackCompleteEstimateConversion}
     />
   );

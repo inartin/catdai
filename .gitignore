@@ -9,6 +9,7 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.pnpm-store
 
 # testing
 /coverage
@@ -17,7 +18,6 @@ tmp/
 demo-valuation-report.pdf
 /external
 CLAUDE.md
-.codegraph
 
 # next.js
 /.next/

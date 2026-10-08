@@ -27,7 +27,7 @@ Backend prepared and active when Redis is reachable.
 - `/api/cadastral` stores the original lookup source (`api` or `local`) with the cached payload so `/cadastru` analytics keep the same source classification on cache hits.
 - Successful unmasked cadastru JSON payloads are persisted before preview/credit responses when production or `ENABLE_RUNTIME_PERSISTENCE=true`. Single-property number/address queries share canonical records; full address aggregates and verified spelling aliases live in `cadastru_address_aliases`. Apply `db/cadastru_address_aliases.sql`.
 - Redis and DB share an absolute 30-day freshness deadline. Cache/DB hits do not reset it or trigger live enrichment. Expired rows remain stored but are not served. Old v1 Redis keys are no longer read.
-- Address keys normalize diacritics, case, whitespace, punctuation and RO/RU street/apartment abbreviations. Source-verified address aliases handle alternate street spellings; no fuzzy property matching is used. Address aliases resolve current canonical number data, while land/building aggregates remain address-scoped.
+- Address keys normalize diacritics, case, whitespace, punctuation and RO/RU street/apartment abbreviations. Source-verified address aliases handle alternate street spellings; no fuzzy property matching is used. Address aliases resolve current canonical number data, while land/building aggregates remain address-scoped. For single-property hits, an alias or saved record district fills missing district data in older canonical Redis JSON and updates the number cache.
 
 ## Estimate Cache
 - Cache keys include the normalized valuation inputs and UI language.

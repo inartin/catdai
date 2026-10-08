@@ -26,14 +26,14 @@ Shows:
 - checkout popup opens, checkout page opens, and standalone pricing page opens as separate dashboard cards, each showing total opens plus unique user/device visitors for the selected period
 - landing market-trends popup opens appear as a simple dashboard count for the selected period, summed from one aggregate row per Chișinău calendar day
 - In the user popup, clicking the package badge opens a package dropdown. Selecting a different Start, Standard, Pro, or Extra package shows save/cancel actions. Saving updates the user's active admin package directly, resets all paid feature-credit balances to the selected package grants, deletes paid feature-credit rows when Start is selected, and does not create or require a payment.
-- The reset button next to the popup package badge asks for confirm/cancel and then resets the current package's paid feature credits back to full unused counts.
+- The reset button next to the popup package badge asks for confirm/cancel and then resets the current package's paid feature credits and current UTC-month free usage back to full unused counts.
 - Registered users table uses vertical column dividers for scanability.
 - Registered users package is based on the pricing page package names: free users show Start with the gray badge, paid Standard is green, Pro is cyan, and Extra is purple.
 - Admin package changes are stored in Supabase auth `app_metadata.catdai_admin_package_key`, which overrides the latest paid package for admin display.
 - Registered type cells show the user's email in the shared tooltip component when Supabase has an email for that user.
 - The user admin API includes a response version in its short cache so table schema changes do not reuse stale in-memory rows.
 - `/api/admin/users` includes paid feature credits and current-month free balances for all six gated features in the user detail popup.
-- `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, calls `override_payment_credits` to atomically override both legacy and MAIB balances. Start clears paid balances; package changes/reset restore the configured package counts with usage reset. Bulk balance overrides preserve usage totals and metadata. Paddle subscription servicing only changes legacy balances.
+- `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, calls `override_payment_credits` to atomically override both legacy and MAIB balances, and clears the user's current UTC-month free usage events. Start clears paid balances and restores one free use per feature; package changes/reset restore the configured package counts with usage reset. Bulk balance overrides preserve usage totals and metadata. Paddle subscription servicing only changes legacy balances.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
 - cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows

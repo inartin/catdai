@@ -16,6 +16,7 @@ import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru
 import { resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
 
 const inFlightCadastralLookups = new Map();
+const inFlightAddressLookups = new Map();
 const CADASTRU_DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
 const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
 const ADDRESS_LOOKUP_REQUEST_STORAGE_KEY = "catdai:cadastru-address-lookup-request:v1";
@@ -358,6 +359,30 @@ function fetchCadastralLookup(cacheKey, body, accessToken) {
   return promise;
 }
 
+function fetchAddressLookup(cacheKey, body, accessToken) {
+  const existing = inFlightAddressLookups.get(cacheKey);
+  if (existing) return existing;
+
+  const promise = fetch("/api/cadastru/address", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    body: JSON.stringify(body),
+  }).then(async (response) => ({
+    ok: response.ok,
+    data: response.ok ? await response.json() : null,
+  }));
+
+  inFlightAddressLookups.set(cacheKey, promise);
+  promise.then(
+    () => inFlightAddressLookups.delete(cacheKey),
+    () => inFlightAddressLookups.delete(cacheKey)
+  );
+  return promise;
+}
+
 function readAddressResultPreview() {
   if (typeof window === "undefined") return null;
   try {
@@ -377,16 +402,6 @@ function readAddressLookupRequest() {
     return parsed;
   } catch {
     return null;
-  }
-}
-
-function clearAddressLookupRequest() {
-  if (typeof window === "undefined") return;
-  try {
-    sessionStorage.removeItem(ADDRESS_LOOKUP_REQUEST_STORAGE_KEY);
-    sessionStorage.removeItem(ADDRESS_PREVIEW_STORAGE_KEY);
-  } catch {
-    // Result cleanup is best-effort.
   }
 }
 
@@ -504,25 +519,21 @@ function CadastruResultContent() {
       async function loadAddressData() {
         setState({ loading: true, error: "", data: null });
         try {
-          const response = await fetch("/api/cadastru/address", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-            },
-            body: JSON.stringify({ ...addressRequest, ...(skipCache ? { skip_cache: true } : {}) }),
-          });
+          const body = { ...addressRequest, ...(skipCache ? { skip_cache: true } : {}) };
+          const response = await fetchAddressLookup(
+            `${requestKey}|${JSON.stringify(body)}|${session?.access_token || "anonymous"}`,
+            body,
+            session?.access_token
+          );
 
           if (!response.ok) {
             if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
             return;
           }
 
-          const data = await response.json();
           if (active) {
             loadedRequestKey.current = requestKey;
-            setState({ loading: false, error: "", data });
-            if (!savedAddressKey && !data?.locked_sections?.cadastru_details && data?.cadastral_number) clearAddressLookupRequest();
+            setState({ loading: false, error: "", data: response.data });
           }
         } catch {
           if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });

@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PAYMENT_FEATURE_KEYS, getPaymentProducts } from "@/lib/payment-products";
+import {
+  FREE_MONTHLY_FEATURE_KEYS,
+  getFreeMonthlyFeatureLimit,
+  getFreeMonthlyFeatureUsageWindow,
+} from "@/lib/free-monthly-feature-usage";
 
 const PACKAGE_PRODUCT_KEYS = new Set(["free", "standard_pack", "pro_pack", "extra_pack"]);
 
@@ -24,6 +29,17 @@ async function resetUserCredits({ userId, grants }) {
     p_user_id: userId, p_grants: grants, p_clear: PAYMENT_FEATURE_KEYS.every(key => !grants[key]), p_preserve_used: false,
   });
   if (error) throw error;
+
+  const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
+  const { error: freeUsageError } = await supabaseAdmin
+    .from("user_feature_usage_events")
+    .delete()
+    .eq("user_id", userId)
+    .eq("source", "free_monthly")
+    .in("feature_key", FREE_MONTHLY_FEATURE_KEYS)
+    .gte("created_at", startIso)
+    .lt("created_at", endIso);
+  if (freeUsageError) throw freeUsageError;
 }
 
 export async function PATCH(request, context) {
@@ -71,6 +87,17 @@ export async function PATCH(request, context) {
       ok: true,
       packageKey,
       credits: rowsForResponse(grants),
+      freeMonthlyCredits: FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
+        const limit = getFreeMonthlyFeatureLimit(featureKey);
+        return {
+          featureKey,
+          remainingUses: limit,
+          totalGranted: limit,
+          totalUsed: 0,
+          source: "free_monthly",
+          eligible: limit > 0,
+        };
+      }),
     });
   } catch (error) {
     console.error("[admin-user-package] update failed:", error);

@@ -8,7 +8,7 @@ Implemented for Google and Telegram login.
 Telegram login uses Telegram's current OAuth popup to get an ID token, verifies that token on the app backend, then signs the user into Supabase with an app-managed Telegram account. Do not use Supabase's hosted Telegram OIDC callback here because Telegram's OIDC discovery has no UserInfo endpoint and Supabase can fail with `Error getting user profile from external provider`. Do not pass Telegram popup ID tokens directly to Supabase `signInWithIdToken`; Supabase can reject those tokens as `Bad ID token`.
 
 ## MAIB verification login (development only)
-`AuthOptions` adds a RO/RU username/password form only with `NODE_ENV=development`. The username is `maib-test`; `POST /api/auth/maib-test` returns 404 in every other environment even when settings exist. It checks same-origin requests, throttles attempts, verifies the server-only password, and allows exactly the configured user ID with the dedicated email and trusted `app_metadata.maib_verification` marker. No signup or arbitrary-user password login is added.
+The username/password form for `maib-test` is hidden from `AuthOptions`. The development-only `POST /api/auth/maib-test` endpoint remains available and returns 404 in every other environment even when settings exist. It checks same-origin requests, throttles attempts, verifies the server-only password, and allows exactly the configured user ID with the dedicated email and trusted `app_metadata.maib_verification` marker. No signup or arbitrary-user password login is added.
 
 Provision the single ordinary account once with:
 ```sh

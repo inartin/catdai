@@ -107,6 +107,26 @@ assert.equal(storage.recordMatchesStructuredAddress(tables.cadastru_records[0], 
 assert.equal(storage.recordMatchesStructuredAddress(tables.cadastru_records[0], "", { ...structuredAddress, apartmentNumber: "13" }), false);
 assert.equal(await storage.getCadastruRecordByAddress("Chișinău str Ștefan cel Mare 9", { structuredAddress: { ...structuredAddress, apartmentNumber: "" } }), null);
 
+// Legacy snapshots may have a district only in the typed DB column while both Redis payloads are older.
+const columnOnlyAddress = "Chișinău, bd. Decebal 63, ap. 4";
+const columnOnlyNumber = "0100106.131.01.004";
+await storage.persistCadastruAddressResult({
+  cadastral_number: columnOnlyNumber,
+  method: "address",
+  apartment: { address: columnOnlyAddress, area_m2: 44.1 },
+}, {
+  requestAddress: columnOnlyAddress,
+  structuredAddress: { city: "Chișinău", street: "Bulevard Decebal", houseNumber: "63", apartmentNumber: "4" },
+  officialFetch: true,
+});
+const columnOnlyRow = tables.cadastru_records.find((row) => row.cadastral_number === columnOnlyNumber);
+columnOnlyRow.district = "Botanica";
+assert.equal((await caching.readCadastruCache("number", columnOnlyNumber)).payload.district, undefined);
+assert.equal((await storage.getCadastruRecordByAddress(columnOnlyAddress)).payload.district, "Botanica", "address cache recovers the saved DB district");
+assert.equal((await caching.readCadastruCache("number", columnOnlyNumber)).payload.district, "Botanica", "the repaired canonical result is cached");
+cache.clear();
+assert.equal((await storage.getCadastruRecordByAddress(columnOnlyAddress)).payload.district, "Botanica", "DB hydration includes column-only districts");
+
 const russian = "Кишинев, ул Штефан чел Маре 9 кв 12";
 await storage.persistCadastruAddressResult({ ...expected, method: "address", request_address: russian }, { requestAddress: russian, structuredAddress: { ...structuredAddress, street: "Strada Штефан чел Маре" }, officialFetch: true });
 const updated = { ...expected, apartment: { ...expected.apartment, area_m2: 70 } };
@@ -174,6 +194,14 @@ assert.equal(caching.isFreshCadastru("invalid"), false);
 persistEnabled = false;
 await storage.persistCadastruAddressResult(aggregate, { requestAddress: aggregateAddress });
 assert.deepEqual(clone((await storage.getCadastruRecordByAddress(aggregateAddress)).payload), aggregate, "Redis-only operation");
+const aliasOnlyAddress = "Chișinău, bd. Decebal 63, ap. 5";
+const aliasOnlyNumber = "0100106.131.01.005";
+const aliasExpiry = caching.cadastruExpiresAt();
+await caching.writeCadastruCache("number", aliasOnlyNumber, { payload: { cadastral_number: aliasOnlyNumber }, expiresAt: aliasExpiry });
+await caching.writeCadastruCache("address", storage.normalizeCadastruAddressForDb(aliasOnlyAddress), {
+  payload: { cadastral_number: aliasOnlyNumber, district: "bOTANICA" }, expiresAt: aliasExpiry,
+});
+assert.equal((await storage.getCadastruRecordByAddress(aliasOnlyAddress)).payload.district, "bOTANICA", "address alias district survives a Redis-only canonical hit");
 persistEnabled = true;
 console.log("Storage regressions passed: full JSON, number/address parity, aggregates, RO/RU aliases, exact matching, expiry, Redis fallback.");
 

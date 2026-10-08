@@ -23,7 +23,7 @@ Preview paywall implemented. Shared checkout selects MAIB by default, with Paddl
 - `POST /api/paddle/webhooks` also handles approved full Paddle refund/chargeback adjustments and revokes remaining credits so refunded orders no longer keep paid access.
 - MAIB feature popups offer one use of the selected feature for 25 MDL. Pricing-page packs grant 5 uses of each feature for 99 MDL or 20 each for 299 MDL.
 - In the desktop result sidebar, the unlock card appears above the PDF/share/compare actions; the unlock button is green and the PDF action is black.
-- Limit-reached blurred-value popups offer a single-feature use through MAIB, with a secondary link to `/pricing`. Paddle retains its Extra offer.
+- Limit-reached blurred-value popups show the package price in MDL only and offer a single-feature use through MAIB, with a secondary link to `/pricing`. Paddle retains its Extra offer.
 - Paddle checkout and status pages use the CatDai-branded RO/RU payment shell and preserve the selected language through the checkout/status redirect.
 - Sale and rent evaluation single-access checkouts charge 25 MDL each through MAIB. When Paddle is selected, they use the same Paddle price ID from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE`, display the euro amount from `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` plus `≈ MDL` at 20 MDL per EUR, and grant one `sale_estimate` or `rent_estimate` credit after Paddle confirms payment.
 - Purchased credits do not affect eligibility for the monthly free allowance.

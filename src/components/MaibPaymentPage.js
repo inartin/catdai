@@ -93,7 +93,6 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
           <div className="mt-6 flex flex-wrap gap-4"><Link href={returnHref} className="rounded-lg bg-primary px-5 py-3 font-semibold text-white">{t('payment.backToEvaluation')}</Link><button onClick={() => setRefresh(value => value + 1)} className="rounded-lg border px-5 py-3">{t('maib.refresh')}</button></div>
         </> : product ? <>
           <p className="mb-3 text-sm text-gray-600">{t('maib.delivery')}</p>
-          <p className="mb-5 text-sm text-gray-600">{t('maib.requirements')}</p>
           <p className="mb-5 text-sm text-gray-600">{t('maib.hosted')}</p>
           <form onSubmit={start}>
             <label htmlFor="receipt-email" className="block text-sm font-semibold">{t('maib.receiptEmail')}</label>

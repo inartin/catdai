@@ -427,8 +427,10 @@ async function findRecordByNumber(cadastralNumber) {
 }
 
 function hydratePayloadFromRecord(row) {
-  if (isObject(row?.raw_payload) && Object.keys(row.raw_payload).length) return cleanCadastruPayload(row.raw_payload);
-  return {
+  if (isObject(row?.raw_payload) && Object.keys(row.raw_payload).length) {
+    return withSavedDistrict(cleanCadastruPayload(row.raw_payload), row.district);
+  }
+  return withSavedDistrict({
     cadastral_number: row.cadastral_number,
     apartment: row.apartment_data || {},
     building: row.building_data || {},
@@ -436,7 +438,12 @@ function hydratePayloadFromRecord(row) {
     form_fields: row.form_fields || {},
     matched_address: row.full_address,
     partial: row.partial,
-  };
+  }, row.district);
+}
+
+function withSavedDistrict(payload, district) {
+  if (!cleanText(district) || cleanText(payload?.district) || cleanText(payload?.form_fields?.district)) return payload;
+  return { ...payload, district };
 }
 
 function isAddressResolverOnlyRecord(row) {
@@ -584,7 +591,26 @@ async function resolveAddressEntry(entry) {
   if (!entry || !isFreshCadastru(entry.expiresAt)) return null;
   // Resolve single-property aliases through the same canonical record as number searches.
   if (entry.payload.cadastral_number) {
-    return await getCadastruRecordByNumber(entry.payload.cadastral_number) || entry;
+    const canonical = await getCadastruRecordByNumber(entry.payload.cadastral_number);
+    if (!canonical) return entry;
+    if (cleanText(canonical.payload?.district) || cleanText(canonical.payload?.form_fields?.district)) return canonical;
+
+    const aliasDistrict = cleanText(entry.payload?.district || entry.payload?.form_fields?.district);
+    let district = aliasDistrict;
+    if (!district && !canonical.payload?.district_lookup_checked && isCadastruDbEnabled()) {
+      try {
+        const row = await findRecordByNumber(entry.payload.cadastral_number);
+        if (row && isFreshCadastru(recordExpiry(row))) district = cleanText(row.district);
+      } catch (error) {
+        logDbError("district recovery failed", error);
+      }
+    }
+    if (district) {
+      const updated = { ...canonical, payload: withSavedDistrict(canonical.payload, district) };
+      await writeCadastruCache("number", entry.payload.cadastral_number, updated);
+      return updated;
+    }
+    return canonical;
   }
   return entry;
 }

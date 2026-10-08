@@ -15,15 +15,6 @@ function formatMdl(value) {
   return `${Math.round(amount).toLocaleString("ro-MD")} lei`;
 }
 
-function formatEuroApprox(value) {
-  const amount = Number(value);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
-  return `≈ ${amount.toLocaleString("ro-MD", {
-    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })} €`;
-}
-
 function getReturnPath() {
   if (typeof window === "undefined") return null;
   return `${window.location.pathname}${window.location.search}`;
@@ -56,7 +47,6 @@ export default function FeaturePricingAction({
 
   const packageOffer = {
     product_key: selectedProductKey,
-    price_eur: provider === "maib" ? selectedMaibProduct.amount_mdl / 20 : process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_COST || 25,
     price_mdl: provider === "maib" ? selectedMaibProduct.amount_mdl : process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499,
   };
   const featureLabels = { sale_estimate: "pricing.featureSale", rent_estimate: "pricing.featureRent", listing_analysis: "pricing.feature999", cadastru_lookup: "pricing.featureCadastru", yield_calculator: "pricing.featureYield", pdf_report: "pricing.featurePdf" };
@@ -93,9 +83,6 @@ export default function FeaturePricingAction({
       <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-4 py-4 text-left">
         <p className="text-lg font-extrabold tracking-tight text-gray-950">
           {t(isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl) })}
-        </p>
-        <p className="mt-1 text-sm font-semibold text-gray-500">
-          {formatEuroApprox(packageOffer.price_eur)}
         </p>
         <p className="mt-4 text-xs font-bold uppercase tracking-wide text-gray-400">
           {t("payment.packageIncludesLabel")}

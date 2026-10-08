@@ -1,7 +1,5 @@
 "use client";
 
-import { useId, useState } from 'react';
-
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import GoogleIcon from "@/components/icons/GoogleIcon";
@@ -9,16 +7,12 @@ import TelegramIcon from "@/components/icons/TelegramIcon";
 
 export default function AuthOptions({ className = "", variant = "default" }) {
   const { t } = useTranslation();
-  const formId = useId();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const {
     loading,
     error,
     activeProvider,
     signInWithGoogle,
     signInWithTelegram,
-    signInWithMaibTest,
     clearAuthError,
   } = useAuth();
 
@@ -69,22 +63,6 @@ export default function AuthOptions({ className = "", variant = "default" }) {
 
       {error && (
         <p className="px-2 pt-1 text-xs text-red-500">{error}</p>
-      )}
-      {process.env.NODE_ENV === 'development' && (
-        <details className="mt-3 border-t border-gray-100 pt-3 text-sm">
-          <summary className="cursor-pointer font-semibold text-gray-700">{t('auth.maibTestLogin')}</summary>
-          <form className="mt-3 space-y-3" onSubmit={async event => {
-            event.preventDefault();
-            if (disabled) return;
-            clearAuthError();
-            const result = await signInWithMaibTest(username, password);
-            if (!result.error) setPassword('');
-          }}>
-            <div><label htmlFor={`${formId}-username`} className="block text-xs text-gray-600">{t('auth.username')}</label><input id={`${formId}-username`} name="username" autoComplete="username" required maxLength={64} value={username} onChange={event => setUsername(event.target.value)} disabled={disabled} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" /></div>
-            <div><label htmlFor={`${formId}-password`} className="block text-xs text-gray-600">{t('auth.password')}</label><input id={`${formId}-password`} name="password" type="password" autoComplete="current-password" required maxLength={1024} value={password} onChange={event => setPassword(event.target.value)} disabled={disabled} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2" /></div>
-            <button type="submit" disabled={disabled} className="w-full rounded-lg bg-primary px-3 py-2 font-semibold text-white disabled:opacity-50">{activeProvider === 'maib-test' ? t('auth.loading') : t('auth.testSignIn')}</button>
-          </form>
-        </details>
       )}
     </div>
   );

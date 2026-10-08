@@ -240,7 +240,15 @@ export async function POST(request) {
     ? logCadastruSearchEvent(request, "address", {
         city,
         searchAddress: rawAddress,
+        searchRequest: {
+          city,
+          road_type: roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : "strada",
+          street: resolution.street,
+          house_number: houseNumber,
+          apartment_number: apartmentNumber,
+        },
         cadastralNumber: payload?.cadastral_number,
+        resultPayload: payload,
         district: resolvePayloadDistrict(payload),
         resultType,
         lookupSource,

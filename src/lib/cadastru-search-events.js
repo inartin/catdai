@@ -56,6 +56,40 @@ function cleanSearchAddress(value) {
   return trimmed ? trimmed.slice(0, 200) : null;
 }
 
+function cleanSearchRequest(value) {
+  if (!value || typeof value !== "object") return null;
+  const city = cleanCity(value.city);
+  const roadType = String(value.road_type || "");
+  const street = typeof value.street === "string" ? value.street.trim().slice(0, 80) : "";
+  const houseNumber = typeof value.house_number === "string" ? value.house_number.trim().slice(0, 10) : "";
+  const apartmentNumber = typeof value.apartment_number === "string" ? value.apartment_number.trim().slice(0, 4) : "";
+  if (!city || !["strada", "str-la", "bulevard"].includes(roadType) || !street || !houseNumber) return null;
+  return { city, road_type: roadType, street, house_number: houseNumber, ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}) };
+}
+
+function resultValueForSearch(searchType, payload) {
+  if (!payload || typeof payload !== "object") return null;
+
+  if (searchType === "number") {
+    const address = [
+      payload.address,
+      payload.apartment?.address,
+      payload.building?.address,
+      payload.matched_address,
+      payload.location?.display_name,
+      payload.building_address,
+    ].find((value) => typeof value === "string" && value.trim());
+    return address ? address.trim().slice(0, 500) : null;
+  }
+
+  const numbers = [
+    payload.cadastral_number,
+    ...(Array.isArray(payload.lands) ? payload.lands.map((land) => land?.cadastral_number) : []),
+    ...(Array.isArray(payload.buildings) ? payload.buildings.map((building) => building?.cadastral_number) : []),
+  ].map(cleanCadastralNumber).filter(Boolean);
+  return [...new Set(numbers)].join(" · ") || null;
+}
+
 export async function logCadastruSearchEvent(request, searchType, options = {}) {
   if (process.env.NODE_ENV === "development" || !shouldPersistRuntimeData()) return;
 
@@ -78,14 +112,16 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
       district: cleanDistrict(options.district),
       cadastral_number: cleanCadastralNumber(options.cadastralNumber),
       search_address: normalizedType === "address" ? cleanSearchAddress(options.searchAddress) : null,
+      search_request: normalizedType === "address" ? cleanSearchRequest(options.searchRequest) : null,
+      result_value: resultValueForSearch(normalizedType, options.resultPayload),
       result_type: normalizeResultType(options.resultType),
       lookup_source: normalizeLookupSource(options.lookupSource),
     };
 
     let { data, error } = await supabaseAdmin.from("cadastru_search_events").insert(row).select("id").single();
 
-    for (let attempt = 0; attempt < 6 && error; attempt++) {
-      const missingColumn = ["search_address", "city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
+    for (let attempt = 0; attempt < 8 && error; attempt++) {
+      const missingColumn = ["search_request", "result_value", "search_address", "city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
         column in row && isMissingColumnError(error, column)
       );
       if (!missingColumn) break;

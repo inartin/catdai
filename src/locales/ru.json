@@ -592,6 +592,8 @@
   "profile.historyCadastruResultType.address_only": "Только адрес",
   "profile.historyCadastruResultType.apartment_only": "Данные квартиры",
   "profile.historyCadastruResultType.full_data": "Полные данные",
+  "profile.historyCadastruNumberUnavailable": "Кадастровый номер недоступен",
+  "profile.historyCadastruAddressUnavailable": "Адрес недоступен",
   "profile.historyCadastruSource.api": "API",
   "profile.historyCadastruSource.local": "Локально",
   "profile.historyLoadMore": "Загрузить ещё",

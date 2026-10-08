@@ -420,6 +420,7 @@ function CadastruResultContent() {
     searchParams.get("preview") === "1" || searchParams.get("result") === "1"
   );
   const savedAddress = getSavedCadastruAddress(searchParams);
+  const isHistoryAddress = searchParams.get("history") === "1";
   const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
   const loadedRequestKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -483,7 +484,7 @@ function CadastruResultContent() {
 
     if (isAddressPreviewHandoff || savedAddressKey) {
       const accessMode = session?.access_token ? "authenticated" : "anonymous";
-      const requestKey = `address-preview|${savedAddressKey}|${accessMode}|${skipCache ? "skipcache" : "cache"}`;
+      const requestKey = `address-preview|${savedAddressKey}|${accessMode}|${skipCache ? "skipcache" : "cache"}|${isHistoryAddress ? "history" : "search"}`;
       if (loadedRequestKey.current === requestKey) return;
 
       const preview = savedAddressKey ? null : readAddressResultPreview();
@@ -503,7 +504,7 @@ function CadastruResultContent() {
       }
 
       const addressRequest = savedAddressKey
-        ? { ...getSavedCadastruAddress(new URLSearchParams(savedAddressKey)), search_context: "cadastru" }
+        ? { ...getSavedCadastruAddress(new URLSearchParams(savedAddressKey)), ...(isHistoryAddress ? {} : { search_context: "cadastru" }) }
         : readAddressLookupRequest();
       if (!addressRequest) {
         loadedRequestKey.current = requestKey;
@@ -595,7 +596,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, savedAddressKey, session?.access_token, skipCache, source, t]);
+  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, savedAddressKey, session?.access_token, skipCache, source, t]);
 
   useEffect(() => {
     if (isAuthenticated) setIsAuthModalOpen(false);

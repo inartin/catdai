@@ -592,6 +592,8 @@
   "profile.historyCadastruResultType.address_only": "Doar adresă",
   "profile.historyCadastruResultType.apartment_only": "Date apartament",
   "profile.historyCadastruResultType.full_data": "Date complete",
+  "profile.historyCadastruNumberUnavailable": "Număr cadastral indisponibil",
+  "profile.historyCadastruAddressUnavailable": "Adresă indisponibilă",
   "profile.historyCadastruSource.api": "API",
   "profile.historyCadastruSource.local": "Local",
   "profile.historyLoadMore": "Încarcă mai multe",

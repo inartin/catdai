@@ -12,6 +12,7 @@ import Tooltip from "@/components/Tooltip";
 import ProfileCreditBalances from "@/components/ProfileCreditBalances";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 import { formatLocalizedDate } from "@/lib/localized-date";
+import { getCadastruFavoritePath } from "@/lib/cadastru-favorites";
 
 const HISTORY_PAGE_SIZE = 10;
 const TRANSACTIONS_PAGE_SIZE = 10;
@@ -98,8 +99,11 @@ function formatHistoryPropertyDetails(row, t) {
 
 function formatHistoryResult(row, lang, t) {
   if (row.type === "cadastru") {
-    return row.cadastralNumber || row.searchAddress ||
-      (row.resultType ? t(`profile.historyCadastruResultType.${row.resultType}`) : "—");
+    if (row.resultType === "no_data") return t("profile.historyCadastruResultType.no_data");
+    if (row.searchType === "address") {
+      return row.resultValue || row.cadastralNumber || t("profile.historyCadastruNumberUnavailable");
+    }
+    return row.resultValue || t("profile.historyCadastruAddressUnavailable");
   }
   return formatHistoryPrice(row.estimatedPrice, lang);
 }
@@ -615,9 +619,19 @@ export default function ProfilePage() {
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {history.map((row) => {
-                            const href = row.type === "cadastru" && row.cadastralNumber && row.resultType !== "no_data"
-                              ? `/${lang}/cadastru/rezultat?cadastral_number=${encodeURIComponent(row.cadastralNumber)}`
-                              : row.href;
+                            let href = row.href;
+                            if (row.type === "cadastru" && row.resultType !== "no_data") {
+                              if (row.cadastralNumber) {
+                                const params = new URLSearchParams({
+                                  cadastral_number: row.cadastralNumber,
+                                  ...(row.searchType === "address" ? { source: "address", ...(row.district ? { district: row.district } : {}) } : {}),
+                                });
+                                href = `/${lang}/cadastru/rezultat?${params}`;
+                              } else if (row.searchType === "address" && row.searchRequest) {
+                                const addressPath = getCadastruFavoritePath({ lang, savedAddress: row.searchRequest });
+                                href = addressPath ? `${addressPath}&history=1` : null;
+                              }
+                            }
                             const isClickable = Boolean(href);
                             return (
                               <tr

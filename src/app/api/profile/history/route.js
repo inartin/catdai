@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
 const DEFAULT_HISTORY_LIMIT = 10;
 const MAX_HISTORY_LIMIT = 30;
 const ESTIMATE_COLUMNS = "id, estimate_type, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at";
-const CADASTRU_COLUMNS = "id, search_type, city, district, cadastral_number, search_address, result_type, lookup_source, created_at";
+const CADASTRU_COLUMNS = "id, search_type, city, district, cadastral_number, search_address, search_request, result_value, result_type, lookup_source, created_at";
 const PAID_USAGE_COLUMNS = "id, feature_key, metadata, created_at";
 
 function isMissingEstimateTypeError(error) {
@@ -50,6 +50,8 @@ function normalizeCadastruRow(row) {
     district: row.district,
     cadastralNumber: row.cadastral_number,
     searchAddress: row.search_address,
+    searchRequest: row.search_request,
+    resultValue: row.result_value,
     resultType: row.result_type,
     lookupSource: row.lookup_source,
     createdAt: row.created_at,
@@ -153,7 +155,7 @@ async function fetchEstimateHistory(userId, cursor, pageSize) {
 
 async function fetchCadastruHistory(userId, cursor, pageSize) {
   let columns = CADASTRU_COLUMNS;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     const res = await applyCursor(
       supabaseAdmin
         .from("cadastru_search_events")
@@ -165,7 +167,7 @@ async function fetchCadastruHistory(userId, cursor, pageSize) {
     );
 
     if (!res.error) return res;
-    const missingColumn = ["search_address", "city"].find((column) =>
+    const missingColumn = ["search_request", "result_value", "search_address", "city"].find((column) =>
       columns.includes(column) && isMissingSchemaError(res.error) && String(res.error.message || "").includes(column)
     );
     if (missingColumn) {

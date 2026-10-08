@@ -193,6 +193,8 @@ create table cadastru_search_events (
   district         text,
   cadastral_number text,
   search_address   text,
+  search_request   jsonb,
+  result_value     text,
   result_type      text check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
   lookup_source    text check (lookup_source in ('api', 'local')),
   created_at       timestamptz not null default now()

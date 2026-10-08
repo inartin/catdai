@@ -479,6 +479,7 @@ export async function POST(request) {
     if (!cadastruSearchType) return;
     await logCadastruSearchEvent(request, cadastruSearchType, {
       cadastralNumber: payload?.cadastral_number || trimmed,
+      resultPayload: payload,
       city: resolveCityFromPayload(payload),
       district: resolveDistrictFromPayload(payload),
       resultType: resultType || classifyCadastralResult(payload),

@@ -1,6 +1,6 @@
 import streets from "./cadastru-streets/data/streets.json";
 import corrections from "./cadastru-streets/data/street-corrections.json";
-import { normalizeStreetName } from "./cadastru-streets/street-resolver.js";
+import { normalizeStreetName, resolveStreet } from "./cadastru-streets/street-resolver.js";
 import { resolveSupportedCity } from "./cadastru-streets/supported-cities.js";
 
 const cyrillic = Object.fromEntries([
@@ -70,4 +70,18 @@ export function suggestStreets({ city, roadType, street, excludeStreet = street 
     if (best <= 0.38) ranked.push({ name, score: best });
   }
   return ranked.sort((a, b) => a.score - b.score || a.name.localeCompare(b.name)).slice(0, 3).map(({ name }) => name);
+}
+
+export function suggestRoadTypes({ city, roadType, street }) {
+  const selectedType = ["str", "strada"].includes(roadType) ? "str"
+    : ["bd", "bulevard"].includes(roadType) ? "bd" : roadType === "str-la" ? "str-la" : null;
+  if (!selectedType || !resolveSupportedCity(city)) return [];
+  if (resolveStreet({ city, roadType: selectedType, street, exactOnly: true }).status === "exact") return [];
+
+  return ["str", "bd", "str-la"]
+    .filter((type) => type !== selectedType)
+    .map((type) => ({ type, match: resolveStreet({ city, roadType: type, street, exactOnly: true }) }))
+    .filter(({ match }) => match.status === "exact")
+    .map(({ type, match }) => ({ road_type: type === "bd" ? "bulevard" : type === "str-la" ? "str-la" : "strada",
+      street: match.street }));
 }

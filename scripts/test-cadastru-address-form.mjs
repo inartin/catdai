@@ -35,6 +35,7 @@ for (const lang of ['ro', 'ru']) {
     '@/context/LanguageContext': { useTranslation: () => ({ lang, t }) },
     '@/context/AuthContext': { useAuth: () => ({ isAuthenticated: true, loading: false, clearAuthError: () => {} }) },
     '@/lib/validation': { validateCadastralNumber: () => true },
+    '@/lib/cadastru-valuation-handoff': { buildFullAccessAddressResultParams: () => new URLSearchParams({ source: 'address', skipcache: 'true' }) },
     '@/lib/cadastru-supported-cities': { CADASTRU_SUPPORTED_CITIES: ['Chișinău', 'Bălți'] },
   };
   const context = vm.createContext({ URLSearchParams, console,
@@ -80,5 +81,21 @@ for (const lang of ['ro', 'ru']) {
   change(10, '48'); finish(Response.json(conflict, { status: 422 })); await pending;
   assert.equal(choices().length, 0, 'late responses cannot restore stale choices');
   assert.equal(field(10).props.value, '48');
+
+  change(80, 'Miron costin'); change(10, '114'); change(4, '24');
+  responder = async () => Response.json({ error: 'service_unavailable',
+    road_type_suggestions: [{ road_type: 'strada', street: 'Miron Costin' }] }, { status: 503 });
+  const callsBeforeSuggestion = bodies.length;
+  await search();
+  assert.equal(bodies.length, callsBeforeSuggestion + 1, 'a road-type suggestion does not retry automatically');
+  const roadChoice = walk(render()).find((node) => node.type === 'button' &&
+    node.props.children === t('cadastru.useRoadTypeSuggestion', { road: t('cadastru.roadTypeStreet'), street: 'Miron Costin' }));
+  assert(roadChoice, `${lang}: show the corrected road type after a timeout`);
+  responder = async () => Response.json({ cadastral_number: '0100101.089.01.024' });
+  await roadChoice.props.onClick();
+  assert.deepEqual(bodies.at(-1), { city: 'Chișinău', road_type: 'strada', street: 'Miron Costin',
+    house_number: '114', apartment_number: '24', search_context: 'cadastru', skip_cache: true });
+  assert.equal(field(80).props.value, 'Miron Costin');
+  assert(walk(render()).some((node) => node.type === 'select' && node.props.value === 'strada'));
 }
-console.log('Address form regressions passed: RO/RU choices, explicit retry, retained address fields/skip-cache, edit invalidation and stale responses.');
+console.log('Address form regressions passed: RO/RU choices, explicit road-type retry, retained fields/skip-cache, edit invalidation and stale responses.');

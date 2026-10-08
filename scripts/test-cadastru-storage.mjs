@@ -365,7 +365,7 @@ assert.deepEqual(tables.cadastru_address_aliases, aliasesBeforeFailure);
 console.log("Worker adapter regressions passed: typed suggestions, no fallback on ambiguity, no alias writes after failure.");
 
 // Suggestions are generated only after the actual address has no result.
-const { suggestStreets } = await load("@/lib/cadastru-street-suggestions");
+const { suggestRoadTypes, suggestStreets } = await load("@/lib/cadastru-street-suggestions");
 for (const street of ["Radiceva", "Radischev", "Radișcev", "Радищева", "Radishcheva"]) {
   const suggestions = clone(suggestStreets({ city: "Balti", roadType: "str", street }));
   assert.equal(suggestions[0], "Alexandr Radișcev", street);
@@ -383,9 +383,17 @@ assert.deepEqual(clone(suggestStreets({ city: "Balti", roadType: "str", street: 
 assert.deepEqual(clone(suggestStreets({ city: "Balti", roadType: "str", street: "Ra" })), []);
 assert(!suggestStreets({ city: "Balti", roadType: "str", street: "Alexandr Radișcev" }).includes("Alexandr Radișcev"));
 assert(!suggestStreets({ city: "Chișinău", roadType: "str", street: "31 August 1988" }).includes("31 August 1989"));
+assert.deepEqual(clone(suggestRoadTypes({ city: "Chișinău", roadType: "bd", street: "Miron costin" })),
+  [{ road_type: "strada", street: "Miron Costin" }]);
+assert.deepEqual(clone(suggestRoadTypes({ city: "Chișinău", roadType: "str", street: "Decebal" })),
+  [{ road_type: "bulevard", street: "Decebal" }]);
+assert.deepEqual(clone(suggestRoadTypes({ city: "Chișinău", roadType: "str", street: "Miron Costin" })), []);
+assert.deepEqual(clone(suggestRoadTypes({ city: "Chișinău", roadType: "bd", street: "Decebal" })), []);
+assert.deepEqual(clone(suggestRoadTypes({ city: "Unknown", roadType: "bd", street: "Miron Costin" })), []);
 
 let suggestionFailure = Object.assign(new Error("missing"), { status: 404, code: "not_found" });
 let backupFailure = Object.assign(new Error("Could not match land or buildings for Balti."), { code: "not_found" });
+let backupLookups = 0;
 const submitted = [];
 const suggestionsRoute = await load("src/app/api/cadastru/address/route.js", {
   ...routeMocks,
@@ -394,7 +402,7 @@ const suggestionsRoute = await load("src/app/api/cadastru/address/route.js", {
     if (suggestionFailure) throw suggestionFailure;
     return { lands: [{ cadastral_number: "0300101.001", address: `Bălți, str ${fields.street} ${fields.house_number}` }] };
   } },
-  "@/lib/cadastru-address-search": { findCadastralByAddress: async () => { throw backupFailure; } },
+  "@/lib/cadastru-address-search": { findCadastralByAddress: async () => { backupLookups++; throw backupFailure; } },
 });
 const baltiRequest = { city: "Bălți", road_type: "strada", street: "Radiceva", house_number: "28", apartment_number: "7", skip_cache: true, search_context: "cadastru" };
 const abbreviatedBody = { ...baltiRequest, street: "G. Cosbuc", house_number: "13", apartment_number: "18" };
@@ -438,6 +446,22 @@ assert.equal(suggested.status, 503);
 const timeoutPayload = await suggested.json();
 assert.equal(timeoutPayload.error, "service_unavailable");
 assert.equal(timeoutPayload.suggestions, undefined);
+const wrongRoadType = { city: "Chișinău", road_type: "bulevard", street: "Miron costin",
+  house_number: "114", apartment_number: "24", skip_cache: true, search_context: "cadastru" };
+suggestionFailure = Object.assign(new Error("missing"), { status: 404, code: "not_found" });
+let roadTypeResponse = await suggestionsRoute.POST(request(wrongRoadType));
+assert.equal(roadTypeResponse.status, 404);
+assert.deepEqual(clone((await roadTypeResponse.json()).road_type_suggestions),
+  [{ road_type: "strada", street: "Miron Costin" }]);
+assert.equal(submitted.at(-1).road_type, "bulevard", "the original road type is searched first");
+suggestionFailure = Object.assign(new Error("timeout"), { code: "external_cadastru_timeout", fallbackEligible: true });
+const previousBackupLookups = backupLookups;
+roadTypeResponse = await suggestionsRoute.POST(request(wrongRoadType));
+assert.equal(roadTypeResponse.status, 503);
+assert.deepEqual(clone((await roadTypeResponse.json()).road_type_suggestions),
+  [{ road_type: "strada", street: "Miron Costin" }]);
+assert.equal(submitted.at(-1).road_type, "bulevard", "the timeout does not trigger an automatic retry");
+assert.equal(backupLookups, previousBackupLookups, "known road-type mismatch skips the repeated slow local lookup after worker timeout");
 console.log("Did-you-mean regressions passed: RO/RU spellings, scope, original lookup first, no-data-only suggestions, retry identity and timeout exclusion.");
 
 // Ambiguous initials must offer full names before any cache or provider lookup.

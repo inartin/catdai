@@ -1,5 +1,7 @@
 {
   "cadastru.didYouMean": "Ați vrut să căutați această stradă?",
+  "cadastru.didYouMeanRoadType": "Ați vrut să căutați acest tip de stradă?",
+  "cadastru.useRoadTypeSuggestion": "Caută {road} {street}",
   "cadastru.addressFieldsConflict": "În câmpul străzii apare numărul {embedded}, dar în câmpul casei este {house}. Ce număr folosim?",
   "cadastru.useAddressCorrection": "Folosește {street}, nr. {house}",
   "cadastru.chooseStreet": "Alegeți strada corectă, apoi căutați din nou.",

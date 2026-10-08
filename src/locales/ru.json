@@ -1,5 +1,7 @@
 {
   "cadastru.didYouMean": "Возможно, вы имели в виду эту улицу?",
+  "cadastru.didYouMeanRoadType": "Возможно, вы имели в виду другой тип улицы?",
+  "cadastru.useRoadTypeSuggestion": "Искать: {road} {street}",
   "cadastru.addressFieldsConflict": "В поле улицы указан дом {embedded}, а в поле дома — {house}. Какой номер использовать?",
   "cadastru.useAddressCorrection": "Использовать {street}, дом {house}",
   "cadastru.chooseStreet": "Выберите нужную улицу и повторите поиск.",

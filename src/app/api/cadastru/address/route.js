@@ -1,4 +1,4 @@
-import { suggestStreets } from "@/lib/cadastru-street-suggestions";
+import { suggestRoadTypes, suggestStreets } from "@/lib/cadastru-street-suggestions";
 import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSuggestionRecovery } from "@/lib/cadastru-suggestion-recovery";
 import { resolveStreet, inspectStreetAddress } from "@/lib/cadastru-streets/street-resolver";
 import { NextResponse } from "next/server";
@@ -211,11 +211,15 @@ export async function POST(request) {
     });
   };
   let failedUsageEventId = null;
+  const roadTypeSuggestions = () => suggestRoadTypes({ city, roadType, street });
   const noResultSuggestions = () => {
-    const suggestions = suggestStreets({ city, roadType, street, excludeStreet: resolution.street });
+    const alternateRoadTypes = roadTypeSuggestions();
+    const suggestions = alternateRoadTypes.length ? []
+      : suggestStreets({ city, roadType, street, excludeStreet: resolution.street });
     const token = shouldTrackCadastruSearch && process.env.NODE_ENV !== "development"
       ? createSuggestionRecoveryToken(failedUsageEventId, suggestionAddress, suggestions) : null;
-    return { suggestions, ...(token ? { suggestion_recovery_token: token } : {}) };
+    return { suggestions, ...(alternateRoadTypes.length ? { road_type_suggestions: alternateRoadTypes } : {}),
+      ...(token ? { suggestion_recovery_token: token } : {}) };
   };
   const withResolution = (payload) => ({
     ...payload,
@@ -345,6 +349,14 @@ export async function POST(request) {
     if (error?.code === "ambiguous_street" && error?.status === 422) {
       return NextResponse.json({ error: "ambiguous_street", suggestions: error.suggestions || [] }, { status: 422 });
     }
+    if (error?.code === "external_cadastru_timeout") {
+      const alternateRoadTypes = roadTypeSuggestions();
+      if (alternateRoadTypes.length) {
+        return NextResponse.json({ error: "service_unavailable",
+          message: "Cadastral service is temporarily unavailable. Please try again later.",
+          road_type_suggestions: alternateRoadTypes }, { status: 503 });
+      }
+    }
     if (!error?.fallbackEligible) {
       console.error("[cadastru/address] external cadastru API failed:", details);
       if (error?.status === 404 || error?.code === "not_found") {
@@ -401,8 +413,10 @@ export async function POST(request) {
     const isUnavailable = externalUnavailable || error?.code === "service_unavailable" ||
       error?.name === "TimeoutError" || error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT";
     if (isUnavailable) {
+      const alternateRoadTypes = roadTypeSuggestions();
       return NextResponse.json(
-        { error: "service_unavailable", message: "Cadastral service is temporarily unavailable. Please try again later." },
+        { error: "service_unavailable", message: "Cadastral service is temporarily unavailable. Please try again later.",
+          ...(alternateRoadTypes.length ? { road_type_suggestions: alternateRoadTypes } : {}) },
         { status: 503 }
       );
     }

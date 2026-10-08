@@ -23,23 +23,21 @@ export function buildReceipt(order, merchant) {
     timeZone: 'Europe/Chisinau', dateStyle: 'long', timeStyle: 'short',
   });
   const amount = (order.amount_minor / 100).toLocaleString(order.language === 'ru' ? 'ru-MD' : 'ro-MD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const lines = [
-    messages['maib.receiptTitle'],
-    ...(order.environment === 'sandbox' ? [messages['maib.sandbox']] : []),
-    `${messages['maib.merchant']}: ${merchant}`,
-    `${messages['maib.website']}: CatDai — ${origin}`,
-    `${messages['maib.orderNumber']}: ${order.id}`,
-    `${messages['maib.paymentDate']}: ${paidAt} (Europe/Chisinau)`,
-    `${messages['maib.total']}: ${amount} ${order.currency_code}`,
-    `${messages['profile.paymentProduct']}: ${order.product_title}`,
-    `${messages['maib.quantity']}: 1`,
-    ...Object.entries(order.grants).filter(([feature]) => MAIB_FEATURE_LABELS[feature]).map(([feature, count]) => `${messages[MAIB_FEATURE_LABELS[feature]]}: ${count}`),
-    ...(order.refunded_minor > 0 ? [`${messages['maib.refundedAmount']}: ${(order.refunded_minor / 100).toFixed(2)} ${order.currency_code}`] : []),
-    messages['maib.delivery'],
-    `${origin}/payment/maib/success?order_id=${encodeURIComponent(order.id)}&lang=${order.language === 'ru' ? 'ru' : 'ro'}`,
-    'info@catdai.md',
-  ];
-  return { subject: `${messages['maib.receiptTitle']} — CatDai — ${order.id}`, text: lines.join('\n\n') };
+  const values = {
+    merchant, siteUrl: origin, orderId: order.id, paidAt, amount,
+    currency: order.currency_code, productTitle: order.product_title,
+    sandbox: order.environment === 'sandbox' ? messages['maib.sandbox'] : '',
+    features: Object.entries(order.grants).filter(([feature]) => MAIB_FEATURE_LABELS[feature])
+      .map(([feature, count]) => `${messages[MAIB_FEATURE_LABELS[feature]]}: ${count}`).join('\n\n'),
+    refund: order.refunded_minor > 0
+      ? `${messages['maib.refundedAmount']}: ${(order.refunded_minor / 100).toFixed(2)} ${order.currency_code}` : '',
+    orderUrl: `${origin}/payment/maib/success?order_id=${encodeURIComponent(order.id)}&lang=${order.language === 'ru' ? 'ru' : 'ro'}`,
+  };
+  const fill = template => template.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? values[key] : match);
+  return {
+    subject: fill(messages['maib.receiptSubject']),
+    text: messages['maib.receiptBody'].map(fill).filter(Boolean).join('\n\n'),
+  };
 }
 
 // Only an explicit rejection or a failure before SMTP DATA is safe to retry.

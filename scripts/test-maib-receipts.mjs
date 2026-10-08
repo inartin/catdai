@@ -17,6 +17,7 @@ for(const mode of ['development','production']) for(const language of ['ro','ru'
   process.env.MAIB_PUBLIC_URL='https://catdai.md';
   const expectedOrigin=mode==='development'?'https://dev.catdai.md':'https://catdai.md';
   const receipt=buildReceipt({...order,language,product_title:maibProductTitle('standard_pack',language)},config.merchant);
+  assert.equal(receipt.subject,`${language==='ro'?'Confirmarea plății':'Подтверждение оплаты'} — CatDai — ${order.id}`);
   for(const required of [order.id,config.merchant,'CatDai','99','MDL','2026','Europe/Chisinau',expectedOrigin]) assert.ok(receipt.text.includes(required),required);
   const urls=receipt.text.match(/https:\/\/\S+/g);
   assert.equal(urls.length,2);
@@ -26,9 +27,16 @@ for(const mode of ['development','production']) for(const language of ['ro','ru'
   assert.equal(returnUrl.searchParams.get('lang'),language);
   assert.ok(receipt.text.includes(language==='ro'?'Cantitate: 1':'Количество: 1'));
   assert.ok(receipt.text.includes(language==='ro'?'Mod de test':'Тестовый режим'));
+  assert.ok(receipt.text.includes(language==='ro'?'Creditele sunt adăugate':'После проверки подтверждения maib использования добавляются'));
+  assert.ok(!receipt.text.includes(language==='ro'?'Sumă rambursată:':'Возвращённая сумма:'));
   const stream=nodemailer.createTransport({streamTransport:true,buffer:true});
   const rendered=await stream.sendMail({from:config.from,to:order.receipt_email,...receipt});
   assert.ok(rendered.message.length>100);assert.ok(rendered.envelope.to.includes(order.receipt_email));stream.close();
+}
+for(const language of ['ro','ru']) {
+  const receipt=buildReceipt({...order,environment:'production',language,refunded_minor:2500},config.merchant);
+  assert.ok(!receipt.text.includes(language==='ro'?'Mod de test':'Тестовый режим'));
+  assert.ok(receipt.text.includes(language==='ro'?'Sumă rambursată: 25.00 MDL':'Возвращённая сумма: 25.00 MDL'));
 }
 for(const [key,value] of Object.entries(savedUrlEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
 assert.throws(()=>buildReceipt({...order,paid_at:null},config.merchant));

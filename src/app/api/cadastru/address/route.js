@@ -69,7 +69,7 @@ function classifyAddressPayload(payload) {
 }
 
 function resolvePayloadDistrict(payload) {
-  return payload?.form_fields?.district || null;
+  return payload?.district || payload?.form_fields?.district || null;
 }
 
 function makeCadastruAddressUsageKey(rawAddress) {
@@ -239,6 +239,7 @@ export async function POST(request) {
   const recordAddressSearch = (payload, lookupSource, resultType) => shouldTrackCadastruSearch
     ? logCadastruSearchEvent(request, "address", {
         city,
+        searchAddress: rawAddress,
         cadastralNumber: payload?.cadastral_number,
         district: resolvePayloadDistrict(payload),
         resultType,
@@ -340,7 +341,7 @@ export async function POST(request) {
       console.error("[cadastru/address] external cadastru API failed:", details);
       if (error?.status === 404 || error?.code === "not_found") {
         if (shouldTrackCadastruSearch) {
-          await logCadastruSearchEvent(request, "address", { city, resultType: "no_data", lookupSource: "api" });
+          await logCadastruSearchEvent(request, "address", { city, searchAddress: rawAddress, resultType: "no_data", lookupSource: "api" });
         }
         return NextResponse.json(
           {
@@ -400,7 +401,7 @@ export async function POST(request) {
 
     const isNotFound = error?.code === "not_found";
     if (isNotFound && shouldTrackCadastruSearch) {
-      await logCadastruSearchEvent(request, "address", { city, resultType: "no_data", lookupSource: "local" });
+      await logCadastruSearchEvent(request, "address", { city, searchAddress: rawAddress, resultType: "no_data", lookupSource: "local" });
     }
 
     return NextResponse.json(

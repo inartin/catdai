@@ -36,14 +36,14 @@ Shows:
 - `PATCH /api/admin/users/[id]/package` verifies the admin session, accepts `packageKey`, updates auth metadata, calls `override_payment_credits` to atomically override both legacy and MAIB balances, and clears the user's current UTC-month free usage events. Start clears paid balances and restores one free use per feature; package changes/reset restore the configured package counts with usage reset. Bulk balance overrides preserve usage totals and metadata. Paddle subscription servicing only changes legacy balances.
 - sale estimations and rent estimations as separate counts from `estimate_log.estimate_type`
 - PDF report generation count with registered/anonymous split, cadastral-included count, period totals, and recent rows
-- cadastru search count with address/number split, registered/anonymous split, top searched districts for address lookups, period totals, and recent rows
+- cadastru search count with address/number split, registered/anonymous split, top known districts, period totals, and recent rows
 - 999.md listing-link analysis count with analyzed/rejected/failed split, period totals, and recent rows
 - calculator usage count with registered/anonymous split, tax-enabled count, period totals, average investment/rent/yield, and recent rows
 - shared links
 - favorites
 - Telegram alert count with an expandable list of configured Telegram alerts
 - sale and rent estimation cards are clickable and each opens its own recent row list with property details, anonymous/user identity, Romanian date-time, shared status, and favorite status
-- Cadastru search rows show date, search type, result type, cadastral number when known, derived district when available, valuation progress (`Started` after the result CTA click or `Completed` after a full evaluation result), anonymous/user name, and a delete action with browser confirmation. Exact searched addresses are not stored for this dashboard.
+- Cadastru search rows show date, search type, `Success` or `No result` status, the searched address or cadastral number when available, district when known, valuation progress (`Started` after the result CTA click or `Completed` after a full evaluation result), anonymous/user name, and a delete action with browser confirmation. Searches logged before `search_address` was added cannot show their original address.
 - 999 link-analysis rows show date, status, listing id/link, mapped property summary, asking price, and anonymous/user id.
 - External API usage shows aggregate signed-worker calls for 999 and cadastru, with success/failure totals counted from background writes. The card opens request-level rows with All, Failed, and Successful filters; each row expands to show the endpoint, HTTP status, duration, error code/message, worker request payload, worker response payload, and a safe allowlist of diagnostic response headers (`content-type`, `retry-after`, `cf-ray`, `x-request-id`, and `x-vercel-id`).
 - Failed address calls distinguish `service_unavailable` from `not_found`. The request payload includes `apartment_number` whenever submitted; an address-only query omits it. Worker response/status remain in the details even when the app's local fallback succeeds.

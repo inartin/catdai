@@ -313,6 +313,7 @@ function classifyCadastralResult(payload) {
 }
 
 function resolveDistrictFromPayload(payload) {
+  if (payload?.district) return payload.district;
   if (payload?.form_fields?.district) return payload.form_fields.district;
   const address = payload?.apartment?.address || payload?.building?.address || payload?.matched_address;
   const district = resolveDistrict(address);
@@ -479,7 +480,7 @@ export async function POST(request) {
     await logCadastruSearchEvent(request, cadastruSearchType, {
       cadastralNumber: payload?.cadastral_number || trimmed,
       city: resolveCityFromPayload(payload),
-      district: cadastruSearchType === "address" ? resolveDistrictFromPayload(payload) : null,
+      district: resolveDistrictFromPayload(payload),
       resultType: resultType || classifyCadastralResult(payload),
       lookupSource,
     });

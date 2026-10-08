@@ -195,6 +195,7 @@ function isMissingCadastruColumnError(error) {
   const code = String(error?.code || "");
   const message = String(error?.message || "");
   return (code === "PGRST204" || code === "42703") && (
+    message.includes("search_address") ||
     message.includes("district") ||
     message.includes("cadastral_number") ||
     message.includes("result_type") ||
@@ -228,8 +229,12 @@ async function fetchCadastruRows(columns, defaults = {}, since) {
 async function fetchCadastruSearchEvents(since) {
   const columnAttempts = [
     {
-      columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
+      columns: "id, search_type, user_id, district, cadastral_number, search_address, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
       defaults: {},
+    },
+    {
+      columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
+      defaults: { search_address: null },
     },
     {
       columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, created_at",

@@ -124,14 +124,6 @@ function fmtCadastruSearchType(type) {
   return type || "\u2014";
 }
 
-function fmtCadastruResultType(type) {
-  if (type === "no_data") return "No data";
-  if (type === "address_only") return "Address only";
-  if (type === "apartment_only") return "Apartment only";
-  if (type === "full_data") return "Full data";
-  return type || "\u2014";
-}
-
 function fmtCadastruResultSummary(byResultType) {
   const counts = byResultType || {};
   const parts = [
@@ -143,12 +135,6 @@ function fmtCadastruResultSummary(byResultType) {
     .map(([key, label]) => counts[key] ? `${fmtNum(counts[key])} ${label}` : null)
     .filter(Boolean);
   return parts.length ? parts.join(" · ") : "No result data yet";
-}
-
-function fmtCadastruSource(source) {
-  if (source === "api") return "API";
-  if (source === "local") return "Local";
-  return source || "\u2014";
 }
 
 function fmtCadastruSourceSummary(byLookupSource) {
@@ -1236,9 +1222,8 @@ export default function AdminDashboard() {
                     <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Type</th>
-                      <th className="px-4 py-3">Result</th>
-                      <th className="px-4 py-3">Source</th>
-                      <th className="px-4 py-3">Cadastral number</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Search</th>
                       <th className="px-4 py-3">District</th>
                       <th className="px-4 py-3">Evaluation</th>
                       <th className="px-4 py-3">User</th>
@@ -1254,14 +1239,19 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-gray-900 font-medium">
                           {fmtCadastruSearchType(row.search_type)}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {fmtCadastruResultType(row.result_type)}
+                        <td className="px-4 py-3">
+                          {row.result_type ? (
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "no_data"
+                              ? "bg-gray-100 text-gray-600"
+                              : "bg-green-50 text-green-700"}`}>
+                              {row.result_type === "no_data" ? "No result" : "Success"}
+                            </span>
+                          ) : "\u2014"}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {fmtCadastruSource(row.lookup_source)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          {row.cadastral_number || "\u2014"}
+                        <td className="max-w-xs break-words px-4 py-3 text-gray-600">
+                          {row.search_type === "address"
+                            ? row.search_address || row.cadastral_number || "\u2014"
+                            : row.cadastral_number || "\u2014"}
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {row.district || "\u2014"}

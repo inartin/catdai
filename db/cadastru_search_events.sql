@@ -10,6 +10,7 @@ create table if not exists cadastru_search_events (
   city             text,
   district         text,
   cadastral_number text,
+  search_address   text,
   result_type      text check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
   lookup_source    text check (lookup_source in ('api', 'local')),
   valuation_clicked_at timestamptz,
@@ -25,6 +26,9 @@ alter table if exists cadastru_search_events
 
 alter table if exists cadastru_search_events
   add column if not exists cadastral_number text;
+
+alter table if exists cadastru_search_events
+  add column if not exists search_address text;
 
 alter table if exists cadastru_search_events
   add column if not exists result_type text;

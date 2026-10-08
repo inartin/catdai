@@ -96,8 +96,11 @@ function formatHistoryPropertyDetails(row, t) {
   ].filter(Boolean).join(" · ") || "—";
 }
 
-function formatHistoryResult(row, lang) {
-  if (row.type === "cadastru") return row.cadastralNumber || "—";
+function formatHistoryResult(row, lang, t) {
+  if (row.type === "cadastru") {
+    return row.cadastralNumber || row.searchAddress ||
+      (row.resultType ? t(`profile.historyCadastruResultType.${row.resultType}`) : "—");
+  }
   return formatHistoryPrice(row.estimatedPrice, lang);
 }
 
@@ -653,8 +656,8 @@ export default function ProfilePage() {
                                     {formatHistoryPropertyDetails(row, t)}
                                   </div>
                                 </td>
-                                <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-gray-900">
-                                  {formatHistoryResult(row, lang)}
+                                <td className="max-w-[20rem] break-words px-4 py-3 text-right font-semibold text-gray-900">
+                                  {formatHistoryResult(row, lang, t)}
                                 </td>
                               </tr>
                             );

@@ -160,6 +160,6 @@ export async function fetchExternalNearbyData(addressFields) {
     addressFields,
     process.env.NEARBY_EXTERNAL_API_URL,
     "cadastru_nearby",
-    { trackUsage: false, timeoutMs: 70_000, preserveWorkerError: true }
+    { timeoutMs: 70_000, preserveWorkerError: true }
   );
 }

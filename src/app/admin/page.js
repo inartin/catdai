@@ -189,7 +189,8 @@ function fmtExternalApiUsageSummary(usage) {
   const byService = usage.byService || {};
   const listing999 = byService["999_listing"]?.total || 0;
   const cadastru = (byService.cadastru_number?.total || 0) + (byService.cadastru_address?.total || 0);
-  return `999 ${fmtNum(listing999)} / cadastru ${fmtNum(cadastru)} · ${fmtNum(usage.failure)} failed`;
+  const nearby = byService.cadastru_nearby?.total || 0;
+  return `999 ${fmtNum(listing999)} / cadastru ${fmtNum(cadastru)} / nearby ${fmtNum(nearby)} · ${fmtNum(usage.failure)} failed`;
 }
 
 function fmtPaidUserSummary(paidUsers) {
@@ -207,6 +208,7 @@ function fmtExternalApiService(service) {
   if (service === "999_listing") return "999 listing";
   if (service === "cadastru_number") return "Cadastru number";
   if (service === "cadastru_address") return "Cadastru address";
+  if (service === "cadastru_nearby") return "Nearby places";
   return service || "\u2014";
 }
 
@@ -1394,9 +1396,9 @@ export default function AdminDashboard() {
               <div className="px-5 py-8 text-center text-gray-400">No external API calls found</div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-3 border-b border-gray-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 border-b border-gray-100">
                   {Object.entries(s.externalApiUsage.byService || {}).map(([service, item]) => (
-                    <div key={service} className="px-5 py-4 md:border-r md:last:border-r-0 border-gray-100">
+                    <div key={service} className="border-gray-100 px-5 py-4 sm:odd:border-r xl:border-r xl:last:border-r-0">
                       <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
                         {fmtExternalApiService(service)}
                       </p>

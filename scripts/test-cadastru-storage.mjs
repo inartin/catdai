@@ -767,8 +767,10 @@ delete legacyNearbyData.categories.food;
 assert.equal(nearbyParsing.validNearbyResult(legacyNearbyData), false, "nearby without food must be refreshed");
 assert.equal(nearbyParsing.validNearbyResult(nearbyData), true);
 await storage.persistCadastruNearby(await storage.getCadastruRecordByNumber(nearbyNumber), legacyNearbyData);
+const nearbyUsage = await load("@/lib/external-api-usage");
+const nearbyEventsBefore = tables.external_api_usage_events.length;
 const signedNearby = await load("@/lib/cadastru-external-api", {
-  "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => { throw new Error("nearby must not use cadastru telemetry constraints"); } },
+  "@/lib/external-api-usage": nearbyUsage,
 }, {
   process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "nearby-test" } },
   fetch: async (url, options) => {
@@ -782,14 +784,23 @@ const signedNearby = await load("@/lib/cadastru-external-api", {
   },
 });
 assert.deepEqual(clone(await signedNearby.fetchExternalNearbyData({ city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" })), nearbyData);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(tables.external_api_usage_events.length, nearbyEventsBefore + 1);
+assert.equal(tables.external_api_usage_events.at(-1).service, "cadastru_nearby");
+assert.equal(tables.external_api_usage_events.at(-1).status, "success");
 const failedSignedNearby = await load("@/lib/cadastru-external-api", {
-  "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => {} },
+  "@/lib/external-api-usage": nearbyUsage,
 }, {
   process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "nearby-test" } },
   fetch: async () => Response.json({ ok: false, error: "routing_unavailable", message: "Walking routes are temporarily unavailable." }, { status: 503 }),
 });
 await assert.rejects(failedSignedNearby.fetchExternalNearbyData({ city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" }),
   (error) => error.code === "routing_unavailable" && error.status === 503);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(tables.external_api_usage_events.length, nearbyEventsBefore + 2);
+assert.equal(tables.external_api_usage_events.at(-1).service, "cadastru_nearby");
+assert.equal(tables.external_api_usage_events.at(-1).status, "failure");
+assert.equal(tables.external_api_usage_events.at(-1).error_code, "routing_unavailable");
 let nearbyCalls = 0;
 const nearbyRoute = await load("src/app/api/cadastru/nearby/route.js", {
   "next/server": { NextResponse: { json: (data, options = {}) => Response.json(data, options) } },

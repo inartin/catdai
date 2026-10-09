@@ -503,6 +503,7 @@ function buildExternalApiUsageStats(rows, events) {
     "999_listing": emptyService(),
     cadastru_number: emptyService(),
     cadastru_address: emptyService(),
+    cadastru_nearby: emptyService(),
   };
 
   for (const row of rows) {

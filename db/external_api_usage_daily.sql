@@ -5,12 +5,18 @@
 
 create table if not exists external_api_usage_daily (
   usage_date date not null default current_date,
-  service    text not null check (service in ('999_listing', 'cadastru_number', 'cadastru_address')),
+  service    text not null check (service in ('999_listing', 'cadastru_number', 'cadastru_address', 'cadastru_nearby')),
   status     text not null check (status in ('success', 'failure')),
   count      integer not null default 0 check (count >= 0),
   updated_at timestamptz not null default now(),
   primary key (usage_date, service, status)
 );
+
+alter table public.external_api_usage_daily
+  drop constraint if exists external_api_usage_daily_service_check;
+alter table public.external_api_usage_daily
+  add constraint external_api_usage_daily_service_check
+  check (service in ('999_listing', 'cadastru_number', 'cadastru_address', 'cadastru_nearby'));
 
 create index if not exists idx_external_api_usage_daily_service_date
   on external_api_usage_daily (service, usage_date desc);
@@ -26,7 +32,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if p_service not in ('999_listing', 'cadastru_number', 'cadastru_address') then
+  if p_service not in ('999_listing', 'cadastru_number', 'cadastru_address', 'cadastru_nearby') then
     return;
   end if;
 

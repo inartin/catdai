@@ -5,7 +5,7 @@
 
 create table if not exists public.external_api_usage_events (
   id               bigserial primary key,
-  service          text not null check (service in ('999_listing', 'cadastru_number', 'cadastru_address')),
+  service          text not null check (service in ('999_listing', 'cadastru_number', 'cadastru_address', 'cadastru_nearby')),
   status           text not null check (status in ('success', 'failure')),
   endpoint         text,
   request_payload  jsonb,
@@ -19,6 +19,12 @@ create table if not exists public.external_api_usage_events (
   user_id          uuid references auth.users(id) on delete set null,
   created_at       timestamptz not null default now()
 );
+
+alter table public.external_api_usage_events
+  drop constraint if exists external_api_usage_events_service_check;
+alter table public.external_api_usage_events
+  add constraint external_api_usage_events_service_check
+  check (service in ('999_listing', 'cadastru_number', 'cadastru_address', 'cadastru_nearby'));
 
 -- Also upgrade existing installations; original failure status/counters stay unchanged.
 alter table public.external_api_usage_events

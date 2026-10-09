@@ -1,7 +1,7 @@
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
-const SERVICES = new Set(["999_listing", "cadastru_number", "cadastru_address"]);
+const SERVICES = new Set(["999_listing", "cadastru_number", "cadastru_address", "cadastru_nearby"]);
 const STATUSES = new Set(["success", "failure"]);
 const DIAGNOSTIC_RESPONSE_HEADERS = [
   "content-type",

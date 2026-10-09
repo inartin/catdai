@@ -468,6 +468,7 @@ export async function persistCadastruRecord(payload, options = {}) {
           ...(Object.hasOwn(row.raw_payload, "map_location") ? { map_location: row.raw_payload.map_location } : {}),
           ...(cleanText(row.raw_payload.district) ? { district: row.raw_payload.district } : {}),
           ...(row.raw_payload.district_lookup_checked === true ? { district_lookup_checked: true } : {}),
+          ...(row.raw_payload.nearby ? { nearby: row.raw_payload.nearby } : {}),
         }
       : null;
     const retainedHash = retainedPayload ? hashPayload(retainedPayload) : null;
@@ -585,6 +586,25 @@ export async function getCadastruRecordByNumber(cadastralNumber, options = {}) {
     logDbError("number lookup failed", error);
     return null;
   }
+}
+
+export async function persistCadastruNearby(entry, nearby, address = null) {
+  const payload = { ...entry.payload, nearby };
+  const updatedEntry = { ...entry, payload };
+  if (payload.cadastral_number) {
+    const saved = await persistCadastruRecord(payload, {
+      countLookup: false,
+      lookupSource: entry.lookupSource,
+      expiresAt: entry.expiresAt,
+      requestAddress: address,
+    });
+    if (saved) updatedEntry.payload = { ...saved, nearby };
+    await writeCadastruCache("number", payload.cadastral_number, updatedEntry);
+  }
+  for (const alias of new Set([address, payload.request_address, payload.resolved_address].filter(Boolean))) {
+    await saveAddressAlias(alias, updatedEntry);
+  }
+  return updatedEntry.payload;
 }
 
 async function resolveAddressEntry(entry) {

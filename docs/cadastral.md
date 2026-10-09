@@ -41,6 +41,8 @@ Implemented and active, with partial fallback.
 - Successful cadastral-number searches and full-access address searches navigate to `/{lang}/cadastru/rezultat?cadastral_number=...`; full-access address handoffs also carry a matched sector when the address API provides one, so the later number lookup cannot lose it. Locked address-search previews use a client-side preview handoff so the discovered cadastral number is not exposed in the URL.
 - `/cadastru/rezultat` fetches `/api/cadastral` with an optional bearer token, uses the shared back button from the estimation form, renders the shared `CadastralDataCard` component used by the evaluation result page, and is marked `noindex` because each URL is generated from a user query.
 - When the API provides valid numeric `map_location.latitude` and `map_location.longitude`, the standalone result page shows an embedded Google satellite map pinned to those coordinates, including in masked previews. It uses a top-level location first, then a nested building/apartment location, then the first valid location in `buildings[]` or `lands[]`. The map sits below the cadastral card on desktop and mobile and shares its exact width, including compact partial-result cards. Null, missing, or invalid coordinates hide the map when no valid property location is available. The PNG export still contains only the cadastral data card. The iframe policy allows `https://www.google.com/maps`.
+- After the main result has rendered, the result page requests `/api/cadastru/nearby`. The route reads the existing successful Cadastru snapshot, returns saved `nearby` data that includes the current categories, or calls the signed worker `POST /v1/nearby/address` with its resolved building address. Older Redis/DB results without nearby data or the `food` category are enriched on first view. Missing addresses or worker failures leave the main Cadastru result intact.
+- A separate card below the main result shows up to three walkable schools, supermarkets, pharmacies, food places, parks, and public transport stops per category, with walking time and distance. The worker searches mapped places within 2 km and supplies `© OpenStreetMap contributors` attribution. Only categories with results are listed.
 - Successful apartment results in Chișinău or Durlești show a bottom valuation CTA. It opens `/estimeaza` with the available city, matching sector from the API's `district` or `form_fields.district`, area, floor, total-floor, and unmasked cadastral number prefilled; the cadastral shortcut opens when a number is present so the user can review it before completing the remaining valuation criteria. Masked previews retain the API's district for this handoff. Sector matching ignores case and Romanian diacritic variants.
 - The result's valuation CTA records a click against the originating `cadastru_search_events` row. A signed, seven-day journey token follows the user through `/estimeaza` to `/evaluare`; `/api/estimate` marks that row completed only after a successful full-access sale evaluation. Blurred evaluation previews do not count as completed. Tracking is skipped in local development alongside Cadastru search events. Reapply `db/cadastru_search_events.sql` before deploying this flow.
 - The result page includes a localized "save image" action that exports the cadastral result card into a downloadable PNG using the desktop two-column layout, even when the page is opened on mobile.
@@ -100,6 +102,8 @@ Implemented and active, with partial fallback.
 - Upstream Geodata calls use a 10 second timeout; Nominatim fallback uses 5 seconds.
 - Timeout logs include the failing stage: `geodata_wfs`, `geodata_wms`, or `nominatim_reverse`.
 - The external cadastru worker uses HMAC headers `X-Catdai-Timestamp` and `X-Catdai-Signature` for AWS-to-worker calls and should listen on `127.0.0.1` when exposed through Cloudflare Tunnel. The main app reads `CADASTRU_EXTERNAL_API_BASE_URL` plus `CADASTRU_EXTERNAL_API_SECRET`, with `CADASTRU_EXTERNAL_API_URL` and `CADASTRU_EXTERNAL_ADDRESS_API_URL` available as explicit endpoint overrides.
+- Nearby lookup uses the same worker base URL and HMAC secret. `NEARBY_EXTERNAL_API_URL` can override its endpoint when the base URL is unset.
+- Local development calls the configured signed worker too. A nearby 503 does not block the Cadastru result; the app log includes the worker's error code, HTTP status, and message to distinguish location, map, routing, and worker availability failures.
 
 ## Related Files
 - `src/app/api/cadastral/route.js`
@@ -120,6 +124,7 @@ Implemented and active, with partial fallback.
 - `src/components/AuthRequiredModal.js`
 - `src/components/BackButton.js`
 - `src/components/CadastralDataCard.js`
+- `src/components/CadastruNearbyCard.js`
 - `src/components/PropertyForm.js`
 - `src/lib/validation.js`
 - `db/cadastru_search_events.sql`

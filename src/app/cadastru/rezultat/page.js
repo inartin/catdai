@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BackButton from "@/components/BackButton";
 import CadastralDataCard from "@/components/CadastralDataCard";
+import CadastruNearbyCard from "@/components/CadastruNearbyCard";
 import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
@@ -14,6 +15,7 @@ import { useAuth } from "@/context/AuthContext";
 import { matchCity, validateCadastralNumber } from "@/lib/validation";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
 import { resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
+import { validNearbyResult } from "@/lib/cadastru-nearby";
 
 const inFlightCadastralLookups = new Map();
 const inFlightAddressLookups = new Map();
@@ -423,6 +425,7 @@ function CadastruResultContent() {
   const isHistoryAddress = searchParams.get("history") === "1";
   const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
   const loadedRequestKey = useRef("");
+  const loadedNearbyKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("cadastru.loginToUse");
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
@@ -431,6 +434,7 @@ function CadastruResultContent() {
     error: "",
     data: null,
   });
+  const [nearbyState, setNearbyState] = useState({ key: "", data: null, loading: false, error: false });
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
   const purchaseOffer = state.data?.access_limit?.purchase || null;
   const cadastralCardRef = useRef(null);
@@ -469,6 +473,16 @@ function CadastruResultContent() {
         output: "embed",
       })}`
     : null;
+  const nearbyAddress = source === "address"
+    ? state.data?.request_address || state.data?.resolved_address || (savedAddress
+      ? `${savedAddress.city}, ${savedAddress.road_type} ${savedAddress.street} ${savedAddress.house_number}${savedAddress.apartment_number ? ` ap ${savedAddress.apartment_number}` : ""}`
+      : "")
+    : "";
+  const nearbyNumber = cadastralNumber || (!state.data?.locked_sections?.cadastral_number ? state.data?.cadastral_number : "") || "";
+  const nearbyKey = `${nearbyAddress || nearbyNumber}|${isAuthenticated ? "authenticated" : "anonymous"}|${skipCache}`;
+  const nearbyData = (validNearbyResult(state.data?.nearby) ? state.data.nearby : null)
+    || (nearbyState.key === nearbyKey ? nearbyState.data : null);
+  const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);
 
   useEffect(() => {
     if (!cadastralNumber && !isAddressPreviewHandoff && !savedAddressKey) return;
@@ -602,6 +616,42 @@ function CadastruResultContent() {
     if (isAuthenticated) setIsAuthModalOpen(false);
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (!state.data) return;
+    if (validNearbyResult(state.data.nearby) || !nearbySearchAvailable) return;
+    if (loadedNearbyKey.current === nearbyKey) return;
+
+    let active = true;
+    let frame;
+    // Start the slower nearby request after the cadastral card has painted.
+    const firstFrame = requestAnimationFrame(() => {
+      if (!active) return;
+      setNearbyState({ key: nearbyKey, data: null, loading: true, error: false });
+      frame = requestAnimationFrame(async () => {
+        loadedNearbyKey.current = nearbyKey;
+        try {
+          const response = await fetch("/api/cadastru/nearby", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...(nearbyAddress ? { address: nearbyAddress } : {}),
+              ...(validateCadastralNumber(nearbyNumber).valid ? { cadastral_number: nearbyNumber } : {}),
+            }),
+          });
+          const result = await response.json();
+          if (active) setNearbyState({ key: nearbyKey, data: response.ok ? result.nearby : null, loading: false, error: !response.ok });
+        } catch {
+          if (active) setNearbyState({ key: nearbyKey, data: null, loading: false, error: true });
+        }
+      });
+    });
+    return () => {
+      active = false;
+      cancelAnimationFrame(firstFrame);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, state.data]);
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <AuthRequiredModal
@@ -702,6 +752,13 @@ function CadastruResultContent() {
                 )}
               </CadastralDataCard>
             </div>
+          )}
+          {state.data && (
+            <CadastruNearbyCard
+              nearby={nearbyData}
+              loading={nearbyState.key === nearbyKey && nearbyState.loading}
+              unavailable={!nearbySearchAvailable || (nearbyState.key === nearbyKey && nearbyState.error)}
+            />
           )}
           {valuationPrefill && (
             <div className="mt-8 flex justify-center">

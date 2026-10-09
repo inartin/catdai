@@ -38,7 +38,8 @@ function externalError(message, options = {}) {
 }
 
 async function fetchSignedExternalCadastru(path, body, explicitUrl, service, options = {}) {
-  const { url, secret, timeoutMs } = externalCadastruConfig(path, explicitUrl);
+  const { url, secret, timeoutMs: configuredTimeoutMs } = externalCadastruConfig(path, explicitUrl);
+  const timeoutMs = options.timeoutMs || configuredTimeoutMs;
   const shouldTrackUsage = options.trackUsage !== false;
   if (!url || !secret) {
     throw externalError("External cadastru API is not configured", {
@@ -106,7 +107,9 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
 
   const unavailable = response.status >= 500 || response.status === 429 ||
     payload?.error === "service_unavailable" || (response.ok && (!payload?.ok || !payload?.data));
-  const code = unavailable ? "service_unavailable" : payload?.error || `external_cadastru_http_${response.status}`;
+  const code = unavailable
+    ? (options.preserveWorkerError && payload?.error) || "service_unavailable"
+    : payload?.error || `external_cadastru_http_${response.status}`;
   const message = payload?.message || `External cadastru API returned ${response.status}`;
   const fallbackEligible = unavailable;
   const usageWrite = shouldTrackUsage ? trackExternalApiUsage(service, "failure", {
@@ -148,5 +151,15 @@ export async function fetchExternalCadastruAddressData(addressFields, options = 
     process.env.CADASTRU_EXTERNAL_ADDRESS_API_URL,
     "cadastru_address",
     options
+  );
+}
+
+export async function fetchExternalNearbyData(addressFields) {
+  return fetchSignedExternalCadastru(
+    "v1/nearby/address",
+    addressFields,
+    process.env.NEARBY_EXTERNAL_API_URL,
+    "cadastru_nearby",
+    { trackUsage: false, timeoutMs: 70_000, preserveWorkerError: true }
   );
 }

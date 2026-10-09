@@ -735,3 +735,114 @@ for (const mode of ["empty", "http503", "timeout", "session", "apex", "geodata",
   }
 }
 console.log("Outage regressions passed: real no-data, provider failures, worker transport, apartment telemetry, no suggestions and successful fallback.");
+
+// Nearby enrichment runs after the cadastral result and keeps the original snapshot expiry.
+const nearbyNumber = "0100106.131.01.099";
+const nearbyParsing = await load("@/lib/cadastru-nearby");
+assert.deepEqual(clone(nearbyParsing.nearbyAddressFromCadastru({
+  apartment: { address: "mun. Chișinău, sect. Botanica, bd. Decebal 63, ap. 99" },
+})), { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" });
+assert.deepEqual(clone(nearbyParsing.nearbyAddressFromCadastru({
+  request_address: "Chișinău, str 31 August 1989 14 ap 7",
+})), { city: "Chișinău", road_type: "strada", street: "31 August 1989", house_number: "14" });
+assert.deepEqual(clone(nearbyParsing.nearbyAddressFromCadastru({
+  matched_address: "Chișinău, Bulevard Decebal, 63",
+})), { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" });
+await storage.persistCadastruRecord({ cadastral_number: nearbyNumber,
+  apartment: { address: "mun. Chișinău, sect. Botanica, bd. Decebal 63, ap. 99", area_m2: 41 },
+}, { officialFetch: true });
+const nearbyRow = tables.cadastru_records.find((row) => row.cadastral_number === nearbyNumber);
+const nearbyExpiry = nearbyRow.next_refresh_after;
+const nearbyData = {
+  attribution: "© OpenStreetMap contributors",
+  categories: Object.fromEntries(["schools", "supermarkets", "pharmacies", "food", "parks", "public_transport"]
+    .map((category) => [category, { available: ["schools", "food"].includes(category), places: category === "schools"
+      ? [{ name: "School", osm_type: "node", osm_id: 1, walking_distance_m: 250, walking_duration_min: 3 }]
+      : category === "food"
+        ? [{ name: "Cafe", food_type: "cafe", osm_type: "node", osm_id: 2, walking_distance_m: 350, walking_duration_min: 4 }]
+        : [] }])),
+};
+const legacyNearbyData = { ...nearbyData, categories: { ...nearbyData.categories } };
+delete legacyNearbyData.categories.food;
+assert.equal(nearbyParsing.validNearbyResult(legacyNearbyData), false, "nearby without food must be refreshed");
+assert.equal(nearbyParsing.validNearbyResult(nearbyData), true);
+await storage.persistCadastruNearby(await storage.getCadastruRecordByNumber(nearbyNumber), legacyNearbyData);
+const signedNearby = await load("@/lib/cadastru-external-api", {
+  "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => { throw new Error("nearby must not use cadastru telemetry constraints"); } },
+}, {
+  process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "nearby-test" } },
+  fetch: async (url, options) => {
+    assert.equal(url, "https://worker.test/v1/nearby/address");
+    assert.equal(options.method, "POST");
+    assert.deepEqual(JSON.parse(options.body), { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" });
+    const signature = crypto.createHmac("sha256", "nearby-test")
+      .update(options.headers["X-Catdai-Timestamp"]).update("\n").update(options.body).digest("hex");
+    assert.equal(options.headers["X-Catdai-Signature"], `sha256=${signature}`);
+    return Response.json({ ok: true, data: nearbyData });
+  },
+});
+assert.deepEqual(clone(await signedNearby.fetchExternalNearbyData({ city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" })), nearbyData);
+const failedSignedNearby = await load("@/lib/cadastru-external-api", {
+  "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => {} },
+}, {
+  process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "nearby-test" } },
+  fetch: async () => Response.json({ ok: false, error: "routing_unavailable", message: "Walking routes are temporarily unavailable." }, { status: 503 }),
+});
+await assert.rejects(failedSignedNearby.fetchExternalNearbyData({ city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" }),
+  (error) => error.code === "routing_unavailable" && error.status === 503);
+let nearbyCalls = 0;
+const nearbyRoute = await load("src/app/api/cadastru/nearby/route.js", {
+  "next/server": { NextResponse: { json: (data, options = {}) => Response.json(data, options) } },
+  "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true }) }) },
+  "@/lib/cadastru-records": storage,
+  "@/lib/cadastru-external-api": { fetchExternalNearbyData: async (fields) => {
+    nearbyCalls++;
+    assert.deepEqual(clone(fields), { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" });
+    return nearbyData;
+  } },
+});
+const nearbyRequest = () => new Request("http://localhost/api/cadastru/nearby", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ cadastral_number: nearbyNumber }),
+});
+assert.equal((await nearbyRoute.POST(nearbyRequest())).status, 200);
+assert.equal(nearbyCalls, 1);
+assert.equal(nearbyRow.raw_payload.nearby.categories.food.places[0].food_type, "cafe", "old Redis nearby data is replaced");
+assert.equal(nearbyRow.next_refresh_after, nearbyExpiry, "nearby must not extend the official snapshot TTL");
+assert.deepEqual(clone(nearbyRow.raw_payload.nearby), nearbyData, "nearby is stored in the cadastru JSONB payload");
+assert.deepEqual(clone((await caching.readCadastruCache("number", nearbyNumber)).payload.nearby), nearbyData);
+assert.equal((await nearbyRoute.POST(nearbyRequest())).status, 200);
+cache.clear();
+assert.equal((await nearbyRoute.POST(nearbyRequest())).status, 200);
+assert.equal(nearbyCalls, 1, "Redis and DB hits must reuse nearby data");
+nearbyRow.raw_payload.nearby = legacyNearbyData;
+cache.clear();
+assert.equal((await nearbyRoute.POST(nearbyRequest())).status, 200);
+assert.equal(nearbyCalls, 2, "old DB nearby data must be refreshed");
+assert.deepEqual(clone(nearbyRow.raw_payload.nearby), nearbyData);
+
+const fallbackNumber = "0100106.131.01.098";
+const unrelatedAddress = "Chișinău, bd Unrelated 111 ap 98";
+await storage.persistCadastruRecord({ cadastral_number: fallbackNumber,
+  apartment: { address: "mun. Chișinău, bd. Decebal 63, ap. 98" },
+}, { officialFetch: true });
+const fallbackResponse = await nearbyRoute.POST(new Request("http://localhost/api/cadastru/nearby", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ address: unrelatedAddress, cadastral_number: fallbackNumber }),
+}));
+assert.equal(fallbackResponse.status, 200, "a number-backed result can recover from a missing old address alias");
+assert.equal(await storage.getCadastruRecordByAddress(unrelatedAddress), null, "unverified fallback addresses must not become aliases");
+
+const nearbyAggregateAddress = "Chișinău, bd Decebal 63";
+await storage.persistCadastruAddressResult({ status: "success", matched_address: nearbyAggregateAddress,
+  lands: [{ cadastral_number: "0100106.131", address: nearbyAggregateAddress }],
+  buildings: [{ cadastral_number: "0100106.131.01", address: nearbyAggregateAddress }],
+}, { requestAddress: nearbyAggregateAddress, officialFetch: true });
+const aggregateEntry = await storage.getCadastruRecordByAddress(nearbyAggregateAddress);
+const aggregateExpiry = aggregateEntry.expiresAt;
+await storage.persistCadastruNearby(aggregateEntry, nearbyData, nearbyAggregateAddress);
+cache.clear();
+const restoredAggregate = await storage.getCadastruRecordByAddress(nearbyAggregateAddress);
+assert.equal(restoredAggregate.expiresAt, aggregateExpiry);
+assert.deepEqual(clone(restoredAggregate.payload.nearby), nearbyData, "address aggregates restore nearby from DB");
+console.log("Nearby regressions passed: signed lookup input, legacy backfill, Redis/DB reuse and unchanged expiry.");

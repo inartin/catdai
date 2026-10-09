@@ -857,3 +857,76 @@ const restoredAggregate = await storage.getCadastruRecordByAddress(nearbyAggrega
 assert.equal(restoredAggregate.expiresAt, aggregateExpiry);
 assert.deepEqual(clone(restoredAggregate.payload.nearby), nearbyData, "address aggregates restore nearby from DB");
 console.log("Nearby regressions passed: signed lookup input, legacy backfill, Redis/DB reuse and unchanged expiry.");
+
+const transportParsing = await load("@/lib/cadastru-public-transport");
+assert.deepEqual(clone(transportParsing.publicTransportInputFromCadastru({
+  map_location: { latitude: 47.02, longitude: 28.83 },
+  apartment: { address: "mun. Chișinău, com. Tohatin, sat. Tohatin, str. Păcii 1" },
+  form_fields: { city: "Chișinău" },
+})), { city: "Tohatin", road_type: "strada", street: "Păcii", house_number: "1" }, "the specific house address takes precedence over property coordinates");
+const transportAddress = { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" };
+assert.deepEqual(clone(transportParsing.publicTransportInputFromCadastru({
+  map_location: { latitude: 47.02, longitude: 28.83 },
+  apartment: { address: "mun. Chișinău, bd. Decebal 63, ap. 59" },
+})), transportAddress, "Decebal 63 is sent as an address even when a stored coordinate points to the city center");
+assert.deepEqual(clone(transportParsing.publicTransportInputFromCadastru({
+  map_location: { latitude: null, longitude: 28.83 }, form_fields: { city: "Orhei" },
+})), { locality: "Orhei" }, "invalid coordinates fall back to a locality");
+assert.equal(transportParsing.publicTransportInputFromCadastru({}), null);
+const transportNumber = "0100106.131.01.097";
+await storage.persistCadastruRecord({ cadastral_number: transportNumber,
+  map_location: { latitude: 47.02, longitude: 28.83 },
+  apartment: { address: "mun. Chișinău, bd. Decebal 63, ap. 97" },
+}, { officialFetch: true });
+const transportData = {
+  location: { latitude: 46.9990547, longitude: 28.8602536, source: "nominatim" },
+  scope: "nearby", search_radius_m: 750,
+  route_groups: [
+    { mode: "trolleybus", routes: [{ ref: "4", name: null, source: "chisinau_transport" }] },
+    { mode: "bus", routes: [{ ref: "19", name: null, source: "chisinau_transport" }] },
+  ],
+  sources: ["chisinau_transport"], attribution: "© OpenStreetMap contributors",
+};
+assert.equal(transportParsing.validPublicTransportResult(transportData), true);
+assert.equal(transportParsing.validPublicTransportResult({ stops: [], locality_routes: [] }), false,
+  "the old stop-based response cannot be rendered as grouped routes");
+const signedTransport = await load("@/lib/cadastru-external-api", {
+  "@/lib/external-api-usage": nearbyUsage,
+}, {
+  process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "transport-test" } },
+  fetch: async (url, options) => {
+    assert.equal(url, "https://worker.test/v1/public-transport");
+    assert.deepEqual(JSON.parse(options.body), transportAddress);
+    const signature = crypto.createHmac("sha256", "transport-test")
+      .update(options.headers["X-Catdai-Timestamp"]).update("\n").update(options.body).digest("hex");
+    assert.equal(options.headers["X-Catdai-Signature"], `sha256=${signature}`);
+    return Response.json({ ok: true, data: transportData });
+  },
+});
+assert.deepEqual(clone(await signedTransport.fetchExternalPublicTransportData(transportAddress)), transportData);
+let transportCalls = 0;
+const transportRoute = await load("src/app/api/cadastru/public-transport/route.js", {
+  "next/server": { NextResponse: { json: (data, options = {}) => Response.json(data, options) } },
+  "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true }) }) },
+  "@/lib/cadastru-records": storage,
+  "@/lib/cadastru-external-api": { fetchExternalPublicTransportData: async (input) => {
+    transportCalls++;
+    assert.deepEqual(clone(input), transportAddress);
+    return transportData;
+  } },
+});
+const transportRequest = (number) => new Request("http://localhost/api/cadastru/public-transport", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ cadastral_number: number }),
+});
+const transportResponse = await transportRoute.POST(transportRequest(transportNumber));
+assert.equal(transportResponse.status, 200);
+assert.deepEqual(clone((await transportResponse.json()).public_transport), transportData);
+assert.equal(transportCalls, 1);
+assert.equal((await transportRoute.POST(transportRequest("bad"))).status, 400);
+assert.equal((await transportRoute.POST(transportRequest("0100106.131.01.096"))).status, 404);
+const transportMissingNumber = "0100106.131.01.096";
+await storage.persistCadastruRecord({ cadastral_number: transportMissingNumber }, { officialFetch: true });
+assert.equal((await transportRoute.POST(transportRequest(transportMissingNumber))).status, 422, "records without a location or locality do not call the worker");
+assert.equal(transportCalls, 1);
+console.log("Public transport regressions passed: address priority, signed worker request and isolated route response.");

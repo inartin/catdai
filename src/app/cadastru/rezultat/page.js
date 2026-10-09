@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import BackButton from "@/components/BackButton";
 import CadastralDataCard from "@/components/CadastralDataCard";
 import CadastruNearbyCard from "@/components/CadastruNearbyCard";
+import CadastruPublicTransportCard from "@/components/CadastruPublicTransportCard";
 import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
@@ -426,6 +427,7 @@ function CadastruResultContent() {
   const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
   const loadedRequestKey = useRef("");
   const loadedNearbyKey = useRef("");
+  const loadedTransportKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("cadastru.loginToUse");
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
@@ -435,6 +437,7 @@ function CadastruResultContent() {
     data: null,
   });
   const [nearbyState, setNearbyState] = useState({ key: "", data: null, loading: false, error: false });
+  const [transportState, setTransportState] = useState({ key: "", data: null, loading: false, error: false });
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
   const purchaseOffer = state.data?.access_limit?.purchase || null;
   const cadastralCardRef = useRef(null);
@@ -483,6 +486,8 @@ function CadastruResultContent() {
   const nearbyData = (validNearbyResult(state.data?.nearby) ? state.data.nearby : null)
     || (nearbyState.key === nearbyKey ? nearbyState.data : null);
   const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);
+  const nearbyDone = !nearbySearchAvailable || Boolean(validNearbyResult(state.data?.nearby))
+    || Boolean(nearbyState.key === nearbyKey && !nearbyState.loading && (nearbyState.data || nearbyState.error));
 
   useEffect(() => {
     if (!cadastralNumber && !isAddressPreviewHandoff && !savedAddressKey) return;
@@ -652,6 +657,40 @@ function CadastruResultContent() {
     };
   }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, state.data]);
 
+  useEffect(() => {
+    if (!state.data || !nearbyDone || !nearbySearchAvailable) return;
+    if (loadedTransportKey.current === nearbyKey) return;
+
+    let active = true;
+    let frame;
+    const firstFrame = requestAnimationFrame(() => {
+      if (!active) return;
+      setTransportState({ key: nearbyKey, data: null, loading: true, error: false });
+      frame = requestAnimationFrame(async () => {
+        loadedTransportKey.current = nearbyKey;
+        try {
+          const response = await fetch("/api/cadastru/public-transport", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...(nearbyAddress ? { address: nearbyAddress } : {}),
+              ...(validateCadastralNumber(nearbyNumber).valid ? { cadastral_number: nearbyNumber } : {}),
+            }),
+          });
+          const result = await response.json();
+          if (active) setTransportState({ key: nearbyKey, data: response.ok ? result.public_transport : null, loading: false, error: !response.ok });
+        } catch {
+          if (active) setTransportState({ key: nearbyKey, data: null, loading: false, error: true });
+        }
+      });
+    });
+    return () => {
+      active = false;
+      cancelAnimationFrame(firstFrame);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [nearbyAddress, nearbyDone, nearbyKey, nearbyNumber, nearbySearchAvailable, state.data]);
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <AuthRequiredModal
@@ -789,6 +828,13 @@ function CadastruResultContent() {
                 </svg>
               </button>
             </div>
+          )}
+          {state.data && (
+            <CadastruPublicTransportCard
+              transport={transportState.key === nearbyKey ? transportState.data : null}
+              loading={nearbySearchAvailable && (!nearbyDone || transportState.key !== nearbyKey || transportState.loading)}
+              unavailable={!nearbySearchAvailable || (transportState.key === nearbyKey && transportState.error)}
+            />
           )}
           {state.data && (
             <div

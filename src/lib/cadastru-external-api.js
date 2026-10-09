@@ -163,3 +163,13 @@ export async function fetchExternalNearbyData(addressFields) {
     { timeoutMs: 70_000, preserveWorkerError: true }
   );
 }
+
+export async function fetchExternalPublicTransportData(location) {
+  return fetchSignedExternalCadastru(
+    "v1/public-transport",
+    location,
+    process.env.PUBLIC_TRANSPORT_EXTERNAL_API_URL,
+    "cadastru_nearby",
+    { timeoutMs: 70_000, preserveWorkerError: true }
+  );
+}

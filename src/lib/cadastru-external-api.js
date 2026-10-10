@@ -20,11 +20,11 @@ function resolveEndpointUrl(path, explicitUrl) {
   return explicitUrl || "";
 }
 
-function externalCadastruConfig(path, explicitUrl) {
+function externalCadastruConfig(path, explicitUrl, defaultTimeoutMs = DEFAULT_TIMEOUT_MS) {
   const url = resolveEndpointUrl(path, explicitUrl);
   const secret = process.env.CADASTRU_EXTERNAL_API_SECRET || "";
-  const timeoutMs = Number(process.env.CADASTRU_EXTERNAL_API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
-  return { url, secret, timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS };
+  const timeoutMs = Number(process.env.CADASTRU_EXTERNAL_API_TIMEOUT_MS || defaultTimeoutMs);
+  return { url, secret, timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : defaultTimeoutMs };
 }
 
 function externalError(message, options = {}) {
@@ -33,12 +33,15 @@ function externalError(message, options = {}) {
   error.status = options.status || null;
   error.fallbackEligible = Boolean(options.fallbackEligible);
   error.suggestions = Array.isArray(options.suggestions) ? options.suggestions.filter((value) => typeof value === "string" && value.length <= 80) : [];
+  error.addressSuggestions = Array.isArray(options.addressSuggestions) ? options.addressSuggestions
+    .filter((value) => ["city", "road_type", "street", "house_number", "apartment_number"].every((key) => typeof value?.[key] === "string"))
+    .slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) => ({ city, road_type, street, house_number, apartment_number })) : [];
   error.usageEventId = options.usageEventId || null;
   return error;
 }
 
 async function fetchSignedExternalCadastru(path, body, explicitUrl, service, options = {}) {
-  const { url, secret, timeoutMs: configuredTimeoutMs } = externalCadastruConfig(path, explicitUrl);
+  const { url, secret, timeoutMs: configuredTimeoutMs } = externalCadastruConfig(path, explicitUrl, options.defaultTimeoutMs);
   const timeoutMs = options.timeoutMs || configuredTimeoutMs;
   const shouldTrackUsage = options.trackUsage !== false;
   if (!url || !secret) {
@@ -129,6 +132,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     code,
     status: response.status,
     suggestions: payload?.suggestions,
+    addressSuggestions: payload?.address_suggestions,
     fallbackEligible,
     usageEventId,
   });
@@ -150,7 +154,7 @@ export async function fetchExternalCadastruAddressData(addressFields, options = 
     addressFields,
     process.env.CADASTRU_EXTERNAL_ADDRESS_API_URL,
     "cadastru_address",
-    options
+    { ...options, defaultTimeoutMs: 45_000 }
   );
 }
 

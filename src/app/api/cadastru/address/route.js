@@ -4,7 +4,7 @@ import { resolveStreet, inspectStreetAddress } from "@/lib/cadastru-streets/stre
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
-import { findCadastralByAddress } from "@/lib/cadastru-address-search";
+import { findCadastralByAddress, getVerifiedAddressAlternative } from "@/lib/cadastru-address-search";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByAddress, persistCadastruAddressResult } from "@/lib/cadastru-records";
@@ -228,6 +228,28 @@ export async function POST(request) {
     resolved_address: lookupAddress,
     street_resolution: { status: resolution.status, original: street, resolved: resolution.street },
   });
+  const addressConfirmationResponse = (error) => {
+    if (error?.code !== "address_confirmation_required" || !apartmentNumber) return null;
+    const expectedRoadType = roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : "strada";
+    const offered = error.addressSuggestions || error.address_suggestions;
+    const suggestions = (Array.isArray(offered) ? offered : []).filter((value) =>
+      value?.city === city && value.road_type === expectedRoadType && value.street === resolution.street &&
+      typeof value.house_number === "string" && value.house_number.length <= HOUSE_NUMBER_MAX_LENGTH &&
+      HOUSE_NUMBER_PATTERN.test(value.house_number) && value.house_number.startsWith(`${houseNumber}/`) &&
+      typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number) &&
+      Number(value.apartment_number) === Number(apartmentNumber)
+    ).slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) =>
+      ({ city, road_type, street, house_number, apartment_number }));
+    if (!suggestions.length) return null;
+    const token = shouldTrackCadastruSearch && process.env.NODE_ENV !== "development"
+      ? createSuggestionRecoveryToken(failedUsageEventId, suggestionAddress, suggestions.map((value) => ({
+          city: value.city, roadType: normalizeRoadType(value.road_type), street: value.street,
+          houseNumber: value.house_number, apartmentNumber: String(Number(value.apartment_number)),
+        }))) : null;
+    return NextResponse.json({ error: "address_confirmation_required", address_suggestions: suggestions,
+      ...(token ? { suggestion_recovery_token: token } : {}),
+      message: "Could not confirm the requested address. Please confirm a registry-matched alternative." }, { status: 422 });
+  };
   const publicPayload = (payload) => {
     const { district_lookup_checked, ...data } = payload;
     return data;
@@ -307,7 +329,9 @@ export async function POST(request) {
 
   let externalUnavailable = false;
   try {
-    const externalResult = await fetchExternalCadastruAddressData({
+    const verifiedAlternative = getVerifiedAddressAlternative(lookupAddress);
+    const lookupSource = verifiedAlternative ? "local" : "api";
+    const lookupResult = verifiedAlternative || await fetchExternalCadastruAddressData({
       city,
       road_type: body.road_type,
       street: resolution.street,
@@ -318,18 +342,18 @@ export async function POST(request) {
       captureUsageEventId: shouldTrackCadastruSearch,
       userId: access.user_id || null,
     });
-    let payload = withResolution({ ...externalResult, district_lookup_checked: true });
+    let payload = withResolution(verifiedAlternative || { ...lookupResult, district_lookup_checked: true });
     payload = await persistCadastruAddressResult(payload, {
       requestAddress: rawAddress,
       resolvedAddress: lookupAddress,
       structuredAddress,
-      lookupSource: "api",
+      lookupSource,
       officialFetch: true,
     });
     payload = withResolution(payload);
-    const evaluationToken = await recordAddressSearch(payload, "api", classifyAddressPayload(payload));
-    const creditResponse = await consumeCadastruCredit(payload, "api", evaluationToken);
-    await recoverSuggestion(payload, "api");
+    const evaluationToken = await recordAddressSearch(payload, lookupSource, classifyAddressPayload(payload));
+    const creditResponse = await consumeCadastruCredit(payload, lookupSource, evaluationToken);
+    await recoverSuggestion(payload, lookupSource);
     if (creditResponse) return creditResponse;
 
     const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
@@ -346,6 +370,8 @@ export async function POST(request) {
       fallback: Boolean(error?.fallbackEligible),
     };
 
+    const confirmation = addressConfirmationResponse(error);
+    if (confirmation) return confirmation;
     if (error?.code === "ambiguous_street" && error?.status === 422) {
       return NextResponse.json({ error: "ambiguous_street", suggestions: error.suggestions || [] }, { status: 422 });
     }
@@ -410,6 +436,8 @@ export async function POST(request) {
       address: rawAddress,
     });
 
+    const confirmation = addressConfirmationResponse(error);
+    if (confirmation) return confirmation;
     const isUnavailable = externalUnavailable || error?.code === "service_unavailable" ||
       error?.name === "TimeoutError" || error?.cause?.code === "UND_ERR_CONNECT_TIMEOUT";
     if (isUnavailable) {

@@ -4,5 +4,17 @@
     "road_type": "str",
     "street": "Grenoble",
     "aliases": ["гренобль", "гренобля", "гренобле"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str-la",
+    "street": "Ghica-Vodă",
+    "aliases": ["Stradela Ghica-Vodă"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Mihail Lomonosov",
+    "aliases": ["Lomonosov", "Ломоносова"]
   }
 ]

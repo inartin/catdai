@@ -1,4 +1,7 @@
 {
+  "cadastru.addressAlternativeIntro": "Nu am putut confirma apartamentul {apartment} la {street}, nr. {house}.",
+  "cadastru.addressAlternativeFound": "Am găsit apartamentul {apartment} la {street}, nr. {house}. Este adresa dorită?",
+  "cadastru.searchSuggestedHouse": "Caută la nr. {house}",
   "cadastru.didYouMean": "Ați vrut să căutați această stradă?",
   "cadastru.didYouMeanRoadType": "Ați vrut să căutați acest tip de stradă?",
   "cadastru.useRoadTypeSuggestion": "Caută {road} {street}",

@@ -27,9 +27,14 @@ export function readSuggestionRecoveryToken(token, address) {
     const actual = Buffer.from(supplied);
     if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
     const data = JSON.parse(Buffer.from(value, "base64url").toString());
-    if (!data.eventId || data.expires < Date.now() || !Array.isArray(data.suggestions) || !data.suggestions.includes(address.street)) return null;
-    for (const key of ["city", "roadType", "houseNumber", "apartmentNumber"]) {
-      if (data.address?.[key] !== address[key]) return null;
+    if (!data.eventId || data.expires < Date.now() || !Array.isArray(data.suggestions)) return null;
+    const confirmedAddress = data.suggestions.some((suggestion) => suggestion && typeof suggestion === "object" &&
+      ["city", "roadType", "street", "houseNumber", "apartmentNumber"].every((key) => suggestion[key] === address[key]));
+    if (!confirmedAddress) {
+      if (!data.suggestions.includes(address.street)) return null;
+      for (const key of ["city", "roadType", "houseNumber", "apartmentNumber"]) {
+        if (data.address?.[key] !== address[key]) return null;
+      }
     }
     return data;
   } catch {

@@ -228,7 +228,7 @@ const routeMocks = {
     },
     fetchExternalCadastralData: async () => { numberFetches++; return expected; },
   },
-  "@/lib/cadastru-address-search": {
+  "@/lib/cadastru-address-search": { getVerifiedAddressAlternative: () => null,
     findCadastralByAddress: async () => { throw Error("Unexpected local fallback"); },
     fetchCadastruDetailData: async () => { enrichFetches++; return null; },
   },
@@ -313,7 +313,7 @@ const streetRoute = await load("src/app/api/cadastru/address/route.js", {
     if (externalFailure) throw externalFailure;
     return grenoblePayload;
   } },
-  "@/lib/cadastru-address-search": { findCadastralByAddress: async (address) => {
+  "@/lib/cadastru-address-search": { getVerifiedAddressAlternative: () => null, findCadastralByAddress: async (address) => {
     fallbackCalls++; assert.equal(address, grenobleAddress); return grenoblePayload;
   } },
 });
@@ -402,7 +402,7 @@ const suggestionsRoute = await load("src/app/api/cadastru/address/route.js", {
     if (suggestionFailure) throw suggestionFailure;
     return { lands: [{ cadastral_number: "0300101.001", address: `Bălți, str ${fields.street} ${fields.house_number}` }] };
   } },
-  "@/lib/cadastru-address-search": { findCadastralByAddress: async () => { backupLookups++; throw backupFailure; } },
+  "@/lib/cadastru-address-search": { getVerifiedAddressAlternative: () => null, findCadastralByAddress: async () => { backupLookups++; throw backupFailure; } },
 });
 const baltiRequest = { city: "Bălți", road_type: "strada", street: "Radiceva", house_number: "28", apartment_number: "7", skip_cache: true, search_context: "cadastru" };
 const abbreviatedBody = { ...baltiRequest, street: "G. Cosbuc", house_number: "13", apartment_number: "18" };
@@ -525,6 +525,7 @@ const recoveryMocks = { ...routeMocks };
 delete recoveryMocks["@/lib/cadastru-external-api"];
 let backupHasResult = false;
 recoveryMocks["@/lib/cadastru-address-search"] = {
+  getVerifiedAddressAlternative: () => null,
   findCadastralByAddress: async () => {
     if (!backupHasResult) throw Object.assign(new Error("Could not match land or buildings for Balti."), { code: "not_found" });
     return { lands: [{ cadastral_number: "0300101.001", address: "Bălți, str Alexandr Radișcev 28" }] };
@@ -621,6 +622,112 @@ const devFailure = await (await developmentRoute.POST(request(baltiRequest))).js
 assert.equal(devFailure.suggestion_recovery_token, undefined);
 console.log("Suggestion recovery regressions passed: failed versus successful clicks, previews, cache/local results, original status, first success, manual edits, token tampering/expiry, property identity and development suppression.");
 
+// A confirmation response does not persist a property result or consume a credit.
+const houseFields = { city: "Chișinău", road_type: "strada", street: "Ion Creangă", house_number: "82", apartment_number: "167", skip_cache: true };
+const houseAlternative = { city: "Chișinău", road_type: "strada", street: "Ion Creangă", house_number: "82/1", apartment_number: "167" };
+let houseWrites = 0, houseCredits = 0, houseBackup = 0, houseWorkerCalls = 0, houseUnavailable = false, houseConfirmed = false, houseCachedMatch = null;
+const houseRoute = await load("src/app/api/cadastru/address/route.js", {
+  ...routeMocks,
+  "@/lib/cadastru-records": { getCadastruRecordByAddress: async () => null,
+    persistCadastruAddressResult: async (payload, options) => {
+      houseWrites++; assert.equal(options.requestAddress, "Chișinău, str Ion Creangă 82/1 ap 167"); return payload;
+    } },
+  "@/lib/paid-feature-usage": { ...routeMocks["@/lib/paid-feature-usage"],
+    checkFeatureAccess: async () => { houseCredits++; return { allowed: true }; },
+    consumeFeatureCredit: async () => { houseCredits++; return { allowed: true }; } },
+  "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: async (fields) => {
+    houseWorkerCalls++;
+    if (houseConfirmed) {
+      assert.equal(fields.house_number, "82/1");
+      return { cadastral_number: "0100511.115.01.167", matched_address: "Chișinău, str Ion Creangă 82/1" };
+    }
+    if (houseUnavailable) throw Object.assign(new Error("offline"), { code: "service_unavailable", fallbackEligible: true });
+    assert.equal(fields.house_number, "82");
+    throw Object.assign(new Error("confirm"), { code: "address_confirmation_required", status: 422,
+      addressSuggestions: [houseAlternative, { ...houseAlternative, city: "Bălți" }, { ...houseAlternative, house_number: "83/1" },
+        { ...houseAlternative, apartment_number: "168" }] });
+  } },
+  "@/lib/cadastru-address-search": { getVerifiedAddressAlternative: (address) => {
+    if (houseCachedMatch) assert.equal(address, "Chișinău, str Ion Creangă 82/1 ap 167");
+    return houseCachedMatch;
+  }, findCadastralByAddress: async () => {
+    houseBackup++;
+    throw Object.assign(new Error("confirm"), { code: "address_confirmation_required", address_suggestions: [houseAlternative] });
+  } },
+});
+let houseResponse = await houseRoute.POST(request(houseFields));
+assert.equal(houseResponse.status, 422);
+assert.deepEqual(clone((await houseResponse.json()).address_suggestions), [houseAlternative]);
+assert.equal(houseWrites, 0); assert.equal(houseCredits, 0); assert.equal(houseBackup, 0);
+houseUnavailable = true;
+houseResponse = await houseRoute.POST(request(houseFields));
+assert.equal(houseResponse.status, 422, "verified local suggestion takes precedence over a failed worker");
+assert.equal(houseWrites, 0); assert.equal(houseCredits, 0); assert.equal(houseBackup, 1);
+houseConfirmed = true;
+houseResponse = await houseRoute.POST(request({ ...houseFields, house_number: "82/1" }));
+assert.equal(houseResponse.status, 200);
+assert.equal(houseWrites, 1); assert.equal(houseCredits, 1);
+
+houseConfirmed = false;
+houseCachedMatch = { cadastral_number: "0100511.115.01.167", matched_address: "Chișinău, str Ion Creangă 82/1" };
+const houseCallsBeforeCache = houseWorkerCalls;
+houseResponse = await houseRoute.POST(request({ ...houseFields, house_number: "82/1" }));
+assert.equal(houseResponse.status, 200, "cached local confirmation skips the unavailable worker");
+assert.equal(houseWorkerCalls, houseCallsBeforeCache);
+assert.equal(houseBackup, 1); assert.equal(houseWrites, 2); assert.equal(houseCredits, 2);
+houseCachedMatch = null;
+
+let houseTimeout;
+const houseAdapter = await load("@/lib/cadastru-external-api", {
+  "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => {} },
+}, {
+  process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "test-only" } },
+  AbortSignal: { timeout: (ms) => { houseTimeout = ms; return AbortSignal.timeout(ms); } },
+  fetch: async () => Response.json({ ok: false, error: "address_confirmation_required",
+    address_suggestions: [houseAlternative, null, { city: "Chișinău" }] }, { status: 422 }),
+});
+await assert.rejects(houseAdapter.fetchExternalCadastruAddressData(houseFields, { trackUsage: false }), (error) => {
+  assert.equal(error.code, "address_confirmation_required"); assert.equal(error.status, 422);
+  assert.equal(error.fallbackEligible, false); assert.deepEqual(clone(error.addressSuggestions), [houseAlternative]); return true;
+});
+assert.equal(houseTimeout, 45_000, "address lookups allow the registry fallback to finish");
+
+let houseLocalCalls = 0, houseLocalDown = false, houseLocalNow = Date.now();
+const houseLocal = await load("@/lib/cadastru-address-search", {}, { Date: class extends Date { static now() { return houseLocalNow; } }, fetch: async (url, options = {}) => {
+  houseLocalCalls++;
+  if (houseLocalDown) throw new Error("offline");
+  const host = new URL(url).hostname;
+  if (host === "nominatim.openstreetmap.org") return Response.json([]);
+  assert.equal(host, "www.cadastru.md");
+  if (options.method !== "POST") return new Response('<input name="p_instance" value="12345">');
+  const body = new URLSearchParams(options.body);
+  if (body.get("p_request") === "APPLICATION_PROCESS=jQuery_Auto") return new Response("0100511115: mun. Chișinău, str. Ion Creangă 82/1");
+  assert.equal(body.get("p_request"), "APPLICATION_PROCESS=GET_INFO_RBI");
+  return new Response('<div class="infoConstr">Adresa: mun. Chișinău, str. Ion Creangă 82/1<br><a onclick="getDetailedInfo(\'0100511.115.01.167\',3)"><i>167</i></a></div>');
+} });
+await assert.rejects(houseLocal.findCadastralByAddress("Chișinău, str Ion Creangă 82 ap 167"), (error) => {
+  assert.equal(error.code, "address_confirmation_required");
+  assert.deepEqual(clone(error.address_suggestions), [houseAlternative]); return true;
+});
+houseLocalDown = true;
+const houseLocalCallsBeforeConfirm = houseLocalCalls;
+const confirmedLocal = await houseLocal.findCadastralByAddress("Chișinău, str Ion Creangă 82/1 ap 167");
+assert.equal(confirmedLocal.cadastral_number, "0100511.115.01.167");
+assert.equal(confirmedLocal.parsed_input.houseNumber, "82/1");
+confirmedLocal.cadastru_search_candidate.address = "changed";
+assert.notEqual(houseLocal.getVerifiedAddressAlternative("Chișinău, str Ion Creangă 82/1 ap 0167").cadastru_search_candidate.address, "changed");
+for (const input of ["Chișinău, str Ion Creangă 82 ap 167", "Chișinău, str Ion Creangă 82/2 ap 167", "Chișinău, str Ion Creangă 82/1 ap 168", "Bălți, str Ion Creangă 82/1 ap 167", "Chișinău, bd Ion Creangă 82/1 ap 167", "Chișinău, str Mihail Lomonosov 82/1 ap 167"]) {
+  assert.equal(houseLocal.getVerifiedAddressAlternative(input), null, "different addresses miss the confirmation cache");
+}
+assert.equal(houseLocalCalls, houseLocalCallsBeforeConfirm, "local confirmation makes no upstream requests");
+houseLocalNow += 5 * 60_000 - 1;
+assert(houseLocal.getVerifiedAddressAlternative("Chișinău, str Ion Creangă 82/1 ap 167"));
+houseLocalNow++;
+assert.equal(houseLocal.getVerifiedAddressAlternative("Chișinău, str Ion Creangă 82/1 ap 167"), null, "cache reads do not extend expiry");
+await assert.rejects(houseLocal.findCadastralByAddress("Chișinău, str Ion Creangă 82/1 ap 167"), (error) => error.code === "service_unavailable");
+assert(houseLocalCalls > houseLocalCallsBeforeConfirm, "expired confirmation performs a fresh lookup");
+console.log("House confirmation regressions passed: exact official alternative, worker/local forwarding, bounded address timeout, five-minute match reuse without upstream calls, normal confirmed saves and credits.");
+
 // Recorded registry addresses exercise locality validation, signing and storage.
 const localityCases = [
   { city: "Vadul lui Vodă", street: "Mircea cel Bătrân", house_number: "6", number: "3158206.066",
@@ -687,7 +794,7 @@ console.log("Locality regressions passed: signed worker fields, local land/build
 for (const mode of ["http503", "gateway", "network", "timeout", "invalid"]) {
   const outageRoute = await load("src/app/api/cadastru/address/route.js", {
     ...recoveryMocks,
-    "@/lib/cadastru-address-search": { findCadastralByAddress: async () => {
+    "@/lib/cadastru-address-search": { getVerifiedAddressAlternative: () => null, findCadastralByAddress: async () => {
       throw Object.assign(new Error("Could not match apartment 59."), { code: "not_found" });
     } },
   }, {

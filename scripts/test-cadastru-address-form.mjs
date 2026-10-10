@@ -97,5 +97,39 @@ for (const lang of ['ro', 'ru']) {
     house_number: '114', apartment_number: '24', search_context: 'cadastru', skip_cache: true });
   assert.equal(field(80).props.value, 'Miron Costin');
   assert(walk(render()).some((node) => node.type === 'select' && node.props.value === 'strada'));
+
+  change(80, 'Ion Creangă'); change(10, '82'); change(4, '167');
+  const alternative = { city: 'Chișinău', road_type: 'strada', street: 'Ion Creangă', house_number: '82/1', apartment_number: '167' };
+  const confirmation = { error: 'address_confirmation_required', address_suggestions: [alternative] };
+  responder = async () => Response.json(confirmation, { status: 422 });
+  const beforeConfirmation = bodies.length;
+  const beforeNavigation = navigations.length;
+  await search();
+  assert.equal(bodies.length, beforeConfirmation + 1, 'no automatic search of a house variant');
+  assert.equal(navigations.length, beforeNavigation, 'no result before confirmation');
+  assert.equal(field(10).props.value, '82', 'the requested house stays unchanged');
+  assert(walk(render()).some((node) => node.type === 'p' && node.props.children ===
+    t('cadastru.addressAlternativeIntro', { street: 'Ion Creangă', house: '82', apartment: '167' })));
+  assert(walk(render()).some((node) => node.type === 'p' && node.props.children ===
+    t('cadastru.addressAlternativeFound', { street: 'Ion Creangă', house: '82/1', apartment: '167' })));
+  const confirmationChoice = () => walk(render()).find((node) => node.type === 'button' &&
+    node.props.children === t('cadastru.searchSuggestedHouse', { house: '82/1' }));
+  responder = async () => Response.json({ cadastral_number: '0100511.115.01.167' });
+  await confirmationChoice().props.onClick();
+  assert.deepEqual(bodies.at(-1), { city: 'Chișinău', road_type: 'strada', street: 'Ion Creangă', house_number: '82/1',
+    apartment_number: '167', search_context: 'cadastru', skip_cache: true });
+  assert.equal(field(10).props.value, '82/1');
+
+  change(10, '82');
+  responder = async () => Response.json(confirmation, { status: 422 });
+  await search();
+  change(4, '168');
+  assert.equal(confirmationChoice(), undefined, 'field edits clear registry suggestions');
+  change(4, '167');
+  responder = () => new Promise((resolve) => { finish = resolve; });
+  const lateConfirmation = search();
+  change(10, '83'); finish(Response.json(confirmation, { status: 422 })); await lateConfirmation;
+  assert.equal(confirmationChoice(), undefined, 'late registry suggestions stay discarded');
+  assert.equal(field(10).props.value, '83');
 }
 console.log('Address form regressions passed: RO/RU choices, explicit road-type retry, retained fields/skip-cache, edit invalidation and stale responses.');

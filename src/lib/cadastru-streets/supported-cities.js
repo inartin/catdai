@@ -80,7 +80,7 @@ export function resolveSupportedCity(value) {
 
 export function resolveSupportedCityFromAddress(value) {
   const normalized = normalizeCityText(value);
-  const roadMarkerIndex = normalized.search(/(?<![\p{L}\p{N}])(?:strada|str|bulevardul|bulevard|bd|soseaua|sos|aleea|al|улица|ул|бульвар|бул|проспект|пр|шоссе|аллея)(?![\p{L}\p{N}])/u);
+  const roadMarkerIndex = normalized.search(/(?<![\p{L}\p{N}])(?:stradela|strada|str|bulevardul|bulevard|bd|soseaua|sos|aleea|al|улица|ул|бульвар|бул|проспект|пр|шоссе|аллея)(?![\p{L}\p{N}])/u);
   const localityPrefix = roadMarkerIndex === -1 ? normalized : normalized.slice(0, roadMarkerIndex).trim();
   const markers = [...localityPrefix.matchAll(/\b(municipiul|municipiu|mun|orasul|oras|or|satul|sat|comuna|com|raionul|raion|r nul|r n|sectorul|sector|sect)\s+/g)];
 

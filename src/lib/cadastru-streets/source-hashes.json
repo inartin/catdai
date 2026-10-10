@@ -1,6 +1,6 @@
 {
-  "street-resolver.js": "467e127e9e4e69d64ab2f559299bf7b931b61a13373129c93c08e045696f510a",
-  "supported-cities.js": "cb4458ba310e483873926c70d1cbb0b5dbaaedc9887a6a92ea13ce684011dc9d",
+  "street-resolver.js": "bff62aa3adbfd3e55b936aa3324ecbacd605f493348ef1a3b239f17d88c82762",
+  "supported-cities.js": "20f68ccbf43c540dc481e60b1d389db6be94b5a3f807ac1c8ecf53b87fa4d09c",
   "data/streets.json": "24ecdf94ade8377cfbc4d73a24f436114236a5c3374a314d4fd6e508cb24ef07",
-  "data/street-corrections.json": "1a5026ea0b5caedaaf809bcfa3cd509d518e2ae482f5321c880852cfb77ac8ca"
+  "data/street-corrections.json": "37470d59364f612a98a41baa81f368c3dd8a6a576f763c6665176b14ef8e6f07"
 }

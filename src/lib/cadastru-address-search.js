@@ -1,3 +1,4 @@
+import { resolveStreet } from "./cadastru-streets/street-resolver.js";
 import { resolveSupportedCityFromGeocode } from "./cadastru-streets/supported-cities.js";
 import {
   resolveCadastruCityFromAddress,
@@ -11,6 +12,9 @@ const CADASTRU_USER_AGENT =
 const WMS_URL = "https://geodata.gov.md/geoserver/contestare/wms";
 const WFS_URL = "https://geodata.gov.md/geoserver/w_cbi/wfs";
 const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+const VERIFIED_HOUSE_CACHE_TTL_MS = 5 * 60_000;
+const VERIFIED_HOUSE_CACHE_MAX_ENTRIES = 500;
+const verifiedHouseCache = new Map();
 const CADASTRU_PAGE_URL = "https://www.cadastru.md/ecadastru/f?p=100:1";
 const CADASTRU_SESSION_URLS = [
   CADASTRU_PAGE_URL,
@@ -801,7 +805,22 @@ function parseCadastruSearchResults(text, parsed) {
       };
     })
     .filter(Boolean)
-    .filter((candidate) => addressMatchesParsedBuilding(candidate.address, parsed));
+    .filter((candidate) => !parsed || addressMatchesParsedBuilding(candidate.address, parsed));
+}
+
+function suggestedHouseNumber(address, parsed) {
+  if (!parsed.apartment || !/^\d{1,4}$/.test(parsed.houseNumber) || canonicalCity(address) !== parsed.city) return null;
+  const roadType = shortRoadType(parsed.roadType);
+  const markers = { str: "str|улица|ул", bd: "bd|бульвар|бул|проспект|пр", "str-la": "str-la|stradela" }[roadType];
+  if (!markers) return null;
+  const resolution = resolveStreet({ city: parsed.city, roadType, street: parsed.streetName, exactOnly: true, includeAliases: true });
+  const names = resolution.aliases || parsed.streetNameVariants || [parsed.streetName];
+  for (const name of names) {
+    const escaped = normalizeForMatch(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    const match = normalizeForMatch(address).match(new RegExp(`(?:^|\\s)(?:${markers})\\s+${escaped}\\s+(?:nr\\s+)?(\\d{1,4}/\\d{1,4})(?=\\s|$)`, "i"));
+    if (match && match[1].split("/")[0] === parsed.houseNumber) return match[1];
+  }
+  return null;
 }
 
 function responseTextToHtml(text) {
@@ -951,22 +970,114 @@ function findApartmentInCadastruHtml(html, parsed) {
   return null;
 }
 
+async function searchCadastruCandidates(session, parsed, houseCandidates = new Map(), failures = []) {
+  let lastError = null;
+  for (const query of buildCadastruSearchQueries(parsed)) {
+    try {
+      const rawSearch = await callCadastruApex(session, "jQuery_Auto", [query, "f", "25", "1"]);
+      for (const candidate of parseCadastruSearchResults(rawSearch, null)) {
+        const houseNumber = suggestedHouseNumber(candidate.address, parsed);
+        if (houseNumber) houseCandidates.set(candidate.code, { ...candidate, house_number: houseNumber });
+      }
+      const candidates = parseCadastruSearchResults(rawSearch, parsed);
+      // Alternative spellings are fallbacks, not mandatory calls after an exact match.
+      if (candidates.length) return [...new Map(candidates.map((candidate) => [candidate.code, candidate])).values()];
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastError) {
+    if (!houseCandidates.size) throw lastError;
+    failures.push(lastError);
+  }
+  return [];
+}
+
+function verifiedHouseCacheKey(parsed) {
+  return JSON.stringify([parsed.city, shortRoadType(parsed.roadType), normalizeForMatch(parsed.streetName),
+    normalizeForMatch(parsed.houseNumber), parsed.apartmentKey]);
+}
+
+function getCachedHouseAlternative(parsed) {
+  const key = verifiedHouseCacheKey(parsed);
+  const cached = verifiedHouseCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    verifiedHouseCache.delete(key);
+    return null;
+  }
+  return { ...JSON.parse(cached.payload), apartment: parsed.apartment, parsed_input: parsed };
+}
+
+export function getVerifiedAddressAlternative(rawAddress) {
+  const parsed = parseInputAddress(rawAddress);
+  return parsed.apartment ? getCachedHouseAlternative(parsed) : null;
+}
+
+function cacheHouseAlternative(result) {
+  const now = Date.now();
+  for (const [key, cached] of verifiedHouseCache) {
+    if (cached.expiresAt <= now) verifiedHouseCache.delete(key);
+  }
+  const key = verifiedHouseCacheKey(result.parsed_input);
+  verifiedHouseCache.delete(key);
+  verifiedHouseCache.set(key, { expiresAt: now + VERIFIED_HOUSE_CACHE_TTL_MS, payload: JSON.stringify(result) });
+  if (verifiedHouseCache.size > VERIFIED_HOUSE_CACHE_MAX_ENTRIES) {
+    verifiedHouseCache.delete(verifiedHouseCache.keys().next().value);
+  }
+}
+
+function cadastruApartmentResult(match, candidate, parsed, html) {
+  return {
+    status: "success",
+    source: "cadastru_md_apex",
+    cadastral_number: match.cadastralNumber,
+    raw_cadastral_number: match.raw_cadastral_number,
+    matched_address: match.matched_address || candidate.address,
+    apartment: parsed.apartment,
+    cadastru_search_candidate: candidate,
+    parsed_input: parsed,
+    raw_response_preview: stripHtml(html).slice(0, 1000),
+  };
+}
+
+async function suggestCadastruHouses(session, parsed, houseCandidates) {
+  const suggestions = new Map();
+  let failure = null;
+  // Only official apartment links qualify; never derive an apartment in another house.
+  for (const candidate of [...houseCandidates.values()].slice(0, 6)) {
+    try {
+      const rawRbi = await callCadastruApex(session, "GET_INFO_RBI", [candidate.code, CADASTRU_LAYERS]);
+      const html = responseTextToHtml(rawRbi);
+      const alternative = parseInputAddress(`${parsed.city}, ${shortRoadType(parsed.roadType)} ${parsed.streetName} ${candidate.house_number} ap ${parsed.apartment}`);
+      const match = findApartmentInCadastruHtml(html, alternative);
+      if (!match?.matched_address || suggestedHouseNumber(match.matched_address, parsed) !== candidate.house_number) continue;
+      cacheHouseAlternative(cadastruApartmentResult(match, candidate, alternative, html));
+      const roadType = shortRoadType(parsed.roadType);
+      suggestions.set(candidate.house_number, { city: parsed.city,
+        road_type: roadType === "bd" ? "bulevard" : roadType === "str" ? "strada" : roadType,
+        street: parsed.streetName, house_number: candidate.house_number, apartment_number: parsed.apartment });
+      if (suggestions.size === 3) break;
+    } catch (error) {
+      if (error?.code !== "service_unavailable") throw error;
+      failure = error;
+    }
+  }
+  if (suggestions.size) {
+    throw Object.assign(new Error("Could not confirm the requested address. Please confirm a registry-matched alternative."), {
+      code: "address_confirmation_required", status: 422, address_suggestions: [...suggestions.values()],
+    });
+  }
+  if (failure) throw failure;
+}
+
 async function findViaCadastruMd(parsed) {
   if (!parsed.streetName || !parsed.houseNumber) return null;
 
   const session = await createCadastruSession();
-  const candidatesByCode = new Map();
-
-  for (const query of buildCadastruSearchQueries(parsed)) {
-    const rawSearch = await callCadastruApex(session, "jQuery_Auto", [query, "f", "25", "1"]);
-    const candidates = parseCadastruSearchResults(rawSearch, parsed);
-    for (const candidate of candidates) {
-      if (!candidatesByCode.has(candidate.code)) candidatesByCode.set(candidate.code, candidate);
-    }
-  }
-
-  const candidates = [...candidatesByCode.values()];
-  if (!candidates.length) return null;
+  const houseCandidates = new Map();
+  const searchFailures = [];
+  const candidates = await searchCadastruCandidates(session, parsed, houseCandidates, searchFailures);
 
   for (const candidate of candidates) {
     const rawRbi = await callCadastruApex(session, "GET_INFO_RBI", [candidate.code, CADASTRU_LAYERS]);
@@ -977,19 +1088,11 @@ async function findViaCadastruMd(parsed) {
       continue;
     }
 
-    return {
-      status: "success",
-      source: "cadastru_md_apex",
-      cadastral_number: match.cadastralNumber,
-      raw_cadastral_number: match.raw_cadastral_number,
-      matched_address: match.matched_address || candidate.address,
-      apartment: parsed.apartment,
-      cadastru_search_candidate: candidate,
-      parsed_input: parsed,
-      raw_response_preview: stripHtml(html).slice(0, 1000),
-    };
+    return cadastruApartmentResult(match, candidate, parsed, html);
   }
 
+  await suggestCadastruHouses(session, parsed, houseCandidates);
+  if (searchFailures.length) throw searchFailures[0];
   return null;
 }
 
@@ -1249,6 +1352,9 @@ export async function findCadastralByAddress(rawAddress) {
     if (cadastruError) throw cadastruError;
     throw Object.assign(new Error(`Could not match land or buildings for ${parsed.buildingAddress}.`), { code: "not_found" });
   }
+  const cachedAlternative = getCachedHouseAlternative(parsed);
+  if (cachedAlternative) return cachedAlternative;
+
   const failures = [];
   let geocoded = [];
   try {

@@ -241,7 +241,8 @@ export default function CadastruSearchForm({
       ...(searchForm.apartmentNumber ? { apartment_number: searchForm.apartmentNumber } : {}),
       search_context: "cadastru",
       ...(skipCache ? { skip_cache: true } : {}),
-      ...(typeof suggestedStreet === "string" && lookupState.didYouMean && lookupState.suggestionRecoveryToken
+      ...(((typeof suggestedStreet === "string" && lookupState.didYouMean) || (correction && lookupState.confirmationRequired))
+        && lookupState.suggestionRecoveryToken
         ? { suggestion_recovery_token: lookupState.suggestionRecoveryToken } : {}),
     };
     writeAddressLookupRequest(requestBody);
@@ -262,7 +263,10 @@ export default function CadastruSearchForm({
           return;
         }
         const failure = await response.clone().json().catch(() => null);
-        const errorMessage = failure?.error === "address_fields_conflict"
+        const confirmationRequired = response.status === 422 && failure?.error === "address_confirmation_required";
+        const errorMessage = confirmationRequired
+          ? t("cadastru.addressAlternativeIntro", { street, house: searchForm.houseNumber, apartment: searchForm.apartmentNumber })
+          : failure?.error === "address_fields_conflict"
           ? t("cadastru.addressFieldsConflict", { embedded: failure.embedded_house_number, house: failure.house_number })
           : failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet") : await readErrorMessage(response);
         if (requestId !== addressRequestId.current) return;
@@ -271,7 +275,15 @@ export default function CadastruSearchForm({
           method: "address",
           didYouMean: response.status === 404 && failure?.error === "not_found",
           suggestionRecoveryToken: failure?.suggestion_recovery_token || null,
-          addressCorrections: failure?.error === "address_fields_conflict" && Array.isArray(failure.corrections)
+          confirmationRequired,
+          addressCorrections: confirmationRequired && Array.isArray(failure.address_suggestions)
+            ? failure.address_suggestions.filter((value) => value?.city === searchForm.city && value.road_type === searchForm.roadType
+              && typeof value.street === "string" && value.street.length <= STREET_MAX_LENGTH
+              && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)
+              && value.house_number.startsWith(`${searchForm.houseNumber}/`)
+              && typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
+              && Number(value.apartment_number) === Number(searchForm.apartmentNumber)).slice(0, 3)
+            : failure?.error === "address_fields_conflict" && Array.isArray(failure.corrections)
             ? failure.corrections.filter((value) => typeof value?.street === "string" && value.street.length <= STREET_MAX_LENGTH
               && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)) : [],
           suggestions: (failure?.error === "ambiguous_street" || (response.status === 404 && failure?.error === "not_found")) && Array.isArray(failure.suggestions)
@@ -550,12 +562,19 @@ export default function CadastruSearchForm({
                 {lookupState.addressCorrections?.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     {lookupState.addressCorrections.map((correction) => (
-                      <button key={`${correction.street}:${correction.house_number}`} type="button"
-                        className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
-                        disabled={lookupState.loading || authLoading}
-                        onClick={() => submitAddressSearch(correction)}>
-                        {t("cadastru.useAddressCorrection", { street: correction.street, house: correction.house_number })}
-                      </button>
+                      <div key={`${correction.street}:${correction.house_number}`}>
+                        {lookupState.confirmationRequired && <p className="mb-2 text-sm">
+                          {t("cadastru.addressAlternativeFound", { street: correction.street, house: correction.house_number,
+                            apartment: correction.apartment_number })}
+                        </p>}
+                        <button type="button"
+                          className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
+                          disabled={lookupState.loading || authLoading}
+                          onClick={() => submitAddressSearch(correction)}>
+                          {lookupState.confirmationRequired ? t("cadastru.searchSuggestedHouse", { house: correction.house_number })
+                            : t("cadastru.useAddressCorrection", { street: correction.street, house: correction.house_number })}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

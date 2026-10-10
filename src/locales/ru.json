@@ -1,4 +1,7 @@
 {
+  "cadastru.addressAlternativeIntro": "Не удалось подтвердить квартиру {apartment} по адресу {street}, дом {house}.",
+  "cadastru.addressAlternativeFound": "Найдена квартира {apartment} по адресу {street}, дом {house}. Это нужный вам адрес?",
+  "cadastru.searchSuggestedHouse": "Найти в доме {house}",
   "cadastru.didYouMean": "Возможно, вы имели в виду эту улицу?",
   "cadastru.didYouMeanRoadType": "Возможно, вы имели в виду другой тип улицы?",
   "cadastru.useRoadTypeSuggestion": "Искать: {road} {street}",

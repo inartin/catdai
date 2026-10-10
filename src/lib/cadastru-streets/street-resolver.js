@@ -7,7 +7,7 @@ const readData = (name) => name === "streets.json" ? streets : corrections;
 export function normalizeStreetName(value) {
   return String(value || "").normalize("NFD").replace(/(\p{Script=Latin})\p{M}+/gu, "$1").normalize("NFC")
     .toLowerCase().replace(/ё/g, "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim()
-    .replace(/^(?:strada|str|bul|улица|ул|bulevardul|bulevard|bd|бульвар|бул|проспект|пр|șoseaua|soseaua|sos|шоссе|aleea|al|аллея)\s+/u, "")
+    .replace(/^(?:stradela|str la|strada|str|bul|улица|ул|bulevardul|bulevard|bd|бульвар|бул|проспект|пр|șoseaua|soseaua|sos|шоссе|aleea|al|аллея)\s+/u, "")
     .replace(/\s+/g, " ");
 }
 
@@ -15,6 +15,7 @@ function roadKey(value) {
   const key = String(value || "").toLowerCase().replace(/\.$/, "");
   if (/^(bd|bul|bulevard|bulevardul|бульвар|бул|проспект|пр)$/.test(key)) return "bd";
   if (/^(str|strada|улица|ул)$/.test(key)) return "str";
+  if (/^(str-la|stradela|strădela)$/.test(key)) return "str-la";
   return key;
 }
 
@@ -57,7 +58,7 @@ export function createStreetResolver(entries) {
   const scopes = new Map();
   for (const entry of entries) {
     const city = resolveSupportedCity(entry.city);
-    if (!city || !entry.street?.trim() || !["str", "bd"].includes(entry.road_type)) {
+    if (!city || !entry.street?.trim() || !["str", "bd", "str-la"].includes(entry.road_type)) {
       throw new Error("Invalid street dictionary entry");
     }
     const scopeKey = `${city}|${entry.road_type}`;
@@ -114,19 +115,24 @@ export const resolveStreet = createStreetResolver([
 
 export function inspectStreetAddress({ city, roadType, street, houseNumber }) {
   const unchanged = { status: "unchanged", street };
+  const leadingMarker = String(street || "").trim().match(/^(?:stradela|strădela|str-la|strada|str|bulevardul|bulevard|bd|bul)(?=[.,\s])/iu)?.[0];
+  if (leadingMarker && roadKey(leadingMarker) !== roadKey(roadType)) {
+    return { status: "road_type_conflict", street };
+  }
   // Check complete names first: dates and numbered streets must retain their digits.
   if (resolveStreet({ city, roadType, street, exactOnly: true }).status !== "unresolved") return unchanged;
   let candidate = String(street || "").trim().replace(/[.,;]+$/, "").trim();
   const house = candidate.match(/(?:^|[\s,;])(?:nr\.?\s*)?(\d{1,4}(?:\/\d{1,4})?)$/i);
   if (house) candidate = candidate.slice(0, house.index).trim();
-  const markers = { str: "strada|str|улица|ул", bd: "bulevardul|bulevard|bd|bul|бульвар|бул|проспект|пр" }[roadKey(roadType)];
+  const markers = { str: "strada|str|улица|ул", bd: "bulevardul|bulevard|bd|bul|бульвар|бул|проспект|пр",
+    "str-la": "stradela|strădela|str-la" }[roadKey(roadType)];
   if (!markers) return unchanged;
   candidate = candidate.replace(new RegExp(`^(?:${markers})(?:[.,]\\s*|\\s+)`, "iu"), "")
     .replace(new RegExp(`[,;\\s]+(?:${markers})\\.?$`, "iu"), "")
     .replace(/^[,;\s]+|[,;\s]+$/g, "");
   const resolved = resolveStreet({ city, roadType, street: candidate, exactOnly: true });
   // A marker for another road type must not disappear through name normalization.
-  if (/^(?:strada|str|bulevardul|bulevard|bd|bul|улица|ул|бульвар|бул|проспект|пр|soseaua|șoseaua|sos|шоссе|aleea|al|аллея)(?:[.,]|\s)/iu.test(candidate)) return unchanged;
+  if (/^(?:stradela|strădela|str-la|strada|str|bulevardul|bulevard|bd|bul|улица|ул|бульвар|бул|проспект|пр|soseaua|șoseaua|sos|шоссе|aleea|al|аллея)(?:[.,]|\s)/iu.test(candidate)) return unchanged;
   if (resolved.status !== "exact") return unchanged;
   if (house && house[1] !== houseNumber) {
     return { status: "conflict", street: resolved.street, embeddedHouseNumber: house[1],

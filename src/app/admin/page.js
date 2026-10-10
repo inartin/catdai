@@ -1416,9 +1416,20 @@ export default function AdminDashboard() {
                       : `No ${externalApiStatusFilter === "failure" ? "failed" : "successful"} requests found`}
                   </div>
                 ) : (
-                  <div className="max-h-[36rem] overflow-auto">
-                    <table className="w-full text-sm">
-                      <thead className="sticky top-0">
+                  <div className="max-h-[36rem] overflow-auto [scrollbar-gutter:stable] [overflow-anchor:none]">
+                    <table className="w-full min-w-[80rem] table-fixed text-sm">
+                      <colgroup>
+                        <col className="w-52" />
+                        <col className="w-36" />
+                        <col className="w-28" />
+                        <col className="w-16" />
+                        <col className="w-24" />
+                        <col />
+                        <col className="w-52" />
+                        <col className="w-36" />
+                        <col className="w-24" />
+                      </colgroup>
+                      <thead className="sticky top-0 z-10">
                         <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
                           <th className="px-4 py-3">Time</th>
                           <th className="px-4 py-3">Service</th>
@@ -1452,9 +1463,17 @@ export default function AdminDashboard() {
                                     toggleExpanded();
                                   }
                                 }}
-                                className="cursor-pointer hover:bg-gray-50"
+                                className={`cursor-pointer ${expanded ? "bg-sky-50 hover:bg-sky-50" : "hover:bg-gray-50"}`}
                               >
-                                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDateTime(row.created_at)}</td>
+                                <td className="px-4 py-3 text-gray-600">
+                                  <div className="flex items-center gap-2">
+                                    <svg aria-hidden="true" viewBox="0 0 16 16" fill="none"
+                                      className={`h-3 w-3 shrink-0 ${expanded ? "rotate-90 text-sky-600" : "text-gray-400"}`}>
+                                      <path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                    <span>{fmtDateTime(row.created_at)}</span>
+                                  </div>
+                                </td>
                                 <td className="px-4 py-3 font-medium text-gray-900">{fmtExternalApiService(row.service)}</td>
                                 <td className="px-4 py-3">
                                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.status === "failure"
@@ -1503,8 +1522,8 @@ export default function AdminDashboard() {
                               {expanded && (
                                 <tr>
                                   <td colSpan={9} className="bg-gray-50 px-4 py-4">
-                                    <div className="grid gap-4 lg:grid-cols-2">
-                                      <div className="space-y-3">
+                                    <div className="grid min-w-0 gap-4 [overflow-wrap:anywhere] lg:grid-cols-2">
+                                      <div className="min-w-0 space-y-3">
                                         <div>
                                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Endpoint</p>
                                           <p className="mt-1 break-all text-sm text-gray-800">{row.endpoint || "Not recorded"}</p>
@@ -1532,7 +1551,7 @@ export default function AdminDashboard() {
                                           </div>
                                         </div>
                                       </div>
-                                      <div>
+                                      <div className="min-w-0">
                                         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">User query / request payload</p>
                                         {requestPayload ? (
                                           <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{requestPayload}</pre>
@@ -1540,7 +1559,7 @@ export default function AdminDashboard() {
                                           <p className="mt-2 text-sm text-gray-500">No request payload recorded.</p>
                                         )}
                                       </div>
-                                      <div className="lg:col-span-2">
+                                      <div className="min-w-0 lg:col-span-2">
                                         <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Worker response</p>
                                         {responsePayload ? (
                                           <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{responsePayload}</pre>
@@ -1549,13 +1568,13 @@ export default function AdminDashboard() {
                                         )}
                                       </div>
                                       {responseHeaders && (
-                                        <div className="lg:col-span-2">
+                                        <div className="min-w-0 lg:col-span-2">
                                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Diagnostic response headers</p>
                                           <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{responseHeaders}</pre>
                                         </div>
                                       )}
                                       {row.suggestion_recovery && (
-                                        <div className="lg:col-span-2">
+                                        <div className="min-w-0 lg:col-span-2">
                                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Successful suggestion retry</p>
                                           <p className="mt-1 text-sm text-gray-800">{row.suggestion_recovery.resolved_address}</p>
                                           <p className="mt-1 text-xs text-gray-500">{fmtDateTime(row.suggestion_recovery.recovered_at)} · Source: {row.suggestion_recovery.lookup_source || "—"}</p>

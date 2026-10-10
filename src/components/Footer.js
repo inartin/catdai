@@ -70,13 +70,6 @@ const paymentLogos = [
     height: 80,
     className: "h-6 sm:h-7 max-w-[72px]",
   },
-  // {
-  //   src: "/brands/mia_clean.svg",
-  //   alt: "MIA",
-  //   width: 245,
-  //   height: 59,
-  //   className: "h-3.5 sm:h-4 max-w-[70px]",
-  // },
 ];
 
 export default function Footer() {
@@ -141,7 +134,12 @@ export default function Footer() {
               unoptimized
             />
           ))}
-          {provider === "maib" && <Image src="/brands/maib.png" alt="maib" width={156} height={44} className="h-6 w-auto object-contain sm:h-7" unoptimized />}
+          {provider === "maib" && (
+            <>
+              <Image src="/brands/maib.png" alt="maib" width={156} height={44} className="mr-2 h-4 w-auto object-contain sm:h-5" unoptimized />
+              <Image src="/brands/mia_clean.svg" alt="MIA" width={245} height={59} className="h-3.5 w-auto object-contain sm:h-4" unoptimized />
+            </>
+          )}
         </div>
       </div>
     </footer>

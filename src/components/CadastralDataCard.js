@@ -67,6 +67,16 @@ export default function CadastralDataCard({
   const detailValueClass = "min-w-0 break-words text-right font-medium text-gray-900";
   const hasLockedDetails = locked || cadastral.locked_sections?.cadastru_details === true;
   const showLockedRevealButton = Boolean(showRevealButton && hasLockedDetails && onLockedClick);
+  const revealButton = showLockedRevealButton ? (
+    <button
+      type="button"
+      onClick={onLockedClick}
+      className={`inline-flex min-h-10 w-max cursor-pointer items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 sm:px-5 ${cadastral.cadastral_number ? "absolute inset-y-0 left-1/2 h-10 max-w-[calc(100%-1.5rem)] -translate-x-1/2 whitespace-nowrap" : "max-w-full"}`}
+    >
+      <LockIcon size={16} strokeWidth={2.2} />
+      {revealButtonLabel || t("cadastru.unlockData")}
+    </button>
+  ) : null;
   const isCadastralNumberLocked = hasLockedDetails && cadastral.locked_sections?.cadastral_number === true;
   const isVisibleLockedField = (section, field) => (
     (section === "apartment" && field === "floor") ||
@@ -188,16 +198,7 @@ export default function CadastralDataCard({
               >
                 {cadastral.cadastral_number}
               </p>
-              {showLockedRevealButton && (
-                <button
-                  type="button"
-                  onClick={onLockedClick}
-                  className="absolute inset-y-0 left-1/2 inline-flex h-10 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 sm:px-5"
-                >
-                  <LockIcon size={16} strokeWidth={2.2} />
-                  {revealButtonLabel || t("cadastru.unlockData")}
-                </button>
-              )}
+              {revealButton}
             </div>
           </div>
         )}
@@ -206,6 +207,12 @@ export default function CadastralDataCard({
           <p className="text-base text-gray-600">
             {displayAddress}
           </p>
+        )}
+
+        {!cadastral.cadastral_number && showLockedRevealButton && (
+          <div className="flex justify-center">
+            {revealButton}
+          </div>
         )}
 
         {(hasApartmentDetails || hasBuildingDetails) && (

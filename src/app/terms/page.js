@@ -83,7 +83,7 @@ const sections = [
       "Anumite funcții CatDai pot fi disponibile gratuit, iar altele pot necesita autentificare și plată. Produsele plătite sunt cumpărate ca acces sau credite de utilizare unică pentru funcțiile indicate pe pagina de prețuri sau în ecranul de plată.",
       "Prețul, moneda, produsul ales și beneficiile incluse sunt afișate înainte de inițierea plății. Plățile noi sunt procesate prin maib; tranzacțiile Paddle existente rămân gestionate prin Paddle.",
       "Pentru o comandă maib, te autentifici în CatDai, alegi produsul, verifici utilizările incluse și suma în MDL, furnizezi o adresă reală de e-mail pentru confirmare și bifezi acceptarea acestor termeni. Continui apoi pe pagina securizată maib pentru plata cu cardul bancar acceptat de procesator.",
-      "Pachetele maib sunt achitate o singură dată, nu creează abonamente și adaugă credite fără expirare. Pachetele includ câte 5 sau 20 de utilizări pentru fiecare dintre cele 6 funcții afișate. Produsul individual include o singură utilizare a funcției selectate înainte de plată. Beneficiile și prețul exact sunt afișate înainte de plată.",
+      "Pachetele maib sunt achitate o singură dată, nu creează abonamente și adaugă credite fără expirare. Pachetele includ câte 5 sau 20 de utilizări pentru fiecare dintre cele 6 funcții afișate. Produsul individual include cantitatea aleasă de utilizări pentru funcția selectată înainte de plată. Prețurile individuale sunt 25 lei pentru 1 utilizare, 65 lei pentru 3, 89 lei pentru 5, 169 lei pentru 10 și 269 lei pentru 20 de utilizări. Pentru cantitățile intermediare, totalul se calculează proporțional între cele două praguri de preț învecinate. Peste 20 de utilizări, fiecare utilizare suplimentară costă 13,45 lei, păstrând prețul unitar al pragului de 20, până la maximum 100 de utilizări. Reducerea afișată se raportează la 25 lei pentru fiecare utilizare; procentul este rotunjit la un număr întreg. Beneficiile și prețul exact sunt afișate înainte de plată.",
       "CatDai nu colectează și nu stochează datele cardului bancar. Datele de card și autorizarea plății sunt gestionate de procesatorul de plăți.",
       "Plățile maib sunt efectuate în MDL. Dacă moneda contului de card diferă, conversia și eventualele comisioane sunt stabilite de banca emitentă a cardului.",
       "Accesul plătit sau creditele sunt activate numai după confirmarea plății de către procesatorul de plăți și verificarea tranzacției de către sistemele CatDai.",
@@ -176,7 +176,7 @@ const sections = [
       `Adresă: ${MERCHANT.address}`,
       `Website: catdai.md. E-mail de contact: ${MERCHANT.email}`,
       "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
-      "Data ultimei actualizări: 6 Octombrie 2026",
+      "Data ultimei actualizări: 10 Octombrie 2026",
     ],
   },
 ];

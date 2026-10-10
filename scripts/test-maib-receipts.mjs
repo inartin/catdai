@@ -37,6 +37,13 @@ for(const language of ['ro','ru']) {
   const receipt=buildReceipt({...order,environment:'production',language,refunded_minor:2500},config.merchant);
   assert.ok(!receipt.text.includes(language==='ro'?'Mod de test':'Тестовый режим'));
   assert.ok(receipt.text.includes(language==='ro'?'Sumă rambursată: 25.00 MDL':'Возвращённая сумма: 25.00 MDL'));
+  const bulkReceipt=buildReceipt({...order,language,product_key:'cadastru_lookup_single',product_title:maibProductTitle('cadastru_lookup_single',language,4),amount_minor:9400,grants:{cadastru_lookup:4}},config.merchant);
+  assert.ok(bulkReceipt.text.includes(language==='ro'?'Cantitate: 4':'Количество: 4'));
+  assert.match(bulkReceipt.text,/94[.,]00 MDL/);
+  assert.ok(bulkReceipt.text.includes('× 4'));
+  const tierReceipt=buildReceipt({...order,language,product_key:'cadastru_lookup_single',product_title:maibProductTitle('cadastru_lookup_single',language,10),amount_minor:16900,grants:{cadastru_lookup:10}},config.merchant);
+  assert.ok(tierReceipt.text.includes(language==='ro'?'Cantitate: 10':'Количество: 10'));
+  assert.match(tierReceipt.text,/169[.,]00 MDL/);
 }
 for(const [key,value] of Object.entries(savedUrlEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
 assert.throws(()=>buildReceipt({...order,paid_at:null},config.merchant));

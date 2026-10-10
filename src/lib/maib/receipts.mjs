@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import { MERCHANT } from '../merchant.mjs';
 import { paymentSiteOrigin } from '../payment-urls.mjs';
 import { MAIB_FEATURE_LABELS, purchaseMessages, receiptEmail } from './purchase.mjs';
+import { maibOrderQuantity } from './products.mjs';
 
 export function receiptConfig(env = process.env) {
   const port = Number(env.MAIB_SMTP_PORT || 587);
@@ -25,7 +26,7 @@ export function buildReceipt(order, merchant) {
   const amount = (order.amount_minor / 100).toLocaleString(order.language === 'ru' ? 'ru-MD' : 'ro-MD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const values = {
     merchant, siteUrl: origin, orderId: order.id, paidAt, amount,
-    currency: order.currency_code, productTitle: order.product_title,
+    currency: order.currency_code, productTitle: order.product_title, quantity: maibOrderQuantity(order),
     sandbox: order.environment === 'sandbox' ? messages['maib.sandbox'] : '',
     features: Object.entries(order.grants).filter(([feature]) => MAIB_FEATURE_LABELS[feature])
       .map(([feature, count]) => `${messages[MAIB_FEATURE_LABELS[feature]]}: ${count}`).join('\n\n'),

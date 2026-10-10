@@ -18,8 +18,36 @@ const products = {
   pdf_report_single: { amount_mdl: 25, grants: { pdf_report: 1 } },
 };
 
-export function maibProduct(key) {
+const singlePriceTiers = [[1, 25], [3, 65], [5, 89], [10, 169], [20, 269]];
+export const MAX_SINGLE_QUANTITY = 100;
+
+function singlePriceMinor(quantity) {
+  const [lastCount, lastPrice] = singlePriceTiers.at(-1);
+  if (quantity > lastCount) return Math.round(lastPrice * 100 * quantity / lastCount);
+  const index = singlePriceTiers.findIndex(([count]) => count >= quantity);
+  const [upperCount, upperPrice] = singlePriceTiers[index];
+  if (index === 0) return upperPrice * 100;
+  const [lowerCount, lowerPrice] = singlePriceTiers[index - 1];
+  return lowerPrice * 100 + Math.round((upperPrice - lowerPrice) * 100 * (quantity - lowerCount) / (upperCount - lowerCount));
+}
+
+export function maibProduct(key, quantity = 1) {
   if (typeof key !== "string" || !Object.hasOwn(products, key)) return null;
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_SINGLE_QUANTITY) return null;
+  const single = key.endsWith("_single");
+  if (!single && quantity !== 1) return null;
   const { amount_mdl, grants } = products[key];
-  return { key, amount_minor: amount_mdl * 100, amount_mdl, currency_code: "MDL", billingMode: "one_time", grants: { ...grants } };
+  const amount_minor = single ? singlePriceMinor(quantity) : amount_mdl * 100;
+  const base_minor = amount_mdl * quantity * 100;
+  const discount_mdl = (base_minor - amount_minor) / 100;
+  const discount_percent = Math.round((base_minor - amount_minor) / base_minor * 100);
+  return { key, quantity, discount_mdl, discount_percent, amount_minor, amount_mdl: amount_minor / 100, currency_code: "MDL", billingMode: "one_time",
+    grants: Object.fromEntries(Object.entries(grants).map(([feature, count]) => [feature, count * quantity])) };
+}
+
+export function maibOrderQuantity(order) {
+  const product = products[order?.product_key];
+  if (!product || !order.product_key.endsWith("_single")) return 1;
+  const quantity = order.grants?.[Object.keys(product.grants)[0]];
+  return Number.isInteger(quantity) && quantity > 0 ? quantity : 1;
 }

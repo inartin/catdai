@@ -1,5 +1,6 @@
 import { supabaseAdmin as db } from '../supabase-admin.js';
 import { environment, maibRequest, minorUnits, validateCheckoutUrl, validatePayment } from './client.mjs';
+import { maibOrderQuantity } from './products.mjs';
 
 export async function checked(query) {
   const { data, error } = await query;
@@ -14,7 +15,7 @@ export async function getOrder(id, userId) {
 export function publicOrder(order) {
   return { order_id: order.id, product_key: order.product_key, status: order.status,
     amount_minor: order.amount_minor, currency_code: order.currency_code, environment: order.environment,
-    product_title: order.product_title, grants: order.grants, quantity: 1,
+    product_title: order.product_title, grants: order.grants, quantity: maibOrderQuantity(order),
     paid_at: order.paid_at, created_at: order.created_at,
     return_to: order.return_to, language: order.language, refunded_minor: order.refunded_minor,
     checkout: order.checkout_url && ['pending','registered','creation_unknown'].includes(order.status) ? { url: order.checkout_url } : null };

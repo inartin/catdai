@@ -6,7 +6,7 @@ import { useTranslation } from '@/context/LanguageContext';
 import AuthOptions from '@/components/AuthOptions';
 import Footer from '@/components/Footer';
 import { maibProduct } from '@/lib/maib/products.mjs';
-import { MAIB_TERMS_VERSION, MAIB_FEATURE_LABELS, receiptEmail } from '@/lib/maib/purchase.mjs';
+import { MAIB_TERMS_VERSION, MAIB_FEATURE_LABELS, receiptEmail, maibProductTitle } from '@/lib/maib/purchase.mjs';
 import { trackPaymentCheckoutEvent } from '@/lib/tracking';
 import { paymentAppLink } from '@/lib/payment-urls.mjs';
 
@@ -27,7 +27,8 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
     const requested = params?.get('lang');
     if (['ro','ru'].includes(requested) && requested !== lang) setLang(requested);
   }, [params, lang, setLang]);
-  const product = maibProduct(result ? order?.product_key : params?.get('product_key'));
+  const quantity = params?.has('quantity') ? Number(params.get('quantity')) : 1;
+  const product = maibProduct(result ? order?.product_key : params?.get('product_key'), result ? 1 : quantity);
   const email = emailInput ?? receiptEmail(user?.email) ?? '';
   const grants = order?.grants || product?.grants || {};
   useEffect(() => {
@@ -48,7 +49,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
         if (stopped) return;
         setOrder(data); setError('');
         if (['paid','partially_refunded','refunded','failed','expired','canceled'].includes(data.status)) {
-          sessionStorage.removeItem(`catdai:maib:request:${user.id}:${data.product_key}`);
+          sessionStorage.removeItem(`catdai:maib:request:${user.id}:${data.product_key}${data.quantity > 1 ? `:${data.quantity}` : ''}`);
         } else if (++checks < 24) timer = setTimeout(poll, 5000);
       } catch {
         if (!stopped) { setError(t('maib.statusError')); if (++checks < 24) timer = setTimeout(poll, 5000); }
@@ -62,10 +63,10 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
     if (inFlight.current || !product || !session?.access_token || !accepted || !receiptEmail(email)) return;
     inFlight.current = true; setBusy(true); setError('');
     try {
-      const key = `catdai:maib:request:${user.id}:${product.key}`;
+      const key = `catdai:maib:request:${user.id}:${product.key}${product.quantity > 1 ? `:${product.quantity}` : ''}`;
       const requestKey = sessionStorage.getItem(key) || crypto.randomUUID();
       sessionStorage.setItem(key, requestKey);
-      const response = await fetch('/api/payments/maib/create', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ product_key: product.key, lang, return_to: params.get('return_to'), request_key: requestKey, terms_accepted: accepted, terms_version: MAIB_TERMS_VERSION, receipt_email: receiptEmail(email) }) });
+      const response = await fetch('/api/payments/maib/create', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ product_key: product.key, quantity: product.quantity, lang, return_to: params.get('return_to'), request_key: requestKey, terms_accepted: accepted, terms_version: MAIB_TERMS_VERSION, receipt_email: receiptEmail(email) }) });
       const data = await response.json();
       if (!response.ok) throw new Error('checkout');
       trackPaymentCheckoutEvent('checkout_order_created', { accessToken: session.access_token, provider: 'maib', order_id: data.order_id, product_key: product.key });
@@ -82,7 +83,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
       {result && sandbox && <p className="mt-3 text-sm font-semibold text-amber-800">{t("maib.sandbox")}</p>}
       <section className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         {product && <>
-          <div className="mb-4 flex justify-between gap-4"><div><h2 className="text-xl font-bold">{order?.product_title || t(`profile.paymentProduct.${product.key}`)}</h2><p className="mt-2 text-sm text-gray-600">{t('maib.oneTime')}</p><p className="mt-1 text-sm text-gray-600">{t('maib.quantity')}: {order?.quantity || 1}</p></div><strong className="shrink-0 text-xl">{((order?.amount_minor ?? product.amount_minor) / 100).toLocaleString(lang === 'ru' ? 'ru-MD' : 'ro-MD')} {order?.currency_code || product.currency_code}</strong></div>
+          <div className="mb-4 flex justify-between gap-4"><div><h2 className="text-xl font-bold">{order?.product_title || maibProductTitle(product.key, lang, product.quantity)}</h2><p className="mt-2 text-sm text-gray-600">{t('maib.oneTime')}</p><p className="mt-1 text-sm text-gray-600">{t('maib.quantity')}: {order?.quantity || product.quantity}</p></div><strong className="shrink-0 text-xl">{((order?.amount_minor ?? product.amount_minor) / 100).toLocaleString(lang === 'ru' ? 'ru-MD' : 'ro-MD')} {order?.currency_code || product.currency_code}</strong></div>
           <ul className="mb-5 space-y-3 text-sm">
             {Object.entries(grants).filter(([feature]) => MAIB_FEATURE_LABELS[feature]).map(([feature, count]) => <li key={feature}><p className="font-semibold">{t(MAIB_FEATURE_LABELS[feature])} · {t('maib.uses', { count })}</p>{result && <p className="mt-1 text-gray-600">{t(`maib.service.${feature}`)}</p>}</li>)}
           </ul>

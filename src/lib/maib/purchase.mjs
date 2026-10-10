@@ -1,7 +1,7 @@
 import ro from '../../locales/ro.json' with { type: 'json' };
 import ru from '../../locales/ru.json' with { type: 'json' };
 
-export const MAIB_TERMS_VERSION = '2026-10-06';
+export const MAIB_TERMS_VERSION = '2026-10-10';
 export const MAIB_FEATURE_LABELS = {
   sale_estimate: 'pricing.featureSale', rent_estimate: 'pricing.featureRent',
   listing_analysis: 'pricing.feature999', cadastru_lookup: 'pricing.featureCadastru',
@@ -18,6 +18,7 @@ export function receiptEmail(value) {
 }
 
 export function purchaseMessages(language) { return language === 'ru' ? ru : ro; }
-export function maibProductTitle(key, language) {
-  return purchaseMessages(language)[`profile.paymentProduct.${key}`];
+export function maibProductTitle(key, language, quantity = 1) {
+  const title = purchaseMessages(language)[`profile.paymentProduct.${key}`];
+  return title && quantity > 1 ? `${title} × ${quantity}` : title;
 }

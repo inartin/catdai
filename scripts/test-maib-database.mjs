@@ -112,8 +112,8 @@ assert.equal((await q("select * from claim_maib_receipts('sandbox',1)")).length,
 assert.equal((await q("select relrowsecurity from pg_class where oid='maib_payment_receipts'::regclass"))[0].relrowsecurity,true);
 const bundleUser=crypto.randomUUID();
 await q('insert into auth.users values($1)',[bundleUser]);
-async function purchaseProduct(key, buyer = bundleUser) {
-  const product=maibProduct(key);
+async function purchaseProduct(key, buyer = bundleUser, quantity = 1) {
+  const product=maibProduct(key, quantity);
   const [placed]=await q(`insert into maib_payment_orders(user_id,environment,request_key,product_key,amount_minor,grants)
     values($1,'sandbox',$2,$3,$4,$5) returning *`,[buyer,crypto.randomUUID(),key,product.amount_minor,JSON.stringify(product.grants)]);
   const checkout=crypto.randomUUID(), payment=crypto.randomUUID();
@@ -146,5 +146,17 @@ assert.ok((await allBalances()).every(row=>row.remaining_uses===25),'5 and 20 us
 await q("select consume_user_feature_credit($1,'sale_estimate',$2,'{}')",[allFeaturesUser,'all-feature-sale']);
 await q('select apply_maib_payment($1,$2,$3,$4,$5,$6,$7,$8,now())',[allTwenty.id,'sandbox',allTwenty.checkout,allTwenty.payment,29900,'MDL','refunded',29900]);
 for(const row of await allBalances()) assert.equal(row.remaining_uses,row.feature_key==='sale_estimate'?4:5,'refund preserves the other pack and consumed usage');
+const quantityUser=crypto.randomUUID();
+await q('insert into auth.users values($1)',[quantityUser]);
+const quantityOrder=await purchaseProduct('cadastru_lookup_single',quantityUser,4);
+assert.equal(quantityOrder.amount_minor,7700);
+const quantityBalance=async () => (await q("select remaining_uses,total_used from user_feature_credit_balances where user_id=$1 and feature_key='cadastru_lookup'",[quantityUser]))[0];
+assert.equal((await quantityBalance()).remaining_uses,4,'four discounted searches are granted once despite duplicate confirmations');
+await q("select consume_user_feature_credit($1,'cadastru_lookup',$2,'{}')",[quantityUser,'quantity-search']);
+assert.equal((await quantityBalance()).remaining_uses,3);
+const quantityRefund=[quantityOrder.id,'sandbox',quantityOrder.checkout,quantityOrder.payment,7700,'MDL','refunded',7700];
+await q('select apply_maib_payment($1,$2,$3,$4,$5,$6,$7,$8,now())',quantityRefund);
+assert.equal((await quantityBalance()).remaining_uses,0,'bulk refund removes only the unused searches');
+assert.equal((await quantityBalance()).total_used,1);
 await db.close();
 console.log('MAIB PostgreSQL regression checks passed.');

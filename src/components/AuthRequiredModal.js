@@ -11,6 +11,7 @@ export default function AuthRequiredModal({
   copyKey = "result.comingSoon",
   showAuthOptions = true,
   showCopy = true,
+  dialogClassName = "max-w-md",
   children = null,
   onClose,
 }) {
@@ -44,7 +45,7 @@ export default function AuthRequiredModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative max-w-md w-full rounded-2xl overflow-hidden shadow-2xl bg-white p-6 sm:p-7 cursor-auto"
+        className={`relative w-full rounded-2xl overflow-hidden shadow-2xl bg-white p-6 sm:p-7 cursor-auto ${dialogClassName}`}
         onClick={(event) => event.stopPropagation()}
       >
         <button

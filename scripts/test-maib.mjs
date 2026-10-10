@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import vm from 'node:vm';
-import { maibProduct } from '../src/lib/maib/products.mjs';
+import { maibProduct, maibOrderQuantity, MAX_SINGLE_QUANTITY } from '../src/lib/maib/products.mjs';
 import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '../src/lib/maib/purchase.mjs';
 import * as client from '../src/lib/maib/client.mjs';
 import { getPaymentProvider } from '../src/lib/payment-provider.js';
@@ -35,6 +35,19 @@ for (const [key, count, amount] of [['all_features_5', 5, 99], ['all_features_20
   for (const lang of ['ro', 'ru']) assert.ok(maibProductTitle(key, lang));
 }
 for(const key of ['__proto__','constructor','',null,{}]) assert.equal(maibProduct(key),null);
+for (const key of ['sale_estimate_single','rent_estimate_single','listing_analysis_single','cadastru_lookup_single','yield_calculator_single','pdf_report_single']) {
+  for (const [quantity, amount, percent] of [[1,25,0],[2,45,10],[3,65,13],[4,77,23],[5,89,29],[6,105,30],[7,121,31],[8,137,32],[9,153,32],[10,169,32],[11,179,35],[19,259,45],[20,269,46],[21,282.45,46],[25,336.25,46],[100,1345,46]]) {
+    const product = maibProduct(key, quantity);
+    assert.equal(product.amount_minor, Math.round(amount * 100));
+    assert.equal(product.discount_mdl, Math.round((quantity * 25 - amount) * 100) / 100);
+    assert.equal(product.discount_percent, percent);
+    assert.deepEqual(Object.values(product.grants), [quantity]);
+    assert.equal(maibOrderQuantity({ product_key: key, grants: product.grants }), quantity);
+  }
+}
+for (const quantity of [null,0,-1,1.5,'4',NaN,Infinity,MAX_SINGLE_QUANTITY + 1]) assert.equal(maibProduct('cadastru_lookup_single',quantity),null);
+assert.equal(maibProduct('all_features_5',2),null,'pack quantity cannot be multiplied with the individual discount');
+assert.equal(maibOrderQuantity({product_key:'all_features_5',grants:maibProduct('all_features_5').grants}),1);
 for(const path of ['https://evil.test','//evil.test','/\\evil.test','/\n/evil.test']) assert.equal(client.safeReturnTo(path),'/profile');
 assert.equal(client.safeReturnTo('/evaluare?test=1#result'),'/evaluare?test=1#result');
 assert.equal(client.minorUnits(50.61),5061);
@@ -153,6 +166,7 @@ const fakeDb={
 };
 const service=await loadRoute('src/lib/maib/service.mjs',{
   '../supabase-admin.js':{supabaseAdmin:fakeDb},
+  './products.mjs':{maibOrderQuantity},
   './client.mjs':{...client,maibRequest:async(path,options)=>{
     if(path===`/v2/checkouts/${checkoutId}`)return {id:checkoutId,order:{id},currency:'MDL',amount:99,url:`https://checkout-sandbox.maib.md/${checkoutId}`,payment:{paymentId}};
     if(path===`/v2/payments/${paymentId}`)return {...payment,status:'Executed',refundedAmount:0,isRefundable:true,refundableAmount:99,requestedRefundAmount:0};
@@ -185,19 +199,20 @@ const entry=await loadRoute('src/app/payment/checkout/page.js',{
 for(const mode of ['development','production']) for(const provider of ['maib','paddle']) {
   process.env.NODE_ENV=mode;
   process.env.PAYMENT_PROVIDER=provider;
-  await entry.default({searchParams:Promise.resolve({product_key:'extra_pack',lang:'ru',return_to:'/evaluare?a=1',injected:'discard'})});
+  await entry.default({searchParams:Promise.resolve({product_key:'extra_pack',quantity:'4',lang:'ru',return_to:'/evaluare?a=1',injected:'discard'})});
   const parsed=new URL(redirectedTo,'https://catdai.test');
   assert.equal(parsed.pathname,`/payment/${provider}/checkout`);
   assert.equal(parsed.origin,mode==='development'?'https://dev.catdai.md':'https://catdai.test');
   assert.equal(parsed.searchParams.get('lang'),'ru');assert.equal(parsed.searchParams.get('product_key'),'extra_pack');
+  assert.equal(parsed.searchParams.get('quantity'),'4');
   assert.equal(parsed.searchParams.get('return_to'),'/evaluare?a=1');assert.equal(parsed.searchParams.has('injected'),false);
 }
 delete process.env.PAYMENT_PROVIDER;
-let insertSnapshot, createUser=null, bankCreates=0, bankPayload, expectedBankAmount=99;
-const createDb={from(){let single=false;const query={select(){return query;},eq(){return query;},in(){return query;},update(){return query;},insert(row){insertSnapshot={...row,id,created_at:new Date().toISOString(),status:'pending'};return query;},maybeSingle(){return Promise.resolve({data:null});},single(){single=true;return query;},then(resolve,reject){return Promise.resolve({data:single?insertSnapshot:null}).then(resolve,reject);}};return query;}};
+let insertSnapshot, existingSnapshot=null, createUser=null, bankCreates=0, bankPayload, expectedBankAmount=99;
+const createDb={from(){let single=false;const query={select(){return query;},eq(){return query;},in(){return query;},update(){return query;},insert(row){insertSnapshot={...row,id,created_at:new Date().toISOString(),status:'pending'};return query;},maybeSingle(){return Promise.resolve({data:existingSnapshot});},single(){single=true;return query;},then(resolve,reject){return Promise.resolve({data:single?insertSnapshot:null}).then(resolve,reject);}};return query;}};
 const create=await loadRoute('src/app/api/payments/maib/create/route.js',{
   ...next,'@/lib/supabase-admin':{supabaseAdmin:createDb},'@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
-  '@/lib/payment-provider':{getPaymentProvider},'@/lib/maib/products.mjs':{maibProduct},
+  '@/lib/payment-provider':{getPaymentProvider},'@/lib/maib/products.mjs':{maibProduct,maibOrderQuantity},
   '@/lib/maib/purchase.mjs':{MAIB_TERMS_VERSION,receiptEmail,maibProductTitle},
   '@/lib/maib/client.mjs':{...client,maibRequest:async(path,{body})=>{bankPayload=body;bankCreates++;assert.equal(body.amount,expectedBankAmount);assert.equal(body.currency,'MDL');return {checkoutId,checkoutUrl:`https://checkout-sandbox.maib.md/${checkoutId}`};}},
   '@/lib/maib/service.mjs':{checked:async query=>(await query).data,publicOrder:x=>x},
@@ -243,6 +258,34 @@ for (const key of ['all_features_5', 'all_features_20', 'pdf_report_single']) {
   assert.equal((await create.POST(createRequest({...purchaseBody, product_key:key, request_key:crypto.randomUUID(), grants:{pdf_report:999}, amount_minor:1}))).status,200);
   assert.equal(insertSnapshot.amount_minor, product.amount_minor);
   assert.deepEqual(insertSnapshot.grants, product.grants, 'checkout snapshots server grants for the selected offer');
+}
+const bulkBody={...purchaseBody,product_key:'cadastru_lookup_single',quantity:4,request_key:crypto.randomUUID(),amount_minor:1,grants:{cadastru_lookup:999}};
+expectedBankAmount=77;
+assert.equal((await create.POST(createRequest(bulkBody))).status,200);
+assert.equal(insertSnapshot.amount_minor,7700);
+assert.deepEqual(insertSnapshot.grants,{cadastru_lookup:4});
+assert.equal(insertSnapshot.product_title,maibProductTitle('cadastru_lookup_single','ro',4));
+assert.equal(service.publicOrder(insertSnapshot).quantity,4);
+assert.equal(bankPayload.orderInfo.items[0].amount,77,'bank receives the discounted bundle total');
+assert.equal(bankPayload.orderInfo.items[0].quantity,1,'non-uniform unit pricing is submitted as one bundle');
+for (const quantity of [null,0,-1,1.5,'4',MAX_SINGLE_QUANTITY + 1]) {
+  assert.equal((await create.POST(createRequest({...bulkBody,quantity}))).status,400);
+}
+assert.equal((await create.POST(createRequest({...purchaseBody,quantity:4}))).status,400,'individual quantities cannot multiply packs');
+existingSnapshot={...insertSnapshot,amount_minor:9400};
+const bankCreatesBeforeReplay=bankCreates;
+const replayResponse=await create.POST(createRequest(bulkBody));
+assert.equal(replayResponse.status,200);
+assert.equal((await replayResponse.json()).amount_minor,9400,'existing orders retain their original price after a pricing change');
+assert.equal(bankCreates,bankCreatesBeforeReplay,'identical bulk request reuses its order');
+assert.equal((await create.POST(createRequest({...bulkBody,quantity:3}))).status,409,'a reused request key cannot change quantity');
+existingSnapshot=null;
+for (const [quantity, amount] of [[1,25],[3,65],[5,89],[10,169],[20,269],[21,282.45],[25,336.25],[100,1345]]) {
+  expectedBankAmount=amount;
+  assert.equal((await create.POST(createRequest({...bulkBody,quantity,request_key:crypto.randomUUID()}))).status,200);
+  assert.equal(insertSnapshot.amount_minor,Math.round(amount * 100),'checkout uses the server price tier');
+  assert.deepEqual(insertSnapshot.grants,{cadastru_lookup:quantity});
+  assert.equal(service.publicOrder(insertSnapshot).quantity,quantity);
 }
 let freeDbCalls=0;
 const freeUsage=await loadRoute('src/lib/free-monthly-feature-usage.js',{

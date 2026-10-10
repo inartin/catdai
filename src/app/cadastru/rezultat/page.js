@@ -702,15 +702,12 @@ function CadastruResultContent() {
         open={isPaywallModalOpen && isAuthenticated}
         copyKey="payment.buyAccess"
         showAuthOptions={false}
+        showCopy={false}
+        dialogClassName="max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto border border-gray-200"
         onClose={() => setIsPaywallModalOpen(false)}
       >
         {purchaseOffer ? (
-          <>
-            <p className="mb-4 text-center text-sm font-medium text-gray-500">
-              {t("payment.limitPackageSubtitle")}
-            </p>
-            <FeaturePricingAction offer={purchaseOffer} trackPopupOpen />
-          </>
+          <FeaturePricingAction offer={purchaseOffer} variant="cadastru" trackPopupOpen />
         ) : null}
       </AuthRequiredModal>
       <Navbar />
@@ -766,7 +763,8 @@ function CadastruResultContent() {
               <CadastralDataCard
                 cadastral={state.data}
                 locked={isLockedPreview}
-                showRevealButton={!isAuthenticated}
+                showRevealButton={isLockedPreview}
+                revealButtonLabel={t(isAuthenticated ? "cadastru.payToUnlock" : "cadastru.unlockData")}
                 onLockedClick={isLockedPreview ? () => {
                   if (isAuthenticated) {
                     setIsPaywallModalOpen(true);

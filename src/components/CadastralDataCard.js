@@ -10,6 +10,7 @@ export default function CadastralDataCard({
   onLockedClick,
   forceDesktopLayout = false,
   showRevealButton = false,
+  revealButtonLabel,
   children,
 }) {
   const { lang, t } = useTranslation();
@@ -194,7 +195,7 @@ export default function CadastralDataCard({
                   className="absolute inset-y-0 left-1/2 inline-flex h-10 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 sm:px-5"
                 >
                   <LockIcon size={16} strokeWidth={2.2} />
-                  {t("cadastru.unlockData")}
+                  {revealButtonLabel || t("cadastru.unlockData")}
                 </button>
               )}
             </div>

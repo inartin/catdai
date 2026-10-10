@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CustomRequestCard, CustomRequestModal } from "@/components/Pricing";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import usePaymentProvider from "@/components/usePaymentProvider";
-import { maibProduct } from "@/lib/maib/products.mjs";
+import { maibProduct, MAX_SINGLE_QUANTITY } from "@/lib/maib/products.mjs";
 import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 
@@ -14,8 +13,10 @@ export default function PricingPackages() {
   const { session, loading: authLoading } = useAuth();
   const provider = usePaymentProvider();
   const trackedRef = useRef(false);
-  const [customRequestOpen, setCustomRequestOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState("cadastru_lookup");
+  const [quantity, setQuantity] = useState(1);
+  const recommendFivePack = quantity >= 4 && quantity <= 5;
+  const recommendTwentyPack = quantity === 20;
 
   useEffect(() => {
     if (authLoading || trackedRef.current) return;
@@ -39,9 +40,10 @@ export default function PricingPackages() {
     { key: "twenty", productKey: "all_features_20" },
   ];
 
-  const startCheckout = (productKey) => {
+  const startCheckout = (productKey, selectedQuantity = 1) => {
     const url = new URL("/payment/maib/checkout", paymentSiteOrigin(window.location.origin));
     url.searchParams.set("product_key", productKey);
+    if (selectedQuantity > 1) url.searchParams.set("quantity", String(selectedQuantity));
     url.searchParams.set("lang", lang);
     window.location.assign(url.toString());
   };
@@ -61,16 +63,61 @@ export default function PricingPackages() {
         <div className="mt-10 grid items-stretch gap-4 gap-y-6 md:grid-cols-3">
           {offers.map(({ key, productKey }) => {
             const single = key === "single";
-            const product = maibProduct(productKey);
+            const product = maibProduct(productKey, single ? quantity : 1);
+            const numberLocale = lang === "ru" ? "ru-MD" : "ro-MD";
+            const price = product.amount_mdl.toLocaleString(numberLocale, { maximumFractionDigits: 2 });
             return (
               <article key={key} className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 className="min-h-10 text-base font-extrabold text-gray-950">{t(`pricing.features.${key}.title`)}</h2>
+                {single ? (
+                  <>
+                    <h2 className="sr-only">{t(quantity > 1 ? "pricing.individualUses" : "pricing.features.single.title", { count: quantity })}</h2>
+                    <div className="flex min-h-10 flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center rounded-lg border border-gray-200" role="group" aria-label={t("maib.quantity")}>
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(value => Math.max(1, value - 1))}
+                            disabled={quantity === 1}
+                            aria-label={t("pricing.decreaseQuantity")}
+                            className="h-8 w-8 cursor-pointer rounded-l-lg text-lg font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+                          >−</button>
+                          <span aria-live="polite" className="min-w-8 text-center text-sm font-semibold tabular-nums text-gray-950">{quantity}</span>
+                          <button
+                            type="button"
+                            onClick={() => setQuantity(value => Math.min(MAX_SINGLE_QUANTITY, value + 1))}
+                            disabled={quantity === MAX_SINGLE_QUANTITY}
+                            aria-label={t("pricing.increaseQuantity")}
+                            className="h-8 w-8 cursor-pointer rounded-r-lg text-lg font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
+                          >+</button>
+                        </div>
+                        {(lang !== "ru" || quantity === 1) && (
+                          <span className="text-sm font-semibold text-gray-950">{t(`pricing.quantityUnit.${new Intl.PluralRules(lang).select(quantity)}`)}</span>
+                        )}
+                      </div>
+                      {product.discount_mdl > 0 && (
+                        <span className="ml-auto shrink-0 text-right text-sm font-semibold tabular-nums text-primary">{t("pricing.quantitySavings", { percent: product.discount_percent, amount: product.discount_mdl.toLocaleString(numberLocale, { maximumFractionDigits: 2 }) })}</span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <h2 className="min-h-10 text-base font-extrabold text-gray-950">{t(`pricing.features.${key}.title`)}</h2>
+                )}
                 <p className="mt-4 text-4xl font-extrabold tracking-tight text-gray-950">
-                  {product.amount_mdl} <span className="text-xl">MDL</span>
+                  {price} <span className="text-xl">MDL</span>
                 </p>
                 <p className="mt-3 min-h-10 text-sm leading-5 text-gray-500">
                   {t(`pricing.features.${key}.desc`)}
                 </p>
+                {single && (recommendFivePack || recommendTwentyPack) && (
+                  <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3.5 text-sm leading-5 text-gray-700">
+                    <p>{t(recommendTwentyPack ? "pricing.twentyPackRecommendation" : "pricing.fivePackRecommendation")}</p>
+                    {provider === "maib" && (
+                      <button type="button" onClick={() => startCheckout(recommendTwentyPack ? "all_features_20" : "all_features_5")} className="mt-2 cursor-pointer text-left font-semibold text-primary hover:underline">
+                        {t(recommendTwentyPack ? "pricing.chooseTwentyPack" : "pricing.chooseFivePack")} →
+                      </button>
+                    )}
+                  </div>
+                )}
                 <fieldset className="mt-5 flex-1 border-t border-gray-100">
                   <legend className="sr-only">{t(single ? "pricing.selectOneFeature" : "payment.packageIncludesLabel")}</legend>
                   {features.map(([feature, label]) => (
@@ -86,7 +133,7 @@ export default function PricingPackages() {
                             className="h-4 w-4 shrink-0 accent-green-700"
                           />
                           <span className="flex-1">{t(label)}</span>
-                          <span className="font-bold tabular-nums text-gray-900">1</span>
+                          <span className="font-bold tabular-nums text-gray-900">{quantity}</span>
                         </label>
                       ) : (
                         <div className="flex min-h-14 items-center gap-2.5 py-2.5 text-sm leading-5 text-gray-700">
@@ -100,13 +147,21 @@ export default function PricingPackages() {
                     </div>
                   ))}
                 </fieldset>
-                <p className="mt-5 min-h-16 rounded-xl bg-gray-50 px-3.5 py-2.5 text-xs font-semibold leading-5 text-gray-500">
-                  {t(single && selectedFeature === "pdf_report" ? "pricing.pdfOnlyNote" : "pricing.previewPackNote")}
-                </p>
+                {single && selectedFeature === "pdf_report" && (
+                  <p className="mt-5 text-xs leading-5 text-gray-500">
+                    {t("pricing.pdfOnlyNote")}
+                  </p>
+                )}
+                {single && (
+                  <div role="status" className="mt-4 flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3.5 text-sm leading-5 text-gray-900">
+                    <span>{t(`pricing.selection.${selectedFeature}.${new Intl.PluralRules(lang).select(quantity)}`, { count: quantity })}</span>
+                    <strong className="shrink-0 tabular-nums">{price} lei</strong>
+                  </div>
+                )}
                 {provider === "maib" && (
                   <button
                     type="button"
-                    onClick={() => startCheckout(productKey)}
+                    onClick={() => startCheckout(productKey, single ? quantity : 1)}
                     className="mt-4 inline-flex w-full cursor-pointer items-center justify-center rounded-xl bg-gray-950 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-gray-800"
                   >
                     {t("pricing.previewBuy")}
@@ -120,12 +175,7 @@ export default function PricingPackages() {
         <p className="mt-6 text-center text-xs leading-5 text-gray-500">
           {t(provider === "maib" ? "pricing.previewDelivery" : "pricing.previewMaibUnavailable")}
         </p>
-        <CustomRequestCard onOpen={() => setCustomRequestOpen(true)} />
       </div>
-      <CustomRequestModal
-        open={customRequestOpen}
-        onClose={() => setCustomRequestOpen(false)}
-      />
     </section>
   );
 }

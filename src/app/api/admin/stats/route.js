@@ -691,16 +691,18 @@ export async function DELETE(request) {
   if (unauthorized) return unauthorized;
 
   const params = request.nextUrl.searchParams;
-  const idValue = params.get("failedApiEventId");
+  const idValue = params.get("apiEventId") ?? params.get("failedApiEventId");
   const deleteAll = params.get("allFailedApiEvents") === "1";
   const id = Number(idValue);
-  if ((deleteAll && params.has("failedApiEventId"))
+  if ((params.has("apiEventId") && params.has("failedApiEventId"))
+    || (deleteAll && (params.has("apiEventId") || params.has("failedApiEventId")))
     || (!deleteAll && (!Number.isSafeInteger(id) || id <= 0))) {
-    return NextResponse.json({ error: "Specify a failed API log id or all failed logs." }, { status: 400 });
+    return NextResponse.json({ error: "Specify an API log id or all failed logs." }, { status: 400 });
   }
 
   try {
-    const { error } = await supabaseAdmin.rpc("delete_failed_external_api_logs", {
+    const rpcName = params.has("apiEventId") ? "delete_external_api_log" : "delete_failed_external_api_logs";
+    const { error } = await supabaseAdmin.rpc(rpcName, {
       p_event_id: deleteAll ? null : id,
     });
     if (error) {
@@ -713,8 +715,8 @@ export async function DELETE(request) {
     cache = { data: null, ts: 0 };
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[admin-stats] failed API log deletion failed:", error.message);
-    return NextResponse.json({ error: "Failed to delete failed API logs." }, { status: 500 });
+    console.error("[admin-stats] API log deletion failed:", error.message);
+    return NextResponse.json({ error: "Failed to delete API logs." }, { status: 500 });
   }
 }
 

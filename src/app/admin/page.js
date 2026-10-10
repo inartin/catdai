@@ -579,10 +579,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const deleteFailedExternalApiLogs = async (row = null) => {
-    if (deletingExternalApiEventId !== null || (row && row.status !== "failure")) return;
+  const deleteExternalApiLogs = async (row = null) => {
+    if (deletingExternalApiEventId !== null) return;
     const confirmed = window.confirm(row
-      ? "Permanently delete this failed API log and its request/response details? The failed count and total will decrease by one."
+      ? "Permanently delete this API log and its request/response details? Its status count and total will decrease by one."
       : "Permanently delete ALL failed API logs across all dates, including logs outside the current table, and reset all failed usage counts to zero?");
     if (!confirmed) return;
 
@@ -590,7 +590,7 @@ export default function AdminDashboard() {
     setExternalApiDeleteError(null);
     try {
       const params = new URLSearchParams(row
-        ? { failedApiEventId: row.id }
+        ? { apiEventId: row.id }
         : { allFailedApiEvents: "1" });
       const res = await fetch(`/api/admin/stats?${params.toString()}`, { method: "DELETE" });
       const data = await res.json().catch(() => ({}));
@@ -607,7 +607,7 @@ export default function AdminDashboard() {
       }));
       await loadStats({ fresh: true });
     } catch (err) {
-      setExternalApiDeleteError(err.message || "Failed to delete failed API logs");
+      setExternalApiDeleteError(err.message || "Failed to delete API logs");
     } finally {
       setDeletingExternalApiEventId(null);
     }
@@ -1379,7 +1379,7 @@ export default function AdminDashboard() {
               <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-5 py-3">
                 <button
                   type="button"
-                  onClick={() => deleteFailedExternalApiLogs()}
+                  onClick={() => deleteExternalApiLogs()}
                   disabled={deletingExternalApiEventId !== null || !s.externalApiUsage?.detailsAvailable}
                   className="cursor-pointer rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -1502,21 +1502,19 @@ export default function AdminDashboard() {
                                   {row.user_name || "Anonymous"}
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  {row.status === "failure" && (
-                                    <button
-                                      type="button"
-                                      aria-label={`Delete failed API log ${row.id}`}
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        deleteFailedExternalApiLogs(row);
-                                      }}
-                                      onKeyDown={(event) => event.stopPropagation()}
-                                      disabled={deletingExternalApiEventId !== null}
-                                      className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      {deletingExternalApiEventId === row.id ? "Deleting..." : "Delete"}
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    aria-label={`Delete API log ${row.id}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      deleteExternalApiLogs(row);
+                                    }}
+                                    onKeyDown={(event) => event.stopPropagation()}
+                                    disabled={deletingExternalApiEventId !== null}
+                                    className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {deletingExternalApiEventId === row.id ? "Deleting..." : "Delete"}
+                                  </button>
                                 </td>
                               </tr>
                               {expanded && (

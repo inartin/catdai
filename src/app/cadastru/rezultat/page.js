@@ -8,6 +8,7 @@ import BackButton from "@/components/BackButton";
 import CadastralDataCard from "@/components/CadastralDataCard";
 import CadastruNearbyCard from "@/components/CadastruNearbyCard";
 import CadastruPublicTransportCard from "@/components/CadastruPublicTransportCard";
+import CadastruMunicipalReportsCard from "@/components/CadastruMunicipalReportsCard";
 import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
@@ -16,7 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { matchCity, validateCadastralNumber } from "@/lib/validation";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
 import { resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
-import { validNearbyResult } from "@/lib/cadastru-nearby";
+import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
 
 const inFlightCadastralLookups = new Map();
 const inFlightAddressLookups = new Map();
@@ -428,6 +429,7 @@ function CadastruResultContent() {
   const loadedRequestKey = useRef("");
   const loadedNearbyKey = useRef("");
   const loadedTransportKey = useRef("");
+  const loadedReportsKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("cadastru.loginToUse");
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
@@ -438,6 +440,7 @@ function CadastruResultContent() {
   });
   const [nearbyState, setNearbyState] = useState({ key: "", data: null, loading: false, error: false });
   const [transportState, setTransportState] = useState({ key: "", data: null, loading: false, error: false });
+  const [reportsState, setReportsState] = useState({ key: "", data: null, loading: false, error: false });
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
   const purchaseOffer = state.data?.access_limit?.purchase || null;
   const cadastralCardRef = useRef(null);
@@ -483,11 +486,9 @@ function CadastruResultContent() {
     : "";
   const nearbyNumber = cadastralNumber || (!state.data?.locked_sections?.cadastral_number ? state.data?.cadastral_number : "") || "";
   const nearbyKey = `${nearbyAddress || nearbyNumber}|${isAuthenticated ? "authenticated" : "anonymous"}|${skipCache}`;
-  const nearbyData = (validNearbyResult(state.data?.nearby) ? state.data.nearby : null)
-    || (nearbyState.key === nearbyKey ? nearbyState.data : null);
+  const nearbyData = nearbyState.key === nearbyKey ? nearbyState.data : null;
   const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);
-  const nearbyDone = !nearbySearchAvailable || Boolean(validNearbyResult(state.data?.nearby))
-    || Boolean(nearbyState.key === nearbyKey && !nearbyState.loading && (nearbyState.data || nearbyState.error));
+  const reportsAvailable = municipalReportsAvailableForCadastru(state.data);
 
   useEffect(() => {
     if (!cadastralNumber && !isAddressPreviewHandoff && !savedAddressKey) return;
@@ -623,7 +624,7 @@ function CadastruResultContent() {
 
   useEffect(() => {
     if (!state.data) return;
-    if (validNearbyResult(state.data.nearby) || !nearbySearchAvailable) return;
+    if (!nearbySearchAvailable) return;
     if (loadedNearbyKey.current === nearbyKey) return;
 
     let active = true;
@@ -658,7 +659,7 @@ function CadastruResultContent() {
   }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, state.data]);
 
   useEffect(() => {
-    if (!state.data || !nearbyDone || !nearbySearchAvailable) return;
+    if (!state.data || !nearbySearchAvailable) return;
     if (loadedTransportKey.current === nearbyKey) return;
 
     let active = true;
@@ -689,7 +690,49 @@ function CadastruResultContent() {
       cancelAnimationFrame(firstFrame);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [nearbyAddress, nearbyDone, nearbyKey, nearbyNumber, nearbySearchAvailable, state.data]);
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, state.data]);
+
+  useEffect(() => {
+    if (!state.data || !nearbySearchAvailable || !reportsAvailable) return;
+    if (loadedReportsKey.current === nearbyKey) return;
+
+    let active = true;
+    let frame;
+    const controller = new AbortController();
+    // Run independently of nearby places and transport once the main result has painted.
+    const firstFrame = requestAnimationFrame(() => {
+      if (!active) return;
+      setReportsState({ key: nearbyKey, data: null, loading: true, error: false });
+      frame = requestAnimationFrame(async () => {
+        try {
+          const response = await fetch("/api/cadastru/municipal-reports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...(nearbyAddress ? { address: nearbyAddress } : {}),
+              ...(validateCadastralNumber(nearbyNumber).valid ? { cadastral_number: nearbyNumber } : {}),
+            }),
+            signal: controller.signal,
+          });
+          const result = await response.json();
+          if (!active) return;
+          const valid = response.ok && validMunicipalReportsResult(result.municipal_reports);
+          loadedReportsKey.current = nearbyKey;
+          setReportsState({ key: nearbyKey, data: valid ? result.municipal_reports : null, loading: false, error: !valid });
+        } catch {
+          if (!active) return;
+          loadedReportsKey.current = nearbyKey;
+          setReportsState({ key: nearbyKey, data: null, loading: false, error: true });
+        }
+      });
+    });
+    return () => {
+      active = false;
+      controller.abort();
+      cancelAnimationFrame(firstFrame);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, reportsAvailable, state.data]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -793,7 +836,7 @@ function CadastruResultContent() {
           {state.data && (
             <CadastruNearbyCard
               nearby={nearbyData}
-              loading={nearbyState.key === nearbyKey && nearbyState.loading}
+              loading={nearbySearchAvailable && (nearbyState.key !== nearbyKey || nearbyState.loading)}
               unavailable={!nearbySearchAvailable || (nearbyState.key === nearbyKey && nearbyState.error)}
             />
           )}
@@ -830,8 +873,15 @@ function CadastruResultContent() {
           {state.data && (
             <CadastruPublicTransportCard
               transport={transportState.key === nearbyKey ? transportState.data : null}
-              loading={nearbySearchAvailable && (!nearbyDone || transportState.key !== nearbyKey || transportState.loading)}
+              loading={nearbySearchAvailable && (transportState.key !== nearbyKey || transportState.loading)}
               unavailable={!nearbySearchAvailable || (transportState.key === nearbyKey && transportState.error)}
+            />
+          )}
+          {state.data && reportsAvailable && (
+            <CadastruMunicipalReportsCard
+              reports={reportsState.key === nearbyKey ? reportsState.data : null}
+              loading={nearbySearchAvailable && (reportsState.key !== nearbyKey || reportsState.loading)}
+              unavailable={!nearbySearchAvailable || (reportsState.key === nearbyKey && reportsState.error)}
             />
           )}
           {state.data && (

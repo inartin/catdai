@@ -66,6 +66,8 @@ export default function CadastruNearbyCard({ nearby, loading, unavailable }) {
           ))}
         </div>
       ) : null}
+      {nearby?.cache?.stale ? <p className="mt-5 text-xs text-gray-500">{t("cadastru.nearbyStale")}</p> : null}
+      {nearby?.incomplete ? <p className="mt-5 text-xs text-gray-500">{t("cadastru.nearbyIncomplete")}</p> : null}
       {nearby ? (
         <p className="mt-6 text-xs text-gray-400">
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 hover:underline">

@@ -577,7 +577,7 @@ export async function getCadastruRecordByNumber(cadastralNumber, options = {}) {
   if (!isCadastruDbEnabled()) return null;
   try {
     const row = await findRecordByNumber(cadastralNumber);
-    if (!row || !isFreshCadastru(recordExpiry(row))) return null;
+    if (!row || (!options.allowExpired && !isFreshCadastru(recordExpiry(row)))) return null;
     if (options.requireDetailPayload && isAddressResolverOnlyRecord(row)) return null;
     const entry = recordEntry(row);
     await writeCadastruCache("number", cadastralNumber, entry);
@@ -607,11 +607,11 @@ export async function persistCadastruNearby(entry, nearby, address = null) {
   return updatedEntry.payload;
 }
 
-async function resolveAddressEntry(entry) {
-  if (!entry || !isFreshCadastru(entry.expiresAt)) return null;
+async function resolveAddressEntry(entry, options = {}) {
+  if (!entry || (!options.allowExpired && !isFreshCadastru(entry.expiresAt))) return null;
   // Resolve single-property aliases through the same canonical record as number searches.
   if (entry.payload.cadastral_number) {
-    const canonical = await getCadastruRecordByNumber(entry.payload.cadastral_number);
+    const canonical = await getCadastruRecordByNumber(entry.payload.cadastral_number, options);
     if (!canonical) return entry;
     if (cleanText(canonical.payload?.district) || cleanText(canonical.payload?.form_fields?.district)) return canonical;
 
@@ -639,17 +639,17 @@ export async function getCadastruRecordByAddress(rawAddress, options = {}) {
   const normalized = normalizeCadastruAddressForDb(rawAddress);
   if (!normalized) return null;
   const cached = await readCadastruCache("address", normalized);
-  if (cached) return resolveAddressEntry(cached);
+  if (cached) return resolveAddressEntry(cached, options);
   if (!isCadastruDbEnabled()) return null;
   try {
     const { data: aliases, error: aliasError } = await supabaseAdmin.from("cadastru_address_aliases")
       .select("raw_payload, lookup_source, expires_at").eq("address_key", normalized).limit(1);
     logDbError("address alias lookup failed", aliasError);
     const alias = aliases?.[0];
-    if (alias && isFreshCadastru(alias.expires_at)) {
+    if (alias && (options.allowExpired || isFreshCadastru(alias.expires_at))) {
       const entry = { payload: alias.raw_payload, lookupSource: alias.lookup_source, expiresAt: alias.expires_at };
       await writeCadastruCache("address", normalized, entry);
-      return resolveAddressEntry(entry);
+      return resolveAddressEntry(entry, options);
     }
     const structured = options.structuredAddress || {};
     if (!structured.city || !structured.houseNumber) return null;
@@ -658,7 +658,7 @@ export async function getCadastruRecordByAddress(rawAddress, options = {}) {
     query = structured.apartmentNumber ? query.eq("apartment_number", structured.apartmentNumber) : query.is("apartment_number", null);
     const { data, error } = await query.limit(100);
     logDbError("structured address lookup failed", error);
-    const matches = (data || []).filter((row) => isFreshCadastru(recordExpiry(row)) && recordMatchesStructuredAddress(row, normalized, structured));
+    const matches = (data || []).filter((row) => (options.allowExpired || isFreshCadastru(recordExpiry(row))) && recordMatchesStructuredAddress(row, normalized, structured));
     // An address without an apartment can describe several parcels/buildings. Only an exact saved aggregate is safe.
     if (!structured.apartmentNumber || matches.length !== 1) return null;
     const entry = recordEntry(matches[0]);

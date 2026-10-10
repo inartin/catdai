@@ -177,3 +177,13 @@ export async function fetchExternalPublicTransportData(location) {
     { timeoutMs: 70_000, preserveWorkerError: true }
   );
 }
+
+export async function fetchExternalMunicipalReportsData(location) {
+  return fetchSignedExternalCadastru(
+    "v1/municipal-reports",
+    location,
+    process.env.MUNICIPAL_REPORTS_EXTERNAL_API_URL,
+    "cadastru_nearby",
+    { timeoutMs: 70_000, preserveWorkerError: true }
+  );
+}

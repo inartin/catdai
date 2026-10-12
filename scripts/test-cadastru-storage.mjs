@@ -266,7 +266,20 @@ await addressRoute.POST(request({ ...addressBody, skip_cache: true }));
 assert.equal(addressFetches, 2, "address skipcache bypasses Redis and DB");
 await numberRoute.POST(request({ cadastral_number: number, skipcache: true }));
 assert.equal(numberFetches, 1, "number skipcache bypasses Redis and DB");
-assert.equal(enrichFetches, 1);
+assert.equal(enrichFetches, 0, "AWS detail enrichment is disabled even on fresh worker results");
+for (const code of ["external_cadastru_timeout", "external_cadastru_unreachable", "service_unavailable", "external_cadastru_not_configured"]) {
+  let localFetches = 0;
+  const unavailable = await load("src/app/api/cadastral/route.js", {
+    ...routeMocks,
+    "@/lib/cadastru-external-api": { fetchExternalCadastralData: async () => {
+      throw Object.assign(new Error("worker unavailable"), { code, fallbackEligible: true });
+    } },
+  }, { fetch: async () => { localFetches++; throw new Error("Unexpected local request"); } });
+  const response = await unavailable.POST(request({ cadastral_number: number, skip_cache: true }));
+  assert.equal(response.status, 503);
+  assert.equal(localFetches, 0);
+  assert.equal(enrichFetches, 0);
+}
 hasCredit = false;
 await numberRoute.POST(request({ cadastral_number: number, skip_cache: true }));
 assert.equal(numberFetches, 2);
@@ -340,10 +353,9 @@ assert.deepEqual((await ambiguous.json()).suggestions, ["Grenoble"]);
 assert.equal(fallbackCalls, 0);
 externalFailure = Object.assign(new Error("offline"), { fallbackEligible: true });
 streetResponse = await (await streetRoute.POST(request({ ...streetBody, skip_cache: true }))).json();
-assert.equal(fallbackCalls, 1);
-assert.equal(streetResponse.resolved_address, grenobleAddress);
-assert.equal(streetResponse.street_resolution.original, "гренобля");
-console.log("Street route regressions passed: shared cache, aliases, previews, ambiguity, worker errors, canonical fallback.");
+assert.equal(fallbackCalls, 0, "AWS backup remains disabled for canonical street lookups");
+assert.equal(streetResponse.error, "service_unavailable");
+console.log("Street route regressions passed: shared cache, aliases, previews, ambiguity, worker errors, disabled fallback.");
 
 const adapter = await load("@/lib/cadastru-external-api", {
   "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => {} },
@@ -439,7 +451,9 @@ assert.equal(suggested.status, 502);
 assert.equal((await suggested.json()).suggestions, undefined);
 suggestionFailure.fallbackEligible = true;
 suggested = await suggestionsRoute.POST(request(baltiRequest));
-assert.equal((await suggested.json()).suggestions[0], "Alexandr Radișcev");
+assert.equal(suggested.status, 503);
+assert.equal((await suggested.json()).suggestions, undefined);
+assert.equal(backupLookups, 0);
 backupFailure = Object.assign(new Error("timeout"), { name: "TimeoutError" });
 suggested = await suggestionsRoute.POST(request(baltiRequest));
 assert.equal(suggested.status, 503);
@@ -586,8 +600,8 @@ failed = await createFailure();
 workerUnavailable = true;
 backupHasResult = true;
 retry = await recoveryRoute.POST(request(retryBody(failed.failure)));
-assert.equal(retry.status, 200);
-assert.equal(failed.event.suggestion_recovery.lookup_source, "local", "local backup success recovers the original failed call");
+assert.equal(retry.status, 503, "worker outage never invokes the retained local backup");
+assert.equal(failed.event.suggestion_recovery, undefined);
 workerUnavailable = false;
 backupHasResult = false;
 
@@ -620,7 +634,7 @@ assert.equal(failed.event.suggestion_recovery, undefined, "development retries d
 workerMissing = true;
 const devFailure = await (await developmentRoute.POST(request(baltiRequest))).json();
 assert.equal(devFailure.suggestion_recovery_token, undefined);
-console.log("Suggestion recovery regressions passed: failed versus successful clicks, previews, cache/local results, original status, first success, manual edits, token tampering/expiry, property identity and development suppression.");
+console.log("Suggestion recovery regressions passed: failed versus successful clicks, previews, cache results, disabled local fallback, original status, first success, manual edits, token tampering/expiry, property identity and development suppression.");
 
 // A confirmation response does not persist a property result or consume a credit.
 const houseFields = { city: "Chișinău", road_type: "strada", street: "Ion Creangă", house_number: "82", apartment_number: "167", skip_cache: true };
@@ -661,8 +675,8 @@ assert.deepEqual(clone((await houseResponse.json()).address_suggestions), [house
 assert.equal(houseWrites, 0); assert.equal(houseCredits, 0); assert.equal(houseBackup, 0);
 houseUnavailable = true;
 houseResponse = await houseRoute.POST(request(houseFields));
-assert.equal(houseResponse.status, 422, "verified local suggestion takes precedence over a failed worker");
-assert.equal(houseWrites, 0); assert.equal(houseCredits, 0); assert.equal(houseBackup, 1);
+assert.equal(houseResponse.status, 503, "worker failure does not trigger local suggestion lookups");
+assert.equal(houseWrites, 0); assert.equal(houseCredits, 0); assert.equal(houseBackup, 0);
 houseConfirmed = true;
 houseResponse = await houseRoute.POST(request({ ...houseFields, house_number: "82/1" }));
 assert.equal(houseResponse.status, 200);
@@ -674,7 +688,7 @@ const houseCallsBeforeCache = houseWorkerCalls;
 houseResponse = await houseRoute.POST(request({ ...houseFields, house_number: "82/1" }));
 assert.equal(houseResponse.status, 200, "cached local confirmation skips the unavailable worker");
 assert.equal(houseWorkerCalls, houseCallsBeforeCache);
-assert.equal(houseBackup, 1); assert.equal(houseWrites, 2); assert.equal(houseCredits, 2);
+assert.equal(houseBackup, 0); assert.equal(houseWrites, 2); assert.equal(houseCredits, 2);
 houseCachedMatch = null;
 
 let houseTimeout;
@@ -792,9 +806,11 @@ console.log("Locality regressions passed: signed worker fields, local land/build
 
 // Worker outages must stay distinct from confirmed empty local lookups.
 for (const mode of ["http503", "gateway", "network", "timeout", "invalid"]) {
+  let localCalls = 0;
   const outageRoute = await load("src/app/api/cadastru/address/route.js", {
     ...recoveryMocks,
     "@/lib/cadastru-address-search": { getVerifiedAddressAlternative: () => null, findCadastralByAddress: async () => {
+      localCalls++;
       throw Object.assign(new Error("Could not match apartment 59."), { code: "not_found" });
     } },
   }, {
@@ -809,10 +825,12 @@ for (const mode of ["http503", "gateway", "network", "timeout", "invalid"]) {
   const response = await outageRoute.POST(request({ city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63", apartment_number: "59", search_context: "cadastru", skip_cache: true }));
   const payload = await response.json();
   assert.equal(response.status, 503, mode);
+  assert.equal(localCalls, 0, "no local lookup on worker failure");
   assert.equal(payload.error, "service_unavailable");
   assert.equal(payload.suggestions, undefined);
   assert.equal(payload.suggestion_recovery_token, undefined);
   assert.equal(tables.external_api_usage_events.at(-1).request_payload.apartment_number, "59");
+  assert.match(tables.external_api_usage_events.at(-1).response_headers["x-request-id"], /^[a-f0-9-]{36}$/);
 }
 
 // Exercise actual local upstream handling, not only the route's error mapping.

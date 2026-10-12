@@ -10,6 +10,7 @@ import CadastruNearbyCard from "@/components/CadastruNearbyCard";
 import CadastruPublicTransportCard from "@/components/CadastruPublicTransportCard";
 import CadastruMunicipalReportsCard from "@/components/CadastruMunicipalReportsCard";
 import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
+import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
 import { useTranslation } from "@/context/LanguageContext";
@@ -790,8 +791,9 @@ function CadastruResultContent() {
           )}
 
           {state.loading && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-6 text-gray-600 shadow-sm sm:p-8">
-              {t("cadastru.searching")}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
+              <CadastruLoadingIcon className="mb-4 h-16 w-auto text-primary" />
+              <p className="text-base font-semibold text-gray-900">{t("cadastru.searching")}</p>
             </div>
           )}
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
+import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { validateCadastralNumber } from "@/lib/validation";
@@ -429,11 +430,16 @@ export default function CadastruSearchForm({
           type="button"
           onClick={submitNumberSearch}
           disabled={lookupState.loading || authLoading}
-          className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-6 text-base font-semibold text-gray-800 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 sm:w-auto"
+          className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-6 text-base font-semibold text-gray-800 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-700 sm:w-auto"
         >
-          {lookupState.loading && lookupState.method === "number"
-            ? t("cadastru.searching")
-            : t("cadastru.numberSearchButton")}
+          {lookupState.loading && lookupState.method === "number" ? (
+            <span className="inline-flex items-center gap-2">
+              <CadastruLoadingIcon className="h-7 w-auto text-primary shrink-0" />
+              <span className="text-gray-800 font-semibold">{t("cadastru.searching")}</span>
+            </span>
+          ) : (
+            t("cadastru.numberSearchButton")
+          )}
         </button>
       </div>
     </div>
@@ -549,11 +555,16 @@ export default function CadastruSearchForm({
               type="button"
               onClick={() => submitAddressSearch()}
               disabled={lookupState.loading || authLoading}
-              className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 sm:w-auto"
+              className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-800 sm:w-auto"
             >
-              {lookupState.loading && lookupState.method === "address"
-                ? t("cadastru.searching")
-                : t("cadastru.searchButton")}
+              {lookupState.loading && lookupState.method === "address" ? (
+                <span className="inline-flex items-center gap-2">
+                  <CadastruLoadingIcon className="h-7 w-auto text-primary shrink-0" />
+                  <span className="text-gray-800 font-semibold">{t("cadastru.searching")}</span>
+                </span>
+              ) : (
+                t("cadastru.searchButton")
+              )}
             </button>
 
             {lookupState.method === "address" && lookupState.error && (

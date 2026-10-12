@@ -17,6 +17,8 @@ import {
 import { CADASTRU_SUPPORTED_CITIES, resolveCadastruSupportedCity } from "@/lib/cadastru-supported-cities";
 
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
+// Retain the backup implementation, but never contact official sources from AWS.
+const LOCAL_CADASTRU_LOOKUP_ENABLED = false;
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 const STREET_MAX_LENGTH = 80;
 const HOUSE_NUMBER_MAX_LENGTH = 10;
@@ -367,7 +369,7 @@ export async function POST(request) {
       code: error?.code || error?.name || "external_cadastru_failed",
       status: error?.status || null,
       message: error?.message || String(error),
-      fallback: Boolean(error?.fallbackEligible),
+      fallback: LOCAL_CADASTRU_LOOKUP_ENABLED && Boolean(error?.fallbackEligible),
     };
 
     const confirmation = addressConfirmationResponse(error);
@@ -409,6 +411,13 @@ export async function POST(request) {
     }
 
     // console.error("[cadastru/address] external cadastru API unavailable, using local backup:", details);
+  }
+
+  if (!LOCAL_CADASTRU_LOOKUP_ENABLED) {
+    return NextResponse.json(
+      { error: "service_unavailable", message: "Cadastral service is temporarily unavailable. Please try again later." },
+      { status: 503 }
+    );
   }
 
   try {

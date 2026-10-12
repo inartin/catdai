@@ -55,6 +55,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
   const timestamp = Date.now();
   const signature = signBody(rawBody, secret, timestamp);
   const startedAt = Date.now();
+  const requestId = crypto.randomUUID();
   let response;
 
   try {
@@ -62,6 +63,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Request-Id": requestId,
         "X-Catdai-Timestamp": String(timestamp),
         "X-Catdai-Signature": `sha256=${signature}`,
       },
@@ -74,6 +76,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     const usageWrite = shouldTrackUsage ? trackExternalApiUsage(service, "failure", {
       endpoint: url,
       requestPayload: body,
+      responseHeaders: { "x-request-id": requestId },
       errorCode: code,
       errorMessage: message,
       durationMs: Date.now() - startedAt,
@@ -100,7 +103,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
       endpoint: url,
       requestPayload: body,
       responsePayload: payload,
-      responseHeaders: getExternalApiDiagnosticHeaders(response),
+      responseHeaders: { "x-request-id": requestId, ...getExternalApiDiagnosticHeaders(response) },
       httpStatus: response.status,
       durationMs: Date.now() - startedAt,
       userId: options.userId ?? null,
@@ -119,7 +122,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     endpoint: url,
     requestPayload: body,
     responsePayload: payload,
-    responseHeaders: getExternalApiDiagnosticHeaders(response),
+    responseHeaders: { "x-request-id": requestId, ...getExternalApiDiagnosticHeaders(response) },
     errorCode: code,
     errorMessage: message,
     httpStatus: response.status,

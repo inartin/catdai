@@ -15,6 +15,8 @@ import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
+// Retain the backup implementation, but never contact official sources from AWS.
+const LOCAL_CADASTRU_LOOKUP_ENABLED = false;
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 const GEODATA_TIMEOUT_MS = 10_000;
 const NOMINATIM_TIMEOUT_MS = 5_000;
@@ -414,6 +416,7 @@ function mergeCadastruMdDetailPayload(payload, detailPayload) {
 }
 
 async function enrichWithCadastruMdDetails(payload, cadastralNumber, accessTier) {
+  if (!LOCAL_CADASTRU_LOOKUP_ENABLED) return payload;
   if (hasAllCadastruMdDetailFields(payload?.apartment)) return payload;
   const detailPayload = await buildCadastruDetailPayload(cadastralNumber, accessTier);
   return detailPayload ? mergeCadastruMdDetailPayload(payload, detailPayload) : payload;
@@ -583,7 +586,7 @@ export async function POST(request) {
       code: error?.code || error?.name || "external_cadastru_failed",
       status: error?.status || null,
       message: error?.message || String(error),
-      fallback: Boolean(error?.fallbackEligible),
+      fallback: LOCAL_CADASTRU_LOOKUP_ENABLED && Boolean(error?.fallbackEligible),
       cadastral_number: trimmed,
     };
 
@@ -600,6 +603,13 @@ export async function POST(request) {
     }
 
     // console.error("[cadastral] external cadastru API unavailable, using local backup:", details);
+  }
+
+  if (!LOCAL_CADASTRU_LOOKUP_ENABLED) {
+    return NextResponse.json(
+      { error: "service_unavailable", message: "Cadastral service is temporarily unavailable. Please try again later." },
+      { status: 503 }
+    );
   }
 
   lookupSource = "local";

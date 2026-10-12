@@ -350,10 +350,11 @@ export default function AdminDashboard() {
   const [externalApiDeleteError, setExternalApiDeleteError] = useState(null);
   const [showCalculatorUsageList, setShowCalculatorUsageList] = useState(false);
   const selectedUserPopupRef = useRef(null);
+  const statsRequestIdRef = useRef(0);
 
   const loadStats = useCallback(async ({ fresh = false } = {}) => {
-    if (fresh) setStatsRefreshing(true);
-    else setLoading(true);
+    const requestId = ++statsRequestIdRef.current;
+    setStatsRefreshing(true);
     setError(null);
 
     try {
@@ -362,12 +363,16 @@ export default function AdminDashboard() {
       const res = await fetch(`/api/admin/stats?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      if (requestId !== statsRequestIdRef.current) return;
       setStats(data);
     } catch (err) {
+      if (requestId !== statsRequestIdRef.current) return;
       setError(err.message || "Failed to load stats");
     } finally {
-      setLoading(false);
-      setStatsRefreshing(false);
+      if (requestId === statsRequestIdRef.current) {
+        setLoading(false);
+        setStatsRefreshing(false);
+      }
     }
   }, [dashboardPeriod]);
 
@@ -552,7 +557,10 @@ export default function AdminDashboard() {
   };
 
   const handleDashboardPeriodChange = (period) => {
+    if (period === dashboardPeriod) return;
+    statsRequestIdRef.current += 1;
     setDashboardPeriod(period);
+    setExpandedExternalApiEventId(null);
     setActiveEstimationsType(null);
     setEstimations([]);
   };
@@ -621,7 +629,7 @@ export default function AdminDashboard() {
     );
   }
 
-  if (error || !stats) {
+  if (!stats || String(error || "").includes("401")) {
     const isAuthError = String(error || "").includes("401");
     return (
       <div className="flex items-center justify-center h-64">
@@ -830,6 +838,10 @@ export default function AdminDashboard() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <p role="alert" className="text-sm text-red-600">Failed to refresh dashboard: {error}</p>
+      )}
 
       {/* Users & App Usage */}
       <div className="space-y-3">
@@ -1352,7 +1364,7 @@ export default function AdminDashboard() {
               <div>
                 <h3 className="font-semibold text-gray-900">External API Usage</h3>
                 <p className="mt-1 text-xs text-gray-500">
-                  {fmtNum(s.externalApiUsage?.success)} successful · {fmtNum(s.externalApiUsage?.failure)} failed
+                  {s.periodLabel} · {fmtNum(s.externalApiUsage?.success)} successful · {fmtNum(s.externalApiUsage?.failure)} failed
                 </p>
               </div>
               <div className="inline-flex w-full rounded-lg border border-gray-200 bg-white p-1 sm:w-auto">

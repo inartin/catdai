@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CadastruSourceNote from "@/components/CadastruSourceNote";
 import CadastruSearchForm from "@/components/CadastruSearchForm";
+import CadastruLoadingPage from "@/components/CadastruLoadingPage";
 import { useTranslation } from "@/context/LanguageContext";
 
 const exampleImages = [
@@ -25,6 +26,7 @@ const exampleImages = [
 export default function CadastruPage() {
   const { t } = useTranslation();
   const [openImage, setOpenImage] = useState(null);
+  const [loadingSearch, setLoadingSearch] = useState(null);
 
   useEffect(() => {
     if (!openImage) return undefined;
@@ -42,6 +44,8 @@ export default function CadastruPage() {
     };
   }, [openImage]);
 
+  if (loadingSearch) return <CadastruLoadingPage {...loadingSearch} onBack={() => setLoadingSearch(null)} />;
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />
@@ -56,7 +60,7 @@ export default function CadastruPage() {
             </p>
           </div>
 
-          <CadastruSearchForm allowAnonymousSearch />
+          <CadastruSearchForm allowAnonymousSearch onSearchStart={setLoadingSearch} />
           <CadastruSourceNote />
           <details className="group mt-6 rounded-2xl border border-gray-200 bg-white open:shadow-sm">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-gray-900 [&::-webkit-details-marker]:hidden">

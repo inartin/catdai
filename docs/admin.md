@@ -55,6 +55,7 @@ Shows:
 - Calculator usage rows show date, property summary, total investment, estimated rent, yield, payback period, tax selection, and anonymous/user id.
 - Dashboard defaults to 1 month and has a period segmented filter for 1 day, 7 days, 1 month, and All time. `/api/admin/stats` accepts `period=day|week|month|all` and filters dashboard totals, expandable recent rows, paid users, shared links, favorites, alerts, and usage cards to that window. `/api/admin/estimations` accepts the same `period` parameter for the sale/rent estimation detail lists.
 - Dashboard has a `Hard refresh` button that reloads `/api/admin/stats?period=...&fresh=1` to bypass the 5-minute server cache for the selected period.
+- External API request rows follow the global dashboard period, shown above the table. Changing periods clears the expanded request and refreshes data in place while the dashboard stays visible; superseded stats responses cannot replace the selected period's data.
 - Dashboard stats intentionally load only Users & App Usage data from `/api/admin/stats`; listing analytics are loaded from the Listings section.
 - `/admin/feedback` is linked from the left menu as `Feedback` and shows the latest registered-user feedback rows with message, user id, date, status, delete action with confirmation, and optional uploaded image preview that opens in an in-page modal.
 - `/admin/news` is linked from the left menu as `News` and lets admins list, create, edit, and remove news items with slug, title, rich description, creation date, and cover image link.

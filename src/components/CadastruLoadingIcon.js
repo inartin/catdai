@@ -1,10 +1,28 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
+
+let animationStartedAt = null;
+
 export default function CadastruLoadingIcon({
   className = "h-6 w-auto text-primary",
   variant = "animated",
   ariaLabel = "Se încarcă...",
 }) {
+  const iconRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const icon = iconRef.current;
+    const now = document.timeline.currentTime;
+    if (!icon || now === null) return;
+
+    // Navigation and Suspense may remount the SVG; resume the same animation phase.
+    animationStartedAt ??= now;
+    for (const animation of icon.getAnimations({ subtree: true })) {
+      animation.startTime = animationStartedAt;
+    }
+  }, [variant]);
+
   if (variant === "image") {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -18,6 +36,7 @@ export default function CadastruLoadingIcon({
 
   return (
     <svg
+      ref={iconRef}
       viewBox="3 3 143 178"
       className={className}
       fill="none"

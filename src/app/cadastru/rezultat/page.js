@@ -10,21 +10,42 @@ import CadastruNearbyCard from "@/components/CadastruNearbyCard";
 import CadastruPublicTransportCard from "@/components/CadastruPublicTransportCard";
 import CadastruMunicipalReportsCard from "@/components/CadastruMunicipalReportsCard";
 import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
-import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
+import CadastruLoadingPage from "@/components/CadastruLoadingPage";
+import CadastruRouteLoading from "./loading";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { matchCity, validateCadastralNumber } from "@/lib/validation";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
-import { resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
+import { buildFullAccessAddressResultParams, resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
 import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
+
+const roadTypes = [
+  { value: "strada", label: "cadastru.roadTypeStreet" },
+  { value: "str-la", label: "cadastru.roadTypeLane" },
+  { value: "bulevard", label: "cadastru.roadTypeBoulevard" },
+];
+const STREET_MAX_LENGTH = 80;
+const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/\d{1,4})?$/;
+const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 
 const inFlightCadastralLookups = new Map();
 const inFlightAddressLookups = new Map();
 const CADASTRU_DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
 const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
 const ADDRESS_LOOKUP_REQUEST_STORAGE_KEY = "catdai:cadastru-address-lookup-request:v1";
+
+function readLookupError(payload, t) {
+  if (payload?.error === "unauthorized") return t("cadastru.loginToUse");
+  if (payload?.error === "invalid_format") return t("form.cadastralInvalid");
+  if (payload?.error === "missing_fields") return t("cadastru.missingAddressFields");
+  if (payload?.error === "invalid_address_fields") return t("cadastru.invalidAddressFields");
+  if (payload?.error === "too_many_requests") return t("cadastru.rateLimitError");
+  if (payload?.error === "service_unavailable") return t("cadastru.serviceUnavailable");
+  if (payload?.error === "not_found") return t("cadastru.lookupError");
+  return payload?.message || payload?.error || t("cadastru.lookupError");
+}
 
 function normalizeLocationText(value) {
   return String(value || "")
@@ -377,7 +398,8 @@ function fetchAddressLookup(cacheKey, body, accessToken) {
     body: JSON.stringify(body),
   }).then(async (response) => ({
     ok: response.ok,
-    data: response.ok ? await response.json() : null,
+    status: response.status,
+    data: await response.json().catch(() => null),
   }));
 
   inFlightAddressLookups.set(cacheKey, promise);
@@ -417,14 +439,18 @@ function CadastruResultContent() {
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
   const source = searchParams.get("source") || "";
-  const originalStreet = (searchParams.get("original_street") || "").slice(0, 80);
-  const resolvedStreet = (searchParams.get("resolved_street") || "").slice(0, 80);
+  const originalStreetParam = (searchParams.get("original_street") || "").slice(0, 80);
+  const resolvedStreetParam = (searchParams.get("resolved_street") || "").slice(0, 80);
   const skipCache = searchParams.get("skipcache") === "true";
   const isAddressResultHandoff = source === "address" && searchParams.get("result") === "1";
   const isAddressPreviewHandoff = source === "address" && (
     searchParams.get("preview") === "1" || searchParams.get("result") === "1"
   );
-  const savedAddress = getSavedCadastruAddress(searchParams);
+  const isPendingAddressLookup = source === "address" && searchParams.get("lookup") === "1";
+  const [retryRequest, setRetryRequest] = useState(null);
+  const pendingAddressRequest = (!cadastralNumber ? retryRequest : null) || (isPendingAddressLookup ? readAddressLookupRequest() : null);
+  const addressRequestKey = pendingAddressRequest ? JSON.stringify(pendingAddressRequest) : "";
+  const savedAddress = (!cadastralNumber ? retryRequest : null) || getSavedCadastruAddress(searchParams);
   const isHistoryAddress = searchParams.get("history") === "1";
   const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
   const loadedRequestKey = useRef("");
@@ -442,6 +468,8 @@ function CadastruResultContent() {
   const [nearbyState, setNearbyState] = useState({ key: "", data: null, loading: false, error: false });
   const [transportState, setTransportState] = useState({ key: "", data: null, loading: false, error: false });
   const [reportsState, setReportsState] = useState({ key: "", data: null, loading: false, error: false });
+  const originalStreet = originalStreetParam || String(state.data?.street_resolution?.original || "").slice(0, 80);
+  const resolvedStreet = resolvedStreetParam || String(state.data?.street_resolution?.resolved || "").slice(0, 80);
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
   const purchaseOffer = state.data?.access_limit?.purchase || null;
   const cadastralCardRef = useRef(null);
@@ -453,7 +481,7 @@ function CadastruResultContent() {
     cadastralNumber,
     cadastral: state.data,
     savedAddress,
-    addressRequest: isAddressPreviewHandoff ? readAddressLookupRequest() : null,
+    addressRequest: (isAddressPreviewHandoff || isPendingAddressLookup) ? readAddressLookupRequest() : null,
   }) : null;
   const favoriteNumber = cadastralNumber || (!isLockedPreview ? state.data?.cadastral_number : "");
   const favoriteAddress = state.data?.resolved_address || state.data?.request_address ||
@@ -491,21 +519,47 @@ function CadastruResultContent() {
   const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);
   const reportsAvailable = municipalReportsAvailableForCadastru(state.data);
 
+  const retryAddressSearch = (suggestion) => {
+    const original = pendingAddressRequest || savedAddress || readAddressLookupRequest();
+    if (!original) return;
+    const address = { ...original };
+    delete address.suggestion_recovery_token;
+    const correction = typeof suggestion === "object" ? suggestion : null;
+    const body = {
+      ...address,
+      ...(typeof suggestion === "string" ? { street: suggestion } : {}),
+      ...(correction?.street ? { street: correction.street } : {}),
+      ...(correction?.house_number ? { house_number: correction.house_number } : {}),
+      ...(correction?.road_type ? { road_type: correction.road_type } : {}),
+      ...(!isHistoryAddress ? { search_context: "cadastru" } : {}),
+      ...(((typeof suggestion === "string" && state.didYouMean) || (correction && state.confirmationRequired))
+        && state.suggestionRecoveryToken ? { suggestion_recovery_token: state.suggestionRecoveryToken } : {}),
+    };
+    try {
+      sessionStorage.setItem(ADDRESS_LOOKUP_REQUEST_STORAGE_KEY, JSON.stringify(body));
+    } catch {
+      // Request persistence is best-effort for auth redirects.
+    }
+    loadedRequestKey.current = "";
+    setState({ loading: true, error: "", data: null });
+    setRetryRequest(body);
+  };
+
   useEffect(() => {
-    if (!cadastralNumber && !isAddressPreviewHandoff && !savedAddressKey) return;
+    if (!state.data) return;
     try {
       localStorage.removeItem(CADASTRU_DRAFT_STORAGE_KEY);
     } catch {
-      // Draft cleanup is best-effort after the result page opens.
+      // Draft cleanup is best-effort after a successful result.
     }
-  }, [cadastralNumber, isAddressPreviewHandoff, savedAddressKey]);
+  }, [state.data]);
 
   useEffect(() => {
     if (authLoading) return;
 
-    if (isAddressPreviewHandoff || savedAddressKey) {
+    if (isAddressPreviewHandoff || isPendingAddressLookup || savedAddressKey) {
       const accessMode = session?.access_token ? "authenticated" : "anonymous";
-      const requestKey = `address-preview|${savedAddressKey}|${accessMode}|${skipCache ? "skipcache" : "cache"}|${isHistoryAddress ? "history" : "search"}`;
+      const requestKey = `address-preview|${savedAddressKey}|${addressRequestKey}|${accessMode}|${skipCache ? "skipcache" : "cache"}|${isHistoryAddress ? "history" : "search"}`;
       if (loadedRequestKey.current === requestKey) return;
 
       const preview = savedAddressKey ? null : readAddressResultPreview();
@@ -514,7 +568,7 @@ function CadastruResultContent() {
         setState({ loading: false, error: "", data: preview });
         return;
       }
-      if (!isAuthenticated && !savedAddressKey) {
+      if (!isAuthenticated && !savedAddressKey && !isPendingAddressLookup) {
         loadedRequestKey.current = requestKey;
         setState({
           loading: false,
@@ -524,9 +578,9 @@ function CadastruResultContent() {
         return;
       }
 
-      const addressRequest = savedAddressKey
+      const addressRequest = pendingAddressRequest || (savedAddressKey
         ? { ...getSavedCadastruAddress(new URLSearchParams(savedAddressKey)), ...(isHistoryAddress ? {} : { search_context: "cadastru" }) }
-        : readAddressLookupRequest();
+        : readAddressLookupRequest());
       if (!addressRequest) {
         loadedRequestKey.current = requestKey;
         setState({
@@ -549,13 +603,59 @@ function CadastruResultContent() {
           );
 
           if (!response.ok) {
-            if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
+            if (!active) return;
+            loadedRequestKey.current = requestKey;
+            const failure = response.data;
+            const confirmationRequired = response.status === 422 && failure?.error === "address_confirmation_required";
+            const errorMessage = confirmationRequired
+              ? t("cadastru.addressAlternativeIntro", { street: body.street, house: body.house_number, apartment: body.apartment_number })
+              : failure?.error === "address_fields_conflict"
+              ? t("cadastru.addressFieldsConflict", { embedded: failure.embedded_house_number, house: failure.house_number })
+              : failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet") : readLookupError(failure, t);
+            setState({
+              loading: false,
+              data: null,
+              didYouMean: response.status === 404 && failure?.error === "not_found",
+              suggestionRecoveryToken: failure?.suggestion_recovery_token || null,
+              confirmationRequired,
+              addressCorrections: confirmationRequired && Array.isArray(failure.address_suggestions)
+                ? failure.address_suggestions.filter((value) => value?.city === body.city && value.road_type === body.road_type
+                  && typeof value.street === "string" && value.street.length <= STREET_MAX_LENGTH
+                  && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)
+                  && value.house_number.startsWith(`${body.house_number}/`)
+                  && typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
+                  && Number(value.apartment_number) === Number(body.apartment_number)).slice(0, 3)
+                : failure?.error === "address_fields_conflict" && Array.isArray(failure.corrections)
+                ? failure.corrections.filter((value) => typeof value?.street === "string" && value.street.length <= STREET_MAX_LENGTH
+                  && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)) : [],
+              suggestions: (failure?.error === "ambiguous_street" || (response.status === 404 && failure?.error === "not_found")) && Array.isArray(failure.suggestions)
+                ? failure.suggestions.filter((value) => typeof value === "string" && value.length <= STREET_MAX_LENGTH) : [],
+              roadTypeSuggestions: (response.status === 404 || response.status === 503) && Array.isArray(failure?.road_type_suggestions)
+                ? failure.road_type_suggestions.filter((value) => roadTypes.some(({ value: type }) => type === value?.road_type)
+                  && typeof value.street === "string" && value.street.length <= STREET_MAX_LENGTH) : [],
+              error: errorMessage,
+            });
             return;
           }
 
           if (active) {
+            const data = response.data;
+            if (isPendingAddressLookup && data?.cadastral_number && !data?.locked_sections?.cadastru_details) {
+              const resolution = data.street_resolution;
+              const params = buildFullAccessAddressResultParams(data, {
+                city: body.city,
+                skipCache,
+                resolvedStreetParams: resolution?.original && resolution?.resolved
+                  && resolution.original !== resolution.resolved ? {
+                    original_street: resolution.original,
+                    resolved_street: resolution.resolved,
+                  } : {},
+              });
+              router.replace(`/${lang}/cadastru/rezultat?${params.toString()}`);
+              return;
+            }
             loadedRequestKey.current = requestKey;
-            setState({ loading: false, error: "", data: response.data });
+            setState({ loading: false, error: data ? "" : t("cadastru.lookupError"), data });
           }
         } catch {
           if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
@@ -568,8 +668,8 @@ function CadastruResultContent() {
       };
     }
 
-    if (!cadastralNumber) {
-      setState({ loading: false, error: "", data: null });
+    if (!cadastralNumber || !validateCadastralNumber(cadastralNumber).valid) {
+      setState({ loading: false, error: source === "number" || cadastralNumber ? t("form.cadastralInvalid") : "", data: null });
       return;
     }
 
@@ -599,7 +699,7 @@ function CadastruResultContent() {
             if (active) setState({ loading: false, error: t("cadastru.loginToUse"), data: null });
             return;
           }
-          if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
+          if (active) setState({ loading: false, error: readLookupError(response.data, t), data: null });
           return;
         }
 
@@ -617,7 +717,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, savedAddressKey, session?.access_token, skipCache, source, t]);
+  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, router, savedAddressKey, session?.access_token, skipCache, source, t]);
 
   useEffect(() => {
     if (isAuthenticated) setIsAuthModalOpen(false);
@@ -735,6 +835,12 @@ function CadastruResultContent() {
     };
   }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, reportsAvailable, state.data]);
 
+  if (state.loading) return <CadastruLoadingPage
+    cadastralNumber={cadastralNumber}
+    address={savedAddress}
+    useStoredAddress={source === "address" && !savedAddress}
+  />;
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <AuthRequiredModal
@@ -790,16 +896,59 @@ function CadastruResultContent() {
             </p>
           )}
 
-          {state.loading && (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm sm:p-12">
-              <CadastruLoadingIcon className="mb-4 h-16 w-auto text-primary" />
-              <p className="text-base font-semibold text-gray-900">{t("cadastru.searching")}</p>
-            </div>
-          )}
-
           {(state.error || (!cadastralNumber && !state.loading && !state.data)) && (
-            <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-sm font-medium text-red-800 shadow-sm sm:p-8">
-              {state.error || t("cadastru.lookupError")}
+            <div role="status" className={`rounded-2xl border p-6 text-sm font-medium shadow-sm sm:p-8 ${state.suggestions?.length || state.roadTypeSuggestions?.length || state.addressCorrections?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
+              <p>{state.error || t("cadastru.lookupError")}</p>
+              {state.addressCorrections?.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {state.addressCorrections.map((correction) => (
+                    <div key={`${correction.street}:${correction.house_number}`}>
+                      {state.confirmationRequired && <p className="mb-2 text-sm">
+                        {t("cadastru.addressAlternativeFound", { street: correction.street, house: correction.house_number,
+                          apartment: correction.apartment_number })}
+                      </p>}
+                      <button type="button"
+                        className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
+                        disabled={state.loading || authLoading}
+                        onClick={() => retryAddressSearch(correction)}>
+                        {state.confirmationRequired ? t("cadastru.searchSuggestedHouse", { house: correction.house_number })
+                          : t("cadastru.useAddressCorrection", { street: correction.street, house: correction.house_number })}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {state.suggestions?.length > 0 && (
+                <div className="mt-3">
+                  {state.didYouMean && <p className="mb-2 text-sm font-semibold">{t("cadastru.didYouMean")}</p>}
+                  <div className="flex flex-wrap gap-2">
+                  {state.suggestions.map((street) => (
+                    <button key={street} type="button" className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
+                      disabled={state.loading || authLoading}
+                      onClick={() => retryAddressSearch(street)}>
+                      {street}
+                    </button>
+                  ))}
+                  </div>
+                </div>
+              )}
+              {state.roadTypeSuggestions?.length > 0 && (
+                <div className="mt-3">
+                  <p className="mb-2 text-sm font-semibold">{t("cadastru.didYouMeanRoadType")}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {state.roadTypeSuggestions.map((suggestion) => (
+                      <button key={`${suggestion.road_type}:${suggestion.street}`} type="button"
+                        className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
+                        disabled={state.loading || authLoading}
+                        onClick={() => retryAddressSearch(suggestion)}>
+                        {t("cadastru.useRoadTypeSuggestion", {
+                          road: t(roadTypes.find(({ value }) => value === suggestion.road_type).label), street: suggestion.street,
+                        })}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -908,7 +1057,7 @@ function CadastruResultContent() {
 
 export default function CadastruResultPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<CadastruRouteLoading />}>
       <CadastruResultContent />
     </Suspense>
   );

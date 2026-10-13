@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalPublicTransportData } from "@/lib/cadastru-external-api";
 import { publicTransportInputFromCadastru, validPublicTransportResult } from "@/lib/cadastru-public-transport";
+import { nearbyAddressFromCadastru } from "@/lib/cadastru-nearby";
 import { getCadastruRecordByAddress, getCadastruRecordByNumber } from "@/lib/cadastru-records";
 import { CADASTRAL_RE } from "@/lib/validation";
 import { isFreshCadastru } from "@/lib/cadastru-cache";
@@ -39,9 +40,10 @@ export async function POST(request) {
     ? await getCadastruRecordByAddress(address, { allowExpired: true })
     : await getCadastruRecordByNumber(number, { allowExpired: true });
   if (!entry && address && CADASTRAL_RE.test(number)) entry = await getCadastruRecordByNumber(number, { allowExpired: true });
-  if (!entry) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
+  if (!entry && !address) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
 
-  const input = publicTransportInputFromCadastru(entry.payload);
+  const input = entry ? publicTransportInputFromCadastru(entry.payload)
+    : nearbyAddressFromCadastru({ request_address: address });
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
   const stored = await getStoredPublicTransport(input);

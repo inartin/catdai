@@ -1267,3 +1267,37 @@ reportsResult = { summary: { total: 0 } };
 assert.equal((await reportsRoute.POST(reportsRequest({ cadastral_number: transportNumber }))).status, 503,
   "invalid data must not turn an outage into a zero-report result");
 console.log("Municipal reports regressions passed: precise origin, HMAC, stored-result lookup, unchanged snapshot and failure handling.");
+
+// Secondary sources must work even when cadastral service failure left no record.
+const directAddress = "Chișinău, bd Decebal 63";
+for (const [endpoint, method, result] of [
+  ["nearby", "fetchExternalNearbyData", nearbyData],
+  ["public-transport", "fetchExternalPublicTransportData", transportData],
+  ["municipal-reports", "fetchExternalMunicipalReportsData", reportsData],
+]) {
+  let calls = 0;
+  const route = await load(`src/app/api/cadastru/${endpoint}/route.js`, {
+    "next/server": { NextResponse: { json: (data, options = {}) => Response.json(data, options) } },
+    "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true }) }) },
+    "@/lib/cadastru-records": { getCadastruRecordByAddress: async () => null, getCadastruRecordByNumber: async () => null },
+    "@/lib/cadastru-nearby-storage": { getStoredNearby: async () => null, storeNearby: async () => null, nearbyFromStorage: () => null },
+    "@/lib/cadastru-public-transport-storage": { getStoredPublicTransport: async () => null, storePublicTransport: async () => null, publicTransportFromStorage: () => null },
+    "@/lib/cadastru-external-api": { [method]: async (input) => {
+      calls++;
+      assert.deepEqual(clone(input), transportAddress);
+      return result;
+    } },
+  });
+  const request = (body) => new Request(`http://localhost/api/cadastru/${endpoint}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  assert.equal((await route.POST(request({ address: directAddress }))).status, 200, `${endpoint} accepts an address without a stored cadastral result`);
+  assert.equal((await route.POST(request({ address: directAddress, cadastral_number: number }))).status, 200, `${endpoint} still uses the address when the follow-up number has no record`);
+  assert.equal((await route.POST(request({ address: "Chișinău" }))).status, 422, `${endpoint} requires a precise house address`);
+  assert.equal((await route.POST(request({ cadastral_number: number }))).status, 404, `${endpoint} cannot guess a location from a number`);
+  if (endpoint === "municipal-reports") {
+    assert.equal((await route.POST(request({ address: "Orhei, str Vasile Lupu 1" }))).status, 422, "municipal reports remain Chișinău-only");
+  }
+  assert.equal(calls, 2, "invalid and number-only inputs never call the secondary worker");
+}
+console.log("Secondary address regressions passed: no-record address origins, precise-house validation and unchanged number/municipal restrictions.");

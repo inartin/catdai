@@ -57,23 +57,27 @@ const useEffect = (effect, deps) => {
   effects.push(() => { slots[index].cleanup = effect(); });
 };
 const number = "0100106.131.01.097";
+let searchParams = new URLSearchParams({ cadastral_number: number });
+let addressRequest = null;
 const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
+  "./loading": { default: noop },
   react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
   "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
-  "next/navigation": { useRouter: () => ({ push: noop }), useSearchParams: () => new URLSearchParams({ cadastral_number: number }) },
+  "next/navigation": { useRouter: () => ({ push: noop, replace: noop }), useSearchParams: () => searchParams },
   "@/context/LanguageContext": translation,
   "@/context/AuthContext": { useAuth: () => ({ isAuthenticated: false, loading: false, session: null, clearAuthError: noop }) },
   "@/lib/validation": { matchCity: () => null, validateCadastralNumber: (value) => ({ valid: value === number, value }) },
   "@/lib/cadastru-favorites": { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
-  "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null },
-  "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: (data) => data?.form_fields?.city === "Chișinău", validMunicipalReportsResult: (data) => data?.summary?.total >= 0 },
+  "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null, buildFullAccessAddressResultParams: () => new URLSearchParams() },
+  "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: (data) => data?.form_fields?.city === "Chișinău" || data?.request_address?.startsWith("Chișinău,"), validMunicipalReportsResult: (data) => data?.summary?.total >= 0 },
 }, {
   window: {}, localStorage: { removeItem: noop },
+  sessionStorage: { getItem: (key) => key.includes("lookup-request") && addressRequest ? JSON.stringify(addressRequest) : null },
   requestAnimationFrame: (callback) => { const id = ++nextFrame; frames.set(id, callback); return id; },
   cancelAnimationFrame: (id) => frames.delete(id),
   fetch: (url, options) => {
     assert(!requests.has(url), `Duplicate request: ${url}`);
-    return new Promise((resolve) => requests.set(url, { resolve, options }));
+    return new Promise((resolve, reject) => requests.set(url, { resolve, reject, options }));
   },
 });
 function render() {
@@ -278,3 +282,56 @@ for (const locale of ["ro", "ru"]) {
   assert(!textOf(nearbyCard.default({ nearby: { ...nearby, cache: { stale: false } } })).includes(t("cadastru.nearbyStale")));
 }
 console.log("Nearby card passed: stale fallback notices in RO/RU, and embedded legacy data does not bypass the shared request.");
+
+for (const locale of ["ro", "ru"]) {
+  lang = locale;
+  for (const scenario of [
+    { source: "address", status: 503, error: "service_unavailable", continues: true },
+    { source: "address", status: 504, error: "timeout", continues: true },
+    { source: "address", status: 408, error: "timeout", continues: true },
+    { source: "address", networkFailure: true, continues: true },
+    { source: "address", status: 404, error: "not_found", continues: false },
+    { source: "address", status: 400, error: "invalid_address_fields", continues: false },
+    { source: "address", status: 401, error: "unauthorized", continues: false },
+    { source: "address", status: 429, error: "too_many_requests", continues: false },
+    { source: "number", status: 503, error: "service_unavailable", continues: false },
+    { source: "number", status: 504, error: "timeout", continues: false },
+    { source: "address", status: 503, error: "service_unavailable", city: "Orhei", continues: true },
+    { source: "address", status: 503, error: "service_unavailable", followup: true, continues: true },
+  ]) {
+    for (const slot of slots) slot?.cleanup?.();
+    slots.length = 0;
+    requests.clear();
+    frames.clear();
+    addressRequest = { city: scenario.city || "Chișinău", road_type: "strada", street: "Decebal", house_number: "63", apartment_number: "1" };
+    searchParams = new URLSearchParams({ source: scenario.source,
+      ...(scenario.source === "number" || scenario.followup ? { cadastral_number: number } : { lookup: "1" }) });
+    render();
+    const main = requests.get(scenario.source === "number" || scenario.followup ? "/api/cadastral" : "/api/cadastru/address");
+    assert(main);
+    if (scenario.networkFailure) main.reject(new TypeError("Failed to fetch"));
+    else main.resolve({ ok: false, status: scenario.status, json: async () => ({ error: scenario.error }) });
+    await flush();
+    const tree = render();
+    const notice = findNode(tree, (node) => node.type === "p" && node.props.children === t("cadastru.otherDataAvailable"));
+    assert.equal(Boolean(notice), scenario.continues, JSON.stringify(scenario));
+    if (scenario.continues) assert(findNode(tree, (node) => node.type === "p" && node.props.children === t("cadastru.serviceUnavailable")), "cadastral error stays visible");
+    paint();
+    paint();
+    assert.equal(requests.has("/api/cadastru/nearby"), scenario.continues);
+    assert.equal(requests.has("/api/cadastru/public-transport"), scenario.continues);
+    assert.equal(requests.has("/api/cadastru/municipal-reports"), scenario.continues && !scenario.city);
+    if (scenario.continues) {
+      const nearby = requests.get("/api/cadastru/nearby");
+      assert.equal(JSON.parse(nearby.options.body).address, `${addressRequest.city}, strada Decebal 63`);
+      nearby.resolve({ ok: true, json: async () => ({ nearby: { categories: {}, location: { latitude: 47.02, longitude: 28.83 } } }) });
+      await flush();
+      const updated = render();
+      assert(findNode(updated, (node) => node.type === "iframe" && node.props.src.includes("47.02")), "available nearby coordinates restore the map");
+      assert(findNode(updated, (node) => node.props?.nearby?.location?.latitude === 47.02), "nearby displays while transport is still pending");
+      assert(findNode(updated, (node) => "transport" in (node.props || {}) && node.props.loading), "transport remains independently loading");
+    }
+  }
+}
+for (const slot of slots) slot?.cleanup?.();
+console.log("Outage continuation passed: RO/RU notice and preserved errors, concurrent address cards and map, timeout/network failures, number searches and validation/auth/rate-limit exclusions.");

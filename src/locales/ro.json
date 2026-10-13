@@ -298,6 +298,7 @@
   "cadastru.searching": "Se caută...",
   "cadastru.lookupError": "Nu am putut găsi date cadastrale. Verifică datele introduse.",
   "cadastru.serviceUnavailable": "Serviciul cadastral este temporar indisponibil. Încearcă din nou mai târziu.",
+  "cadastru.otherDataAvailable": "Continuăm căutarea și afișăm celelalte informații disponibile pentru această adresă.",
   "cadastru.missingAddressFields": "Completează strada și numărul imobilului.",
   "cadastru.invalidAddressFields": "Nr. imobil trebuie să conțină doar cifre și opțional /",
   "cadastru.rateLimitError": "Prea multe căutări. Încearcă din nou peste puțin timp.",

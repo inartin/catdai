@@ -42,9 +42,19 @@ function readLookupError(payload, t) {
   if (payload?.error === "missing_fields") return t("cadastru.missingAddressFields");
   if (payload?.error === "invalid_address_fields") return t("cadastru.invalidAddressFields");
   if (payload?.error === "too_many_requests") return t("cadastru.rateLimitError");
-  if (payload?.error === "service_unavailable") return t("cadastru.serviceUnavailable");
+  if (["service_unavailable", "timeout", "external_cadastru_timeout", "external_cadastru_unreachable"].includes(payload?.error)) return t("cadastru.serviceUnavailable");
   if (payload?.error === "not_found") return t("cadastru.lookupError");
   return payload?.message || payload?.error || t("cadastru.lookupError");
+}
+
+function isLookupUnavailable(response) {
+  return response.status === 408 || response.status >= 500 ||
+    ["service_unavailable", "timeout", "external_cadastru_timeout", "external_cadastru_unreachable"].includes(response.data?.error);
+}
+
+function formatLookupAddress(address) {
+  if (!address?.city || !address?.road_type || !address?.street || !address?.house_number) return "";
+  return `${address.city}, ${address.road_type} ${address.street} ${address.house_number}`;
 }
 
 function normalizeLocationText(value) {
@@ -487,8 +497,17 @@ function CadastruResultContent() {
   const favoriteAddress = state.data?.resolved_address || state.data?.request_address ||
     state.data?.matched_address || state.data?.apartment?.address || state.data?.building?.address;
   const favoriteLabel = [t("nav.cadastru"), favoriteNumber, favoriteAddress].filter(Boolean).join(" · ");
+  const nearbyAddress = state.fallbackAddress || (source === "address"
+    ? state.data?.request_address || state.data?.resolved_address || (savedAddress
+      ? `${savedAddress.city}, ${savedAddress.road_type} ${savedAddress.street} ${savedAddress.house_number}${savedAddress.apartment_number ? ` ap ${savedAddress.apartment_number}` : ""}`
+      : "")
+    : "");
+  const nearbyNumber = cadastralNumber || (!state.data?.locked_sections?.cadastral_number ? state.data?.cadastral_number : "") || "";
+  const nearbyKey = `${nearbyAddress || nearbyNumber}|${isAuthenticated ? "authenticated" : "anonymous"}|${skipCache}|${state.fallbackAddress ? "address-fallback" : "result"}`;
+  const nearbyData = nearbyState.key === nearbyKey ? nearbyState.data : null;
   const mapLocation = [
     state.data?.map_location,
+    ...(state.fallbackAddress ? [nearbyData?.location] : []),
     state.data?.building?.map_location,
     state.data?.apartment?.map_location,
     ...(Array.isArray(state.data?.buildings) ? state.data.buildings.map((property) => property?.map_location) : []),
@@ -508,16 +527,22 @@ function CadastruResultContent() {
         output: "embed",
       })}`
     : null;
-  const nearbyAddress = source === "address"
-    ? state.data?.request_address || state.data?.resolved_address || (savedAddress
-      ? `${savedAddress.city}, ${savedAddress.road_type} ${savedAddress.street} ${savedAddress.house_number}${savedAddress.apartment_number ? ` ap ${savedAddress.apartment_number}` : ""}`
-      : "")
-    : "";
-  const nearbyNumber = cadastralNumber || (!state.data?.locked_sections?.cadastral_number ? state.data?.cadastral_number : "") || "";
-  const nearbyKey = `${nearbyAddress || nearbyNumber}|${isAuthenticated ? "authenticated" : "anonymous"}|${skipCache}`;
-  const nearbyData = nearbyState.key === nearbyKey ? nearbyState.data : null;
+  const map = mapUrl && (
+    <div className="mt-6 w-full overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md">
+      <iframe
+        key={mapUrl}
+        src={mapUrl}
+        title={t("cadastru.mapTitle")}
+        className="block h-[360px] w-full border-0 sm:h-[440px]"
+        loading="lazy"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+      />
+    </div>
+  );
   const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);
-  const reportsAvailable = municipalReportsAvailableForCadastru(state.data);
+  const secondaryAvailable = Boolean(state.data || state.fallbackAddress);
+  const reportsAvailable = municipalReportsAvailableForCadastru(state.data || { request_address: state.fallbackAddress });
 
   const retryAddressSearch = (suggestion) => {
     const original = pendingAddressRequest || savedAddress || readAddressLookupRequest();
@@ -611,10 +636,12 @@ function CadastruResultContent() {
               ? t("cadastru.addressAlternativeIntro", { street: body.street, house: body.house_number, apartment: body.apartment_number })
               : failure?.error === "address_fields_conflict"
               ? t("cadastru.addressFieldsConflict", { embedded: failure.embedded_house_number, house: failure.house_number })
-              : failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet") : readLookupError(failure, t);
+              : failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet")
+              : isLookupUnavailable(response) ? t("cadastru.serviceUnavailable") : readLookupError(failure, t);
             setState({
               loading: false,
               data: null,
+              fallbackAddress: isLookupUnavailable(response) ? formatLookupAddress(body) : "",
               didYouMean: response.status === 404 && failure?.error === "not_found",
               suggestionRecoveryToken: failure?.suggestion_recovery_token || null,
               confirmationRequired,
@@ -658,7 +685,8 @@ function CadastruResultContent() {
             setState({ loading: false, error: data ? "" : t("cadastru.lookupError"), data });
           }
         } catch {
-          if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
+          if (active) setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: null,
+            fallbackAddress: formatLookupAddress(addressRequest) });
         }
       }
 
@@ -699,7 +727,9 @@ function CadastruResultContent() {
             if (active) setState({ loading: false, error: t("cadastru.loginToUse"), data: null });
             return;
           }
-          if (active) setState({ loading: false, error: readLookupError(response.data, t), data: null });
+          if (active) setState({ loading: false, error: isLookupUnavailable(response) ? t("cadastru.serviceUnavailable") : readLookupError(response.data, t), data: null,
+            fallbackAddress: source === "address" && isLookupUnavailable(response)
+              ? formatLookupAddress(readAddressLookupRequest()) : "" });
           return;
         }
 
@@ -708,7 +738,8 @@ function CadastruResultContent() {
           setState({ loading: false, error: "", data: response.data });
         }
       } catch {
-        if (active) setState({ loading: false, error: t("cadastru.lookupError"), data: null });
+        if (active) setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: null,
+          fallbackAddress: source === "address" ? formatLookupAddress(readAddressLookupRequest()) : "" });
       }
     }
 
@@ -724,13 +755,12 @@ function CadastruResultContent() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    if (!state.data) return;
-    if (!nearbySearchAvailable) return;
+    if (!secondaryAvailable || !nearbySearchAvailable) return;
     if (loadedNearbyKey.current === nearbyKey) return;
 
     let active = true;
     let frame;
-    // Start the slower nearby request after the cadastral card has painted.
+    // Start after the cadastral result or outage notice has painted.
     const firstFrame = requestAnimationFrame(() => {
       if (!active) return;
       setNearbyState({ key: nearbyKey, data: null, loading: true, error: false });
@@ -757,10 +787,10 @@ function CadastruResultContent() {
       cancelAnimationFrame(firstFrame);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, state.data]);
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, secondaryAvailable]);
 
   useEffect(() => {
-    if (!state.data || !nearbySearchAvailable) return;
+    if (!secondaryAvailable || !nearbySearchAvailable) return;
     if (loadedTransportKey.current === nearbyKey) return;
 
     let active = true;
@@ -791,10 +821,10 @@ function CadastruResultContent() {
       cancelAnimationFrame(firstFrame);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, state.data]);
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, secondaryAvailable]);
 
   useEffect(() => {
-    if (!state.data || !nearbySearchAvailable || !reportsAvailable) return;
+    if (!secondaryAvailable || !nearbySearchAvailable || !reportsAvailable) return;
     if (loadedReportsKey.current === nearbyKey) return;
 
     let active = true;
@@ -833,7 +863,7 @@ function CadastruResultContent() {
       cancelAnimationFrame(firstFrame);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, reportsAvailable, state.data]);
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, reportsAvailable, secondaryAvailable]);
 
   if (state.loading) return <CadastruLoadingPage
     cadastralNumber={cadastralNumber}
@@ -899,6 +929,9 @@ function CadastruResultContent() {
           {(state.error || (!cadastralNumber && !state.loading && !state.data)) && (
             <div role="status" className={`rounded-2xl border p-6 text-sm font-medium shadow-sm sm:p-8 ${state.suggestions?.length || state.roadTypeSuggestions?.length || state.addressCorrections?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
               <p>{state.error || t("cadastru.lookupError")}</p>
+              {state.fallbackAddress && <p className="mt-2 font-normal text-gray-700">
+                {t("cadastru.otherDataAvailable")}
+              </p>}
               {state.addressCorrections?.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {state.addressCorrections.map((correction) => (
@@ -968,23 +1001,12 @@ function CadastruResultContent() {
                   }
                 } : undefined}
               >
-                {mapUrl && (
-                  <div className="mt-6 w-full overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md">
-                    <iframe
-                      key={mapUrl}
-                      src={mapUrl}
-                      title={t("cadastru.mapTitle")}
-                      className="block h-[360px] w-full border-0 sm:h-[440px]"
-                      loading="lazy"
-                      allowFullScreen
-                      referrerPolicy="strict-origin-when-cross-origin"
-                    />
-                  </div>
-                )}
+                {map}
               </CadastralDataCard>
             </div>
           )}
-          {state.data && (
+          {state.fallbackAddress && map}
+          {secondaryAvailable && (
             <CadastruNearbyCard
               nearby={nearbyData}
               loading={nearbySearchAvailable && (nearbyState.key !== nearbyKey || nearbyState.loading)}
@@ -1021,19 +1043,24 @@ function CadastruResultContent() {
               </button>
             </div>
           )}
-          {state.data && (
+          {secondaryAvailable && (
             <CadastruPublicTransportCard
               transport={transportState.key === nearbyKey ? transportState.data : null}
               loading={nearbySearchAvailable && (transportState.key !== nearbyKey || transportState.loading)}
               unavailable={!nearbySearchAvailable || (transportState.key === nearbyKey && transportState.error)}
             />
           )}
-          {state.data && reportsAvailable && (
+          {secondaryAvailable && reportsAvailable && (
             <CadastruMunicipalReportsCard
               reports={reportsState.key === nearbyKey ? reportsState.data : null}
               loading={nearbySearchAvailable && (reportsState.key !== nearbyKey || reportsState.loading)}
               unavailable={!nearbySearchAvailable || (reportsState.key === nearbyKey && reportsState.error)}
             />
+          )}
+          {(state.data || secondaryAvailable) && (
+            <p className="mt-6 text-center text-xs text-gray-500">
+              © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a>
+            </p>
           )}
           {state.data && (
             <div

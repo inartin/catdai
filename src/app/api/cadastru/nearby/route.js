@@ -39,14 +39,14 @@ export async function POST(request) {
     ? await getCadastruRecordByAddress(address, { allowExpired: true })
     : await getCadastruRecordByNumber(number, { allowExpired: true });
   if (!entry && address && CADASTRAL_RE.test(number)) entry = await getCadastruRecordByNumber(number, { allowExpired: true });
-  if (!entry) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
+  if (!entry && !address) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
 
-  const addressFields = nearbyAddressFromCadastru(entry.payload);
+  const addressFields = nearbyAddressFromCadastru(entry?.payload || { request_address: address });
   if (!addressFields) return NextResponse.json({ error: "address_unavailable" }, { status: 422 });
 
   let stored = await getStoredNearby(addressFields);
   // Lazily move valid legacy snapshots to the shared building store without renewing them.
-  if (!stored && validNearbyResult(entry.payload.nearby) && Number.isFinite(Date.parse(entry.expiresAt))) {
+  if (!stored && validNearbyResult(entry?.payload.nearby) && Number.isFinite(Date.parse(entry.expiresAt))) {
     stored = await storeNearby(addressFields, entry.payload.nearby, {
       fetchedAt: new Date(Date.parse(entry.expiresAt) - CADASTRU_TTL_SECONDS * 1000).toISOString(),
       expiresAt: entry.expiresAt,

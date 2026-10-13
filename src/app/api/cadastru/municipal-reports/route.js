@@ -37,9 +37,9 @@ export async function POST(request) {
     ? await getCadastruRecordByAddress(address)
     : await getCadastruRecordByNumber(number);
   if (!entry && address && CADASTRAL_RE.test(number)) entry = await getCadastruRecordByNumber(number);
-  if (!entry) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
+  if (!entry && !address) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
 
-  const input = municipalReportsInputFromCadastru(entry.payload);
+  const input = municipalReportsInputFromCadastru(entry?.payload || { request_address: address });
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
   try {

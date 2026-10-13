@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import AdminCadastruOfflineSearch from "@/components/admin/AdminCadastruOfflineSearch";
 
 function fmtNum(value) {
   return Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
@@ -28,7 +29,7 @@ export default function AdminCadastruPage() {
   }, [loadStats]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Cadastru</h1>
@@ -44,6 +45,10 @@ export default function AdminCadastruPage() {
         </button>
       </div>
 
+      {/* Offline / Local Data Search Form & Results */}
+      <AdminCadastruOfflineSearch />
+
+      {/* Stored Cadastru Data Stats */}
       <section className="space-y-3" aria-labelledby="cadastru-storage-heading">
         <h2 id="cadastru-storage-heading" className="text-lg font-semibold text-gray-900">Stored Cadastru Data</h2>
         {loading && !stats ? (

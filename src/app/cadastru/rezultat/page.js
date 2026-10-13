@@ -1059,7 +1059,7 @@ function CadastruResultContent() {
           )}
           {(state.data || secondaryAvailable) && (
             <p className="mt-6 text-center text-xs text-gray-500">
-              © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a>
+              © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a> · © <a href="https://map.md/" className="underline">map.md</a>
             </p>
           )}
           {state.data && (

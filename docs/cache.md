@@ -79,3 +79,5 @@ pm2 start ecosystem.config.cjs
 - `src/lib/cache.js`
 - `src/app/api/prices/route.js`
 - `src/app/api/market-trends/route.js`
+
+The manual `catdai-api` collector writes these same stores and invalidates affected app Redis keys after durable writes. `--partial` fills missing categories without renewing existing complete snapshot dates; known RO/RU address aliases share a collection job. See the worker documentation for its persistent checkpoint and configuration.

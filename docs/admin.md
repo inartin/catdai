@@ -15,7 +15,13 @@ Implemented as admin dashboard with direct registered-user package adjustment.
 - Protected `/api/admin/*` data routes also verify the `admin_token` cookie inside each route before returning cached data or using `SUPABASE_SERVICE_KEY`.
 
 ## Cadastru
-`/admin/cadastru` is linked from the left menu and shows Stored Cadastru Data: the total unique cadastral numbers in `cadastru_records` and their counts by city, sorted by count. It includes expired snapshots, groups missing cities as Unknown city, and is independent of the dashboard period filter. `/api/admin/cadastru-storage` uses a five-minute cache and supports Hard refresh; database errors show an unavailable state rather than zero or partial counts.
+`/admin/cadastru` starts with an all-time database overview, followed by offline search:
+- Separate cards for verified apartment buildings, apartment/unit records (including references), units with details, and other properties. Shared building registry duplicates are counted once in the overall unique-number total.
+- Per-building coverage bars for cadastral details, nearby places, public transport and municipal reports, with saved/missing and fresh/expired counts. Address aliases are deduplicated; reports apply only to Chișinău. Coverage reads the dedicated durable stores and excludes explicitly incomplete/stale source responses; expired saved snapshots still count as stored.
+- Whole-building collection results: harvested, partial harvest, or not harvested yet. These reflect saved collection metadata, not the worker's live queue; a harvested response does not prove a complete apartment inventory.
+- City breakdown separates buildings, apartments/units and other properties; missing cities appear as Unknown city.
+
+`/api/admin/cadastru-storage` reads counting metadata only, retains admin authentication, a five-minute cache and Hard refresh. Any failed database read shows unavailable rather than misleading zero/partial totals. The overview is independent of dashboard period filters. Regression check: `pnpm exec node --experimental-vm-modules scripts/test-admin-cadastru-storage-stats.mjs`.
 
 ## Dashboard
 

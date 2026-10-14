@@ -267,6 +267,7 @@ assert(textOf(renderComponent(nearbyGroup)).includes(ro["cadastru.reportsMoreAtS
 console.log("Municipal card passed: independent per-group load more and exhaustion, inline description expansion/collapse, RO/RU copy, privacy and data states.");
 
 const transportCard = await loadJsx("src/components/CadastruPublicTransportCard.js", {
+  "next/image": { default: noop },
   "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
   "@/context/LanguageContext": translation,
 });

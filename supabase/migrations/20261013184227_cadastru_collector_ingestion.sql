@@ -16,9 +16,9 @@ language sql stable security invoker set search_path = '' as $$
     select 'reports', r.lookup_input, null, null, 0 from public.cadastru_municipal_reports r
     union all
     select 'listing', null, l.address_text, null, count(*) from (
-      select address_text from public.listing where city = 'Chișinău' and address_text is not null
+      select address_text from public.listing where city in ('Chișinău','Chisinau','Кишинев','Кишинёв','Кишинэу') and address_text is not null
       union all
-      select address_text from public.listing_rent where city = 'Chișinău' and address_text is not null
+      select address_text from public.listing_rent where city in ('Chișinău','Chisinau','Кишинев','Кишинёв','Кишинэу') and address_text is not null
     ) l group by l.address_text
   ) seeds(source,lookup_input,address_text,building_number,listing_count)
   order by source, building_number nulls last, address_text nulls last, lookup_input::text

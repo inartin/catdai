@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useTranslation } from "@/context/LanguageContext";
 
 export default function CadastruPublicTransportCard({ transport, loading, unavailable }) {
@@ -27,18 +28,26 @@ export default function CadastruPublicTransportCard({ transport, loading, unavai
             const modeLabel = t(`cadastru.transportMode.${group.mode}`);
             return (
               <div key={group.mode} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                <h3 className="font-semibold text-gray-900">
+                <h3 className="flex items-center gap-2 font-semibold text-gray-900">
+                  {group.mode === "bus" || group.mode === "trolleybus" ? (
+                    <Image src={`/icons/transport/${group.mode}.svg`} width={24} height={24} alt="" aria-hidden="true" className="shrink-0" />
+                  ) : null}
                   {modeLabel.startsWith("cadastru.") ? t("cadastru.transportMode.unknown") : modeLabel}
                 </h3>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <ul className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
                   {group.routes.map((route) => (
-                    <span key={`${group.mode}-${route.ref}`} className="rounded-lg bg-emerald-50 px-2.5 py-1 text-sm text-emerald-900">
-                      <span className="font-semibold">{route.ref}</span>
+                    <li key={`${group.mode}-${route.ref}`} className="min-w-0 rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
+                      <span
+                        className="inline-flex h-12 min-w-12 items-center justify-center rounded-lg bg-emerald-950 px-2 text-[1.75rem] leading-none font-semibold text-white tabular-nums"
+                        style={{ fontFamily: 'ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace' }}
+                      >
+                        {route.ref}
+                      </span>
                       {route.name && route.name !== route.ref
-                        ? <span className="ml-1 text-emerald-800">· {route.name}</span> : null}
-                    </span>
+                        ? <p className="mt-2 text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">{route.name}</p> : null}
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             );
           })}

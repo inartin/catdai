@@ -1,9 +1,11 @@
+import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
+import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { cadastruExpiresAt, writeCadastruCache, cleanCadastruPayload } from "@/lib/cadastru-cache";
 import {
@@ -500,7 +502,7 @@ export async function POST(request) {
         officialFetch: true,
       });
       if (saved) payload = normalizeCadastralPayload(saved, trimmed, access.tier);
-      await writeCadastruCache("number", trimmed, {
+      if (!saved) await writeCadastruCache("number", trimmed, {
         payload: cleanCadastruPayload(payload), lookupSource, expiresAt: cadastruExpiresAt(),
       });
     }
@@ -544,7 +546,7 @@ export async function POST(request) {
       officialFetch: false,
       expiresAt: options.expiresAt,
     });
-    const { district_lookup_checked, ...publicPayload } = payload;
+    const { district_lookup_checked, building_bundles, ...publicPayload } = payload;
     const res = NextResponse.json({ ...publicPayload, cadastru_evaluation_token: evaluationToken });
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     return res;
@@ -570,6 +572,7 @@ export async function POST(request) {
     const externalPayload = await fetchExternalCadastralData(trimmed, {
       trackUsage: !(process.env.NODE_ENV === "development" && cadastruSearchType),
       userId: access.user_id || null,
+      ...getCadastruLookupTracking(body),
     });
     lookupSource = "api";
     const payload = await enrichWithCadastruMdDetails(
@@ -582,6 +585,20 @@ export async function POST(request) {
       { officialFetch: true }
     );
   } catch (error) {
+    if (!skipCache && ![400, 401, 403, 422].includes(error?.status)) {
+      const stale = await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true, allowExpired: true });
+      if (stale?.buildingNumber) {
+        lookupSource = stale.lookupSource;
+        return respondWithCadastralPayload(normalizeCadastralPayload(stale.payload, trimmed, access.tier),
+          { expiresAt: stale.expiresAt });
+      }
+      const partial = await getBuildingFallback({ number: trimmed });
+      if (partial) {
+        // Building-only fallback never consumes a full apartment lookup credit.
+        return NextResponse.json(creditCheck.allowed ? partial
+          : buildCadastruPreviewPayload(partial, creditCheck.reason || "no_credit", { maskCadastralNumber: maskPreviewCadastralNumber }));
+      }
+    }
     const details = {
       code: error?.code || error?.name || "external_cadastru_failed",
       status: error?.status || null,

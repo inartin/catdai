@@ -13,12 +13,12 @@ export function isFreshCadastru(expiresAt) {
 
 export function cadastruCacheKey(kind, value) {
   const normalized = kind === "number" ? String(value).replace(/\D/g, "") : value;
-  return `catdai:cadastru:${kind}:v2:${crypto.createHash("sha256").update(normalized).digest("hex")}`;
+  return `catdai:cadastru:${kind}:v3:${crypto.createHash("sha256").update(normalized).digest("hex")}`;
 }
 
 export function cleanCadastruPayload(payload) {
   const clean = { ...payload };
-  for (const key of ["access_tier", "locked_sections", "access_limit"]) delete clean[key];
+  for (const key of ["access_tier", "locked_sections", "access_limit", "building_bundles", "data_freshness"]) delete clean[key];
   return clean;
 }
 
@@ -34,4 +34,8 @@ export async function writeCadastruCache(kind, key, entry) {
     ...entry,
     payload: cleanCadastruPayload(entry.payload),
   }, ttl);
+}
+
+export async function invalidateCadastruCache(kind, key) {
+  await setSharedCache(cadastruCacheKey(kind, key), null, 1);
 }

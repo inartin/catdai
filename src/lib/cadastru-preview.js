@@ -48,6 +48,8 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     source: payload?.source,
     method: payload?.method,
     partial: payload?.partial,
+    ...(payload?.apartment_unavailable ? { apartment_unavailable: true } : {}),
+    ...(payload?.data_freshness ? { data_freshness: payload.data_freshness } : {}),
     district: payload?.district || null,
     map_location: payload?.map_location || null,
     apartment: maskObjectFields(apartment, ["address", "floor", "map_location"]),

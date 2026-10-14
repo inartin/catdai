@@ -13,7 +13,7 @@ export function cadastruLocationOriginKey(input) {
   return crypto.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
 }
 
-export function createCadastruLocationStore({ name, table, isValid }) {
+export function createCadastruLocationStore({ name, table, isValid, ttlSeconds = CADASTRU_TTL_SECONDS }) {
   function cacheKey(originKey) {
     return `catdai:cadastru:${name}:v1:${originKey}`;
   }
@@ -24,7 +24,7 @@ export function createCadastruLocationStore({ name, table, isValid }) {
   }
 
   async function cacheEntry(originKey, entry) {
-    const ttl = Math.min(CADASTRU_TTL_SECONDS, Math.floor((Date.parse(entry.expiresAt) - Date.now()) / 1000));
+    const ttl = Math.min(ttlSeconds, Math.floor((Date.parse(entry.expiresAt) - Date.now()) / 1000));
     if (ttl > 0) await setSharedCache(cacheKey(originKey), entry, ttl);
   }
 
@@ -53,7 +53,8 @@ export function createCadastruLocationStore({ name, table, isValid }) {
     if (!isValid(payload) || payload.incomplete) return null;
     const originKey = cadastruLocationOriginKey(input);
     const fetchedAt = timestamps.fetchedAt || new Date().toISOString();
-    const entry = { payload, fetchedAt, expiresAt: timestamps.expiresAt || cadastruExpiresAt(fetchedAt) };
+    const entry = { payload, fetchedAt, expiresAt: timestamps.expiresAt || (ttlSeconds === CADASTRU_TTL_SECONDS
+      ? cadastruExpiresAt(fetchedAt) : new Date(Date.parse(fetchedAt) + ttlSeconds * 1000).toISOString()) };
     if (!validEntry(entry)) return null;
     if (shouldPersistRuntimeData()) {
       try {
@@ -77,7 +78,7 @@ export function createCadastruLocationStore({ name, table, isValid }) {
   }
 
   function toResponse(entry) {
-    return { ...entry.payload, cache: {
+    return { ...entry.payload, cache: { ...entry.payload.cache,
       fetched_at: entry.fetchedAt, expires_at: entry.expiresAt, stale: !isFreshCadastru(entry.expiresAt),
     } };
   }

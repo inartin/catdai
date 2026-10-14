@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { matchDistrict } from "@/lib/validation";
 import { resolveCadastruSupportedCity, resolveCadastruCityFromAddress } from "@/lib/cadastru-supported-cities";
 import { cadastruExpiresAt, isFreshCadastru, cleanCadastruPayload, readCadastruCache, writeCadastruCache } from "@/lib/cadastru-cache";
+import { apartmentBuildingNumber, isApartmentBlock, storeSharedBuilding, getSharedBuilding, composeBuildingEntry } from "@/lib/cadastru-buildings";
 
 const RECORD_COLUMNS = [
   "id",
@@ -11,6 +12,7 @@ const RECORD_COLUMNS = [
   "official_cadastral_number",
   "raw_cadastral_number",
   "building_cadastral_number",
+  "shared_building_number",
   "full_address",
   "address_ro",
   "address_ru",
@@ -448,20 +450,106 @@ function withSavedDistrict(payload, district) {
 
 function isAddressResolverOnlyRecord(row) {
   const payload = isObject(row?.raw_payload) ? row.raw_payload : {};
+  if (payload.unit_list_entry) return true;
   return payload.method === "address" && !hasDetailedPayload(payload) && !payload.lands?.length && !payload.buildings?.length;
+}
+
+function apartmentPayload(payload) {
+  const clean = cleanCadastruPayload(payload);
+  // Keep embedded legacy secondary snapshots available for their existing lazy promotion.
+  for (const key of ["building", "building_address", "map_location"]) delete clean[key];
+  if (clean.form_fields) {
+    clean.form_fields = { ...clean.form_fields };
+    delete clean.form_fields.total_floors;
+    delete clean.form_fields.building_type;
+  }
+  return clean;
+}
+
+async function persistBuildingBundles(payload, options) {
+  for (const bundle of payload?.building_bundles || []) {
+    const registry = payload.buildings?.find((property) => property.cadastral_number === bundle.cadastral_number);
+    const building = await storeSharedBuilding(bundle.cadastral_number, {
+      ...bundle.building, ...(registry ? { registry } : {}),
+    }, {
+      address: bundle.building?.address, mapLocation: bundle.map_location,
+      fetchedAt: bundle.fetched_at, expiresAt: bundle.expires_at,
+    });
+    if (!building) continue;
+    for (const unit of bundle.apartments || []) {
+      if (apartmentBuildingNumber(unit.cadastral_number) !== building.number) continue;
+      await persistCadastruRecord({ ...unit, source: payload.source || "geodata_wms" }, {
+        lookupSource: options.lookupSource, officialFetch: true, countLookup: false,
+        skipBuildingBundles: true, buildingNumber: building.number,
+      });
+    }
+  }
 }
 
 export async function persistCadastruRecord(payload, options = {}) {
   if (!isCadastruDbEnabled()) return null;
 
   try {
+    if (!options.skipBuildingBundles) await persistBuildingBundles(payload, options);
     const existing = await findRecordByNumber(payload?.cadastral_number || options.cadastralNumber);
     const row = buildRecordRow(payload, options, existing);
     if (!row) return null;
 
+    const parentNumber = apartmentBuildingNumber(row.cadastral_number);
+    const blockProperty = !parentNumber && payload.buildings?.find((property) => property.cadastral_number === row.cadastral_number);
+    let sharedBuilding = null;
+    if (parentNumber && !String(payload.source || "").includes("derived")) {
+      if (isApartmentBlock(row.building_data) && (options.officialFetch || !existing?.shared_building_number)) {
+        sharedBuilding = await storeSharedBuilding(parentNumber, row.building_data, {
+          address: row.full_address, mapLocation: payload.map_location,
+          fetchedAt: options.officialFetch ? undefined : existing?.last_official_fetch_at || existing?.data_updated_at,
+          expiresAt: row.next_refresh_after,
+        });
+      } else {
+        sharedBuilding = await getSharedBuilding(parentNumber);
+      }
+    }
+    if (blockProperty && await getSharedBuilding(row.cadastral_number)) {
+      sharedBuilding = options.officialFetch
+        ? await storeSharedBuilding(row.cadastral_number, { registry: blockProperty }, {
+          mapLocation: blockProperty.map_location, expiresAt: row.next_refresh_after,
+        }) : await getSharedBuilding(row.cadastral_number);
+      if (sharedBuilding) {
+        row.shared_building_number = row.cadastral_number;
+        row.raw_payload = { cadastral_number: row.cadastral_number, source: row.source };
+        row.payload_hash = hashPayload(row.raw_payload);
+      }
+    }
+    if (sharedBuilding && parentNumber) {
+      row.shared_building_number = parentNumber;
+      row.building_cadastral_number = parentNumber;
+      // A partial refresh cannot erase fields already fetched for this apartment.
+      const incoming = Object.fromEntries(Object.entries(row.apartment_data).filter(([, value]) => value != null && value !== ""));
+      const retained = Object.keys(existing?.apartment_data || {}).some((key) => !(key in incoming));
+      row.apartment_data = { ...existing?.apartment_data, ...incoming };
+      row.raw_payload = { ...existing?.raw_payload, ...row.raw_payload, apartment: row.apartment_data };
+      if (hasDetailedPayload({ apartment: row.apartment_data })) delete row.raw_payload.unit_list_entry;
+      row.apartment_area_m2 = normalizeNumber(row.apartment_data.area_m2);
+      row.apartment_floor = normalizeInteger(row.apartment_data.floor);
+      row.apartment_estimated_value_lei = normalizeNumber(row.apartment_data.estimated_value_lei);
+      row.form_fields = { ...existing?.form_fields, ...row.form_fields };
+      row.raw_payload.form_fields = row.form_fields;
+      if (retained) {
+        row.next_refresh_after = recordExpiry(existing);
+        row.last_official_fetch_at = existing.last_official_fetch_at;
+        row.result_type = existing.result_type;
+      }
+      row.building_data = {};
+      row.building_total_floors = null;
+      row.building_construction_year = null;
+      row.raw_payload = apartmentPayload(row.raw_payload);
+      row.form_fields = apartmentPayload({ form_fields: row.form_fields }).form_fields;
+      row.payload_hash = hashPayload(row.raw_payload);
+    }
+
     const now = new Date().toISOString();
     const countLookup = options.countLookup !== false;
-    const shouldKeepExistingDetail = existing && isFreshCadastru(recordExpiry(existing)) && row.raw_payload.method === "address" && hasDetailedPayload(existing.raw_payload) && !hasDetailedPayload(row.raw_payload);
+    const shouldKeepExistingDetail = !sharedBuilding && existing && isFreshCadastru(recordExpiry(existing)) && row.raw_payload.method === "address" && hasDetailedPayload(existing.raw_payload) && !hasDetailedPayload(row.raw_payload);
     const retainedPayload = shouldKeepExistingDetail
       ? {
           ...existing.raw_payload,
@@ -538,7 +626,7 @@ export async function persistCadastruRecord(payload, options = {}) {
         await saveAddressAlias(address, entry);
       }
     }
-    return entry.payload;
+      return (await composeBuildingEntry(entry)).payload;
   } catch (error) {
     if (!isMissingSchemaError(error)) {
       console.error("[cadastru-records] persist failed:", error?.message || String(error));
@@ -549,7 +637,8 @@ export async function persistCadastruRecord(payload, options = {}) {
 
 function recordEntry(row) {
   return {
-    payload: hydratePayloadFromRecord(row),
+    payload: row.shared_building_number ? apartmentPayload(hydratePayloadFromRecord(row)) : hydratePayloadFromRecord(row),
+    ...(row.shared_building_number ? { buildingNumber: row.shared_building_number } : {}),
     lookupSource: normalizeLookupSource(row.lookup_source),
     resultType: normalizeResultType(row.result_type),
     expiresAt: recordExpiry(row),
@@ -559,12 +648,13 @@ function recordEntry(row) {
 async function saveAddressAlias(address, entry) {
   const addressKey = normalizeCadastruAddressForDb(address);
   if (!addressKey || !isFreshCadastru(entry.expiresAt)) return;
-  await writeCadastruCache("address", addressKey, entry);
+  const savedEntry = entry.buildingNumber ? { ...entry, payload: { cadastral_number: entry.payload.cadastral_number } } : entry;
+  await writeCadastruCache("address", addressKey, savedEntry);
   if (!isCadastruDbEnabled()) return;
   const { error } = await supabaseAdmin.from("cadastru_address_aliases").upsert({
     address_key: addressKey,
     cadastral_number: entry.payload.cadastral_number || null,
-    raw_payload: cleanCadastruPayload(entry.payload),
+    raw_payload: cleanCadastruPayload(savedEntry.payload),
     lookup_source: entry.lookupSource,
     expires_at: entry.expiresAt,
   }, { onConflict: "address_key" });
@@ -573,7 +663,7 @@ async function saveAddressAlias(address, entry) {
 
 export async function getCadastruRecordByNumber(cadastralNumber, options = {}) {
   const cached = await readCadastruCache("number", cadastralNumber);
-  if (cached && (!options.requireDetailPayload || !isAddressResolverOnlyRecord({ raw_payload: cached.payload }))) return cached;
+  if (cached && (!options.requireDetailPayload || !isAddressResolverOnlyRecord({ raw_payload: cached.payload }))) return composeBuildingEntry(cached);
   if (!isCadastruDbEnabled()) return null;
   try {
     const row = await findRecordByNumber(cadastralNumber);
@@ -581,7 +671,7 @@ export async function getCadastruRecordByNumber(cadastralNumber, options = {}) {
     if (options.requireDetailPayload && isAddressResolverOnlyRecord(row)) return null;
     const entry = recordEntry(row);
     await writeCadastruCache("number", cadastralNumber, entry);
-    return entry;
+    return composeBuildingEntry(entry);
   } catch (error) {
     logDbError("number lookup failed", error);
     return null;
@@ -613,6 +703,7 @@ async function resolveAddressEntry(entry, options = {}) {
   if (entry.payload.cadastral_number) {
     const canonical = await getCadastruRecordByNumber(entry.payload.cadastral_number, options);
     if (!canonical) return entry;
+    if (options.requireUnitDetails && canonical.payload.unit_list_entry) return null;
     if (cleanText(canonical.payload?.district) || cleanText(canonical.payload?.form_fields?.district)) return canonical;
 
     const aliasDistrict = cleanText(entry.payload?.district || entry.payload?.form_fields?.district);
@@ -627,12 +718,13 @@ async function resolveAddressEntry(entry, options = {}) {
     }
     if (district) {
       const updated = { ...canonical, payload: withSavedDistrict(canonical.payload, district) };
-      await writeCadastruCache("number", entry.payload.cadastral_number, updated);
+      await writeCadastruCache("number", entry.payload.cadastral_number,
+        updated.buildingNumber ? { ...updated, payload: apartmentPayload(updated.payload) } : updated);
       return updated;
     }
     return canonical;
   }
-  return entry;
+  return composeBuildingEntry(entry);
 }
 
 export async function getCadastruRecordByAddress(rawAddress, options = {}) {
@@ -658,12 +750,13 @@ export async function getCadastruRecordByAddress(rawAddress, options = {}) {
     query = structured.apartmentNumber ? query.eq("apartment_number", structured.apartmentNumber) : query.is("apartment_number", null);
     const { data, error } = await query.limit(100);
     logDbError("structured address lookup failed", error);
-    const matches = (data || []).filter((row) => (options.allowExpired || isFreshCadastru(recordExpiry(row))) && recordMatchesStructuredAddress(row, normalized, structured));
+    const matches = (data || []).filter((row) => (!options.requireUnitDetails || !row.raw_payload?.unit_list_entry)
+      && (options.allowExpired || isFreshCadastru(recordExpiry(row))) && recordMatchesStructuredAddress(row, normalized, structured));
     // An address without an apartment can describe several parcels/buildings. Only an exact saved aggregate is safe.
     if (!structured.apartmentNumber || matches.length !== 1) return null;
     const entry = recordEntry(matches[0]);
     await saveAddressAlias(rawAddress, entry);
-    return entry;
+    return composeBuildingEntry(entry);
   } catch (error) {
     logDbError("address lookup failed", error);
     return null;
@@ -671,13 +764,14 @@ export async function getCadastruRecordByAddress(rawAddress, options = {}) {
 }
 
 export async function persistCadastruAddressResult(payload, options = {}) {
+  await persistBuildingBundles(payload, options);
   const entry = {
     payload: cleanCadastruPayload(payload),
     lookupSource: normalizeLookupSource(options.lookupSource),
     expiresAt: options.expiresAt || cadastruExpiresAt(),
   };
   if (payload.cadastral_number) {
-    const saved = await persistCadastruRecord(payload, { ...options, skipAddressAlias: true, countLookup: false });
+    const saved = await persistCadastruRecord(payload, { ...options, skipBuildingBundles: true, skipAddressAlias: true, countLookup: false });
     if (saved) {
       const canonical = await getCadastruRecordByNumber(payload.cadastral_number);
       if (canonical) Object.assign(entry, canonical);
@@ -694,15 +788,21 @@ export async function persistCadastruAddressResult(payload, options = {}) {
         matched_address: property.address || payload.matched_address,
         [kind]: [property],
       };
-      await persistCadastruRecord(individual, { ...options, skipAddressAlias: true, countLookup: false });
-      await writeCadastruCache("number", property.cadastral_number, { ...entry, payload: individual });
+      const saved = await persistCadastruRecord(individual, { ...options, skipAddressAlias: true, countLookup: false });
+      if (!saved) await writeCadastruCache("number", property.cadastral_number, { ...entry, payload: individual });
     }
+  }
+  if (payload.buildings?.length) {
+    const references = await Promise.all(payload.buildings.map(async (property) =>
+      await getSharedBuilding(property.cadastral_number)
+        ? { cadastral_number: property.cadastral_number, shared_building_reference: true } : property));
+    entry.payload = { ...entry.payload, buildings: references };
   }
   for (const address of new Set([options.requestAddress, options.resolvedAddress, payload.matched_address].filter(Boolean))) {
     // Derived apartment results may carry only the building address: never alias them to the whole building.
     if (payload.cadastral_number && address !== options.requestAddress && options.structuredAddress?.apartmentNumber
       && !parseAddressParts(address).apartmentNumber) continue;
-    await saveAddressAlias(address, { ...entry, payload: cleanCadastruPayload(payload) });
+      await saveAddressAlias(address, entry);
   }
-  return entry.payload;
+  return (await composeBuildingEntry(entry)).payload;
 }

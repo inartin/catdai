@@ -370,23 +370,25 @@ function CadastruImageSaveButton({ cadastral, targetRef }) {
   );
 }
 
-function fetchCadastralLookup(cacheKey, body, accessToken) {
+function fetchCadastralLookup(cacheKey, body, accessToken, tracking) {
   const existing = inFlightCadastralLookups.get(cacheKey);
   if (existing) return existing;
 
+  const lookupTracking = tracking || { id: crypto.randomUUID(), query: body.cadastral_number };
   const promise = fetch("/api/cadastral", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, lookup_id: lookupTracking.id, lookup_query: lookupTracking.query }),
   }).then(async (response) => ({
     ok: response.ok,
     status: response.status,
     data: await response.json().catch(() => null),
   }));
 
+  promise.lookupTracking = lookupTracking;
   inFlightCadastralLookups.set(cacheKey, promise);
   promise.then(
     () => inFlightCadastralLookups.delete(cacheKey),
@@ -395,23 +397,25 @@ function fetchCadastralLookup(cacheKey, body, accessToken) {
   return promise;
 }
 
-function fetchAddressLookup(cacheKey, body, accessToken) {
+function fetchAddressLookup(cacheKey, body, accessToken, tracking) {
   const existing = inFlightAddressLookups.get(cacheKey);
   if (existing) return existing;
 
+  const lookupTracking = tracking || { id: crypto.randomUUID(), query: [formatLookupAddress(body), body.apartment_number ? `ap. ${body.apartment_number}` : ""].filter(Boolean).join(", ") };
   const promise = fetch("/api/cadastru/address", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, lookup_id: lookupTracking.id, lookup_query: lookupTracking.query }),
   }).then(async (response) => ({
     ok: response.ok,
     status: response.status,
     data: await response.json().catch(() => null),
   }));
 
+  promise.lookupTracking = lookupTracking;
   inFlightAddressLookups.set(cacheKey, promise);
   promise.then(
     () => inFlightAddressLookups.delete(cacheKey),
@@ -463,6 +467,7 @@ function CadastruResultContent() {
   const savedAddress = (!cadastralNumber ? retryRequest : null) || getSavedCadastruAddress(searchParams);
   const isHistoryAddress = searchParams.get("history") === "1";
   const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
+  const lookupTracking = useRef(null);
   const loadedRequestKey = useRef("");
   const loadedNearbyKey = useRef("");
   const loadedTransportKey = useRef("");
@@ -565,6 +570,7 @@ function CadastruResultContent() {
     } catch {
       // Request persistence is best-effort for auth redirects.
     }
+    lookupTracking.current = null;
     loadedRequestKey.current = "";
     setState({ loading: true, error: "", data: null });
     setRetryRequest(body);
@@ -621,12 +627,14 @@ function CadastruResultContent() {
         setState({ loading: true, error: "", data: null });
         try {
           const body = { ...addressRequest, ...(skipCache ? { skip_cache: true } : {}) };
-          const response = await fetchAddressLookup(
+          const lookup = fetchAddressLookup(
             `${requestKey}|${JSON.stringify(body)}|${session?.access_token || "anonymous"}`,
             body,
             session?.access_token
           );
 
+          lookupTracking.current = lookup.lookupTracking;
+          const response = await lookup;
           if (!response.ok) {
             if (!active) return;
             loadedRequestKey.current = requestKey;
@@ -719,7 +727,10 @@ function CadastruResultContent() {
           ...(searchSource === "address" ? { preview_origin: "address" } : {}),
         };
 
-        const response = await fetchCadastralLookup(`${requestKey}|${session?.access_token || "anonymous"}`, body, session?.access_token);
+        const lookup = fetchCadastralLookup(`${requestKey}|${session?.access_token || "anonymous"}`, body, session?.access_token,
+          searchSource === "address" ? lookupTracking.current : undefined);
+        lookupTracking.current = lookup.lookupTracking;
+        const response = await lookup;
 
         if (!response.ok) {
           if (response.status === 401) {
@@ -771,6 +782,8 @@ function CadastruResultContent() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
+              lookup_query: lookupTracking.current.query,
               ...(nearbyAddress ? { address: nearbyAddress } : {}),
               ...(validateCadastralNumber(nearbyNumber).valid ? { cadastral_number: nearbyNumber } : {}),
             }),
@@ -805,6 +818,8 @@ function CadastruResultContent() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
+              lookup_query: lookupTracking.current.query,
               ...(nearbyAddress ? { address: nearbyAddress } : {}),
               ...(validateCadastralNumber(nearbyNumber).valid ? { cadastral_number: nearbyNumber } : {}),
             }),
@@ -840,6 +855,8 @@ function CadastruResultContent() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
+              lookup_query: lookupTracking.current.query,
               ...(nearbyAddress ? { address: nearbyAddress } : {}),
               ...(validateCadastralNumber(nearbyNumber).valid ? { cadastral_number: nearbyNumber } : {}),
             }),

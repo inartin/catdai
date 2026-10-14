@@ -1,3 +1,4 @@
+import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalNearbyData } from "@/lib/cadastru-external-api";
@@ -6,6 +7,7 @@ import { getCadastruRecordByAddress, getCadastruRecordByNumber } from "@/lib/cad
 import { CADASTRU_TTL_SECONDS, isFreshCadastru } from "@/lib/cadastru-cache";
 import { getStoredNearby, storeNearby, nearbyFromStorage } from "@/lib/cadastru-nearby-storage";
 import { CADASTRAL_RE } from "@/lib/validation";
+import { getBuildingFallback } from "@/lib/cadastru-buildings";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15, namespace: "cadastru-nearby" });
 
@@ -39,6 +41,10 @@ export async function POST(request) {
     ? await getCadastruRecordByAddress(address, { allowExpired: true })
     : await getCadastruRecordByNumber(number, { allowExpired: true });
   if (!entry && address && CADASTRAL_RE.test(number)) entry = await getCadastruRecordByNumber(number, { allowExpired: true });
+  if (!entry) {
+    const partial = await getBuildingFallback(address ? { address } : { number });
+    if (partial) entry = { payload: partial };
+  }
   if (!entry && !address) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
 
   const addressFields = nearbyAddressFromCadastru(entry?.payload || { request_address: address });
@@ -57,7 +63,7 @@ export async function POST(request) {
   }
 
   try {
-    const nearby = await fetchExternalNearbyData(addressFields);
+    const nearby = await fetchExternalNearbyData(addressFields, getCadastruLookupTracking(body));
     if (!validNearbyResult(nearby)) throw new Error("Invalid nearby response");
     if (nearby.incomplete && stored) return NextResponse.json({ nearby: nearbyFromStorage(stored) });
     const saved = await storeNearby(addressFields, nearby);

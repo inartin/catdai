@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Tooltip from "@/components/Tooltip";
+import { groupExternalApiEvents } from "@/lib/admin-external-api-groups";
 import ProfileCreditBalances from "@/components/ProfileCreditBalances";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 
@@ -204,12 +205,190 @@ function fmtCheckoutSummary(item) {
   return `${fmtNum(item?.uniqueVisitors || 0)} users`;
 }
 
-function fmtExternalApiService(service) {
+function fmtExternalApiService(service, endpoint = "") {
+  if (endpoint.includes("/municipal-reports")) return "Municipal reports";
+  if (endpoint.includes("/public-transport")) return "Public transport";
   if (service === "999_listing") return "999 listing";
   if (service === "cadastru_number") return "Cadastru number";
   if (service === "cadastru_address") return "Cadastru address";
   if (service === "cadastru_nearby") return "Nearby places";
   return service || "\u2014";
+}
+
+function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedExternalApiEventId,
+  deletingExternalApiEventId, deleteExternalApiLogs }) {
+  return (
+    <table className="w-full min-w-[80rem] table-fixed text-sm">
+      <colgroup>
+        <col className="w-52" />
+        <col className="w-36" />
+        <col className="w-28" />
+        <col className="w-16" />
+        <col className="w-24" />
+        <col />
+        <col className="w-52" />
+        <col className="w-36" />
+        <col className="w-24" />
+      </colgroup>
+      <thead>
+        <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+          <th className="px-4 py-3">Time</th>
+          <th className="px-4 py-3">Service</th>
+          <th className="px-4 py-3">Status</th>
+          <th className="px-4 py-3 text-right">HTTP</th>
+          <th className="px-4 py-3 text-right">Duration</th>
+          <th className="px-4 py-3">Result</th>
+          <th className="px-4 py-3">Suggestion recovery</th>
+          <th className="px-4 py-3">User</th>
+          <th className="px-4 py-3 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-gray-100">
+        {rows.map((row) => {
+          const expanded = expandedExternalApiEventId === row.id;
+          const toggleExpanded = () => setExpandedExternalApiEventId(expanded ? null : row.id);
+          const requestPayload = fmtExternalApiPayload(row.request_payload);
+          const responsePayload = fmtExternalApiPayload(row.response_payload);
+          const responseHeaders = fmtExternalApiPayload(row.response_headers);
+
+          return (
+            <Fragment key={row.id}>
+              <tr
+                role="button"
+                tabIndex={0}
+                aria-expanded={expanded}
+                onClick={toggleExpanded}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    toggleExpanded();
+                  }
+                }}
+                className={`cursor-pointer ${expanded ? "bg-sky-50 hover:bg-sky-50" : "hover:bg-gray-50"}`}
+              >
+                <td className="px-4 py-3 text-gray-600">
+                  <div className="flex items-center gap-2">
+                    <svg aria-hidden="true" viewBox="0 0 16 16" fill="none"
+                      className={`h-3 w-3 shrink-0 ${expanded ? "rotate-90 text-sky-600" : "text-gray-400"}`}>
+                      <path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span>{fmtDateTime(row.created_at)}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 font-medium text-gray-900">{fmtExternalApiService(row.service, row.endpoint)}</td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.status === "failure"
+                    ? "bg-red-50 text-red-700"
+                    : "bg-green-50 text-green-700"
+                    }`}>
+                    {row.status === "failure" ? "Failed" : "Successful"}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right text-gray-600">{row.http_status ?? "—"}</td>
+                <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                  {row.duration_ms == null ? "—" : `${fmtNum(row.duration_ms)} ms`}
+                </td>
+                <td className="max-w-xs truncate px-4 py-3 text-gray-600">
+                  {row.error_message || row.error_code || (row.response_payload ? "Response received" : "Completed")}
+                </td>
+                <td className="px-4 py-3">
+                  {row.suggestion_recovery ? (
+                    <div className="min-w-40">
+                      <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Recovered with suggestion</span>
+                      <p className="mt-1 text-xs text-gray-600">{row.suggestion_recovery.suggested_street}</p>
+                    </div>
+                  ) : <span className="text-gray-400">—</span>}
+                </td>
+                <td className="px-4 py-3 text-gray-600 break-all">
+                  {row.user_name || "Anonymous"}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button
+                    type="button"
+                    aria-label={`Delete API log ${row.id}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      deleteExternalApiLogs(row);
+                    }}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    disabled={deletingExternalApiEventId !== null}
+                    className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {deletingExternalApiEventId === row.id ? "Deleting..." : "Delete"}
+                  </button>
+                </td>
+              </tr>
+              {expanded && (
+                <tr>
+                  <td colSpan={9} className="bg-gray-50 px-4 py-4">
+                    <div className="grid min-w-0 gap-4 [overflow-wrap:anywhere] lg:grid-cols-2">
+                      <div className="min-w-0 space-y-3">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Endpoint</p>
+                          <p className="mt-1 break-all text-sm text-gray-800">{row.endpoint || "Not recorded"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">User</p>
+                          <p className="mt-1 break-all text-sm text-gray-800">{row.user_name || "Anonymous"}</p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <div>
+                            <p className="text-xs text-gray-500">HTTP status</p>
+                            <p className="mt-1 text-sm font-medium text-gray-800">{row.http_status ?? "No response"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Duration</p>
+                            <p className="mt-1 text-sm font-medium text-gray-800">{row.duration_ms == null ? "—" : `${fmtNum(row.duration_ms)} ms`}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Error code</p>
+                            <p className="mt-1 break-all text-sm font-medium text-gray-800">{row.error_code || "—"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Error message</p>
+                            <p className="mt-1 break-words text-sm font-medium text-gray-800">{row.error_message || "—"}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">User query / request payload</p>
+                        {requestPayload ? (
+                          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{requestPayload}</pre>
+                        ) : (
+                          <p className="mt-2 text-sm text-gray-500">No request payload recorded.</p>
+                        )}
+                      </div>
+                      <div className="min-w-0 lg:col-span-2">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Worker response</p>
+                        {responsePayload ? (
+                          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{responsePayload}</pre>
+                        ) : (
+                          <p className="mt-2 text-sm text-gray-500">No response payload was received or recorded.</p>
+                        )}
+                      </div>
+                      {responseHeaders && (
+                        <div className="min-w-0 lg:col-span-2">
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Diagnostic response headers</p>
+                          <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{responseHeaders}</pre>
+                        </div>
+                      )}
+                      {row.suggestion_recovery && (
+                        <div className="min-w-0 lg:col-span-2">
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Successful suggestion retry</p>
+                          <p className="mt-1 text-sm text-gray-800">{row.suggestion_recovery.resolved_address}</p>
+                          <p className="mt-1 text-xs text-gray-500">{fmtDateTime(row.suggestion_recovery.recovered_at)} · Source: {row.suggestion_recovery.lookup_source || "—"}</p>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+  );
 }
 
 function fmtExternalApiPayload(payload) {
@@ -345,6 +524,7 @@ export default function AdminDashboard() {
   const [showListingLinkAnalysesList, setShowListingLinkAnalysesList] = useState(false);
   const [showExternalApiUsageList, setShowExternalApiUsageList] = useState(false);
   const [externalApiStatusFilter, setExternalApiStatusFilter] = useState("all");
+  const [expandedExternalApiGroupId, setExpandedExternalApiGroupId] = useState(null);
   const [expandedExternalApiEventId, setExpandedExternalApiEventId] = useState(null);
   const [deletingExternalApiEventId, setDeletingExternalApiEventId] = useState(null);
   const [externalApiDeleteError, setExternalApiDeleteError] = useState(null);
@@ -561,6 +741,7 @@ export default function AdminDashboard() {
     statsRequestIdRef.current += 1;
     setDashboardPeriod(period);
     setExpandedExternalApiEventId(null);
+    setExpandedExternalApiGroupId(null);
     setActiveEstimationsType(null);
     setEstimations([]);
   };
@@ -604,6 +785,7 @@ export default function AdminDashboard() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setExpandedExternalApiEventId(null);
+      setExpandedExternalApiGroupId(null);
       setStats((current) => ({
         ...current,
         externalApiUsage: {
@@ -660,9 +842,7 @@ export default function AdminDashboard() {
   const externalApiEvents = Array.isArray(s.externalApiUsage?.events)
     ? s.externalApiUsage.events
     : [];
-  const filteredExternalApiEvents = externalApiStatusFilter === "all"
-    ? externalApiEvents
-    : externalApiEvents.filter((row) => row.status === externalApiStatusFilter);
+  const externalApiGroups = groupExternalApiEvents(externalApiEvents, externalApiStatusFilter);
 
   return (
     <div className="space-y-8">
@@ -1375,6 +1555,7 @@ export default function AdminDashboard() {
                     onClick={() => {
                       setExternalApiStatusFilter(option.key);
                       setExpandedExternalApiEventId(null);
+                      setExpandedExternalApiGroupId(null);
                     }}
                     className={`flex-1 cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:flex-none ${externalApiStatusFilter === option.key
                       ? "bg-primary text-white"
@@ -1421,7 +1602,7 @@ export default function AdminDashboard() {
                     </div>
                   ))}
                 </div>
-                {filteredExternalApiEvents.length === 0 ? (
+                {externalApiGroups.length === 0 ? (
                   <div className="px-5 py-8 text-center text-gray-400">
                     {externalApiStatusFilter === "all"
                       ? "No request-level external API rows found"
@@ -1429,45 +1610,33 @@ export default function AdminDashboard() {
                   </div>
                 ) : (
                   <div className="max-h-[36rem] overflow-auto [scrollbar-gutter:stable] [overflow-anchor:none]">
-                    <table className="w-full min-w-[80rem] table-fixed text-sm">
+                    <table className="w-full min-w-[56rem] table-fixed text-sm">
                       <colgroup>
                         <col className="w-52" />
-                        <col className="w-36" />
-                        <col className="w-28" />
-                        <col className="w-16" />
-                        <col className="w-24" />
                         <col />
-                        <col className="w-52" />
                         <col className="w-36" />
-                        <col className="w-24" />
+                        <col className="w-44" />
+                        <col className="w-36" />
                       </colgroup>
                       <thead className="sticky top-0 z-10">
-                        <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+                        <tr className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
                           <th className="px-4 py-3">Time</th>
-                          <th className="px-4 py-3">Service</th>
+                          <th className="px-4 py-3">Search / request</th>
                           <th className="px-4 py-3">Status</th>
-                          <th className="px-4 py-3 text-right">HTTP</th>
-                          <th className="px-4 py-3 text-right">Duration</th>
-                          <th className="px-4 py-3">Result</th>
-                          <th className="px-4 py-3">Suggestion recovery</th>
+                          <th className="px-4 py-3">API calls</th>
                           <th className="px-4 py-3">User</th>
-                          <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {filteredExternalApiEvents.map((row) => {
-                          const expanded = expandedExternalApiEventId === row.id;
-                          const toggleExpanded = () => setExpandedExternalApiEventId(expanded ? null : row.id);
-                          const requestPayload = fmtExternalApiPayload(row.request_payload);
-                          const responsePayload = fmtExternalApiPayload(row.response_payload);
-                          const responseHeaders = fmtExternalApiPayload(row.response_headers);
-
+                        {externalApiGroups.map((group) => {
+                          const expanded = expandedExternalApiGroupId === group.id;
+                          const toggleExpanded = () => {
+                            setExpandedExternalApiGroupId(expanded ? null : group.id);
+                            setExpandedExternalApiEventId(null);
+                          };
                           return (
-                            <Fragment key={row.id}>
-                              <tr
-                                role="button"
-                                tabIndex={0}
-                                aria-expanded={expanded}
+                            <Fragment key={group.id}>
+                              <tr role="button" tabIndex={0} aria-expanded={expanded}
                                 onClick={toggleExpanded}
                                 onKeyDown={(event) => {
                                   if (event.key === "Enter" || event.key === " ") {
@@ -1475,121 +1644,46 @@ export default function AdminDashboard() {
                                     toggleExpanded();
                                   }
                                 }}
-                                className={`cursor-pointer ${expanded ? "bg-sky-50 hover:bg-sky-50" : "hover:bg-gray-50"}`}
-                              >
+                                className={`cursor-pointer ${expanded ? "bg-sky-50" : "hover:bg-gray-50"}`}>
                                 <td className="px-4 py-3 text-gray-600">
                                   <div className="flex items-center gap-2">
                                     <svg aria-hidden="true" viewBox="0 0 16 16" fill="none"
                                       className={`h-3 w-3 shrink-0 ${expanded ? "rotate-90 text-sky-600" : "text-gray-400"}`}>
                                       <path d="m6 3 5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                     </svg>
-                                    <span>{fmtDateTime(row.created_at)}</span>
+                                    <span>{fmtDateTime(group.created_at)}</span>
                                   </div>
                                 </td>
-                                <td className="px-4 py-3 font-medium text-gray-900">{fmtExternalApiService(row.service)}</td>
                                 <td className="px-4 py-3">
-                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.status === "failure"
-                                    ? "bg-red-50 text-red-700"
-                                    : "bg-green-50 text-green-700"
-                                    }`}>
-                                    {row.status === "failure" ? "Failed" : "Successful"}
+                                  <p className="truncate font-medium text-gray-900" title={String(group.query)}>
+                                    {group.query || (group.linked || group.inferred ? "Cadastru search" : fmtExternalApiService(group.service, group.events[0].endpoint))}
+                                  </p>
+                                  <p className="mt-1 text-xs text-gray-500">
+                                    {group.linked ? "Cadastru search" : group.inferred ? "Cadastru search (older logs)" : "Individual API log"}
+                                  </p>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${group.failure ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+                                    {group.failure ? (group.success ? "With failures" : "Failed") : "Successful"}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3 text-right text-gray-600">{row.http_status ?? "—"}</td>
-                                <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
-                                  {row.duration_ms == null ? "—" : `${fmtNum(row.duration_ms)} ms`}
+                                <td className="px-4 py-3 text-gray-600">
+                                  <p>{fmtNum(group.events.length)} {group.events.length === 1 ? "call" : "calls"}</p>
+                                  <p className="mt-1 text-xs">{fmtNum(group.success)} successful · {fmtNum(group.failure)} failed</p>
                                 </td>
-                                <td className="max-w-xs truncate px-4 py-3 text-gray-600">
-                                  {row.error_message || row.error_code || (row.response_payload ? "Response received" : "Completed")}
-                                </td>
-                                <td className="px-4 py-3">
-                                  {row.suggestion_recovery ? (
-                                    <div className="min-w-40">
-                                      <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Recovered with suggestion</span>
-                                      <p className="mt-1 text-xs text-gray-600">{row.suggestion_recovery.suggested_street}</p>
-                                    </div>
-                                  ) : <span className="text-gray-400">—</span>}
-                                </td>
-                                <td className="px-4 py-3 text-gray-600 break-all">
-                                  {row.user_name || "Anonymous"}
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <button
-                                    type="button"
-                                    aria-label={`Delete API log ${row.id}`}
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      deleteExternalApiLogs(row);
-                                    }}
-                                    onKeyDown={(event) => event.stopPropagation()}
-                                    disabled={deletingExternalApiEventId !== null}
-                                    className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    {deletingExternalApiEventId === row.id ? "Deleting..." : "Delete"}
-                                  </button>
-                                </td>
+                                <td className="break-all px-4 py-3 text-gray-600">{group.user_name || "Anonymous"}</td>
                               </tr>
                               {expanded && (
                                 <tr>
-                                  <td colSpan={9} className="bg-gray-50 px-4 py-4">
-                                    <div className="grid min-w-0 gap-4 [overflow-wrap:anywhere] lg:grid-cols-2">
-                                      <div className="min-w-0 space-y-3">
-                                        <div>
-                                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Endpoint</p>
-                                          <p className="mt-1 break-all text-sm text-gray-800">{row.endpoint || "Not recorded"}</p>
-                                        </div>
-                                        <div>
-                                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">User</p>
-                                          <p className="mt-1 break-all text-sm text-gray-800">{row.user_name || "Anonymous"}</p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                          <div>
-                                            <p className="text-xs text-gray-500">HTTP status</p>
-                                            <p className="mt-1 text-sm font-medium text-gray-800">{row.http_status ?? "No response"}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-xs text-gray-500">Duration</p>
-                                            <p className="mt-1 text-sm font-medium text-gray-800">{row.duration_ms == null ? "—" : `${fmtNum(row.duration_ms)} ms`}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-xs text-gray-500">Error code</p>
-                                            <p className="mt-1 break-all text-sm font-medium text-gray-800">{row.error_code || "—"}</p>
-                                          </div>
-                                          <div>
-                                            <p className="text-xs text-gray-500">Error message</p>
-                                            <p className="mt-1 break-words text-sm font-medium text-gray-800">{row.error_message || "—"}</p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">User query / request payload</p>
-                                        {requestPayload ? (
-                                          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{requestPayload}</pre>
-                                        ) : (
-                                          <p className="mt-2 text-sm text-gray-500">No request payload recorded.</p>
-                                        )}
-                                      </div>
-                                      <div className="min-w-0 lg:col-span-2">
-                                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Worker response</p>
-                                        {responsePayload ? (
-                                          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{responsePayload}</pre>
-                                        ) : (
-                                          <p className="mt-2 text-sm text-gray-500">No response payload was received or recorded.</p>
-                                        )}
-                                      </div>
-                                      {responseHeaders && (
-                                        <div className="min-w-0 lg:col-span-2">
-                                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Diagnostic response headers</p>
-                                          <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{responseHeaders}</pre>
-                                        </div>
-                                      )}
-                                      {row.suggestion_recovery && (
-                                        <div className="min-w-0 lg:col-span-2">
-                                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Successful suggestion retry</p>
-                                          <p className="mt-1 text-sm text-gray-800">{row.suggestion_recovery.resolved_address}</p>
-                                          <p className="mt-1 text-xs text-gray-500">{fmtDateTime(row.suggestion_recovery.recovered_at)} · Source: {row.suggestion_recovery.lookup_source || "—"}</p>
-                                        </div>
-                                      )}
+                                  <td colSpan={5} className="bg-sky-50/40 px-4 py-4">
+                                    <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+                                      <ExternalApiEventTable
+                                        rows={group.events}
+                                        expandedExternalApiEventId={expandedExternalApiEventId}
+                                        setExpandedExternalApiEventId={setExpandedExternalApiEventId}
+                                        deletingExternalApiEventId={deletingExternalApiEventId}
+                                        deleteExternalApiLogs={deleteExternalApiLogs}
+                                      />
                                     </div>
                                   </td>
                                 </tr>

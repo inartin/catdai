@@ -7,7 +7,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 
 const cache = new Map();
-const tables = { cadastru_records: [], cadastru_address_aliases: [], external_api_usage_events: [], cadastru_public_transport: [], cadastru_nearby: [] };
+const tables = { cadastru_records: [], cadastru_address_aliases: [], external_api_usage_events: [], cadastru_public_transport: [], cadastru_nearby: [], cadastru_buildings: [], cadastru_building_addresses: [], cadastru_municipal_reports: [] };
 let persistEnabled = true;
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const supabaseAdmin = {
@@ -1207,7 +1207,7 @@ const reportsData = {
   period: { years: 2, from: "2024-10-10", to: "2026-10-10" },
   at_address: { count: 0, reports: [], has_more: false },
   nearby: { count: 0, reports: [], has_more: false },
-  cache: { fetched_at: "2026-10-10T15:53:29.376Z", stale: false },
+  cache: { fetched_at: new Date(Date.now() - 3600000).toISOString(), stale: false },
   source: { name: "eu.chisinau.md", reports_url: "https://eu.chisinau.md/reports" },
 };
 assert.equal(reportsParsing.validMunicipalReportsResult(reportsData), true, "empty data is a valid response");
@@ -1249,7 +1249,10 @@ const reportsRequest = (body) => new Request("http://localhost/api/cadastru/muni
 const snapshotBeforeReports = clone(await storage.getCadastruRecordByNumber(transportNumber));
 const reportsResponse = await reportsRoute.POST(reportsRequest({ cadastral_number: transportNumber }));
 assert.equal(reportsResponse.status, 200);
-assert.deepEqual(clone((await reportsResponse.json()).municipal_reports), reportsData);
+const savedReports = (await reportsResponse.json()).municipal_reports;
+assert.deepEqual(savedReports.summary, reportsData.summary);
+assert.equal(savedReports.cache.fetched_at, reportsData.cache.fetched_at);
+assert.equal(Date.parse(savedReports.cache.expires_at) - Date.parse(savedReports.cache.fetched_at), 72 * 3600000);
 assert.deepEqual(clone(await storage.getCadastruRecordByNumber(transportNumber)), snapshotBeforeReports,
   "municipal reports must not persist in or extend the official snapshot");
 assert.equal((await reportsRoute.POST(reportsRequest({ address: unrelatedAddress, cadastral_number: transportNumber }))).status, 200,
@@ -1260,12 +1263,14 @@ assert.equal((await reportsRoute.POST(reportsRequest({ cadastral_number: "bad" }
 assert.equal((await reportsRoute.POST(new Request("http://localhost/api/cadastru/municipal-reports", { method: "POST", body: "{" }))).status, 400);
 assert.equal((await reportsRoute.POST(reportsRequest({ cadastral_number: "0100106.131.01.095" }))).status, 404);
 assert.equal((await reportsRoute.POST(reportsRequest({ cadastral_number: transportMissingNumber }))).status, 422);
-assert.equal(reportsCalls, 3, "unusable search inputs do not call the worker");
+assert.equal(reportsCalls, 1, "apartments at the same location share stored reports");
 reportsResult = new Error("upstream unavailable");
-assert.equal((await reportsRoute.POST(reportsRequest({ cadastral_number: transportNumber }))).status, 503);
+cache.clear();
+tables.cadastru_municipal_reports[0].expires_at = new Date(Date.now() - 1000).toISOString();
+assert.equal((await (await reportsRoute.POST(reportsRequest({ cadastral_number: transportNumber }))).json()).municipal_reports.cache.stale, true);
 reportsResult = { summary: { total: 0 } };
-assert.equal((await reportsRoute.POST(reportsRequest({ cadastral_number: transportNumber }))).status, 503,
-  "invalid data must not turn an outage into a zero-report result");
+assert.equal((await reportsRoute.POST(reportsRequest({ cadastral_number: transportNumber }))).status, 200,
+  "invalid data retains the saved snapshot");
 console.log("Municipal reports regressions passed: precise origin, HMAC, stored-result lookup, unchanged snapshot and failure handling.");
 
 // Secondary sources must work even when cadastral service failure left no record.
@@ -1282,6 +1287,7 @@ for (const [endpoint, method, result] of [
     "@/lib/cadastru-records": { getCadastruRecordByAddress: async () => null, getCadastruRecordByNumber: async () => null },
     "@/lib/cadastru-nearby-storage": { getStoredNearby: async () => null, storeNearby: async () => null, nearbyFromStorage: () => null },
     "@/lib/cadastru-public-transport-storage": { getStoredPublicTransport: async () => null, storePublicTransport: async () => null, publicTransportFromStorage: () => null },
+    "@/lib/cadastru-municipal-reports-storage": { getStoredMunicipalReports: async () => null, storeMunicipalReports: async () => null, municipalReportsFromStorage: () => null },
     "@/lib/cadastru-external-api": { [method]: async (input) => {
       calls++;
       assert.deepEqual(clone(input), transportAddress);

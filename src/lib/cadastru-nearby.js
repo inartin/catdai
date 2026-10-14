@@ -14,6 +14,7 @@ const ROAD_TYPES = {
 
 export function nearbyAddressFromCadastru(payload) {
   const addresses = [
+    ...(payload?.data_freshness?.building ? [payload?.building?.address] : []),
     payload?.resolved_address,
     payload?.request_address,
     payload?.apartment?.address,

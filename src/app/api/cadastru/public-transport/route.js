@@ -1,3 +1,4 @@
+import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalPublicTransportData } from "@/lib/cadastru-external-api";
@@ -5,6 +6,7 @@ import { publicTransportInputFromCadastru, validPublicTransportResult } from "@/
 import { nearbyAddressFromCadastru } from "@/lib/cadastru-nearby";
 import { getCadastruRecordByAddress, getCadastruRecordByNumber } from "@/lib/cadastru-records";
 import { CADASTRAL_RE } from "@/lib/validation";
+import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { isFreshCadastru } from "@/lib/cadastru-cache";
 import { getStoredPublicTransport, storePublicTransport, publicTransportFromStorage } from "@/lib/cadastru-public-transport-storage";
 
@@ -40,6 +42,10 @@ export async function POST(request) {
     ? await getCadastruRecordByAddress(address, { allowExpired: true })
     : await getCadastruRecordByNumber(number, { allowExpired: true });
   if (!entry && address && CADASTRAL_RE.test(number)) entry = await getCadastruRecordByNumber(number, { allowExpired: true });
+  if (!entry) {
+    const partial = await getBuildingFallback(address ? { address } : { number });
+    if (partial) entry = { payload: partial };
+  }
   if (!entry && !address) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
 
   const input = entry ? publicTransportInputFromCadastru(entry.payload)
@@ -52,7 +58,7 @@ export async function POST(request) {
   }
 
   try {
-    const publicTransport = await fetchExternalPublicTransportData(input);
+    const publicTransport = await fetchExternalPublicTransportData(input, getCadastruLookupTracking(body));
     if (!validPublicTransportResult(publicTransport)) throw new Error("Invalid public transport response");
     // A partial source outage must not replace the last complete saved response.
     if (publicTransport.incomplete && stored) {

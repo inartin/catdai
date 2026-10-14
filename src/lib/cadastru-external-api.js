@@ -56,6 +56,10 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
   const signature = signBody(rawBody, secret, timestamp);
   const startedAt = Date.now();
   const requestId = crypto.randomUUID();
+  const trackingHeaders = options.lookupId ? {
+    "x-catdai-lookup-id": options.lookupId,
+    ...(options.lookupQuery ? { "x-catdai-lookup-query": options.lookupQuery } : {}),
+  } : {};
   let response;
 
   try {
@@ -76,7 +80,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     const usageWrite = shouldTrackUsage ? trackExternalApiUsage(service, "failure", {
       endpoint: url,
       requestPayload: body,
-      responseHeaders: { "x-request-id": requestId },
+      responseHeaders: { ...trackingHeaders, "x-request-id": requestId },
       errorCode: code,
       errorMessage: message,
       durationMs: Date.now() - startedAt,
@@ -103,7 +107,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
       endpoint: url,
       requestPayload: body,
       responsePayload: payload,
-      responseHeaders: { "x-request-id": requestId, ...getExternalApiDiagnosticHeaders(response) },
+      responseHeaders: { ...trackingHeaders, "x-request-id": requestId, ...getExternalApiDiagnosticHeaders(response) },
       httpStatus: response.status,
       durationMs: Date.now() - startedAt,
       userId: options.userId ?? null,
@@ -122,7 +126,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     endpoint: url,
     requestPayload: body,
     responsePayload: payload,
-    responseHeaders: { "x-request-id": requestId, ...getExternalApiDiagnosticHeaders(response) },
+    responseHeaders: { ...trackingHeaders, "x-request-id": requestId, ...getExternalApiDiagnosticHeaders(response) },
     errorCode: code,
     errorMessage: message,
     httpStatus: response.status,
@@ -161,32 +165,32 @@ export async function fetchExternalCadastruAddressData(addressFields, options = 
   );
 }
 
-export async function fetchExternalNearbyData(addressFields) {
+export async function fetchExternalNearbyData(addressFields, options = {}) {
   return fetchSignedExternalCadastru(
     "v1/nearby/address",
     addressFields,
     process.env.NEARBY_EXTERNAL_API_URL,
     "cadastru_nearby",
-    { timeoutMs: 70_000, preserveWorkerError: true }
+    { ...options, timeoutMs: 70_000, preserveWorkerError: true }
   );
 }
 
-export async function fetchExternalPublicTransportData(location) {
+export async function fetchExternalPublicTransportData(location, options = {}) {
   return fetchSignedExternalCadastru(
     "v1/public-transport",
     location,
     process.env.PUBLIC_TRANSPORT_EXTERNAL_API_URL,
     "cadastru_nearby",
-    { timeoutMs: 70_000, preserveWorkerError: true }
+    { ...options, timeoutMs: 70_000, preserveWorkerError: true }
   );
 }
 
-export async function fetchExternalMunicipalReportsData(location) {
+export async function fetchExternalMunicipalReportsData(location, options = {}) {
   return fetchSignedExternalCadastru(
     "v1/municipal-reports",
     location,
     process.env.MUNICIPAL_REPORTS_EXTERNAL_API_URL,
     "cadastru_nearby",
-    { timeoutMs: 70_000, preserveWorkerError: true }
+    { ...options, timeoutMs: 70_000, preserveWorkerError: true }
   );
 }

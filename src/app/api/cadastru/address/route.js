@@ -1,3 +1,4 @@
+import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { suggestRoadTypes, suggestStreets } from "@/lib/cadastru-street-suggestions";
 import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSuggestionRecovery } from "@/lib/cadastru-suggestion-recovery";
 import { resolveStreet, inspectStreetAddress } from "@/lib/cadastru-streets/street-resolver";
@@ -5,6 +6,7 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
 import { findCadastralByAddress, getVerifiedAddressAlternative } from "@/lib/cadastru-address-search";
+import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByAddress, persistCadastruAddressResult } from "@/lib/cadastru-records";
@@ -253,7 +255,7 @@ export async function POST(request) {
       message: "Could not confirm the requested address. Please confirm a registry-matched alternative." }, { status: 422 });
   };
   const publicPayload = (payload) => {
-    const { district_lookup_checked, ...data } = payload;
+    const { district_lookup_checked, building_bundles, ...data } = payload;
     return data;
   };
   const skipCache = body?.skip_cache === true || body?.skipcache === true;
@@ -314,7 +316,7 @@ export async function POST(request) {
     return response;
   };
 
-  const stored = skipCache ? null : await getCadastruRecordByAddress(lookupAddress, { structuredAddress });
+  const stored = skipCache ? null : await getCadastruRecordByAddress(lookupAddress, { structuredAddress, requireUnitDetails: true });
   const shouldRefreshStoredDistrict = Boolean(stored && city === "Chișinău" && apartmentNumber &&
     !stored.payload?.district && !stored.payload?.form_fields?.district && !stored.payload?.district_lookup_checked);
   const respondWithStored = async () => {
@@ -343,6 +345,7 @@ export async function POST(request) {
       trackUsage: !(process.env.NODE_ENV === "development" && shouldTrackCadastruSearch),
       captureUsageEventId: shouldTrackCadastruSearch,
       userId: access.user_id || null,
+      ...getCadastruLookupTracking(body),
     });
     let payload = withResolution(verifiedAlternative || { ...lookupResult, district_lookup_checked: true });
     payload = await persistCadastruAddressResult(payload, {
@@ -363,6 +366,24 @@ export async function POST(request) {
     return response;
   } catch (error) {
     if (shouldRefreshStoredDistrict) return respondWithStored();
+    if (!skipCache && apartmentNumber && ![400, 401, 403, 422].includes(error?.status)) {
+      const stale = await getCadastruRecordByAddress(lookupAddress, { structuredAddress, allowExpired: true, requireUnitDetails: true });
+      if (stale?.buildingNumber) {
+        const payload = withResolution(stale.payload);
+        const evaluationToken = await recordAddressSearch(payload, stale.lookupSource, stale.resultType);
+        const creditResponse = await consumeCadastruCredit(payload, stale.lookupSource, evaluationToken);
+        if (creditResponse) return creditResponse;
+        return NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
+      }
+      const partial = await getBuildingFallback({ address: lookupAddress });
+      if (partial) {
+        const credit = await checkFeatureAccess({ userId: access.user_id,
+          featureKey: CADASTRU_LOOKUP_FEATURE_KEY, idempotencyKey: makeCadastruAddressUsageKey(lookupAddress) });
+        const payload = withResolution(partial);
+        return NextResponse.json(credit.allowed ? payload
+          : buildCadastruPreviewPayload(payload, credit.reason || "no_credit", { maskCadastralNumber: true }));
+      }
+    }
     failedUsageEventId = error?.usageEventId || null;
     externalUnavailable = ["service_unavailable", "external_cadastru_timeout", "external_cadastru_unreachable"].includes(error?.code);
     const details = {

@@ -1,0 +1,45 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { PGlite } from '@electric-sql/pglite';
+const db=new PGlite();
+await db.exec('create role anon; create role authenticated; create role service_role;');
+for(const file of ['db/cadastru_records.sql','db/cadastru_nearby.sql','db/cadastru_public_transport.sql','supabase/migrations/20261013155148_cadastru_shared_buildings.sql']) await db.exec(await fs.readFile(file,'utf8'));
+await db.exec('create table listing(city text,address_text text); create table listing_rent(city text,address_text text);');
+await db.exec(await fs.readFile('supabase/migrations/20261013184227_cadastru_collector_ingestion.sql','utf8'));
+const input={city:'Chișinău',road_type:'bulevard',street:'Decebal',house_number:'63'};
+const number='0100106.131.01';
+const unit=`${number}.059`;
+const bundle={cadastral_number:number,building:{classifier:'Bloc cu apartamente',address:'Chișinău, bd Decebal 63',total_floors:5},
+ apartments:[{cadastral_number:unit,apartment:{address:'Chișinău, bd Decebal 63, ap 59',area_m2:41,floor:'4'},partial:true}]};
+const ingest=async(b,time='2026-10-13T12:00:00Z')=>(await db.query('select ingest_cadastru_collection($1,$2,$3,$4) as result',[b,input,'a'.repeat(64),time])).rows[0].result;
+assert.equal((await ingest(bundle)).usable,true);
+let row=(await db.query('select * from cadastru_records')).rows[0];
+assert.equal(row.shared_building_number,number);
+assert.equal(row.apartment_number,'59');
+assert.equal(row.lookup_count,0);
+assert.deepEqual(row.building_data,{});
+assert.equal(row.raw_payload.building,undefined);
+assert.equal(row.raw_payload.unit_list_entry,undefined);
+const oldDate=row.last_official_fetch_at;
+await ingest({...bundle,apartments:[{cadastral_number:unit,unit_list_entry:true,apartment:{address:bundle.apartments[0].apartment.address}}]},'2026-10-14T12:00:00Z');
+row=(await db.query('select * from cadastru_records')).rows[0];
+assert.equal(row.apartment_data.area_m2,41);
+assert.equal(row.raw_payload.unit_list_entry,undefined,'registry link cannot downgrade detailed record');
+assert.equal(row.last_official_fetch_at.toISOString(),oldDate.toISOString(),'missing fields retain age');
+assert.equal(row.lookup_count,0);
+await assert.rejects(ingest({...bundle,cadastral_number:'0100106.132.01'}),/parent mismatch/);
+assert.equal((await db.query('select count(*)::int n from cadastru_buildings')).rows[0].n,1,'invalid bundle rolls back building and units');
+await assert.rejects(ingest({...bundle,building:{classifier:'Casa'}}),/not verified/);
+await ingest(bundle,'2026-10-12T12:00:00Z');
+row=(await db.query('select * from cadastru_records')).rows[0];
+assert.equal(row.apartment_data.floor,'4');
+assert.equal((await db.query('select count(*)::int n from cadastru_records')).rows[0].n,1,'replay is idempotent');
+await db.exec("insert into listing values ('Chișinău','Chișinău, bd Decebal 63'),('Chișinău','Chișinău, bd Decebal 63'),('Bălți','Bălți, str X 1');");
+const seeds=(await db.query('select * from cadastru_collection_seeds(0,500)')).rows;
+assert.equal(seeds.find(s=>s.source==='listing').listing_count,2);
+for(const role of ['anon','authenticated']) {
+ const grants=(await db.query(`select has_function_privilege('${role}','public.ingest_cadastru_collection(jsonb,jsonb,text,timestamptz)','execute') as allowed`)).rows[0];
+ assert.equal(grants.allowed,false);
+}
+console.log('Collector SQL: atomic ingestion, preserved partial fields/age, idempotence, seeds and permissions passed.');
+await db.close();

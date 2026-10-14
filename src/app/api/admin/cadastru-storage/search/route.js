@@ -15,6 +15,7 @@ import { getStoredNearby, nearbyFromStorage } from "@/lib/cadastru-nearby-storag
 import { publicTransportInputFromCadastru, validPublicTransportResult } from "@/lib/cadastru-public-transport";
 import { getStoredPublicTransport, publicTransportFromStorage } from "@/lib/cadastru-public-transport-storage";
 import { validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
+import { getStoredMunicipalReports, municipalReportsFromStorage } from "@/lib/cadastru-municipal-reports-storage";
 import { CADASTRAL_RE } from "@/lib/validation";
 
 const RECORD_COLUMNS = [
@@ -292,7 +293,11 @@ export async function POST(request) {
   }
 
   let municipalReportsData = null;
-  if (validMunicipalReportsResult(cadastralPayload?.municipal_reports)) {
+  if (transportInput) {
+    const stored = await getStoredMunicipalReports(transportInput);
+    if (stored) municipalReportsData = municipalReportsFromStorage(stored);
+  }
+  if (!municipalReportsData && validMunicipalReportsResult(cadastralPayload?.municipal_reports)) {
     municipalReportsData = cadastralPayload.municipal_reports;
   }
 

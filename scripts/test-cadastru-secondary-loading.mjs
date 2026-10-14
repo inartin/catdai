@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
+import crypto from "node:crypto";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -24,7 +25,7 @@ async function loadJsx(file, mocks, globals = {}) {
     jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } } },
     module: { type: "es6" },
   });
-  const context = vm.createContext({ console, URL, URLSearchParams, AbortController, ...globals });
+  const context = vm.createContext({ console, crypto, URL, URLSearchParams, AbortController, ...globals });
   const jsxModule = new vm.SourceTextModule(code, { context });
   await jsxModule.link((name) => {
     const exports = mocks[name] || (name.startsWith("@/components/") ? { default: noop } : null);
@@ -63,12 +64,15 @@ const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
   "./loading": { default: noop },
   react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
   "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
-  "next/navigation": { useRouter: () => ({ push: noop, replace: noop }), useSearchParams: () => searchParams },
+  "next/navigation": { useRouter: () => ({ push: noop, replace: (url) => {
+    searchParams = new URLSearchParams(url.split("?")[1]);
+  } }), useSearchParams: () => searchParams },
   "@/context/LanguageContext": translation,
   "@/context/AuthContext": { useAuth: () => ({ isAuthenticated: false, loading: false, session: null, clearAuthError: noop }) },
   "@/lib/validation": { matchCity: () => null, validateCadastralNumber: (value) => ({ valid: value === number, value }) },
   "@/lib/cadastru-favorites": { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
-  "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null, buildFullAccessAddressResultParams: () => new URLSearchParams() },
+  "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null,
+    buildFullAccessAddressResultParams: (data) => new URLSearchParams({ source: "address", cadastral_number: data.cadastral_number }) },
   "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: (data) => data?.form_fields?.city === "Chișinău" || data?.request_address?.startsWith("Chișinău,"), validMunicipalReportsResult: (data) => data?.summary?.total >= 0 },
 }, {
   window: {}, localStorage: { removeItem: noop },
@@ -105,6 +109,9 @@ for (const endpoint of ["nearby", "public-transport", "municipal-reports"]) {
   const request = requests.get(`/api/cadastru/${endpoint}`);
   assert(request, `${endpoint} starts without waiting for other secondary responses`);
   assert.equal(JSON.parse(request.options.body).cadastral_number, number);
+  assert.equal(JSON.parse(request.options.body).lookup_id, JSON.parse(requests.get("/api/cadastral").options.body).lookup_id,
+    "all secondary calls share the primary search ID");
+  assert.equal(JSON.parse(request.options.body).lookup_query, number);
 }
 requests.get("/api/cadastru/municipal-reports").resolve({ ok: true,
   json: async () => ({ municipal_reports: { summary: { total: 4 } } }) });
@@ -324,6 +331,8 @@ for (const locale of ["ro", "ru"]) {
     if (scenario.continues) {
       const nearby = requests.get("/api/cadastru/nearby");
       assert.equal(JSON.parse(nearby.options.body).address, `${addressRequest.city}, strada Decebal 63`);
+      assert.equal(JSON.parse(nearby.options.body).lookup_id, JSON.parse(main.options.body).lookup_id,
+        "outage and network-error continuations keep the original search ID");
       nearby.resolve({ ok: true, json: async () => ({ nearby: { categories: {}, location: { latitude: 47.02, longitude: 28.83 } } }) });
       await flush();
       const updated = render();
@@ -335,3 +344,30 @@ for (const locale of ["ro", "ru"]) {
 }
 for (const slot of slots) slot?.cleanup?.();
 console.log("Outage continuation passed: RO/RU notice and preserved errors, concurrent address cards and map, timeout/network failures, number searches and validation/auth/rate-limit exclusions.");
+
+slots.length = 0;
+requests.clear();
+frames.clear();
+addressRequest = { city: "Chișinău", road_type: "strada", street: "Decebal", house_number: "63", apartment_number: "1" };
+searchParams = new URLSearchParams({ source: "address", lookup: "1" });
+render();
+const addressLookup = requests.get("/api/cadastru/address");
+const addressTracking = JSON.parse(addressLookup.options.body);
+addressLookup.resolve({ ok: true, json: async () => ({ cadastral_number: number, form_fields: { city: "Chișinău" } }) });
+await flush();
+render();
+const numberLookup = requests.get("/api/cadastral");
+assert(numberLookup, "a full address result hands off to the number lookup");
+assert.equal(JSON.parse(numberLookup.options.body).lookup_id, addressTracking.lookup_id);
+numberLookup.resolve({ ok: true, json: async () => ({ cadastral_number: number, form_fields: { city: "Chișinău" } }) });
+await flush();
+render();
+paint();
+paint();
+for (const endpoint of ["nearby", "public-transport", "municipal-reports"]) {
+  const body = JSON.parse(requests.get(`/api/cadastru/${endpoint}`).options.body);
+  assert.equal(body.lookup_id, addressTracking.lookup_id, "handoff and secondary calls stay in the original search");
+  assert(body.lookup_query.includes("ap. 1"), "the grouped search retains the submitted apartment");
+}
+for (const slot of slots) slot?.cleanup?.();
+console.log("Lookup grouping passed: address-to-number navigation and all secondary calls share the original search ID and query.");

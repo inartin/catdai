@@ -130,6 +130,7 @@ function fmtCadastruResultSummary(byResultType) {
   const parts = [
     ["full_data", "full"],
     ["apartment_only", "apartment"],
+    ["land_only", "land"],
     ["address_only", "address"],
     ["no_data", "none"],
   ]
@@ -525,7 +526,7 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName, expanded = 
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "no_data"
                     ? "bg-gray-100 text-gray-600"
                     : "bg-green-50 text-green-700"}`}>
-                    {row.result_type === "no_data" ? "No result" : "Success"}
+                    {row.result_type === "no_data" ? "No result" : row.result_type === "land_only" ? "Land" : "Success"}
                   </span>
                 ) : "\u2014"}
               </td>

@@ -312,6 +312,8 @@ function classifyCadastralResult(payload) {
 
   if (apartmentData && buildingData) return "full_data";
   if (apartmentData) return "apartment_only";
+  if (!buildingData && Array.isArray(payload?.lands) && payload.lands.some((land) => land?.cadastral_number)
+    && !payload?.buildings?.length) return "land_only";
   if (hasAnyAddress(payload) || buildingData) return "address_only";
   return "no_data";
 }
@@ -565,7 +567,7 @@ export async function POST(request) {
     lookupSource = stored.lookupSource;
     return respondWithCadastralPayload(
       normalizeCadastralPayload(stored.payload, trimmed, access.tier),
-      { countLookup: true, resultType: stored.resultType, expiresAt: stored.expiresAt }
+      { countLookup: true, resultType: classifyCadastralResult(stored.payload), expiresAt: stored.expiresAt }
     );
   }
 

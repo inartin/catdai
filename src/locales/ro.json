@@ -677,6 +677,7 @@
   "profile.historyCadastruSearchType.number": "Număr cadastral",
   "profile.historyCadastruResultType.no_data": "Fără date",
   "profile.historyCadastruResultType.address_only": "Doar adresă",
+  "profile.historyCadastruResultType.land_only": "Date teren",
   "profile.historyCadastruResultType.apartment_only": "Date apartament",
   "profile.historyCadastruResultType.full_data": "Date complete",
   "profile.historyCadastruNumberUnavailable": "Număr cadastral indisponibil",

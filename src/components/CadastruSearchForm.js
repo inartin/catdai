@@ -166,6 +166,7 @@ export default function CadastruSearchForm({
   };
 
   const submitNumberSearch = () => {
+    if (authLoading || !cadastralNumber.trim()) return;
     if (requireAuth()) return;
 
     setLoadingSearch({ cadastralNumber: cadastralNumber.trim() });
@@ -227,7 +228,7 @@ export default function CadastruSearchForm({
         <button
           type="button"
           onClick={submitNumberSearch}
-          disabled={authLoading}
+          disabled={authLoading || !cadastralNumber.trim()}
           className="inline-flex h-12 w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-6 text-base font-semibold text-gray-800 shadow-sm transition-colors hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-700 sm:w-auto"
         >
           {t("cadastru.numberSearchButton")}

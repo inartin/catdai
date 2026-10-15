@@ -18,6 +18,20 @@ await db.exec(migration);
 await db.exec(migration);
 assert.equal((await db.query("select count(*)::int n from cadastru_search_events")).rows[0].n, 2);
 
+await db.exec(await fs.readFile("db/cadastru_records.sql", "utf8"));
+// Upgrade the old constraints, preserving existing event types and rejecting unknown ones.
+for (const table of ["cadastru_search_events", "cadastru_records"]) {
+  await db.exec(`alter table ${table} drop constraint ${table}_result_type_check;
+    alter table ${table} add constraint ${table}_result_type_check
+    check (result_type in ('no_data','address_only','apartment_only','full_data'));`);
+}
+const landMigration = await fs.readFile("supabase/migrations/20261015111730_cadastru_land_result_type.sql", "utf8");
+await db.exec(landMigration);
+await db.exec(landMigration);
+await db.exec("insert into cadastru_records(cadastral_number,result_type) values ('5520202.182','land_only');");
+await assert.rejects(db.exec("insert into cadastru_records(cadastral_number,result_type) values ('5520202.183','unknown');"), /check constraint/);
+await assert.rejects(db.exec("insert into cadastru_search_events(search_type,result_type) values ('number','unknown');"), /check constraint/);
+
 const errors = [];
 let persist = true;
 const environment = { NODE_ENV: "production", ADMIN_TOKEN: "isolated-test-secret" };
@@ -90,6 +104,9 @@ const noData = { lookupId: crypto.randomUUID(), resultType: "no_data" };
 assert.equal(eventId(await search(noData)), eventId(await search(noData)), "no-result retries dedupe");
 const number = { lookupId: crypto.randomUUID(), cadastralNumber: "0100104.003.01" };
 assert.equal(eventId(await search(number, userA, "number")), eventId(await search(number, userA, "number")), "number searches dedupe");
+const landId = eventId(await search({ ...number, lookupId: crypto.randomUUID(), resultType: "land_only",
+  resultPayload: { lands: [{ cadastral_number: "5520202.182", area_m2: 1352 }] } }, userA, "number"));
+assert.equal((await getRow(landId)).result_type, "land_only", "land result type survives logger normalization and database constraints");
 for (const lookupId of [undefined, "invalid"]) {
   assert.notEqual(eventId(await search({ lookupId })), eventId(await search({ lookupId })), "legacy/invalid IDs retain existing behavior");
 }

@@ -6,7 +6,7 @@ import { createCadastruEvaluationToken } from "@/lib/cadastru-evaluation-trackin
 import { normalizeCadastruLookupId } from "@/lib/cadastru-lookup-tracking";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
-const RESULT_TYPES = new Set(["no_data", "address_only", "apartment_only", "full_data"]);
+const RESULT_TYPES = new Set(["no_data", "address_only", "land_only", "apartment_only", "full_data"]);
 const LOOKUP_SOURCES = new Set(["api", "local"]);
 
 function normalizeSearchType(searchType) {

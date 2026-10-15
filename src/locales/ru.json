@@ -677,6 +677,7 @@
   "profile.historyCadastruSearchType.number": "Кадастровый номер",
   "profile.historyCadastruResultType.no_data": "Нет данных",
   "profile.historyCadastruResultType.address_only": "Только адрес",
+  "profile.historyCadastruResultType.land_only": "Данные участка",
   "profile.historyCadastruResultType.apartment_only": "Данные квартиры",
   "profile.historyCadastruResultType.full_data": "Полные данные",
   "profile.historyCadastruNumberUnavailable": "Кадастровый номер недоступен",

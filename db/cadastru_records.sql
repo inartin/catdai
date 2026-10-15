@@ -25,7 +25,7 @@ create table if not exists public.cadastru_records (
   apartment_number text,
 
   result_type text not null default 'address_only'
-    check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
+    check (result_type in ('no_data', 'address_only', 'land_only', 'apartment_only', 'full_data')),
   lookup_source text check (lookup_source in ('api', 'local')),
   source text,
   partial boolean not null default false,
@@ -56,6 +56,12 @@ create table if not exists public.cadastru_records (
   constraint cadastru_records_cadastral_number_key unique (cadastral_number),
   constraint cadastru_records_digits_key unique (cadastral_number_digits)
 );
+
+alter table public.cadastru_records
+  drop constraint if exists cadastru_records_result_type_check;
+alter table public.cadastru_records
+  add constraint cadastru_records_result_type_check
+  check (result_type in ('no_data', 'address_only', 'land_only', 'apartment_only', 'full_data'));
 
 create index if not exists idx_cadastru_records_city_region_district
   on public.cadastru_records (city, region, district);

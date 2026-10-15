@@ -46,7 +46,7 @@ const RECORD_COLUMNS = [
   "next_refresh_after",
 ].join(", ");
 
-const RESULT_TYPES = new Set(["no_data", "address_only", "apartment_only", "full_data"]);
+const RESULT_TYPES = new Set(["no_data", "address_only", "land_only", "apartment_only", "full_data"]);
 const LOOKUP_SOURCES = new Set(["api", "local"]);
 
 function isObject(value) {
@@ -253,7 +253,10 @@ function recordExpiry(row) {
 }
 
 function classifyCadastruPayload(payload) {
-  return hasDetailedPayload(payload) ? classifyDetailedCadastruPayload(payload) : "address_only";
+  if (hasDetailedPayload(payload)) return classifyDetailedCadastruPayload(payload);
+  if (Array.isArray(payload?.lands) && payload.lands.some((land) => land?.cadastral_number)
+    && !payload?.buildings?.length) return "land_only";
+  return "address_only";
 }
 
 function hasDetailedPayload(payload) {

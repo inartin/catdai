@@ -13,7 +13,7 @@ create table if not exists cadastru_search_events (
   search_address   text,
   search_request   jsonb,
   result_value     text,
-  result_type      text check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data')),
+  result_type      text check (result_type in ('no_data', 'address_only', 'land_only', 'apartment_only', 'full_data')),
   lookup_source    text check (lookup_source in ('api', 'local')),
   valuation_clicked_at timestamptz,
   valuation_completed_at timestamptz,
@@ -50,14 +50,11 @@ alter table if exists cadastru_search_events
 alter table if exists cadastru_search_events
   add column if not exists valuation_completed_at timestamptz;
 
-do $$
-begin
-  alter table cadastru_search_events
-    add constraint cadastru_search_events_result_type_check
-    check (result_type in ('no_data', 'address_only', 'apartment_only', 'full_data'));
-exception
-  when duplicate_object then null;
-end $$;
+alter table cadastru_search_events
+  drop constraint if exists cadastru_search_events_result_type_check;
+alter table cadastru_search_events
+  add constraint cadastru_search_events_result_type_check
+  check (result_type in ('no_data', 'address_only', 'land_only', 'apartment_only', 'full_data'));
 
 do $$
 begin

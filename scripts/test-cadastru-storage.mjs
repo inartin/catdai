@@ -143,6 +143,7 @@ await storage.persistCadastruAddressResult(aggregate, { requestAddress: aggregat
 cache.clear();
 assert.deepEqual(clone((await storage.getCadastruRecordByAddress(aggregateAddress)).payload), aggregate);
 assert.deepEqual(clone((await storage.getCadastruRecordByNumber(aggregate.lands[0].cadastral_number)).payload.map_location), aggregate.lands[0].map_location, "land coordinates belong to their own number record");
+assert.equal((await storage.getCadastruRecordByNumber(aggregate.lands[0].cadastral_number)).resultType, "land_only");
 assert.deepEqual(clone((await storage.getCadastruRecordByNumber(aggregate.buildings[0].cadastral_number)).payload.map_location), aggregate.buildings[0].map_location, "building coordinates belong to their own number record");
 const single = (await storage.getCadastruRecordByNumber("0100201.555.02")).payload;
 assert.equal(single.buildings.length, 1); assert.equal(single.buildings[0].restrictions, "test");
@@ -1317,3 +1318,38 @@ for (const [endpoint, method, result] of [
   assert.equal(calls, 2, "invalid and number-only inputs never call the secondary worker");
 }
 console.log("Secondary address regressions passed: no-record address origins, precise-house validation and unchanged number/municipal restrictions.");
+
+// Parcel-only worker successes must not be logged as empty results, including old cache entries.
+cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;
+const parcelNumber = "5520202.182";
+const parcelPayload = { cadastral_number: parcelNumber, status: "success", source: "geodata_wfs",
+  apartment: {}, building: {}, form_fields: {}, buildings: [],
+  lands: [{ cadastral_number: parcelNumber, area_m2: "1352", object_type: "Teren" }] };
+const parcelMocks = { ...routeMocks, "@/lib/cadastru-external-api": {
+  fetchExternalCadastralData: async () => parcelPayload,
+  fetchExternalCadastruAddressData: async () => parcelPayload,
+} };
+const parcelNumberRoute = await load("src/app/api/cadastral/route.js", parcelMocks);
+const parcelAddressRoute = await load("src/app/api/cadastru/address/route.js", parcelMocks);
+hasCredit = true;
+const parcelFull = await (await parcelNumberRoute.POST(request({ cadastral_number: parcelNumber }))).json();
+assert.equal(parcelFull.lands[0].area_m2, "1352");
+assert.equal(searchLogs.at(-1).resultType, "land_only", "fresh number search records land success");
+assert.equal(tables.cadastru_records[0].result_type, "land_only");
+await caching.writeCadastruCache("number", parcelNumber, {
+  payload: parcelPayload, resultType: "no_data", lookupSource: "api", expiresAt: new Date(Date.now() + 86400000).toISOString(),
+});
+hasCredit = false;
+const parcelPreview = await (await parcelNumberRoute.POST(request({ cadastral_number: parcelNumber }))).json();
+assert.equal(searchLogs.at(-1).resultType, "land_only", "legacy cached number classification is corrected");
+assert.equal(parcelPreview.full_access, false);
+assert.notEqual(parcelPreview.lands[0].area_m2, "1352", "land classification preserves credit masking");
+const parcelAddressBody = { ...addressBody, apartment_number: "", skip_cache: true };
+await parcelAddressRoute.POST(request(parcelAddressBody));
+assert.equal(searchLogs.at(-1).resultType, "land_only", "address results also classify land parcels");
+await caching.writeCadastruCache("address", storage.normalizeCadastruAddressForDb(searchLogs.at(-1).searchAddress), {
+  payload: parcelPayload, resultType: "no_data", lookupSource: "api", expiresAt: new Date(Date.now() + 86400000).toISOString(),
+});
+await parcelAddressRoute.POST(request({ ...parcelAddressBody, skip_cache: false }));
+assert.equal(searchLogs.at(-1).resultType, "land_only", "legacy cached address classification is corrected");
+console.log("Land regressions passed: storage, number/address searches, legacy cache metadata and preview masking.");

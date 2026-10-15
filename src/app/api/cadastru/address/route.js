@@ -69,7 +69,10 @@ function hasAddressPayloadDetails(payload) {
 }
 
 function classifyAddressPayload(payload) {
-  return hasAddressPayloadDetails(payload) ? "apartment_only" : "address_only";
+  if (hasAddressPayloadDetails(payload)) return "apartment_only";
+  if (Array.isArray(payload?.lands) && payload.lands.some((land) => land?.cadastral_number)
+    && !payload?.buildings?.length) return "land_only";
+  return "address_only";
 }
 
 function resolvePayloadDistrict(payload) {
@@ -322,7 +325,9 @@ export async function POST(request) {
     !stored.payload?.district && !stored.payload?.form_fields?.district && !stored.payload?.district_lookup_checked);
   const respondWithStored = async () => {
     const payload = withResolution(stored.payload);
-    const evaluationToken = await recordAddressSearch(payload, stored.lookupSource, stored.resultType || classifyAddressPayload(payload));
+    const payloadResultType = classifyAddressPayload(payload);
+    const evaluationToken = await recordAddressSearch(payload, stored.lookupSource,
+      payloadResultType === "land_only" ? payloadResultType : stored.resultType || payloadResultType);
     const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource, evaluationToken);
     await recoverSuggestion(payload, "cache");
     if (creditResponse) return creditResponse;

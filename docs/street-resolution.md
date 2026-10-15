@@ -39,6 +39,8 @@ The isolated storage/route regression suite covers original/resolved aliases, sh
 
 ## Verified house-number alternatives
 
+With multiple verified addresses, the result screen shows the shared explanation and one button per house number without repeating the confirmation sentence for each option. A single alternative retains its address confirmation sentence.
+
 Building/land searches without an apartment also offer up to three verified numeric house suffixes when the exact house is absent. Autocomplete candidates must be confirmed by an explicit matching address and a land/building link in the same registry section. Exact original results take precedence, including Geodata recovery; verified choices can still be shown if geocoding fails. Confirmation never consumes credits or saves a property; clicking a choice starts the usual exact lookup. The result page explains in RO/RU that an exact building location is needed for nearby places, transport and reports, and does not start those requests while a choice is pending.
 
 The synced resolver recognizes Chișinău strada `Киев` as `Kiev`. Russian street aliases ending in `улица` also accept the bare name or a leading `улица`/`ул.` marker (for example `Киевская`, `Киевская улица`, `ул. Киевская`). Matching remains scoped to city and road type; alias collisions remain ambiguous.

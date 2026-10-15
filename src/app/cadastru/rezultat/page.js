@@ -1050,7 +1050,7 @@ function CadastruResultContent() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   {state.addressCorrections.map((correction) => (
                     <div key={`${correction.street}:${correction.house_number}`}>
-                      {state.confirmationRequired && <p className="mb-2 text-sm">
+                      {state.confirmationRequired && state.addressCorrections.length === 1 && <p className="mb-2 text-sm">
                         {t(correction.apartment_number ? "cadastru.addressAlternativeFound" : "cadastru.buildingAlternativeFound",
                           { street: correction.street, house: correction.house_number,
                           apartment: correction.apartment_number })}

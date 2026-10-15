@@ -2,7 +2,7 @@ import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalNearbyData } from "@/lib/cadastru-external-api";
-import { nearbyAddressFromCadastru, validNearbyResult } from "@/lib/cadastru-nearby";
+import { nearbyInputFromCadastru, validNearbyResult } from "@/lib/cadastru-nearby";
 import { getCadastruRecordByAddress, getCadastruRecordByNumber } from "@/lib/cadastru-records";
 import { CADASTRU_TTL_SECONDS, isFreshCadastru } from "@/lib/cadastru-cache";
 import { getStoredNearby, storeNearby, nearbyFromStorage } from "@/lib/cadastru-nearby-storage";
@@ -47,13 +47,13 @@ export async function POST(request) {
   }
   if (!entry && !address) return NextResponse.json({ error: "result_not_found" }, { status: 404 });
 
-  const addressFields = nearbyAddressFromCadastru(entry?.payload || { request_address: address });
-  if (!addressFields) return NextResponse.json({ error: "address_unavailable" }, { status: 422 });
+  const input = nearbyInputFromCadastru(entry?.payload || { request_address: address });
+  if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
-  let stored = await getStoredNearby(addressFields);
+  let stored = await getStoredNearby(input);
   // Lazily move valid legacy snapshots to the shared building store without renewing them.
   if (!stored && validNearbyResult(entry?.payload.nearby) && Number.isFinite(Date.parse(entry.expiresAt))) {
-    stored = await storeNearby(addressFields, entry.payload.nearby, {
+    stored = await storeNearby(input, entry.payload.nearby, {
       fetchedAt: new Date(Date.parse(entry.expiresAt) - CADASTRU_TTL_SECONDS * 1000).toISOString(),
       expiresAt: entry.expiresAt,
     });
@@ -63,10 +63,10 @@ export async function POST(request) {
   }
 
   try {
-    const nearby = await fetchExternalNearbyData(addressFields, getCadastruLookupTracking(body));
+    const nearby = await fetchExternalNearbyData(input, getCadastruLookupTracking(body));
     if (!validNearbyResult(nearby)) throw new Error("Invalid nearby response");
     if (nearby.incomplete && stored) return NextResponse.json({ nearby: nearbyFromStorage(stored) });
-    const saved = await storeNearby(addressFields, nearby);
+    const saved = await storeNearby(input, nearby);
     return NextResponse.json({ nearby: saved ? nearbyFromStorage(saved) : nearby });
   } catch (error) {
     console.error("[cadastru/nearby] lookup failed:", {

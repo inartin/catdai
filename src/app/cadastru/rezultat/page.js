@@ -493,6 +493,15 @@ function CadastruResultContent() {
   const purchaseOffer = state.data?.access_limit?.purchase || null;
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
+  const [device, setDevice] = useState({ isMobile: false, isIOS: false });
+
+  useEffect(() => {
+    const ua = navigator.userAgent || "";
+    const isIOSDevice = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isMobileDevice = isIOSDevice || /Android|webOS|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+    setDevice({ isMobile: isMobileDevice, isIOS: isIOSDevice });
+  }, []);
+
   const valuationPrefill = buildValuationPrefill(state.data, source === "address" ? searchParams.get("district") : null);
   const evaluationToken = searchParams.get("cadastru_evaluation") || state.data?.cadastru_evaluation_token;
   const favoritePath = state.data ? getCadastruFavoritePath({
@@ -536,8 +545,61 @@ function CadastruResultContent() {
         output: "embed",
       })}`
     : null;
+  const externalMapUrl = hasMapLocation
+    ? (device.isMobile && device.isIOS
+        ? `https://maps.apple.com/?q=${latitude},${longitude}&ll=${latitude},${longitude}`
+        : `https://www.google.com/maps?q=${latitude},${longitude}${device.isMobile ? "" : `&ll=${latitude},${longitude}&t=k&z=18`}`)
+    : "#";
+
+  const handleOpenExternalMap = (event) => {
+    if (device.isMobile) {
+      event.preventDefault();
+      window.location.href = externalMapUrl;
+    }
+  };
+
   const map = mapUrl && (
     <div className="mt-6 w-full overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5" aria-hidden="true">
+              <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" />
+              <line x1="9" y1="3" x2="9" y2="18" />
+              <line x1="15" y1="6" x2="15" y2="21" />
+            </svg>
+          </span>
+          <span className="truncate text-base font-bold text-gray-950 sm:text-lg">
+            {t("cadastru.mapCardTitle")}
+          </span>
+        </div>
+        <a
+          href={externalMapUrl}
+          target={device.isMobile ? undefined : "_blank"}
+          rel={device.isMobile ? undefined : "noopener noreferrer"}
+          onClick={handleOpenExternalMap}
+          className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3.5 py-2 text-xs font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-950 sm:px-4 sm:text-sm"
+        >
+          {device.isMobile ? (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-emerald-700" aria-hidden="true">
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                <circle cx="12" cy="10" r="3" />
+              </svg>
+              <span>{t("cadastru.openMapApp")}</span>
+            </>
+          ) : (
+            <>
+              <span>{t("cadastru.openMapNewTab")}</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-emerald-700" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+            </>
+          )}
+        </a>
+      </div>
       <iframe
         key={mapUrl}
         src={mapUrl}

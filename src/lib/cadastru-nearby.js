@@ -42,6 +42,21 @@ export function nearbyAddressFromCadastru(payload) {
   return null;
 }
 
+// Prefer the exact house address; parcels without one can use their stored map point.
+export function nearbyInputFromCadastru(payload) {
+  const address = nearbyAddressFromCadastru(payload);
+  if (address) return address;
+  const location = [
+    payload?.map_location,
+    payload?.building?.map_location,
+    payload?.apartment?.map_location,
+    ...(Array.isArray(payload?.buildings) ? payload.buildings.map((item) => item?.map_location) : []),
+    ...(Array.isArray(payload?.lands) ? payload.lands.map((item) => item?.map_location) : []),
+  ].find((point) => Number.isFinite(point?.latitude) && Math.abs(point.latitude) <= 90
+    && Number.isFinite(point?.longitude) && Math.abs(point.longitude) <= 180);
+  return location ? { latitude: location.latitude, longitude: location.longitude } : null;
+}
+
 export function validNearbyResult(data) {
   return data && typeof data === "object" && ["schools", "supermarkets", "pharmacies", "food", "parks", "public_transport"]
     .every((category) => {

@@ -876,6 +876,26 @@ console.log("Outage regressions passed: real no-data, provider failures, worker 
 // Nearby enrichment runs after the cadastral result and keeps the original snapshot expiry.
 const nearbyNumber = "0100106.131.01.099";
 const nearbyParsing = await load("@/lib/cadastru-nearby");
+const parcelLocation = { latitude: 46.88383418, longitude: 29.296051565 };
+const nearbyParcelPayload = { cadastral_number: "1014203.418", lands: [{ cadastral_number: "1014203.418",
+  address: "r-nul Anenii Noi, sat. Bulboaca", map_location: parcelLocation }] };
+assert.deepEqual(clone(nearbyParsing.nearbyInputFromCadastru(nearbyParcelPayload)), parcelLocation);
+for (const payload of [
+  { map_location: parcelLocation }, { building: { map_location: parcelLocation } },
+  { apartment: { map_location: parcelLocation } }, { buildings: [{ map_location: parcelLocation }] },
+  { map_location: { latitude: null, longitude: 29 }, ...nearbyParcelPayload },
+]) assert.deepEqual(clone(nearbyParsing.nearbyInputFromCadastru(payload)), parcelLocation);
+assert.deepEqual(clone(nearbyParsing.nearbyInputFromCadastru({ map_location: parcelLocation,
+  request_address: "Chișinău, bd Decebal 63" })),
+{ city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" }, "exact house address keeps precedence");
+for (const point of [null, { latitude: "47", longitude: 29 }, { latitude: 91, longitude: 29 },
+  { latitude: 47, longitude: -181 }, { latitude: 47 }, { latitude: NaN, longitude: 29 },
+  { latitude: 47, longitude: Infinity }]) {
+  assert.equal(nearbyParsing.nearbyInputFromCadastru({ map_location: point }), null);
+}
+assert.equal(nearbyParsing.nearbyInputFromCadastru({ request_address: "r-nul Anenii Noi, sat. Bulboaca" }), null);
+assert.deepEqual(clone(nearbyParsing.nearbyInputFromCadastru({ map_location: { latitude: 0, longitude: 0 } })),
+  { latitude: 0, longitude: 0 });
 assert.deepEqual(clone(nearbyParsing.nearbyAddressFromCadastru({
   apartment: { address: "mun. Chișinău, sect. Botanica, bd. Decebal 63, ap. 99" },
 })), { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" });
@@ -1045,6 +1065,49 @@ assert.equal(tables.cadastru_nearby.length, 0, "incomplete data is not saved for
 assert.equal((await nearbyRoute.POST(new Request("http://localhost/api/cadastru/nearby", {
   method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cadastral_number: "bad" }),
 }))).status, 400);
+// Parcel-only origins use stored coordinates, never coordinates supplied by the client.
+await storage.persistCadastruRecord(nearbyParcelPayload, { officialFetch: true });
+let coordinateNearbyCalls = 0;
+let coordinateNearbyFailure = false;
+const parcelNearbyRoute = await load("src/app/api/cadastru/nearby/route.js", {
+  "next/server": { NextResponse: { json: (data, options = {}) => Response.json(data, options) } },
+  "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true }) }) },
+  "@/lib/cadastru-records": storage,
+  "@/lib/cadastru-external-api": { fetchExternalNearbyData: async (input) => {
+    coordinateNearbyCalls++;
+    assert.deepEqual(clone(input), parcelLocation);
+    if (coordinateNearbyFailure) throw new Error("worker offline");
+    return { ...nearbyData, location: parcelLocation };
+  } },
+});
+const parcelRequest = () => new Request("http://localhost/api/cadastru/nearby", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ cadastral_number: "1014203.418", latitude: 0, longitude: 0 }),
+});
+const parcelRecord = tables.cadastru_records.find((row) => row.cadastral_number === "1014203.418");
+const parcelDeadline = parcelRecord.next_refresh_after;
+assert.equal((await parcelNearbyRoute.POST(parcelRequest())).status, 200);
+assert.equal(coordinateNearbyCalls, 1);
+const parcelNearbyRow = tables.cadastru_nearby[0];
+assert.deepEqual(parcelNearbyRow.lookup_input, parcelLocation, "coordinate input is persisted with its own origin key");
+assert.equal(Date.parse(parcelNearbyRow.expires_at) - Date.parse(parcelNearbyRow.fetched_at), 30 * 86400 * 1000);
+assert.equal((await parcelNearbyRoute.POST(parcelRequest())).status, 200);
+cache.clear();
+assert.equal((await parcelNearbyRoute.POST(parcelRequest())).status, 200);
+assert.equal(coordinateNearbyCalls, 1, "coordinate snapshots reuse Redis and DB hits");
+parcelNearbyRow.expires_at = new Date(Date.now() - 1000).toISOString();
+cache.clear();
+coordinateNearbyFailure = true;
+assert.equal((await (await parcelNearbyRoute.POST(parcelRequest())).json()).nearby.cache.stale, true,
+  "coordinate snapshots retain stale fallback on worker failure");
+assert.equal(parcelRecord.next_refresh_after, parcelDeadline, "nearby never renews the property snapshot");
+assert.equal(parcelRecord.raw_payload.nearby, undefined);
+assert.equal((await parcelNearbyRoute.POST(new Request("http://localhost/api/cadastru/nearby", {
+  method: "POST", headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ address: "r-nul Anenii Noi, sat. Bulboaca", latitude: 0, longitude: 0 }),
+}))).status, 422, "a locality-only request without a property point remains unavailable");
+tables.cadastru_nearby.length = 0;
+cache.clear();
 console.log("Nearby regressions passed: shared building persistence, 30-day cache, legacy promotion, stale outage fallback, safe refreshes and unchanged property snapshots.");
 
 const transportParsing = await load("@/lib/cadastru-public-transport");

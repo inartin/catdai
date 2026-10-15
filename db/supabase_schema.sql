@@ -187,6 +187,7 @@ create index idx_pdf_generation_events_session on pdf_generation_events (session
 -- ============================================================
 create table cadastru_search_events (
   id               bigserial primary key,
+  event_key        text,
   search_type      text not null check (search_type in ('address', 'number')),
   user_id          uuid references auth.users(id) on delete set null,
   city             text,
@@ -208,6 +209,7 @@ create index idx_cadastru_search_events_district_created on cadastru_search_even
 create index idx_cadastru_search_events_number_created on cadastru_search_events (cadastral_number, created_at desc);
 create index idx_cadastru_search_events_result_created on cadastru_search_events (result_type, created_at desc);
 create index idx_cadastru_search_events_source_created on cadastru_search_events (lookup_source, created_at desc);
+create unique index idx_cadastru_search_events_event_key on cadastru_search_events (event_key);
 
 -- ============================================================
 -- listing_link_analysis_events — tracks 999.md link analyzer usage

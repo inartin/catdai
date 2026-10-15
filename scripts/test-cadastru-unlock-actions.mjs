@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import crypto from "node:crypto";
+import { ensureCadastruLookupId } from "../src/lib/cadastru-lookup-tracking.js";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -91,6 +92,7 @@ async function checkPageAction(isAuthenticated) {
   ]);
   const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
     "./loading": { default: noop },
+    "@/lib/cadastru-lookup-tracking": { ensureCadastruLookupId },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0],
       useEffect: (effect) => effects.push(effect) },
     "next/navigation": { useRouter: () => ({ push: noop }),

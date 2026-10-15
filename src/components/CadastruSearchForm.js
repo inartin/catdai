@@ -150,6 +150,7 @@ export default function CadastruSearchForm({
       house_number: addressForm.houseNumber,
       ...(addressForm.apartmentNumber ? { apartment_number: addressForm.apartmentNumber } : {}),
       search_context: "cadastru",
+      lookup_id: crypto.randomUUID(),
       ...(skipCache ? { skip_cache: true } : {}),
     };
     setLoadingSearch({ address: requestBody });
@@ -158,6 +159,7 @@ export default function CadastruSearchForm({
     const params = new URLSearchParams({
       source: "address",
       lookup: "1",
+      lookup_id: requestBody.lookup_id,
       ...(skipCache ? { skipcache: "true" } : {}),
     });
     router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);
@@ -173,6 +175,7 @@ export default function CadastruSearchForm({
     const params = new URLSearchParams({
       cadastral_number: cadastralNumber.trim(),
       source: "number",
+      lookup_id: crypto.randomUUID(),
       ...(skipCache ? { skipcache: "true" } : {}),
     });
     router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);

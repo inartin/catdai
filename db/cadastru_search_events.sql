@@ -91,3 +91,8 @@ create index if not exists idx_cadastru_search_events_result_created
 
 create index if not exists idx_cadastru_search_events_source_created
   on cadastru_search_events (lookup_source, created_at desc);
+
+-- Nullable for existing events and older app versions during rollout.
+alter table public.cadastru_search_events add column if not exists event_key text;
+create unique index if not exists idx_cadastru_search_events_event_key
+  on public.cadastru_search_events (event_key);

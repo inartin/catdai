@@ -20,6 +20,7 @@ import { matchCity, validateCadastralNumber } from "@/lib/validation";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
 import { buildFullAccessAddressResultParams, resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
 import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
+import { ensureCadastruLookupId } from "@/lib/cadastru-lookup-tracking";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet", fullLabel: "cadastru.roadTypeStreetFull" },
@@ -453,6 +454,7 @@ function CadastruResultContent() {
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const cadastralNumber = searchParams.get("cadastral_number") || "";
   const source = searchParams.get("source") || "";
+  const searchLookupId = searchParams.get("lookup_id") || "";
   const originalStreetParam = (searchParams.get("original_street") || "").slice(0, 80);
   const resolvedStreetParam = (searchParams.get("resolved_street") || "").slice(0, 80);
   const skipCache = searchParams.get("skipcache") === "true";
@@ -558,6 +560,7 @@ function CadastruResultContent() {
     const correction = typeof suggestion === "object" ? suggestion : null;
     const body = {
       ...address,
+      lookup_id: crypto.randomUUID(),
       ...(typeof suggestion === "string" ? { street: suggestion } : {}),
       ...(correction?.street ? { street: correction.street } : {}),
       ...(correction?.house_number ? { house_number: correction.house_number } : {}),
@@ -588,10 +591,12 @@ function CadastruResultContent() {
 
   useEffect(() => {
     if (authLoading) return;
+    const pendingRequest = addressRequestKey ? JSON.parse(addressRequestKey) : null;
 
     if (isAddressPreviewHandoff || isPendingAddressLookup || savedAddressKey) {
+      const lookupId = ensureCadastruLookupId(pendingRequest?.lookup_id || searchLookupId || lookupTracking.current?.id);
       const accessMode = session?.access_token ? "authenticated" : "anonymous";
-      const requestKey = `address-preview|${savedAddressKey}|${addressRequestKey}|${accessMode}|${skipCache ? "skipcache" : "cache"}|${isHistoryAddress ? "history" : "search"}`;
+      const requestKey = `address-preview|${lookupId}|${savedAddressKey}|${addressRequestKey}|${accessMode}|${skipCache ? "skipcache" : "cache"}|${isHistoryAddress ? "history" : "search"}`;
       if (loadedRequestKey.current === requestKey) return;
 
       const preview = savedAddressKey ? null : readAddressResultPreview();
@@ -610,7 +615,7 @@ function CadastruResultContent() {
         return;
       }
 
-      const addressRequest = pendingAddressRequest || (savedAddressKey
+      const addressRequest = pendingRequest || (savedAddressKey
         ? { ...getSavedCadastruAddress(new URLSearchParams(savedAddressKey)), ...(isHistoryAddress ? {} : { search_context: "cadastru" }) }
         : readAddressLookupRequest());
       if (!addressRequest) {
@@ -631,7 +636,8 @@ function CadastruResultContent() {
           const lookup = fetchAddressLookup(
             `${requestKey}|${JSON.stringify(body)}|${session?.access_token || "anonymous"}`,
             body,
-            session?.access_token
+            session?.access_token,
+            { id: lookupId, query: [formatLookupAddress(body), body.apartment_number ? `ap. ${body.apartment_number}` : ""].filter(Boolean).join(", ") }
           );
 
           lookupTracking.current = lookup.lookupTracking;
@@ -692,6 +698,7 @@ function CadastruResultContent() {
                     resolved_street: resolution.resolved,
                   } : {},
               });
+              params.set("lookup_id", lookupId);
               router.replace(`/${lang}/cadastru/rezultat?${params.toString()}`);
               return;
             }
@@ -717,7 +724,8 @@ function CadastruResultContent() {
 
     const searchSource = source === "address" || source === "number" ? source : "";
     const accessMode = session?.access_token ? "authenticated" : "anonymous";
-    const requestKey = `${cadastralNumber}|${searchSource}|${accessMode}|${skipCache ? "skipcache" : "cache"}`;
+    const lookupId = ensureCadastruLookupId(searchLookupId || lookupTracking.current?.id);
+    const requestKey = `${lookupId}|${cadastralNumber}|${searchSource}|${accessMode}|${skipCache ? "skipcache" : "cache"}`;
     if (loadedRequestKey.current === requestKey) return;
 
     let active = true;
@@ -738,7 +746,7 @@ function CadastruResultContent() {
         };
 
         const lookup = fetchCadastralLookup(`${requestKey}|${session?.access_token || "anonymous"}`, body, session?.access_token,
-          searchSource === "address" ? lookupTracking.current : undefined);
+          { id: lookupId, query: (searchSource === "address" && lookupTracking.current?.query) || cadastralNumber });
         lookupTracking.current = lookup.lookupTracking;
         const response = await lookup;
 
@@ -773,7 +781,7 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, router, savedAddressKey, session?.access_token, skipCache, source, t]);
+  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, router, savedAddressKey, searchLookupId, session?.access_token, skipCache, source, t]);
 
   useEffect(() => {
     if (isAuthenticated) setIsAuthModalOpen(false);

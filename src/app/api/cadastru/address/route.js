@@ -268,6 +268,7 @@ export async function POST(request) {
   });
   const recordAddressSearch = (payload, lookupSource, resultType) => shouldTrackCadastruSearch
     ? logCadastruSearchEvent(request, "address", {
+        lookupId: getCadastruLookupTracking(body).lookupId,
         city,
         searchAddress: rawAddress,
         searchRequest: {
@@ -410,7 +411,7 @@ export async function POST(request) {
       console.error("[cadastru/address] external cadastru API failed:", details);
       if (error?.status === 404 || error?.code === "not_found") {
         if (shouldTrackCadastruSearch) {
-          await logCadastruSearchEvent(request, "address", { city, searchAddress: rawAddress, resultType: "no_data", lookupSource: "api" });
+          await logCadastruSearchEvent(request, "address", { lookupId: getCadastruLookupTracking(body).lookupId, city, searchAddress: rawAddress, resultType: "no_data", lookupSource: "api" });
         }
         return NextResponse.json(
           {
@@ -481,7 +482,7 @@ export async function POST(request) {
 
     const isNotFound = error?.code === "not_found";
     if (isNotFound && shouldTrackCadastruSearch) {
-      await logCadastruSearchEvent(request, "address", { city, searchAddress: rawAddress, resultType: "no_data", lookupSource: "local" });
+      await logCadastruSearchEvent(request, "address", { lookupId: getCadastruLookupTracking(body).lookupId, city, searchAddress: rawAddress, resultType: "no_data", lookupSource: "local" });
     }
 
     return NextResponse.json(

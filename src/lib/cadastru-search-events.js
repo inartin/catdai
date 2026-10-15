@@ -1,7 +1,9 @@
+import crypto from "node:crypto";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createCadastruEvaluationToken } from "@/lib/cadastru-evaluation-tracking";
+import { normalizeCadastruLookupId } from "@/lib/cadastru-lookup-tracking";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
 const RESULT_TYPES = new Set(["no_data", "address_only", "apartment_only", "full_data"]);
@@ -117,16 +119,30 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
       result_type: normalizeResultType(options.resultType),
       lookup_source: normalizeLookupSource(options.lookupSource),
     };
+    const lookupId = normalizeCadastruLookupId(options.lookupId);
+    if (lookupId) {
+      // Scope to the verified viewer and query so shared URLs cannot merge users.
+      row.event_key = crypto.createHash("sha256").update(JSON.stringify([
+        lookupId, userId, normalizedType, row.search_address || row.cadastral_number,
+      ])).digest("hex");
+    }
 
     let { data, error } = await supabaseAdmin.from("cadastru_search_events").insert(row).select("id").single();
 
-    for (let attempt = 0; attempt < 8 && error; attempt++) {
-      const missingColumn = ["search_request", "result_value", "search_address", "city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
+    for (let attempt = 0; attempt < 9 && error; attempt++) {
+      const missingColumn = ["event_key", "search_request", "result_value", "search_address", "city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
         column in row && isMissingColumnError(error, column)
       );
       if (!missingColumn) break;
       delete row[missingColumn];
       ({ data, error } = await supabaseAdmin.from("cadastru_search_events").insert(row).select("id").single());
+    }
+
+    if (error?.code === "23505" && row.event_key) {
+      // Concurrent retries return the original event without resetting its time
+      // or evaluation progress. The database unique index arbitrates the race.
+      ({ data, error } = await supabaseAdmin.from("cadastru_search_events")
+        .select("id").eq("event_key", row.event_key).single());
     }
 
     if (error && !isMissingSchemaError(error)) {

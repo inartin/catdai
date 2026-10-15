@@ -491,6 +491,133 @@ function StatCard({ label, value, detail, onClick, active = false }) {
   );
 }
 
+function CadastruSearchTable({ rows, onDelete, deletingId, userName, expanded = false }) {
+  if (!rows?.length) {
+    return <div className="px-5 py-8 text-center text-gray-400">No cadastru searches found</div>;
+  }
+
+  return (
+    <div className={expanded ? "overflow-x-auto" : "overflow-x-auto max-h-96 overflow-y-auto"}>
+      <table className="w-full text-sm">
+        <thead className="sticky top-0">
+          <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
+            <th className="px-4 py-3">Date</th>
+            <th className="px-4 py-3">Type</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Search</th>
+            <th className="px-4 py-3">District</th>
+            <th className="px-4 py-3">Evaluation</th>
+            <th className="px-4 py-3">User</th>
+            <th className="px-4 py-3 text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {rows.map((row) => (
+            <tr key={row.id} className="hover:bg-gray-50">
+              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                {fmtDateTime(row.created_at)}
+              </td>
+              <td className="px-4 py-3 text-gray-900 font-medium">
+                {fmtCadastruSearchType(row.search_type)}
+              </td>
+              <td className="px-4 py-3">
+                {row.result_type ? (
+                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "no_data"
+                    ? "bg-gray-100 text-gray-600"
+                    : "bg-green-50 text-green-700"}`}>
+                    {row.result_type === "no_data" ? "No result" : "Success"}
+                  </span>
+                ) : "\u2014"}
+              </td>
+              <td className="max-w-xs break-words px-4 py-3 text-gray-600">
+                {row.search_type === "address"
+                  ? row.search_address || row.cadastral_number || "\u2014"
+                  : row.cadastral_number || "\u2014"}
+              </td>
+              <td className="px-4 py-3 text-gray-600">
+                {row.district || "\u2014"}
+              </td>
+              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                {row.valuation_completed_at ? "Completed" : row.valuation_clicked_at ? "Started" : "\u2014"}
+              </td>
+              <td className="px-4 py-3 text-gray-600 break-all">
+                {row.user_name || userName || "Anonymous"}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <button
+                  type="button"
+                  onClick={() => onDelete(row)}
+                  disabled={deletingId === row.id}
+                  className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-default disabled:text-red-300"
+                >
+                  {deletingId === row.id ? "Deleting..." : "Delete"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function UserCadastruSearches({ user, onDelete, deletingId, deleteError }) {
+  const [rows, setRows] = useState([]);
+  const [offset, setOffset] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({ userId: user.id, offset: String(offset) });
+    fetch(`/api/admin/cadastru-searches?${params}`, { signal: controller.signal })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        return data;
+      })
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setRows((current) => offset === 0 ? data.searches : [...current, ...data.searches]);
+        setHasMore(data.hasMore);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) setError(err.message || "Failed to load searches");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [user.id, offset, attempt]);
+
+  return (
+    <div id={`user-cadastru-${user.id}`} className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <h4 className="font-semibold text-gray-900">Cadastru Searches · {user.name || user.email || user.id}</h4>
+        <p className="mt-1 text-xs text-gray-500">All time · {fmtNum(user.cadastruSearches)} searches</p>
+        {deleteError && <p role="alert" className="mt-2 text-xs text-red-500">{deleteError}</p>}
+      </div>
+      {rows.length > 0 && (
+        <CadastruSearchTable rows={rows} userName={user.name || user.email || user.id} onDelete={onDelete} deletingId={deletingId} expanded />
+      )}
+      {error ? (
+        <div role="alert" className="px-4 py-3 text-sm text-red-500">
+          {error}
+          <button type="button" onClick={() => { setError(null); setLoading(true); setAttempt((value) => value + 1); }} className="ml-3 text-primary hover:underline">Retry</button>
+        </div>
+      ) : loading ? (
+        <div className="px-4 py-4 text-sm text-gray-400">Loading searches...</div>
+      ) : rows.length === 0 ? (
+        <div className="px-4 py-4 text-sm text-gray-400">No cadastru searches found</div>
+      ) : hasMore && (
+        <button type="button" onClick={() => { setLoading(true); setOffset(rows.length); }} className="m-4 text-xs text-primary hover:underline">Load more</button>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [statsRefreshing, setStatsRefreshing] = useState(false);
@@ -502,6 +629,8 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState(null);
+  const [expandedUserCadastruId, setExpandedUserCadastruId] = useState(null);
+  const [userCadastruVersion, setUserCadastruVersion] = useState(0);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedUserTransactions, setSelectedUserTransactions] = useState([]);
   const [selectedUserTransactionsLoading, setSelectedUserTransactionsLoading] = useState(false);
@@ -747,7 +876,7 @@ export default function AdminDashboard() {
   };
 
   const deleteCadastruSearch = async (row) => {
-    if (!row?.id) return;
+    if (!row?.id || deletingCadastruSearchId !== null) return;
     const confirmed = window.confirm("Delete this cadastru search?");
     if (!confirmed) return;
 
@@ -760,7 +889,8 @@ export default function AdminDashboard() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      await loadStats({ fresh: true });
+      setUserCadastruVersion((value) => value + 1);
+      await Promise.all([loadStats({ fresh: true }), users.length > 0 ? loadUsers() : Promise.resolve()]);
     } catch (err) {
       setCadastruSearchDeleteError(err.message || "Failed to delete cadastru search");
     } finally {
@@ -1188,7 +1318,7 @@ export default function AdminDashboard() {
             ) : users.length === 0 ? (
               <div className="px-5 py-8 text-center text-gray-400">No users found</div>
             ) : (
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0">
                     <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase [&>*+*]:border-l [&>*+*]:border-gray-100">
@@ -1208,58 +1338,86 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {users.map((u) => (
-                      <tr key={u.id} className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
-                        <td className="px-4 py-3 text-gray-900 font-medium">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedUser(u)}
-                            className="text-left font-medium text-primary hover:underline"
-                          >
-                            {u.name || "\u2014"}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(u)}`}>
-                            {fmtUserPackage(u.packageKey)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {u.email ? (
-                            <Tooltip text={u.email}>
-                              <span className="cursor-help">{u.authProvider || "\u2014"}</span>
-                            </Tooltip>
-                          ) : (
-                            u.authProvider || "\u2014"
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          {fmtDate(u.registeredAt)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          {fmtDateTime(u.lastVisitAt)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-600">
-                          {fmtNum(u.totalEstimations)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-600">
-                          {fmtNum(u.cadastruSearches)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-600">
-                          {fmtNum(u.calculatorUsage)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-600">
-                          {fmtNum(u.pdfReports)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-600">
-                          {fmtNum(u.listingLinks)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-600">
-                          {fmtNum(u.sharedLinks)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-gray-600">
-                          {fmtNum(u.favorites)}
-                        </td>
-                      </tr>
+                      <Fragment key={u.id}>
+                        <tr className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
+                          <td className="px-4 py-3 text-gray-900 font-medium">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUser(u)}
+                              className="text-left font-medium text-primary hover:underline"
+                            >
+                              {u.name || "\u2014"}
+                            </button>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(u)}`}>
+                              {fmtUserPackage(u.packageKey)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {u.email ? (
+                              <Tooltip text={u.email}>
+                                <span className="cursor-help">{u.authProvider || "\u2014"}</span>
+                              </Tooltip>
+                            ) : (
+                              u.authProvider || "\u2014"
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                            {fmtDate(u.registeredAt)}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                            {fmtDateTime(u.lastVisitAt)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-600">
+                            {fmtNum(u.totalEstimations)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-600">
+                            <button
+                              type="button"
+                              aria-expanded={expandedUserCadastruId === u.id}
+                              aria-controls={`user-cadastru-${u.id}`}
+                              aria-label={`${expandedUserCadastruId === u.id ? "Hide" : "Show"} cadastru searches for ${u.name || u.email || u.id}`}
+                              onClick={() => {
+                                setExpandedUserCadastruId((current) => current === u.id ? null : u.id);
+                                setCadastruSearchDeleteError(null);
+                              }}
+                              className="inline-flex cursor-pointer items-center gap-1 font-medium text-primary hover:underline"
+                            >
+                              {fmtNum(u.cadastruSearches)}
+                              <span aria-hidden="true">{expandedUserCadastruId === u.id ? "▾" : "▸"}</span>
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-600">
+                            {fmtNum(u.calculatorUsage)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-600">
+                            {fmtNum(u.pdfReports)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-600">
+                            {fmtNum(u.listingLinks)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-600">
+                            {fmtNum(u.sharedLinks)}
+                          </td>
+                          <td className="px-4 py-3 text-right text-gray-600">
+                            {fmtNum(u.favorites)}
+                          </td>
+                        </tr>
+                        {expandedUserCadastruId === u.id && (
+                          <tr className="bg-gray-50">
+                            <td colSpan={12} className="p-4">
+                              <UserCadastruSearches
+                                key={`${u.id}-${userCadastruVersion}`}
+                                user={u}
+                                onDelete={deleteCadastruSearch}
+                                deletingId={deletingCadastruSearchId}
+                                deleteError={cadastruSearchDeleteError}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -1407,71 +1565,11 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {!Array.isArray(s.cadastruSearches?.recent) || s.cadastruSearches.recent.length === 0 ? (
-              <div className="px-5 py-8 text-center text-gray-400">No cadastru searches found</div>
-            ) : (
-              <div className="overflow-x-auto max-h-96 overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0">
-                    <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
-                      <th className="px-4 py-3">Date</th>
-                      <th className="px-4 py-3">Type</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Search</th>
-                      <th className="px-4 py-3">District</th>
-                      <th className="px-4 py-3">Evaluation</th>
-                      <th className="px-4 py-3">User</th>
-                      <th className="px-4 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {s.cadastruSearches.recent.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          {fmtDateTime(row.created_at)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-900 font-medium">
-                          {fmtCadastruSearchType(row.search_type)}
-                        </td>
-                        <td className="px-4 py-3">
-                          {row.result_type ? (
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "no_data"
-                              ? "bg-gray-100 text-gray-600"
-                              : "bg-green-50 text-green-700"}`}>
-                              {row.result_type === "no_data" ? "No result" : "Success"}
-                            </span>
-                          ) : "\u2014"}
-                        </td>
-                        <td className="max-w-xs break-words px-4 py-3 text-gray-600">
-                          {row.search_type === "address"
-                            ? row.search_address || row.cadastral_number || "\u2014"
-                            : row.cadastral_number || "\u2014"}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {row.district || "\u2014"}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          {row.valuation_completed_at ? "Completed" : row.valuation_clicked_at ? "Started" : "\u2014"}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 break-all">
-                          {row.user_name || "Anonymous"}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => deleteCadastruSearch(row)}
-                            disabled={deletingCadastruSearchId === row.id}
-                            className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-default disabled:text-red-300"
-                          >
-                            {deletingCadastruSearchId === row.id ? "Deleting..." : "Delete"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <CadastruSearchTable
+              rows={s.cadastruSearches?.recent}
+              onDelete={deleteCadastruSearch}
+              deletingId={deletingCadastruSearchId}
+            />
           </div>
         )}
         {showListingLinkAnalysesList && (

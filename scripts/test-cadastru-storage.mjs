@@ -208,6 +208,7 @@ console.log("Storage regressions passed: full JSON, number/address parity, aggre
 cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;
 let addressFetches = 0, numberFetches = 0, enrichFetches = 0;
 let hasCredit = false;
+const searchLogs = [], creditCalls = [];
 let workerDistrict = "bOTANICA", workerError = null;
 const routeMocks = {
   "next/server": { NextResponse: { json: (data, init) => Response.json(data, init) } },
@@ -215,11 +216,11 @@ const routeMocks = {
   "@/lib/access-tier": { resolveAccessTier: async () => ({ tier: "free", user_id: hasCredit ? "test-user" : null }) },
   "@/lib/paid-feature-usage": {
     checkFeatureAccess: async () => ({ allowed: hasCredit, reason: "no_credit" }),
-    consumeFeatureCredit: async () => ({ allowed: hasCredit, reason: "no_credit" }),
+    consumeFeatureCredit: async (args) => { creditCalls.push(args); return { allowed: hasCredit, reason: "no_credit" }; },
     makePaidFeatureUsageKey: (_feature, params) => JSON.stringify(params),
     buildFeatureCreditRequiredPayload: (_feature, reason) => ({ reason }),
   },
-  "@/lib/cadastru-search-events": { logCadastruSearchEvent: async () => {} },
+  "@/lib/cadastru-search-events": { logCadastruSearchEvent: async (_request, type, options) => { searchLogs.push({ type, ...options }); } },
   "@/lib/cadastru-external-api": {
     fetchExternalCadastruAddressData: async () => {
       addressFetches++;
@@ -260,6 +261,15 @@ assert.equal(full.apartment.area_m2, 64);
 assert.equal(full.district_lookup_checked, undefined, "internal district refresh state is not exposed");
 assert.deepEqual(full.map_location, expected.map_location, "full results retain stored map coordinates");
 assert.equal(full.novel.records[0].value, "unexpected");
+const searchId = crypto.randomUUID();
+await addressRoute.POST(request({ ...addressBody, lookup_id: searchId }));
+assert.equal(searchLogs.at(-1).lookupId, searchId, "cached address route forwards search identity");
+const addressCreditKey = creditCalls.at(-1).idempotencyKey;
+await addressRoute.POST(request({ ...addressBody, lookup_id: crypto.randomUUID() }));
+assert.equal(creditCalls.at(-1).idempotencyKey, addressCreditKey, "new analytics IDs do not change credit idempotency");
+await numberRoute.POST(request({ cadastral_number: number, lookup_id: searchId }));
+assert.equal(searchLogs.at(-1).lookupId, searchId, "number route forwards search identity");
+assert.equal(creditCalls.at(-1).idempotencyKey, addressCreditKey, "address-to-number credit key remains shared");
 await addressRoute.POST(request({ ...addressBody, street: "Stefan cel Mare" }));
 assert.equal(addressFetches, 1, "diacritic variants share a snapshot");
 await addressRoute.POST(request({ ...addressBody, skip_cache: true }));

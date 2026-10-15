@@ -483,6 +483,7 @@ export async function POST(request) {
   const recordCadastruSearch = async (payload, resultType = null) => {
     if (!cadastruSearchType) return;
     await logCadastruSearchEvent(request, cadastruSearchType, {
+      lookupId: getCadastruLookupTracking(body).lookupId,
       cadastralNumber: payload?.cadastral_number || trimmed,
       resultPayload: payload,
       city: resolveCityFromPayload(payload),

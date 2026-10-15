@@ -13,7 +13,7 @@ import {
   consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
-import { matchDistrict, CADASTRAL_RE } from "@/lib/validation";
+import { matchDistrict, validateCadastralNumber } from "@/lib/validation";
 import { NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
@@ -464,14 +464,15 @@ export async function POST(request) {
     );
   }
 
-  const trimmed = cadastral_number.trim();
-  if (!CADASTRAL_RE.test(trimmed)) {
+  const validation = validateCadastralNumber(cadastral_number);
+  if (!validation.valid) {
     return NextResponse.json(
       { error: "invalid_format", message: "Invalid cadastral number format" },
       { status: 400 }
     );
   }
 
+  const trimmed = validation.value;
   const skipCache = body?.skip_cache === true || body?.skipcache === true;
   const maskPreviewCadastralNumber = cadastruSearchType === "address" || body?.preview_origin === "address";
   const creditIdempotencyKey = makeCadastruLookupUsageKey(trimmed);

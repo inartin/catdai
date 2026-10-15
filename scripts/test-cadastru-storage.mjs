@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import vm from "node:vm";
 import crypto from "node:crypto";
 import path from "node:path";
+import * as validation from "../src/lib/validation.js";
 
 const cache = new Map();
 const tables = { cadastru_records: [], cadastru_address_aliases: [], external_api_usage_events: [], cadastru_public_transport: [], cadastru_nearby: [], cadastru_buildings: [], cadastru_building_addresses: [], cadastru_municipal_reports: [] };
@@ -48,7 +49,7 @@ const baseMocks = {
   "node:crypto": { default: crypto },
   "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => persistEnabled },
   "@/lib/supabase-admin": { supabaseAdmin },
-  "@/lib/validation": { matchDistrict: () => null, CADASTRAL_RE: /^\d{7}\.\d+(?:\.\d+){0,2}$/ },
+  "@/lib/validation": { ...validation, matchDistrict: () => null },
   "@/lib/cache": {
     getSharedCache: async (key) => cache.has(key) ? { value: clone(cache.get(key)) } : null,
     setSharedCache: async (key, value, ttl) => {
@@ -1325,14 +1326,26 @@ const parcelNumber = "5520202.182";
 const parcelPayload = { cadastral_number: parcelNumber, status: "success", source: "geodata_wfs",
   apartment: {}, building: {}, form_fields: {}, buildings: [],
   lands: [{ cadastral_number: parcelNumber, area_m2: "1352", object_type: "Teren" }] };
+let parcelFetches = 0;
 const parcelMocks = { ...routeMocks, "@/lib/cadastru-external-api": {
-  fetchExternalCadastralData: async () => parcelPayload,
+  fetchExternalCadastralData: async (number) => {
+    parcelFetches++;
+    assert.equal(number, parcelNumber, "worker receives the dotted land number");
+    return parcelPayload;
+  },
   fetchExternalCadastruAddressData: async () => parcelPayload,
 } };
 const parcelNumberRoute = await load("src/app/api/cadastral/route.js", parcelMocks);
 const parcelAddressRoute = await load("src/app/api/cadastru/address/route.js", parcelMocks);
 hasCredit = true;
-const parcelFull = await (await parcelNumberRoute.POST(request({ cadastral_number: parcelNumber }))).json();
+const parcelFull = await (await parcelNumberRoute.POST(request({ cadastral_number: parcelNumber.replaceAll(".", "") }))).json();
+assert.equal(parcelFull.cadastral_number, parcelNumber);
+const parcelCreditKey = creditCalls.at(-1).idempotencyKey;
+const dottedParcel = await (await parcelNumberRoute.POST(request({ cadastral_number: parcelNumber }))).json();
+assert.equal(dottedParcel.cadastral_number, parcelNumber);
+assert.equal(parcelFetches, 1, "compact and dotted land searches share the cache");
+assert.equal(creditCalls.at(-1).idempotencyKey, parcelCreditKey, "compact and dotted land searches share the credit key");
+assert.equal(tables.cadastru_records.length, 1, "compact and dotted land searches share one stored record");
 assert.equal(parcelFull.lands[0].area_m2, "1352");
 assert.equal(searchLogs.at(-1).resultType, "land_only", "fresh number search records land success");
 assert.equal(tables.cadastru_records[0].result_type, "land_only");

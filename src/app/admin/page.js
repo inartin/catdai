@@ -623,7 +623,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [statsRefreshing, setStatsRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
-  const [dashboardPeriod, setDashboardPeriod] = useState("month");
+  const [dashboardPeriod, setDashboardPeriod] = useState("day");
   const [error, setError] = useState(null);
   const [showUsersList, setShowUsersList] = useState(false);
   const [showPaidUsersList, setShowPaidUsersList] = useState(false);

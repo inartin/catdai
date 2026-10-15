@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import vm from "node:vm";
 import crypto from "node:crypto";
 import { ensureCadastruLookupId } from "../src/lib/cadastru-lookup-tracking.js";
+import * as validation from "../src/lib/validation.js";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -73,7 +74,7 @@ const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
   "next/navigation": { useRouter: () => router, useSearchParams: () => searchParams },
   "@/context/LanguageContext": translation,
   "@/context/AuthContext": { useAuth: () => ({ isAuthenticated: Boolean(authSession), loading: false, session: authSession, clearAuthError: noop }) },
-  "@/lib/validation": { matchCity: () => null, validateCadastralNumber: (value) => ({ valid: value === number, value }) },
+  "@/lib/validation": { ...validation, matchCity: () => null },
   "@/lib/cadastru-favorites": { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
   "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null,
     buildFullAccessAddressResultParams: (data, { skipCache }) => new URLSearchParams({ source: "address", cadastral_number: data.cadastral_number,
@@ -426,3 +427,33 @@ for (const locale of ["ro", "ru"]) {
 }
 for (const slot of slots) slot?.cleanup?.();
 console.log("Address handoff passed: RO/RU immediate card, background details and concurrent cards, stable lookup grouping, skip-cache, retained results on failure and auth isolation.");
+
+// Compact parcel URLs use the same dotted identity for all result-page requests.
+for (const locale of ["ro", "ru"]) {
+  lang = locale;
+  for (const slot of slots) slot?.cleanup?.();
+  slots.length = 0;
+  requests.clear();
+  frames.clear();
+  addressRequest = null;
+  authSession = null;
+  searchParams = new URLSearchParams({ cadastral_number: "1014203418" });
+  render();
+  const main = requests.get("/api/cadastral");
+  assert(main, `${locale}: compact land input passes client validation`);
+  assert.equal(JSON.parse(main.options.body).cadastral_number, "1014203.418");
+  main.resolve({ ok: true, json: async () => ({ cadastral_number: "1014203.418",
+    lands: [{ cadastral_number: "1014203.418", address: "Chișinău, str Test 1" }],
+    form_fields: { city: "Chișinău" } }) });
+  await flush();
+  render();
+  paint();
+  paint();
+  for (const endpoint of ["nearby", "public-transport", "municipal-reports"]) {
+    const secondary = requests.get(`/api/cadastru/${endpoint}`);
+    assert(secondary, `${locale}: ${endpoint} starts for the compact parcel result`);
+    assert.equal(JSON.parse(secondary.options.body).cadastral_number, "1014203.418");
+  }
+}
+for (const slot of slots) slot?.cleanup?.();
+console.log("Compact land input passed: RO/RU result-page validation and canonical main/secondary requests.");

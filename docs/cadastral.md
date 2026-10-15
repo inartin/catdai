@@ -11,7 +11,7 @@ Implemented and active, with partial fallback.
 - Successful `/api/cadastral` responses are cached in Redis for 30 days by cadastral number and stored as one `cadastru_records` row per cadastral number with a 30-day refresh deadline; linked apartment blocks can reuse saved data after a failed refresh. Failed/not-found responses are not cached.
 - It autofills city, district, area, floor, total floors, building type, and bathroom count when available.
 - Result and PDF cadastral panels show official apartment and building details when IPCBI provides them.
-- Cadastral validation accepts apartment suffixes with 3 or 4 digits, including the UI example `0100201.999.01.0101`.
+- Cadastral validation accepts apartment suffixes with 3 or 4 digits, including the UI example `0100201.999.01.0101`. Land parcels accept dotted seven-digit zones with 1–4 parcel digits, or 8–11 digits without a dot (for example, `1014203418` → `1014203.418`). Shared client validation, result-page requests and `/api/cadastral` normalize compact land inputs to dotted form before cache, storage and credit-key lookup; leading zeros are preserved.
 
 ## Address-Based Page
 - `/ro/cadastru` and `/ru/cadastru` are the indexable localized search pages; direct `/cadastru` is a noindex duplicate that canonicals to the current language version.

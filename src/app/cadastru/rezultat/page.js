@@ -452,7 +452,8 @@ function CadastruResultContent() {
   const searchParams = useSearchParams();
   const { lang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
-  const cadastralNumber = searchParams.get("cadastral_number") || "";
+  const rawCadastralNumber = searchParams.get("cadastral_number") || "";
+  const cadastralNumber = validateCadastralNumber(rawCadastralNumber).value || rawCadastralNumber;
   const source = searchParams.get("source") || "";
   const searchLookupId = searchParams.get("lookup_id") || "";
   const originalStreetParam = (searchParams.get("original_street") || "").slice(0, 80);

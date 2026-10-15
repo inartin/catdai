@@ -39,7 +39,7 @@ const RENOVATION_TYPES = [
   "Are nevoie de reparație", "Dat în exploatare", "Variantă sură",
 ];
 
-const CADASTRAL_RE = /^(?:\d{7}\.\d{3}|\d{5,7}\.\d{1,4}\.\d{2}\.\d{3,4}|\d{7,12}\.\d{2}\.\d{3,4})$/;
+const CADASTRAL_RE = /^(?:\d{8,11}|\d{7}\.\d{1,4}|\d{5,7}\.\d{1,4}\.\d{2}\.\d{3,4}|\d{7,12}\.\d{2}\.\d{3,4})$/;
 
 function matchCity(raw) {
   if (!raw || typeof raw !== "string") return null;
@@ -185,7 +185,7 @@ export function validateEstimateInput(raw) {
  */
 export function validateCadastralNumber(raw) {
   if (!raw || typeof raw !== "string") return { valid: false, reason: "missing" };
-  const trimmed = raw.trim();
+  const trimmed = raw.trim().replace(/^(\d{7})(\d{1,4})$/, "$1.$2");
   if (!CADASTRAL_RE.test(trimmed)) return { valid: false, reason: "invalid_format" };
   return { valid: true, value: trimmed };
 }

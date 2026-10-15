@@ -711,10 +711,13 @@ function CadastruResultContent() {
             const failure = response.data;
             const confirmationRequired = response.status === 422 && failure?.error === "address_confirmation_required";
             const errorMessage = confirmationRequired
-              ? t("cadastru.addressAlternativeIntro", { street: body.street, house: body.house_number, apartment: body.apartment_number })
+              ? t(body.apartment_number ? "cadastru.addressAlternativeIntro" : "cadastru.buildingAlternativeIntro",
+                { street: body.street, house: body.house_number, apartment: body.apartment_number })
               : failure?.error === "address_fields_conflict"
               ? t("cadastru.addressFieldsConflict", { embedded: failure.embedded_house_number, house: failure.house_number })
               : failure?.error === "ambiguous_street" ? t("cadastru.chooseStreet")
+              : failure?.error === "not_found" && !body.apartment_number
+              ? t("cadastru.buildingNotLocated", { street: body.street, house: body.house_number })
               : isLookupUnavailable(response) ? t("cadastru.serviceUnavailable") : readLookupError(failure, t);
             setState({
               loading: false,
@@ -730,8 +733,8 @@ function CadastruResultContent() {
                   && typeof value.street === "string" && value.street.length <= STREET_MAX_LENGTH
                   && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)
                   && value.house_number.startsWith(`${body.house_number}/`)
-                  && typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
-                  && Number(value.apartment_number) === Number(body.apartment_number)).slice(0, 3)
+                  && (body.apartment_number ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
+                    && Number(value.apartment_number) === Number(body.apartment_number) : !value.apartment_number)).slice(0, 3)
                 : failure?.error === "address_fields_conflict" && Array.isArray(failure.corrections)
                 ? failure.corrections.filter((value) => typeof value?.street === "string" && value.street.length <= STREET_MAX_LENGTH
                   && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)) : [],
@@ -1048,7 +1051,8 @@ function CadastruResultContent() {
                   {state.addressCorrections.map((correction) => (
                     <div key={`${correction.street}:${correction.house_number}`}>
                       {state.confirmationRequired && <p className="mb-2 text-sm">
-                        {t("cadastru.addressAlternativeFound", { street: correction.street, house: correction.house_number,
+                        {t(correction.apartment_number ? "cadastru.addressAlternativeFound" : "cadastru.buildingAlternativeFound",
+                          { street: correction.street, house: correction.house_number,
                           apartment: correction.apartment_number })}
                       </p>}
                       <button type="button"

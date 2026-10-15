@@ -35,7 +35,7 @@ export default function CadastruNearbyCard({ nearby, loading, unavailable }) {
       {loading ? (
         <p className="mt-4 flex items-center gap-2 text-sm text-gray-500">
           <span aria-hidden="true" className="shrink-0">
-            <CadastruLoadingIcon className="h-6 w-auto text-primary" />
+            <CadastruLoadingIcon bold className="h-8 w-auto text-primary-dark" />
           </span>
           <span>{t("cadastru.nearbyLoading")}</span>
         </p>
@@ -56,7 +56,7 @@ export default function CadastruNearbyCard({ nearby, loading, unavailable }) {
               </h3>
               <div className="space-y-2.5 pl-0.5">
                 {places.map((place) => (
-                  <div key={`${place.osm_type}-${place.osm_id}`} className="flex items-start justify-between gap-4 text-sm sm:text-base">
+                  <div key={place.place_id ? `${place.source}-${place.place_id}` : `${place.osm_type}-${place.osm_id}`} className="flex items-start justify-between gap-4 text-sm sm:text-base">
                     <span className="min-w-0 break-words text-gray-800">{place.name || t("cadastru.nearbyUnnamed")}</span>
                     <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-gray-500">
                       <svg viewBox="0 0 512 512" fill="currentColor" className="h-5 w-5" aria-hidden="true">
@@ -78,8 +78,11 @@ export default function CadastruNearbyCard({ nearby, loading, unavailable }) {
       {nearby?.incomplete ? <p className="mt-5 text-xs text-gray-500">{t("cadastru.nearbyIncomplete")}</p> : null}
       {nearby ? (
         <p className="mt-6 text-xs text-gray-400">
+          {nearby.source === "geoapify" ? <>
+            Powered by <a href="https://www.geoapify.com/" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 hover:underline">Geoapify</a>{" · "}
+          </> : null}
           <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer" className="hover:text-emerald-700 hover:underline">
-            {nearby.attribution || "© OpenStreetMap contributors"}
+            {nearby.source === "geoapify" ? "© OpenStreetMap contributors" : nearby.attribution || "© OpenStreetMap contributors"}
           </a>
         </p>
       ) : null}

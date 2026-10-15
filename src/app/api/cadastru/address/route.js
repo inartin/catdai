@@ -236,22 +236,22 @@ export async function POST(request) {
     street_resolution: { status: resolution.status, original: street, resolved: resolution.street },
   });
   const addressConfirmationResponse = (error) => {
-    if (error?.code !== "address_confirmation_required" || !apartmentNumber) return null;
+    if (error?.code !== "address_confirmation_required") return null;
     const expectedRoadType = roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : "strada";
     const offered = error.addressSuggestions || error.address_suggestions;
     const suggestions = (Array.isArray(offered) ? offered : []).filter((value) =>
       value?.city === city && value.road_type === expectedRoadType && value.street === resolution.street &&
       typeof value.house_number === "string" && value.house_number.length <= HOUSE_NUMBER_MAX_LENGTH &&
       HOUSE_NUMBER_PATTERN.test(value.house_number) && value.house_number.startsWith(`${houseNumber}/`) &&
-      typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number) &&
-      Number(value.apartment_number) === Number(apartmentNumber)
+      (apartmentNumber ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number) &&
+        Number(value.apartment_number) === Number(apartmentNumber) : !value.apartment_number)
     ).slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) =>
-      ({ city, road_type, street, house_number, apartment_number }));
+      ({ city, road_type, street, house_number, ...(apartment_number ? { apartment_number } : {}) }));
     if (!suggestions.length) return null;
     const token = shouldTrackCadastruSearch && process.env.NODE_ENV !== "development"
       ? createSuggestionRecoveryToken(failedUsageEventId, suggestionAddress, suggestions.map((value) => ({
           city: value.city, roadType: normalizeRoadType(value.road_type), street: value.street,
-          houseNumber: value.house_number, apartmentNumber: String(Number(value.apartment_number)),
+          houseNumber: value.house_number, apartmentNumber: value.apartment_number ? String(Number(value.apartment_number)) : "",
         }))) : null;
     return NextResponse.json({ error: "address_confirmation_required", address_suggestions: suggestions,
       ...(token ? { suggestion_recovery_token: token } : {}),

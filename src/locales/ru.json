@@ -1,4 +1,7 @@
 {
+  "cadastru.buildingNotLocated": "Не удалось точно определить местоположение дома {house} на улице {street}. Проверьте полный номер дома, включая дробь. Без точного местоположения мы не можем искать информацию об окрестностях.",
+  "cadastru.buildingAlternativeIntro": "Не удалось точно определить местоположение дома {house} на улице {street}. Выберите нужный адрес из проверенных вариантов, чтобы найти и информацию об окрестностях.",
+  "cadastru.buildingAlternativeFound": "Найден дом {house} на улице {street}. Это нужный вам адрес?",
   "cadastru.addressAlternativeIntro": "Не удалось подтвердить квартиру {apartment} по адресу {street}, дом {house}.",
   "cadastru.addressAlternativeFound": "Найдена квартира {apartment} по адресу {street}, дом {house}. Это нужный вам адрес?",
   "cadastru.searchSuggestedHouse": "Найти в доме {house}",

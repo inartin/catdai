@@ -15,7 +15,7 @@ export default function CadastruPublicTransportCard({ transport, loading, unavai
       {loading ? (
         <p className="mt-4 flex items-center gap-2 text-sm text-gray-500">
           <span aria-hidden="true" className="shrink-0">
-            <CadastruLoadingIcon className="h-6 w-auto text-primary" />
+            <CadastruLoadingIcon bold className="h-8 w-auto text-primary-dark" />
           </span>
           <span>{t("cadastru.transportLoading")}</span>
         </p>

@@ -8,6 +8,7 @@ export function normalizeStreetName(value) {
   return String(value || "").normalize("NFD").replace(/(\p{Script=Latin})\p{M}+/gu, "$1").normalize("NFC")
     .toLowerCase().replace(/ё/g, "е").replace(/[^\p{L}\p{N}]+/gu, " ").trim()
     .replace(/^(?:stradela|str la|strada|str|bul|улица|ул|bulevardul|bulevard|bd|бульвар|бул|проспект|пр|șoseaua|soseaua|sos|шоссе|aleea|al|аллея)\s+/u, "")
+    .replace(/\s+улица$/u, "")
     .replace(/\s+/g, " ");
 }
 

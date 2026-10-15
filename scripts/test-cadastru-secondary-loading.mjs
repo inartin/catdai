@@ -27,7 +27,7 @@ async function loadJsx(file, mocks, globals = {}) {
     jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } } },
     module: { type: "es6" },
   });
-  const context = vm.createContext({ console, crypto, URL, URLSearchParams, AbortController, ...globals });
+  const context = vm.createContext({ console, crypto, URL, URLSearchParams, AbortController, navigator: { userAgent: "" }, ...globals });
   const jsxModule = new vm.SourceTextModule(code, { context });
   await jsxModule.link((name) => {
     const exports = mocks[name] || (name.startsWith("@/components/") ? { default: noop } : null);
@@ -294,6 +294,13 @@ for (const locale of ["ro", "ru"]) {
   const nearby = { categories: {}, cache: { stale: true } };
   assert(textOf(nearbyCard.default({ nearby })).includes(t("cadastru.nearbyStale")));
   assert(!textOf(nearbyCard.default({ nearby: { ...nearby, cache: { stale: false } } })).includes(t("cadastru.nearbyStale")));
+  const fallback = nearbyCard.default({ nearby: { ...nearby, source: "geoapify",
+    attribution: "Powered by Geoapify | © OpenStreetMap contributors" } });
+  const credit = findNode(fallback, (node) => node.type === "a" && node.props.href === "https://www.geoapify.com/");
+  assert(credit && !/nofollow/.test(credit.props.rel), "Geoapify fallback has a follow-link in both locales");
+  assert(findNode(fallback, (node) => node.type === "a" && node.props.href === "https://www.openstreetmap.org/copyright"));
+  assert(!findNode(nearbyCard.default({ nearby }), (node) => node.type === "a" && node.props.href === "https://www.geoapify.com/"),
+    "OSM-only snapshots keep their existing attribution");
 }
 console.log("Nearby card passed: stale fallback notices in RO/RU, and embedded legacy data does not bypass the shared request.");
 

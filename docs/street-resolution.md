@@ -33,9 +33,15 @@ The sync script adapts only the loader and records worker source hashes in `sour
 
 ## Validation
 
+`pnpm exec node --experimental-vm-modules scripts/test-cadastru-building-confirmation.mjs` checks RO/RU building-location messages, validated suffix choices, explicit retries, skip-cache preservation and stale-choice cleanup.
+
 The isolated storage/route regression suite covers original/resolved aliases, shared cache reuse, current-request metadata, masked previews, ambiguous suggestions, worker 422 propagation and canonical local fallback. It also checks pasted-address conflicts before cache/provider calls and redundant-input cleanup. These mocks do not establish live cadastral availability or browser interaction.
 
 ## Verified house-number alternatives
+
+Building/land searches without an apartment also offer up to three verified numeric house suffixes when the exact house is absent. Autocomplete candidates must be confirmed by an explicit matching address and a land/building link in the same registry section. Exact original results take precedence, including Geodata recovery; verified choices can still be shown if geocoding fails. Confirmation never consumes credits or saves a property; clicking a choice starts the usual exact lookup. The result page explains in RO/RU that an exact building location is needed for nearby places, transport and reports, and does not start those requests while a choice is pending.
+
+The synced resolver recognizes Chișinău strada `Киев` as `Kiev`. Russian street aliases ending in `улица` also accept the bare name or a leading `улица`/`ул.` marker (for example `Киевская`, `Киевская улица`, `ул. Киевская`). Matching remains scoped to city and road type; alias collisions remain ambiguous.
 
 If an apartment lookup cannot confirm the submitted house without a suffix (for example `Ion Creangă 82`, apartment `167`), the worker can return 422 `address_confirmation_required` with up to three `address_suggestions`. Each suggestion has the same city, road type, complete street and apartment, plus a registry house suffix such as `82/1`. Autocomplete candidates alone are insufficient: the detail record must explicitly show that address and an actual apartment link. No apartment number is derived for a suggested house. The local backup follows the same verification.
 

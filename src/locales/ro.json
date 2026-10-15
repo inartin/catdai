@@ -1,4 +1,7 @@
 {
+  "cadastru.buildingNotLocated": "Nu am putut localiza exact imobilul de pe {street}, nr. {house}. Verifică numărul complet, inclusiv sufixul. Fără locația exactă nu putem căuta informațiile despre zonă.",
+  "cadastru.buildingAlternativeIntro": "Nu am putut localiza exact imobilul de pe {street}, nr. {house}. Alege adresa corectă dintre variantele verificate pentru a căuta și informațiile despre zonă.",
+  "cadastru.buildingAlternativeFound": "Am găsit imobilul de pe {street}, nr. {house}. Este adresa dorită?",
   "cadastru.addressAlternativeIntro": "Nu am putut confirma apartamentul {apartment} la {street}, nr. {house}.",
   "cadastru.addressAlternativeFound": "Am găsit apartamentul {apartment} la {street}, nr. {house}. Este adresa dorită?",
   "cadastru.searchSuggestedHouse": "Caută la nr. {house}",

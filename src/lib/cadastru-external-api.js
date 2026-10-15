@@ -34,8 +34,9 @@ function externalError(message, options = {}) {
   error.fallbackEligible = Boolean(options.fallbackEligible);
   error.suggestions = Array.isArray(options.suggestions) ? options.suggestions.filter((value) => typeof value === "string" && value.length <= 80) : [];
   error.addressSuggestions = Array.isArray(options.addressSuggestions) ? options.addressSuggestions
-    .filter((value) => ["city", "road_type", "street", "house_number", "apartment_number"].every((key) => typeof value?.[key] === "string"))
-    .slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) => ({ city, road_type, street, house_number, apartment_number })) : [];
+    .filter((value) => ["city", "road_type", "street", "house_number"].every((key) => typeof value?.[key] === "string")
+      && (value.apartment_number === undefined || typeof value.apartment_number === "string"))
+    .slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) => ({ city, road_type, street, house_number, ...(apartment_number ? { apartment_number } : {}) })) : [];
   error.usageEventId = options.usageEventId || null;
   return error;
 }

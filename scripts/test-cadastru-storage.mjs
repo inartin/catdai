@@ -1429,3 +1429,50 @@ await caching.writeCadastruCache("address", storage.normalizeCadastruAddressForD
 await parcelAddressRoute.POST(request({ ...parcelAddressBody, skip_cache: false }));
 assert.equal(searchLogs.at(-1).resultType, "land_only", "legacy cached address classification is corrected");
 console.log("Land regressions passed: storage, number/address searches, legacy cache metadata and preview masking.");
+
+// Address-only confirmation uses canonical street names and never persists or charges before selection.
+const buildingFields = { city: "Chișinău", road_type: "strada", street: "Киев", house_number: "6", skip_cache: true };
+const buildingChoice = { city: "Chișinău", road_type: "strada", street: "Kiev", house_number: "6/1" };
+let buildingWrites = 0, buildingCredits = 0, buildingSelection = false;
+const buildingConfirmationRoute = await load("src/app/api/cadastru/address/route.js", {
+  ...routeMocks,
+  "@/lib/cadastru-records": { getCadastruRecordByAddress: async () => null,
+    persistCadastruAddressResult: async (payload, options) => {
+      buildingWrites++; assert.equal(options.requestAddress, "Chișinău, str Kiev 6/1"); return payload;
+    } },
+  "@/lib/paid-feature-usage": { ...routeMocks["@/lib/paid-feature-usage"],
+    checkFeatureAccess: async () => { buildingCredits++; return { allowed: true }; },
+    consumeFeatureCredit: async () => { buildingCredits++; return { allowed: true }; } },
+  "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: async (fields) => {
+    assert.equal(fields.street, "Kiev");
+    assert.equal(fields.apartment_number, undefined);
+    if (buildingSelection) {
+      assert.equal(fields.house_number, "6/1");
+      return { lands: [{ cadastral_number: "0100424.086", address: "Chișinău, str Kiev 6/1" }] };
+    }
+    throw Object.assign(new Error("confirm"), { code: "address_confirmation_required", status: 422,
+      addressSuggestions: [buildingChoice, { ...buildingChoice, city: "Bălți" },
+        { ...buildingChoice, house_number: "16/1" }, { ...buildingChoice, apartment_number: "7" }] });
+  } },
+});
+let buildingResponse = await buildingConfirmationRoute.POST(request(buildingFields));
+assert.equal(buildingResponse.status, 422);
+assert.deepEqual(clone((await buildingResponse.json()).address_suggestions), [buildingChoice]);
+assert.equal(buildingWrites, 0); assert.equal(buildingCredits, 0);
+buildingSelection = true;
+buildingResponse = await buildingConfirmationRoute.POST(request({ ...buildingFields, street: "Kiev", house_number: "6/1" }));
+assert.equal(buildingResponse.status, 200);
+assert.equal(buildingWrites, 1); assert.equal(buildingCredits, 1);
+const buildingAdapter = await load("@/lib/cadastru-external-api", {
+  "@/lib/external-api-usage": { getExternalApiDiagnosticHeaders: () => ({}), trackExternalApiUsage: () => {} },
+}, {
+  process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test/", CADASTRU_EXTERNAL_API_SECRET: "test-only" } },
+  fetch: async () => Response.json({ ok: false, error: "address_confirmation_required",
+    address_suggestions: [buildingChoice, { ...buildingChoice, apartment_number: 5 }, null] }, { status: 422 }),
+});
+await assert.rejects(buildingAdapter.fetchExternalCadastruAddressData(buildingFields, { trackUsage: false }), (error) => {
+  assert.equal(error.code, "address_confirmation_required");
+  assert.deepEqual(clone(error.addressSuggestions), [buildingChoice]);
+  assert.equal(error.fallbackEligible, false); return true;
+});
+console.log("Building confirmation passed: Киев normalization, optional apartment, scoped choices, no writes or credits before selection, confirmed lookup and adapter propagation.");

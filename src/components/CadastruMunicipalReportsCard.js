@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
+import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
 import { municipalReportDate, municipalSourceUrl } from "@/lib/cadastru-municipal-reports";
 
 const STATUS_STYLES = {
@@ -120,7 +121,14 @@ export default function CadastruMunicipalReportsCard({ reports, loading, unavail
         {reports ? <span className="shrink-0 rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-600">{t("cadastru.reportsPeriod", { years: reports.period.years })}</span> : null}
       </div>
       <p className="mt-2 text-sm leading-relaxed text-gray-500">{t("cadastru.reportsSubtitle")}</p>
-      {loading ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.reportsLoading")}</p> : null}
+      {loading ? (
+        <p className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+          <span aria-hidden="true" className="shrink-0">
+            <CadastruLoadingIcon className="h-6 w-auto text-primary" />
+          </span>
+          <span>{t("cadastru.reportsLoading")}</span>
+        </p>
+      ) : null}
       {unavailable ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.reportsUnavailable")}</p> : null}
       {!loading && !unavailable && reports ? (
         <>

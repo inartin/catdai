@@ -468,6 +468,7 @@ function CadastruResultContent() {
   const isHistoryAddress = searchParams.get("history") === "1";
   const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
   const lookupTracking = useRef(null);
+  const addressResultHandoff = useRef(null);
   const loadedRequestKey = useRef("");
   const loadedNearbyKey = useRef("");
   const loadedTransportKey = useRef("");
@@ -678,6 +679,9 @@ function CadastruResultContent() {
           if (active) {
             const data = response.data;
             if (isPendingAddressLookup && data?.cadastral_number && !data?.locked_sections?.cadastru_details) {
+              addressResultHandoff.current = { data, accessToken: session?.access_token, skipCache };
+              loadedRequestKey.current = requestKey;
+              setState({ loading: false, error: "", data });
               const resolution = data.street_resolution;
               const params = buildFullAccessAddressResultParams(data, {
                 city: body.city,
@@ -717,9 +721,13 @@ function CadastruResultContent() {
     if (loadedRequestKey.current === requestKey) return;
 
     let active = true;
+    const handoff = addressResultHandoff.current;
+    const addressData = searchSource === "address" && handoff?.data?.cadastral_number === cadastralNumber
+      && handoff.accessToken === session?.access_token && handoff.skipCache === skipCache ? handoff.data : null;
 
     async function loadCadastralData() {
-      setState({ loading: true, error: "", data: null });
+      // Keep the successful address result visible while number details load.
+      setState({ loading: !addressData, error: "", data: addressData });
 
       try {
         const body = {
@@ -740,19 +748,23 @@ function CadastruResultContent() {
             if (active) setState({ loading: false, error: t("cadastru.loginToUse"), data: null });
             return;
           }
-          if (active) setState({ loading: false, error: isLookupUnavailable(response) ? t("cadastru.serviceUnavailable") : readLookupError(response.data, t), data: null,
-            fallbackAddress: source === "address" && isLookupUnavailable(response)
+          if (active) setState({ loading: false, error: isLookupUnavailable(response) ? t("cadastru.serviceUnavailable") : readLookupError(response.data, t), data: addressData,
+            fallbackAddress: !addressData && source === "address" && isLookupUnavailable(response)
               ? formatLookupAddress(readAddressLookupRequest()) : "" });
           return;
         }
 
         if (active) {
           loadedRequestKey.current = requestKey;
-          setState({ loading: false, error: "", data: response.data });
+          setState({ loading: false, error: "", data: addressData && response.data ? {
+            ...response.data,
+            request_address: response.data.request_address || addressData.request_address,
+            resolved_address: response.data.resolved_address || addressData.resolved_address,
+          } : response.data });
         }
       } catch {
-        if (active) setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: null,
-          fallbackAddress: source === "address" ? formatLookupAddress(readAddressLookupRequest()) : "" });
+        if (active) setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: addressData,
+          fallbackAddress: !addressData && source === "address" ? formatLookupAddress(readAddressLookupRequest()) : "" });
       }
     }
 

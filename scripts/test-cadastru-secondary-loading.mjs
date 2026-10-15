@@ -60,19 +60,22 @@ const useEffect = (effect, deps) => {
 const number = "0100106.131.01.097";
 let searchParams = new URLSearchParams({ cadastral_number: number });
 let addressRequest = null;
+let authSession = null;
+const router = { push: noop, replace: (url) => {
+  searchParams = new URLSearchParams(url.split("?")[1]);
+} };
 const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
   "./loading": { default: noop },
   react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
   "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
-  "next/navigation": { useRouter: () => ({ push: noop, replace: (url) => {
-    searchParams = new URLSearchParams(url.split("?")[1]);
-  } }), useSearchParams: () => searchParams },
+  "next/navigation": { useRouter: () => router, useSearchParams: () => searchParams },
   "@/context/LanguageContext": translation,
-  "@/context/AuthContext": { useAuth: () => ({ isAuthenticated: false, loading: false, session: null, clearAuthError: noop }) },
+  "@/context/AuthContext": { useAuth: () => ({ isAuthenticated: Boolean(authSession), loading: false, session: authSession, clearAuthError: noop }) },
   "@/lib/validation": { matchCity: () => null, validateCadastralNumber: (value) => ({ valid: value === number, value }) },
   "@/lib/cadastru-favorites": { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
   "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null,
-    buildFullAccessAddressResultParams: (data) => new URLSearchParams({ source: "address", cadastral_number: data.cadastral_number }) },
+    buildFullAccessAddressResultParams: (data, { skipCache }) => new URLSearchParams({ source: "address", cadastral_number: data.cadastral_number,
+      ...(skipCache ? { skipcache: "true" } : {}) }) },
   "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: (data) => data?.form_fields?.city === "Chișinău" || data?.request_address?.startsWith("Chișinău,"), validMunicipalReportsResult: (data) => data?.summary?.total >= 0 },
 }, {
   window: {}, localStorage: { removeItem: noop },
@@ -346,29 +349,78 @@ for (const locale of ["ro", "ru"]) {
 for (const slot of slots) slot?.cleanup?.();
 console.log("Outage continuation passed: RO/RU notice and preserved errors, concurrent address cards and map, timeout/network failures, number searches and validation/auth/rate-limit exclusions.");
 
-slots.length = 0;
-requests.clear();
-frames.clear();
-addressRequest = { city: "Chișinău", road_type: "strada", street: "Decebal", house_number: "63", apartment_number: "1" };
-searchParams = new URLSearchParams({ source: "address", lookup: "1" });
-render();
-const addressLookup = requests.get("/api/cadastru/address");
-const addressTracking = JSON.parse(addressLookup.options.body);
-addressLookup.resolve({ ok: true, json: async () => ({ cadastral_number: number, form_fields: { city: "Chișinău" } }) });
-await flush();
-render();
-const numberLookup = requests.get("/api/cadastral");
-assert(numberLookup, "a full address result hands off to the number lookup");
-assert.equal(JSON.parse(numberLookup.options.body).lookup_id, addressTracking.lookup_id);
-numberLookup.resolve({ ok: true, json: async () => ({ cadastral_number: number, form_fields: { city: "Chișinău" } }) });
-await flush();
-render();
-paint();
-paint();
-for (const endpoint of ["nearby", "public-transport", "municipal-reports"]) {
-  const body = JSON.parse(requests.get(`/api/cadastru/${endpoint}`).options.body);
-  assert.equal(body.lookup_id, addressTracking.lookup_id, "handoff and secondary calls stay in the original search");
-  assert(body.lookup_query.includes("ap. 1"), "the grouped search retains the submitted apartment");
+for (const locale of ["ro", "ru"]) {
+  lang = locale;
+  for (const outcome of ["success", "unavailable", "network", "unauthorized", "auth-change"]) {
+    for (const slot of slots) slot?.cleanup?.();
+    slots.length = 0;
+    requests.clear();
+    frames.clear();
+    authSession = { access_token: "signed-in" };
+    addressRequest = { city: "Chișinău", road_type: "bulevard", street: "Dacia", house_number: "15", apartment_number: "9" };
+    searchParams = new URLSearchParams({ source: "address", lookup: "1", skipcache: "true" });
+    render();
+    const addressLookup = requests.get("/api/cadastru/address");
+    const addressTracking = JSON.parse(addressLookup.options.body);
+    const addressData = { cadastral_number: number, request_address: "Chișinău, bulevard Dacia 15 ap 9",
+      matched_address: "bd. Dacia 15, ap. 9", form_fields: { city: "Chișinău" }, apartment: { area_m2: 52 } };
+    addressLookup.resolve({ ok: true, json: async () => addressData });
+    await flush();
+    const firstResult = render();
+    assert(findNode(firstResult, (node) => node.props?.cadastral === addressData),
+      "the address result replaces the loading screen while number details are still pending");
+    const numberLookup = requests.get("/api/cadastral");
+    assert(numberLookup, "address results still request number details");
+    assert.equal(JSON.parse(numberLookup.options.body).lookup_id, addressTracking.lookup_id);
+    assert.equal(JSON.parse(numberLookup.options.body).skip_cache, true);
+    assert(findNode(render(), (node) => node.props?.cadastral === addressData),
+      "the follow-up request does not reset the card to the loading screen");
+    assert.equal(requests.size, 2, "secondary requests wait for the result to paint");
+    paint();
+    paint();
+    for (const endpoint of ["nearby", "public-transport", "municipal-reports"]) {
+      const body = JSON.parse(requests.get(`/api/cadastru/${endpoint}`).options.body);
+      assert.equal(body.lookup_id, addressTracking.lookup_id);
+      assert(body.lookup_query.includes("ap. 9"));
+    }
+    const transportRequest = requests.get("/api/cadastru/public-transport");
+    if (outcome === "auth-change") {
+      authSession = null;
+      requests.delete("/api/cadastral");
+      render();
+      assert(!findNode(render(), (node) => node.props?.cadastral === addressData),
+        "changing auth does not reuse the previous viewer's full address result");
+      // Finish both requests before clearing this scenario's isolated state.
+      const masked = { cadastral_number: number, locked_sections: { cadastru_details: true } };
+      numberLookup.resolve({ ok: true, json: async () => addressData });
+      requests.get("/api/cadastral").resolve({ ok: true, json: async () => masked });
+      await flush();
+      assert(findNode(render(), (node) => node.props?.cadastral === masked));
+      continue;
+    }
+    if (outcome === "network") numberLookup.reject(new TypeError("Failed to fetch"));
+    else numberLookup.resolve({ ok: outcome === "success", status: outcome === "unauthorized" ? 401 : 503,
+      json: async () => outcome === "success"
+        ? { cadastral_number: number, form_fields: { city: "Chișinău" }, apartment: { area_m2: 54 } }
+        : { error: outcome === "unauthorized" ? "unauthorized" : "service_unavailable" } });
+    await flush();
+    const updated = render();
+    if (outcome === "unauthorized") {
+      assert(!findNode(updated, (node) => node.props?.cadastral), "unauthorized detail responses clear the full card");
+      continue;
+    }
+    const card = findNode(updated, (node) => node.props?.cadastral);
+    assert(card, "a failed detail request retains the successful address result");
+    assert.equal(card.props.cadastral.apartment.area_m2, outcome === "success" ? 54 : 52);
+    paint();
+    paint();
+    assert.equal(requests.size, 5, "detail completion does not restart secondary requests");
+    const transportData = { route_groups: [] };
+    transportRequest.resolve({ ok: true, json: async () => ({ public_transport: transportData }) });
+    await flush();
+    assert(findNode(render(), (node) => node.props?.transport === transportData),
+      "secondary responses started from the address result still complete after number details");
+  }
 }
 for (const slot of slots) slot?.cleanup?.();
-console.log("Lookup grouping passed: address-to-number navigation and all secondary calls share the original search ID and query.");
+console.log("Address handoff passed: RO/RU immediate card, background details and concurrent cards, stable lookup grouping, skip-cache, retained results on failure and auth isolation.");

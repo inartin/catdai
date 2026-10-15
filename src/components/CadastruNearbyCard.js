@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@/context/LanguageContext";
+import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
 
 const CATEGORIES = ["schools", "supermarkets", "pharmacies", "food", "parks", "public_transport"];
 
@@ -31,7 +32,14 @@ export default function CadastruNearbyCard({ nearby, loading, unavailable }) {
   return (
     <section className="mx-1 mt-6 rounded-2xl border-2 border-emerald-200 bg-white p-5 shadow-md sm:p-7" aria-busy={loading}>
       <h2 className="text-xl font-bold text-gray-950 sm:text-2xl">{t("cadastru.nearbyTitle")}</h2>
-      {loading ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.nearbyLoading")}</p> : null}
+      {loading ? (
+        <p className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+          <span aria-hidden="true" className="shrink-0">
+            <CadastruLoadingIcon className="h-6 w-auto text-primary" />
+          </span>
+          <span>{t("cadastru.nearbyLoading")}</span>
+        </p>
+      ) : null}
       {unavailable ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.nearbyUnavailable")}</p> : null}
       {!loading && !unavailable && nearby && groups.length === 0
         ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.nearbyEmpty")}</p>

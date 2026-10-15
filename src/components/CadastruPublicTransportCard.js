@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useTranslation } from "@/context/LanguageContext";
+import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
 
 export default function CadastruPublicTransportCard({ transport, loading, unavailable }) {
   const { t } = useTranslation();
@@ -11,7 +12,14 @@ export default function CadastruPublicTransportCard({ transport, loading, unavai
   return (
     <section className="mx-1 mt-6 rounded-2xl border-2 border-emerald-200 bg-white p-5 shadow-md sm:p-7" aria-busy={loading}>
       <h2 className="text-xl font-bold text-gray-950 sm:text-2xl">{t("cadastru.transportTitle")}</h2>
-      {loading ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.transportLoading")}</p> : null}
+      {loading ? (
+        <p className="mt-4 flex items-center gap-2 text-sm text-gray-500">
+          <span aria-hidden="true" className="shrink-0">
+            <CadastruLoadingIcon className="h-6 w-auto text-primary" />
+          </span>
+          <span>{t("cadastru.transportLoading")}</span>
+        </p>
+      ) : null}
       {unavailable ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.transportUnavailable")}</p> : null}
       {!loading && !unavailable && transport && !groups.length
         ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.transportEmpty")}</p>

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
+import crypto from "node:crypto";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -24,7 +25,7 @@ async function loadJsx(file, mocks, globals = {}) {
     jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } } },
     module: { type: "es6" },
   });
-  const context = vm.createContext({ console, URL, URLSearchParams, ...globals });
+  const context = vm.createContext({ console, crypto, URL, URLSearchParams, ...globals });
   const jsxModule = new vm.SourceTextModule(code, { context });
   await jsxModule.link((name) => {
     const exports = name === "react/jsx-runtime" ? { jsx, jsxs: jsx, Fragment: "Fragment" }
@@ -89,6 +90,7 @@ async function checkPageAction(isAuthenticated) {
     ["catdai:cadastru-address-lookup-request:v1", JSON.stringify(request)],
   ]);
   const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
+    "./loading": { default: noop },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0],
       useEffect: (effect) => effects.push(effect) },
     "next/navigation": { useRouter: () => ({ push: noop }),
@@ -98,7 +100,7 @@ async function checkPageAction(isAuthenticated) {
       session: isAuthenticated ? { access_token: "test-token" } : null, clearAuthError: noop }) },
     "@/lib/validation": { matchCity: () => null, validateCadastralNumber: () => ({ valid: false }) },
     "@/lib/cadastru-favorites": { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
-    "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null },
+    "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null, buildFullAccessAddressResultParams: noop },
     "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: () => false,
       validMunicipalReportsResult: () => false },
     "@/components/CadastralDataCard": { default: CadastralDataCard },

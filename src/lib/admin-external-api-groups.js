@@ -96,7 +96,10 @@ export function groupExternalApiEvents(events, statusFilter = "all") {
       user_name: primary.user_name || events.find((event) => event.user_name)?.user_name,
       success: events.filter((event) => event.status === "success").length,
       failure: events.filter((event) => event.status === "failure").length,
+      mainFailure: events.filter((event) => event.status === "failure"
+        && (event.service === "cadastru_address" || event.service === "cadastru_number")).length,
     };
-  }).filter((group) => statusFilter === "all" || group.events.some((event) => event.status === statusFilter))
+  }).filter((group) => statusFilter === "all" || (statusFilter === "failure"
+    ? group.mainFailure > 0 : group.events.some((event) => event.status === statusFilter)))
     .sort((a, b) => Date.parse(b.latest_at) - Date.parse(a.latest_at));
 }

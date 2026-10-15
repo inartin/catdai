@@ -772,7 +772,7 @@ export default function AdminDashboard() {
     if (deletingExternalApiEventId !== null) return;
     const confirmed = window.confirm(row
       ? "Permanently delete this API log and its request/response details? Its status count and total will decrease by one."
-      : "Permanently delete ALL failed API logs across all dates, including logs outside the current table, and reset all failed usage counts to zero?");
+      : "Permanently delete ALL failed worker logs across all services and dates, including secondary-service and 999 errors outside the current table, and reset their error counts to zero?");
     if (!confirmed) return;
 
     setDeletingExternalApiEventId(row ? row.id : "all");
@@ -1545,7 +1545,9 @@ export default function AdminDashboard() {
                 <h3 className="font-semibold text-gray-900">External API Usage</h3>
                 <p className="mt-1 text-xs text-gray-500">
                   {s.periodLabel} · {fmtNum(s.externalApiUsage?.success)} successful · {fmtNum(s.externalApiUsage?.failure)} failed
+                  {s.externalApiUsage?.otherFailure > 0 && ` · ${fmtNum(s.externalApiUsage.otherFailure)} other errors`}
                 </p>
+                <p className="mt-1 text-xs text-gray-500">Failed counts and the Failed filter include only Cadastru address and number lookup failures.</p>
               </div>
               <div className="inline-flex w-full rounded-lg border border-gray-200 bg-white p-1 sm:w-auto">
                 {EXTERNAL_API_STATUS_FILTERS.map((option) => (
@@ -1568,7 +1570,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {externalApiStatusFilter === "failure" && (
+            {externalApiStatusFilter === "all" && (
               <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-5 py-3">
                 <button
                   type="button"
@@ -1576,9 +1578,9 @@ export default function AdminDashboard() {
                   disabled={deletingExternalApiEventId !== null || !s.externalApiUsage?.detailsAvailable}
                   className="cursor-pointer rounded-lg border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {deletingExternalApiEventId === "all" ? "Deleting..." : "Delete all failed logs"}
+                  {deletingExternalApiEventId === "all" ? "Deleting..." : "Delete all failed worker logs"}
                 </button>
-                <span className="text-xs text-gray-500">All dates · Resets failed counts to zero</span>
+                <span className="text-xs text-gray-500">All services and dates · Includes secondary-service and 999 errors</span>
               </div>
             )}
             {externalApiDeleteError && (
@@ -1597,7 +1599,7 @@ export default function AdminDashboard() {
                       </p>
                       <p className="mt-1 text-lg font-semibold text-gray-900">{fmtNum(item.total)}</p>
                       <p className="mt-1 text-xs text-gray-500">
-                        {fmtNum(item.success)} successful · {fmtNum(item.failure)} failed
+                        {fmtNum(item.success)} successful · {fmtNum(item.failure)} {service === "cadastru_address" || service === "cadastru_number" ? "failed" : "errors"}
                       </p>
                     </div>
                   ))}
@@ -1663,13 +1665,16 @@ export default function AdminDashboard() {
                                   </p>
                                 </td>
                                 <td className="px-4 py-3">
-                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${group.failure ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
-                                    {group.failure ? (group.success ? "With failures" : "Failed") : "Successful"}
+                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${group.mainFailure ? "bg-red-50 text-red-700" : group.failure ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
+                                    {group.mainFailure ? "Failed" : group.failure ? "With failures" : "Successful"}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-600">
                                   <p>{fmtNum(group.events.length)} {group.events.length === 1 ? "call" : "calls"}</p>
-                                  <p className="mt-1 text-xs">{fmtNum(group.success)} successful · {fmtNum(group.failure)} failed</p>
+                                  <p className="mt-1 text-xs">
+                                    {fmtNum(group.success)} successful · {fmtNum(group.mainFailure)} failed
+                                    {group.failure > group.mainFailure && ` · ${fmtNum(group.failure - group.mainFailure)} other errors`}
+                                  </p>
                                 </td>
                                 <td className="break-all px-4 py-3 text-gray-600">{group.user_name || "Anonymous"}</td>
                               </tr>

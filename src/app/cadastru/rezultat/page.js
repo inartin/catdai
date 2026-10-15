@@ -22,9 +22,9 @@ import { buildFullAccessAddressResultParams, resolveValuationDistrict } from "@/
 import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
 
 const roadTypes = [
-  { value: "strada", label: "cadastru.roadTypeStreet" },
-  { value: "str-la", label: "cadastru.roadTypeLane" },
-  { value: "bulevard", label: "cadastru.roadTypeBoulevard" },
+  { value: "strada", label: "cadastru.roadTypeStreet", fullLabel: "cadastru.roadTypeStreetFull" },
+  { value: "str-la", label: "cadastru.roadTypeLane", fullLabel: "cadastru.roadTypeLaneFull" },
+  { value: "bulevard", label: "cadastru.roadTypeBoulevard", fullLabel: "cadastru.roadTypeBoulevardFull" },
 ];
 const STREET_MAX_LENGTH = 80;
 const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/\d{1,4})?$/;
@@ -651,6 +651,8 @@ function CadastruResultContent() {
               data: null,
               fallbackAddress: isLookupUnavailable(response) ? formatLookupAddress(body) : "",
               didYouMean: response.status === 404 && failure?.error === "not_found",
+              requestedStreet: body.street,
+              requestedRoad: t(roadTypes.find(({ value }) => value === body.road_type)?.fullLabel),
               suggestionRecoveryToken: failure?.suggestion_recovery_token || null,
               confirmationRequired,
               addressCorrections: confirmationRequired && Array.isArray(failure.address_suggestions)
@@ -945,7 +947,16 @@ function CadastruResultContent() {
 
           {(state.error || (!cadastralNumber && !state.loading && !state.data)) && (
             <div role="status" className={`rounded-2xl border p-6 text-sm font-medium shadow-sm sm:p-8 ${state.suggestions?.length || state.roadTypeSuggestions?.length || state.addressCorrections?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
-              <p>{state.error || t("cadastru.lookupError")}</p>
+              <p className="flex items-start gap-2">{state.didYouMean && (state.suggestions?.length > 0 || state.roadTypeSuggestions?.length > 0)
+                ? <>
+                  <svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4" />
+                    <path d="M12 8h.01" />
+                  </svg>
+                  <span>{t("cadastru.notFoundWithSuggestion", { road: state.requestedRoad, street: state.requestedStreet })}</span>
+                </>
+                : state.error || t("cadastru.lookupError")}</p>
               {state.fallbackAddress && <p className="mt-2 font-normal text-gray-700">
                 {t("cadastru.otherDataAvailable")}
               </p>}
@@ -970,13 +981,14 @@ function CadastruResultContent() {
               )}
               {state.suggestions?.length > 0 && (
                 <div className="mt-3">
-                  {state.didYouMean && <p className="mb-2 text-sm font-semibold">{t("cadastru.didYouMean")}</p>}
+                  {state.didYouMean && <p className="mb-2 text-sm font-normal">{t("cadastru.didYouMean")}</p>}
                   <div className="flex flex-wrap gap-2">
                   {state.suggestions.map((street) => (
                     <button key={street} type="button" className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
                       disabled={state.loading || authLoading}
                       onClick={() => retryAddressSearch(street)}>
-                      {street}
+                      {state.didYouMean ? <>{t("cadastru.useRoadTypeSuggestion", { road: state.requestedRoad, street })}
+                        <span aria-hidden="true" className="ml-3">→</span></> : street}
                     </button>
                   ))}
                   </div>
@@ -984,7 +996,7 @@ function CadastruResultContent() {
               )}
               {state.roadTypeSuggestions?.length > 0 && (
                 <div className="mt-3">
-                  <p className="mb-2 text-sm font-semibold">{t("cadastru.didYouMeanRoadType")}</p>
+                  <p className="mb-2 text-sm font-normal">{t("cadastru.didYouMeanRoadType")}</p>
                   <div className="flex flex-wrap gap-2">
                     {state.roadTypeSuggestions.map((suggestion) => (
                       <button key={`${suggestion.road_type}:${suggestion.street}`} type="button"
@@ -992,8 +1004,9 @@ function CadastruResultContent() {
                         disabled={state.loading || authLoading}
                         onClick={() => retryAddressSearch(suggestion)}>
                         {t("cadastru.useRoadTypeSuggestion", {
-                          road: t(roadTypes.find(({ value }) => value === suggestion.road_type).label), street: suggestion.street,
+                          road: t(roadTypes.find(({ value }) => value === suggestion.road_type).fullLabel), street: suggestion.street,
                         })}
+                        <span aria-hidden="true" className="ml-3">→</span>
                       </button>
                     ))}
                   </div>

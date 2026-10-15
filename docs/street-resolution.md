@@ -43,6 +43,8 @@ The result screen keeps the original requested house and asks whether the verifi
 
 ## Suggestions after no result
 
+When a completed lookup has no result but offers a street-name or road-type alternative, the localized message names the submitted road and street, explains that a similar name was found, and offers `Caută „{road} {street}”` buttons (with equivalent Russian copy).
+
 After an address lookup returns `not_found` (404), the API suggests up to three streets from the existing city/road-type dictionary. The app-owned `cadastru-street-suggestions.js` ranks whole-word matches, given-name initials, missing first names, bounded spelling differences and Romanian/Russian transliterations. These loose matches are suggestions only; they never identify or cache a property. Unique initials are handled by the synced worker resolver before lookup; looser matches remain suggestions only.
 
 If the submitted street has no exact dictionary match under the selected road type but matches another type in the same city, a failed lookup offers that type and canonical street instead. This applies to 404 and 503 responses. After a worker timeout with such a match, the API returns the suggestion without repeating the same slow lookup in the local backup. It does not claim that the house or apartment exists. The result screen shows a localized button and retries with the suggested road type only after a click, retaining the city, house, apartment and skip-cache setting. Successful searches and streets already known under the selected type do not show a road-type suggestion.

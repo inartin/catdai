@@ -56,14 +56,15 @@ export default function AdminCadastruPage() {
       </header>
 
       {loading && !stats ? (
-        <div role="status" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((key) => <div key={key} className="h-36 animate-pulse rounded-xl border border-gray-200 bg-white" />)}
+        <div role="status" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+          {[0, 1, 2, 3, 4].map((key) => <div key={key} className="h-36 animate-pulse rounded-xl border border-gray-200 bg-white" />)}
           <span className="sr-only">Loading stored data overview…</span>
         </div>
       ) : stats?.available ? (
         <div className="space-y-6" aria-busy={loading}>
-          <section aria-label="Stored property totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Apartment buildings" value={stats.buildings} detail="Verified blocks · shared details stored once" accent />
+          <section aria-label="Stored property totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <StatCard label="Unique cadastral numbers" value={stats.total} detail="All property types" accent />
+            <StatCard label="Apartment buildings" value={stats.buildings} detail="Verified blocks · shared details stored once" />
             <StatCard label="Apartments / units" value={stats.apartments.total}
               detail={`${fmtNum(stats.apartments.linked)} linked to shared buildings`} />
             <StatCard label="Units with details" value={stats.apartments.details}
@@ -103,7 +104,7 @@ export default function AdminCadastruPage() {
                 );
               })}
             </div>
-            <p className="border-t border-gray-100 px-5 py-3 text-xs leading-5 text-gray-500 sm:px-6">Expired snapshots remain stored. Coverage shows saved datasets, not a guarantee that every apartment or source field is available.</p>
+            <p className="border-t border-gray-100 px-5 py-3 text-xs leading-5 text-gray-500 sm:px-6">Expired snapshots remain stored</p>
           </section>
 
           <section aria-labelledby="collection-heading" className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">

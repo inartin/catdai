@@ -30,8 +30,8 @@ const mocks = {
     },
   },
 };
-async function load(file) {
-  const loadedModule = new vm.SourceTextModule(await fs.readFile(file, "utf8"), { context });
+async function load(file, extraSource = "") {
+  const loadedModule = new vm.SourceTextModule((await fs.readFile(file, "utf8")) + extraSource, { context });
   await loadedModule.link((name) => {
     const exports = mocks[name];
     assert(exports, `Unexpected import: ${name}`);
@@ -66,8 +66,20 @@ assert.equal(groups[0].query, query);
 assert.equal(groups[0].success, 3);
 assert.equal(groups[0].failure, 2);
 assert.equal(groups[0].events.length, 5);
-assert.equal(groupExternalApiEvents(recorded, "failure")[0].events.length, 5,
-  "failed filters retain successful siblings for context");
+assert.equal(groups[0].mainFailure, 0);
+assert.equal(groupExternalApiEvents(recorded, "failure").length, 0,
+  "secondary failures do not enter the Failed filter");
+for (const service of ["cadastru_address", "cadastru_number"]) {
+  const failedMain = recorded.map((event, index) => index === 0 ? { ...event, service, status: "failure" } : event);
+  const failedGroups = groupExternalApiEvents(failedMain, "failure");
+  assert.equal(failedGroups.length, 1, `${service} failure enters the Failed filter`);
+  assert.equal(failedGroups[0].mainFailure, 1);
+  assert.equal(failedGroups[0].events.length, 5, "failed searches retain all sibling calls");
+}
+assert.equal(groupExternalApiEvents(recorded.filter((event) => event.service === "cadastru_nearby"), "failure").length, 0,
+  "secondary-only failures with a cached primary never become main lookup failures");
+assert.equal(groupExternalApiEvents([{ ...recorded[0], service: "999_listing", status: "failure" }], "failure").length, 0,
+  "the key Failed filter is reserved for Cadastru address and number lookups");
 assert.equal(groupExternalApiEvents(recorded, "success").length, 1);
 
 mode = "success";
@@ -76,7 +88,7 @@ groups = groupExternalApiEvents(recorded);
 assert.equal(groups.length, 2, "repeated searches at the same address stay separate");
 assert.equal(groups[0].events.length, 1, "a cached primary with only a secondary worker call still has a group");
 assert.equal(groups[0].query, query);
-assert.equal(groupExternalApiEvents(recorded, "failure").length, 1);
+assert.equal(groupExternalApiEvents(recorded, "failure").length, 0);
 const historical = [1, 2].map((id) => ({ id: `old-${id}`, service: "cadastru_address", status: "success",
   created_at: recorded[0].created_at, request_payload: { address: query } }));
 const listing = { ...recorded[0], id: "listing", service: "999_listing" };
@@ -101,7 +113,7 @@ assert.equal(legacyGroups.length, 1, "the three older Bălți calls in the scree
 assert.equal(legacyGroups[0].events.length, 3);
 assert.equal(legacyGroups[0].inferred, true);
 assert.equal(legacyGroups[0].failure, 1);
-assert.equal(groupExternalApiEvents(legacyCalls, "failure")[0].events.length, 3);
+assert.equal(groupExternalApiEvents(legacyCalls, "failure").length, 0, "legacy secondary errors are also excluded");
 assert.equal(groupExternalApiEvents(legacyCalls.map(({ duration_ms, ...event }) => event)).length, 1,
   "older logs without durations still group within the two-minute completion window");
 const numberPrimary = { ...legacyCalls[2], service: "cadastru_number", request_payload: { cadastral_number: "0100106.131.01.097" },
@@ -197,8 +209,14 @@ nodes(tree, (node) => node.type === "button" && node.props["aria-label"] === "De
 assert.equal(confirmations, 1, "nested call deletion retains confirmation");
 nodes(tree, (node) => node.type === "button" && node.props.children === "Failed")[0].props.onClick();
 tree = render();
+assert.equal(nodes(tree, (node) => node.type === "tr" && node.props.role === "button").length, 0,
+  "Failed hides successful Cadastru searches with secondary errors");
+slots[2] = { ...slots[2], externalApiUsage: { ...slots[2].externalApiUsage,
+  events: recorded.map((event) => event.id === 1 ? { ...event, status: "failure" } : event) } };
+tree = render();
 assert.equal(nodes(tree, (node) => node.type === "tr" && node.props.role === "button").length, 1);
-assert(/5\s+calls/.test(textOf(tree)), "status filtering preserves the mixed search and all siblings");
+assert(/5\s+calls/.test(textOf(tree)), "failed main lookup retains all siblings for context");
+nodes(tree, (node) => node.type === "button" && node.props.children === "All")[0].props.onClick();
 console.log("Admin grouped table passed: collapsed searches, keyboard expansion, service labels, call payloads, deletion and status filters.");
 
 slots[2] = { ...slots[2], externalApiUsage: { ...slots[2].externalApiUsage, events: legacyCalls } };
@@ -206,6 +224,34 @@ tree = render();
 rows = nodes(tree, (node) => node.type === "tr" && node.props.role === "button");
 assert.equal(rows.length, 1, "older logs display one combined search row in the table");
 assert(textOf(tree).includes("Cadastru search (older logs)"));
+assert(textOf(tree).includes("With failures"), "secondary failure keeps the warning badge");
+assert(/2\s+successful\s+·\s+0\s+failed\s+·\s+1 other errors/.test(textOf(tree)),
+  "secondary errors stay visible without increasing failed counts");
 rows[0].props.onClick();
 assert.equal(nodes(render(), (node) => node.type === "tr" && node.props.role === "button").length, 4,
   "the older combined row expands into its three individual calls");
+
+// Daily aggregates include history beyond the latest 200 event details.
+mocks["@/lib/supabase-admin"] = { supabaseAdmin: {} };
+mocks["@/lib/admin-auth"] = { requireAdminApiAuth: () => null };
+mocks["next/server"] = { NextResponse: {} };
+const { buildExternalApiUsageStats } = await load("src/app/api/admin/stats/route.js",
+  "\nexport { buildExternalApiUsageStats };");
+const daily = [
+  { service: "cadastru_address", status: "success", count: 300 },
+  { service: "cadastru_address", status: "failure", count: 3 },
+  { service: "cadastru_number", status: "failure", count: "2" },
+  { service: "cadastru_nearby", status: "failure", count: 7 },
+  { service: "999_listing", status: "failure", count: 4 },
+];
+const usage = buildExternalApiUsageStats(daily, { available: true, rows: recorded });
+assert.equal(usage.total, 316, "all worker calls remain counted");
+assert.equal(usage.success, 300);
+assert.equal(usage.failure, 5, "only address/number failures enter the key failed counter");
+assert.equal(usage.otherFailure, 11, "secondary and listing errors remain separately visible");
+assert.equal(usage.byService.cadastru_nearby.failure, 7, "raw per-service diagnostics stay intact");
+assert.equal(usage.total, usage.success + usage.failure + usage.otherFailure);
+assert.equal(buildExternalApiUsageStats(daily, { available: false, rows: [] }).failure, 5,
+  "aggregate-only history uses the same classification when event details are unavailable");
+assert.equal(buildExternalApiUsageStats([], { available: true, rows: [] }).failure, 0);
+console.log("Admin API failure totals passed: primary failures, other errors, historical totals and unavailable details.");

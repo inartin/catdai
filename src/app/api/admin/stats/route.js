@@ -518,7 +518,8 @@ function buildExternalApiUsageStats(rows, events) {
   return {
     total: Object.values(byService).reduce((sum, item) => sum + item.total, 0),
     success: Object.values(byService).reduce((sum, item) => sum + item.success, 0),
-    failure: Object.values(byService).reduce((sum, item) => sum + item.failure, 0),
+    failure: byService.cadastru_address.failure + byService.cadastru_number.failure,
+    otherFailure: byService.cadastru_nearby.failure + byService["999_listing"].failure,
     byService,
     recent: rows.slice(0, 60),
     detailsAvailable: events.available,

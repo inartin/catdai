@@ -20,6 +20,7 @@ const PAGE_MARGIN_TOP = 42;
 const PAGE_MARGIN_BOTTOM = 42;
 const CONTENT_WIDTH = PDF_CANVAS_WIDTH - PAGE_MARGIN_X * 2;
 const DEMO_PDF_URL = "/samples/demo-evaluare-catdai.md.pdf";
+const PDF_PURCHASE_OFFER = { product_key: "pdf_report_single" };
 const COLORS = {
   text: "#111827",
   muted: "#6b7280",
@@ -279,7 +280,7 @@ async function authorizePdfGeneration(accessToken, reportKey) {
   if (res.status === 402 && payload?.error === "feature_credit_required") {
     return { authorized: false, reason: "credit", purchase: payload.purchase || null };
   }
-  if (!res.ok) {
+  if (!res.ok || payload?.ok !== true) {
     throw new Error(`PDF authorization failed with ${res.status}`);
   }
 
@@ -715,7 +716,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
   const [options, setOptions] = useState(() => createInitialOptions(data));
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState("");
-  const [purchaseOffer, setPurchaseOffer] = useState(null);
+  const [purchaseOffer, setPurchaseOffer] = useState(PDF_PURCHASE_OFFER);
   const [showCadastralInput, setShowCadastralInput] = useState(false);
   const [cadastralInput, setCadastralInput] = useState("");
   const [cadastralLoading, setCadastralLoading] = useState(false);
@@ -732,7 +733,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
     if (!open) return;
     setOptions(createInitialOptions(data));
     setError("");
-    setPurchaseOffer(null);
+    setPurchaseOffer(PDF_PURCHASE_OFFER);
     setShowCadastralInput(false);
     setCadastralInput("");
     setCadastralLoading(false);
@@ -837,7 +838,6 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
     if (isGenerating) return;
     setIsGenerating(true);
     setError("");
-    setPurchaseOffer(null);
 
     try {
       const authorization = await authorizePdfGeneration(
@@ -850,7 +850,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
         return;
       }
       if (!authorization.authorized && authorization.reason === "credit") {
-        setPurchaseOffer(authorization.purchase || { product_key: "extra_pack" });
+        setPurchaseOffer(authorization.purchase || { product_key: "pdf_report_single" });
         return;
       }
 
@@ -885,7 +885,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
         role="dialog"
         aria-modal="true"
         aria-labelledby="valuation-pdf-title"
-        className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -913,6 +913,13 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
           >
             <CloseIcon size={18} />
           </button>
+        </div>
+
+        <div className="mb-5">
+          <FeaturePricingAction offer={purchaseOffer} trackPopupOpen />
+          <p className="mt-3 text-sm leading-5 text-gray-500">
+            {t("result.pdfAccessNote")}
+          </p>
         </div>
 
         <div className="space-y-2.5">
@@ -962,9 +969,6 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
           <p className="mt-4 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-600">
             {error}
           </p>
-        )}
-        {purchaseOffer && (
-          <FeaturePricingAction offer={purchaseOffer} className="mt-4" trackPopupOpen />
         )}
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">

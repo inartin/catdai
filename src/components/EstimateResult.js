@@ -16,7 +16,6 @@ import InfoCallout from "@/components/InfoCallout";
 const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
 const LISTING_FAIR_BAND_PCT = 3;
 const LockedTooltipContext = createContext("payment.buyAccess");
-const EXTRA_PACKAGE_OFFER = { product_key: "extra_pack" };
 
 function rememberPdfLoginReturn() {
   if (typeof window === "undefined") return;
@@ -1751,8 +1750,12 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const isPaid = data.full_access === true || data.access_tier === "paid";
   const freeMonthlyLimitReached = data.access_limit?.reason === "free_monthly_limit_reached";
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
-  const purchaseOffer = !isPaid ? data.access_limit?.purchase : null;
-  const authModalPurchaseOffer = purchaseOffer || (!isPaid ? EXTRA_PACKAGE_OFFER : null);
+  const purchaseOffer = !isPaid ? data.access_limit?.purchase || {
+    product_key: data.locked_sections?.rent_yield_calculation === true
+      ? "yield_calculator_single"
+      : "rent_estimate_single",
+  } : null;
+  const authModalPurchaseOffer = purchaseOffer;
   const paidFeatureCreditRequired = !!purchaseOffer && !freeMonthlyLimitReached && !paidEvaluationLimitReached;
   const lockedSections = data.locked_sections || {};
   const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
@@ -2099,12 +2102,14 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const paidEvaluationLimitReached = data.access_limit?.reason === "paid_evaluation_limit_reached";
   const listingAnalysisLocked = data.access_limit?.feature_key === "listing_analysis";
   const listingAnalysisRequiresLogin = listingAnalysisLocked && data.access_limit?.reason === "unauthorized";
-  const purchaseOffer = (freeMonthlyLimitReached || paidEvaluationLimitReached || listingAnalysisLocked) ? data.access_limit?.purchase : null;
+  const purchaseOffer = !isPaid ? data.access_limit?.purchase || {
+    product_key: listingAnalysisLocked ? "listing_analysis_single" : "sale_estimate_single",
+  } : null;
   const cadastralLockedPreview = cadastral?.locked_sections?.cadastru_details === true;
   const cadastralPurchaseOffer = cadastral?.access_limit?.purchase || null;
   const authModalPurchaseOffer = authModalCopyKey === "payment.buyAccess" && cadastralPurchaseOffer
     ? cadastralPurchaseOffer
-    : purchaseOffer || (!isPaid ? EXTRA_PACKAGE_OFFER : null);
+    : purchaseOffer;
   const lockedSections = data.locked_sections || {};
   const hideMarketEstimate = !isPaid && lockedSections.market_estimate === true;
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;

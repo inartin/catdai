@@ -240,9 +240,11 @@ export async function POST(request) {
     const expectedRoadType = roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : "strada";
     const offered = error.addressSuggestions || error.address_suggestions;
     const suggestions = (Array.isArray(offered) ? offered : []).filter((value) =>
-      value?.city === city && value.road_type === expectedRoadType && value.street === resolution.street &&
+      value && value.road_type === expectedRoadType && value.street === resolution.street &&
       typeof value.house_number === "string" && value.house_number.length <= HOUSE_NUMBER_MAX_LENGTH &&
-      HOUSE_NUMBER_PATTERN.test(value.house_number) && value.house_number.startsWith(`${houseNumber}/`) &&
+      HOUSE_NUMBER_PATTERN.test(value.house_number) &&
+      ((value.city === city && value.house_number.startsWith(`${houseNumber}/`)) ||
+        (city === "Chișinău" && value.city !== city && CADASTRU_SUPPORTED_CITIES.includes(value.city) && value.house_number === houseNumber)) &&
       (apartmentNumber ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number) &&
         Number(value.apartment_number) === Number(apartmentNumber) : !value.apartment_number)
     ).slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) =>

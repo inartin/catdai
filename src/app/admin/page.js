@@ -218,6 +218,7 @@ function fmtExternalApiService(service, endpoint = "") {
 
 function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedExternalApiEventId,
   deletingExternalApiEventId, deleteExternalApiLogs }) {
+  const canDelete = Boolean(deleteExternalApiLogs);
   return (
     <table className="w-full min-w-[80rem] table-fixed text-sm">
       <colgroup>
@@ -229,7 +230,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
         <col />
         <col className="w-52" />
         <col className="w-36" />
-        <col className="w-24" />
+        {canDelete && <col className="w-24" />}
       </colgroup>
       <thead>
         <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
@@ -241,7 +242,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
           <th className="px-4 py-3">Result</th>
           <th className="px-4 py-3">Suggestion recovery</th>
           <th className="px-4 py-3">User</th>
-          <th className="px-4 py-3 text-right">Actions</th>
+          {canDelete && <th className="px-4 py-3 text-right">Actions</th>}
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100">
@@ -303,7 +304,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                 <td className="px-4 py-3 text-gray-600 break-all">
                   {row.user_name || "Anonymous"}
                 </td>
-                <td className="px-4 py-3 text-right">
+                {canDelete && <td className="px-4 py-3 text-right">
                   <button
                     type="button"
                     aria-label={`Delete API log ${row.id}`}
@@ -317,11 +318,11 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                   >
                     {deletingExternalApiEventId === row.id ? "Deleting..." : "Delete"}
                   </button>
-                </td>
+                </td>}
               </tr>
               {expanded && (
                 <tr>
-                  <td colSpan={9} className="bg-gray-50 px-4 py-4">
+                  <td colSpan={canDelete ? 9 : 8} className="bg-gray-50 px-4 py-4">
                     <div className="grid min-w-0 gap-4 [overflow-wrap:anywhere] lg:grid-cols-2">
                       <div className="min-w-0 space-y-3">
                         <div>
@@ -492,14 +493,81 @@ function StatCard({ label, value, detail, onClick, active = false }) {
   );
 }
 
-function CadastruSearchTable({ rows, onDelete, deletingId, userName, expanded = false }) {
+function CadastruSearchDetails({ row, userName }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
+  const [expandedEventId, setExpandedEventId] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/admin/cadastru-searches/${row.id}`, { signal: controller.signal })
+      .then(async (res) => {
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
+        return result;
+      })
+      .then((result) => { if (!controller.signal.aborted) setData(result); })
+      .catch((err) => { if (!controller.signal.aborted) setError(err.message || "Failed to load search details"); });
+    return () => controller.abort();
+  }, [row.id, attempt]);
+
+  if (error) return (
+    <div role="alert" className="p-4 text-sm text-red-600">
+      {error}
+      <button type="button" onClick={() => { setError(null); setAttempt((value) => value + 1); }} className="ml-3 cursor-pointer text-primary hover:underline">Retry</button>
+    </div>
+  );
+  if (!data) return <p role="status" className="p-4 text-sm text-gray-500">Loading search details...</p>;
+
+  const search = data.search;
+  const request = fmtExternalApiPayload(search.search_request
+    || (search.search_type === "number" ? { cadastral_number: search.cadastral_number } : { address: search.search_address }));
+  return (
+    <div className="min-w-0 space-y-4 p-4">
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+        <div className="min-w-0 space-y-2 text-sm text-gray-700 [overflow-wrap:anywhere]">
+          <h4 className="font-semibold text-gray-900">Search details</h4>
+          <p>Result type: {search.result_type || "Not recorded"}</p>
+          <p>Returned value: {search.result_value || "Not recorded"}</p>
+          <p>Lookup source: {search.lookup_source === "api" ? "External API" : search.lookup_source === "local" ? "Local fallback" : "Not recorded"}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Saved search request</p>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-gray-900 p-3 text-xs text-gray-100">{request}</pre>
+        </div>
+      </div>
+      <div>
+        <h4 className="font-semibold text-gray-900">External API calls · {fmtNum(data.events.length)}</h4>
+        <p className="mt-1 text-xs text-gray-500">Recorded worker responses. Cached results, local fallbacks and access masking can change what was displayed; the exact page shown to the user was not saved.</p>
+        {data.match === "inferred" && <p className="mt-1 text-xs text-amber-700">Older logs matched by the full search query and time.</p>}
+      </div>
+      {data.events.length ? (
+        <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+          <ExternalApiEventTable
+            rows={data.events.map((event) => ({ ...event, user_name: event.user_id ? row.user_name || userName || event.user_id : null }))}
+            expandedExternalApiEventId={expandedEventId}
+            setExpandedExternalApiEventId={setExpandedEventId}
+          />
+        </div>
+      ) : <p className="text-sm text-gray-500">No confidently linked worker logs found. Cached searches create no new worker logs; older or deleted logs may be unavailable.</p>}
+    </div>
+  );
+}
+
+function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
+  const [expandedSearchId, setExpandedSearchId] = useState(null);
   if (!rows?.length) {
     return <div className="px-5 py-8 text-center text-gray-400">No cadastru searches found</div>;
   }
 
   return (
-    <div className={expanded ? "overflow-x-auto" : "overflow-x-auto max-h-96 overflow-y-auto"}>
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[64rem] table-fixed text-sm">
+        <colgroup>
+          <col className="w-52" /><col className="w-24" /><col className="w-28" /><col />
+          <col className="w-24" /><col className="w-28" /><col className="w-36" /><col className="w-24" />
+        </colgroup>
         <thead className="sticky top-0">
           <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
             <th className="px-4 py-3">Date</th>
@@ -513,49 +581,69 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName, expanded = 
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-gray-50">
-              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                {fmtDateTime(row.created_at)}
-              </td>
-              <td className="px-4 py-3 text-gray-900 font-medium">
-                {fmtCadastruSearchType(row.search_type)}
-              </td>
-              <td className="px-4 py-3">
-                {row.result_type ? (
-                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "no_data"
-                    ? "bg-gray-100 text-gray-600"
-                    : "bg-green-50 text-green-700"}`}>
-                    {row.result_type === "no_data" ? "No result" : "Success"}
-                  </span>
-                ) : "\u2014"}
-              </td>
-              <td className="max-w-xs break-words px-4 py-3 text-gray-600">
-                {row.search_type === "address"
-                  ? row.search_address || row.cadastral_number || "\u2014"
-                  : row.cadastral_number || "\u2014"}
-              </td>
-              <td className="px-4 py-3 text-gray-600">
-                {row.district || "\u2014"}
-              </td>
-              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                {row.valuation_completed_at ? "Completed" : row.valuation_clicked_at ? "Started" : "\u2014"}
-              </td>
-              <td className="px-4 py-3 text-gray-600 break-all">
-                {row.user_name || userName || "Anonymous"}
-              </td>
-              <td className="px-4 py-3 text-right">
-                <button
-                  type="button"
-                  onClick={() => onDelete(row)}
-                  disabled={deletingId === row.id}
-                  className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-default disabled:text-red-300"
-                >
-                  {deletingId === row.id ? "Deleting..." : "Delete"}
-                </button>
-              </td>
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const isExpanded = expandedSearchId === row.id;
+            const toggleExpanded = () => setExpandedSearchId(isExpanded ? null : row.id);
+            return (
+              <Fragment key={row.id}>
+                <tr role="button" tabIndex={0} aria-expanded={isExpanded} onClick={toggleExpanded}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      toggleExpanded();
+                    }
+                  }}
+                  className={`cursor-pointer ${isExpanded ? "bg-sky-50 hover:bg-sky-50" : "hover:bg-gray-50"}`}>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                    <span aria-hidden="true" className={`mr-2 ${isExpanded ? "text-sky-600" : "text-gray-400"}`}>{isExpanded ? "▾" : "▸"}</span>
+                    {fmtDateTime(row.created_at)}
+                  </td>
+                  <td className="px-4 py-3 text-gray-900 font-medium">
+                    {fmtCadastruSearchType(row.search_type)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {row.result_type ? (
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "no_data"
+                        ? "bg-gray-100 text-gray-600"
+                        : "bg-green-50 text-green-700"}`}>
+                        {row.result_type === "no_data" ? "No result" : "Success"}
+                      </span>
+                    ) : "\u2014"}
+                  </td>
+                  <td className="max-w-xs break-words px-4 py-3 text-gray-600">
+                    {row.search_type === "address"
+                      ? row.search_address || row.cadastral_number || "\u2014"
+                      : row.cadastral_number || "\u2014"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {row.district || "\u2014"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                    {row.valuation_completed_at ? "Completed" : row.valuation_clicked_at ? "Started" : "\u2014"}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 break-all">
+                    {row.user_name || userName || "Anonymous"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); onDelete(row); }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      disabled={deletingId === row.id}
+                      className="cursor-pointer rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-default disabled:text-red-300"
+                    >
+                      {deletingId === row.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </td>
+                </tr>
+                {isExpanded && (
+                  <tr><td colSpan={8} className="bg-gray-50">
+                    <CadastruSearchDetails row={row} userName={userName} />
+                  </td></tr>
+                )}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -601,7 +689,7 @@ function UserCadastruSearches({ user, onDelete, deletingId, deleteError }) {
         {deleteError && <p role="alert" className="mt-2 text-xs text-red-500">{deleteError}</p>}
       </div>
       {rows.length > 0 && (
-        <CadastruSearchTable rows={rows} userName={user.name || user.email || user.id} onDelete={onDelete} deletingId={deletingId} expanded />
+        <CadastruSearchTable rows={rows} userName={user.name || user.email || user.id} onDelete={onDelete} deletingId={deletingId} />
       )}
       {error ? (
         <div role="alert" className="px-4 py-3 text-sm text-red-500">

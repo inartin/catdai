@@ -27,7 +27,8 @@ async function loadJsx(file, mocks, globals = {}) {
     jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } } },
     module: { type: "es6" },
   });
-  const context = vm.createContext({ console, crypto, URL, URLSearchParams, AbortController, navigator: { userAgent: "" }, ...globals });
+  const context = vm.createContext({ console, crypto, URL, URLSearchParams, AbortController,
+    setTimeout: () => 1, clearTimeout: noop, navigator: { userAgent: "" }, ...globals });
   const jsxModule = new vm.SourceTextModule(code, { context });
   await jsxModule.link((name) => {
     const exports = mocks[name] || (name.startsWith("@/components/") ? { default: noop } : null);
@@ -75,6 +76,7 @@ const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
   "@/context/LanguageContext": translation,
   "@/context/AuthContext": { useAuth: () => ({ isAuthenticated: Boolean(authSession), loading: false, session: authSession, clearAuthError: noop }) },
   "@/lib/validation": { ...validation, matchCity: () => null },
+  "@/lib/cadastru-supported-cities": { CADASTRU_SUPPORTED_CITIES: ["Chișinău", "Durlești"] },
   "@/lib/cadastru-favorites": { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
   "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null,
     buildFullAccessAddressResultParams: (data, { skipCache }) => new URLSearchParams({ source: "address", cadastral_number: data.cadastral_number,
@@ -336,7 +338,7 @@ for (const locale of ["ro", "ru"]) {
     const tree = render();
     const notice = findNode(tree, (node) => node.type === "p" && node.props.children === t("cadastru.otherDataAvailable"));
     assert.equal(Boolean(notice), scenario.continues, JSON.stringify(scenario));
-    if (scenario.continues) assert(findNode(tree, (node) => node.type === "p" && node.props.children === t("cadastru.serviceUnavailable")), "cadastral error stays visible");
+    if (scenario.continues) assert(findNode(tree, (node) => node.type === "p" && node.props.children === t("cadastru.retrying")), "controlled retry is visible while secondary data loads");
     paint();
     paint();
     assert.equal(requests.has("/api/cadastru/nearby"), scenario.continues);

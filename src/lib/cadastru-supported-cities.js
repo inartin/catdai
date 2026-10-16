@@ -20,6 +20,7 @@ export const CADASTRU_SUPPORTED_CITIES = [
   "Cruzești",
   "Dobrogea",
   "Dumbrava",
+  "Durlești",
   "Făurești",
   "Frumușica",
   "Ghidighici",

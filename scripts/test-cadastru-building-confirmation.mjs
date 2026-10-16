@@ -57,7 +57,7 @@ async function harness(file, path, stored = {}, lang = 'ro') {
     '@/lib/cadastru-valuation-handoff': { resolveValuationDistrict: () => null,
       buildFullAccessAddressResultParams: (data) => new URLSearchParams({ source: 'address', cadastral_number: data.cadastral_number }) },
     '@/lib/cadastru-municipal-reports': { municipalReportsAvailableForCadastru: () => false, validMunicipalReportsResult: () => false },
-    '@/lib/cadastru-supported-cities': { CADASTRU_SUPPORTED_CITIES: ['Chișinău'] },
+    '@/lib/cadastru-supported-cities': { CADASTRU_SUPPORTED_CITIES: ['Chișinău', 'Durlești', 'Codru', 'Bălți'] },
     './loading': { default: noop },
   };
   const context = vm.createContext({ URL, URLSearchParams, crypto, console, window: browser, navigator: { userAgent: "" },
@@ -142,3 +142,42 @@ assert(russianText.includes('Не удалось точно определить
 assert(russianText.includes('Найден дом 6/2 на улице Kiev.'));
 assert(!russianText.includes('undefined') && !russianText.includes('{house}'));
 console.log('RO/RU building confirmation translations passed.');
+
+// Locality corrections retain the complete address until the user explicitly selects a city.
+for (const lang of ['ro', 'ru']) {
+  const input = { city: 'Chișinău', road_type: 'strada', street: 'Cartușa', house_number: '95/4', skip_cache: true };
+  const singlePage = await harness(pageFile, `/${lang}/cadastru/rezultat?source=address&lookup=1`,
+    { [addressKey]: JSON.stringify(input) }, lang);
+  singlePage.render();
+  await singlePage.finish({ error: 'address_confirmation_required', address_suggestions: [{ ...input, city: 'Durlești' }] }, 422);
+  const singleText = textOf(singlePage.render());
+  assert(singleText.includes(lang === 'ro' ? 'Am găsit aceeași adresă în Durlești.' : 'Такой же адрес найден в Durlești.'));
+  assert(singleText.includes(lang === 'ro' ? 'Este aceasta adresa dorită?' : 'Это нужный вам адрес?'));
+  assert(!singleText.includes(lang === 'ro' ? 'Am găsit imobilul de pe' : 'Найден дом'));
+  assert(!singleText.includes('{localities}'));
+  const localityPage = await harness(pageFile, `/${lang}/cadastru/rezultat?source=address&lookup=1&skipcache=true`,
+    { [addressKey]: JSON.stringify(input) }, lang);
+  localityPage.render();
+  await localityPage.finish({ error: 'address_confirmation_required', suggestion_recovery_token: 'locality-recovery', address_suggestions: [
+    { ...input, city: 'Durlești' }, { ...input, city: 'Codru' },
+    { ...input, city: 'Unknown' }, { ...input, city: 'Durlești', house_number: '95/5' },
+    { ...input, city: 'Durlești', road_type: 'bulevard' }, { ...input, city: 'Durlești', apartment_number: '7' },
+  ] }, 422);
+  const localityTree = localityPage.render();
+  const localityButtons = walk(localityTree).filter((node) => node.type === 'button' && node.props.className?.includes('border-sky-200'));
+  assert.equal(localityButtons.length, 2);
+  assert(textOf(localityTree).includes(lang === 'ro' ? 'Am găsit aceeași adresă în Durlești, Codru.' : 'Такой же адрес найден в Durlești, Codru.'));
+  assert(textOf(localityButtons[0]).includes('Durlești, Cartușa 95/4'));
+  assert(textOf(localityButtons[1]).includes('Codru, Cartușa 95/4'));
+  assert.equal(localityPage.requests.length, 1, 'no speculative retry or secondary data before selection');
+  assert.equal(JSON.parse(localityPage.storage.get(addressKey)).city, 'Chișinău');
+  localityButtons[0].props.onClick(); localityPage.render();
+  assert.equal(localityPage.requests.at(-1).body.city, 'Durlești');
+  assert.equal(localityPage.requests.at(-1).body.street, 'Cartușa');
+  assert.equal(localityPage.requests.at(-1).body.house_number, '95/4');
+  assert.equal(localityPage.requests.at(-1).body.skip_cache, true);
+  assert.equal(localityPage.requests.at(-1).body.suggestion_recovery_token, 'locality-recovery');
+  await localityPage.finish({ error: 'not_found' }, 404);
+  assert(!walk(localityPage.render()).some((node) => node.type === 'button' && node.props.className?.includes('border-sky-200')));
+}
+console.log('RO/RU locality confirmation passed: full addresses, distinct city choices, exact house, explicit city retry, skip-cache, recovery and stale-choice cleanup.');

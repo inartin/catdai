@@ -10,6 +10,7 @@ const { transform, loadBindings } = require('next/dist/build/swc');
 await loadBindings();
 const jsx = (type, props) => ({ type, props });
 const noop = () => null;
+const t = (key) => key;
 const walk = (node) => Array.isArray(node) ? node.flatMap(walk)
   : node && typeof node === 'object' ? [node, ...walk(node.props?.children)] : [];
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -19,9 +20,11 @@ const number = '0100104.003.01';
 const result = { lands: [{ cadastral_number: '0100104.003' }], request_address: 'Chișinău, str Valea Trandafirilor 11' };
 
 async function harness(file, path, stored = {}) {
-  let slots = [], cursor = 0, effects = [], authSession = null;
+  let slots = [], cursor = 0, effects = [], authSession = null, clearAuthError = noop;
   const storage = new Map(Object.entries(stored));
   const requests = [], navigations = [];
+  const timers = new Map();
+  let nextTimer = 0;
   const browser = { location: { href: `https://catdai.md${path}` }, history: { state: { retained: true } } };
   browser.history.replaceState = (state, _, url) => {
     browser.history.state = state;
@@ -46,9 +49,9 @@ async function harness(file, path, stored = {}) {
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'next/navigation': { useRouter: () => router, useSearchParams: () => new URL(browser.location.href).searchParams },
-    '@/context/LanguageContext': { useTranslation: () => ({ lang: 'ro', t: (key) => key }) },
+    '@/context/LanguageContext': { useTranslation: () => ({ lang: 'ro', t }) },
     '@/context/AuthContext': { useAuth: () => ({ isAuthenticated: Boolean(authSession), loading: false,
-      session: authSession, clearAuthError: noop }) },
+      session: authSession, clearAuthError }) },
     '@/lib/validation': { matchCity: () => null, validateCadastralNumber: (value) => ({ valid: value === number }) },
     '@/lib/cadastru-favorites': { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
     '@/lib/cadastru-valuation-handoff': { resolveValuationDistrict: () => null,
@@ -57,12 +60,15 @@ async function harness(file, path, stored = {}) {
     '@/lib/cadastru-supported-cities': { CADASTRU_SUPPORTED_CITIES: ['Chișinău'] },
     './loading': { default: noop },
   };
-  const context = vm.createContext({ URL, URLSearchParams, crypto, console, window: browser,
+  const context = vm.createContext({ URL, URLSearchParams, crypto, console, AbortController,
+    navigator: { userAgent: '', platform: '', maxTouchPoints: 0 }, window: browser,
     localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
     sessionStorage: { getItem: (key) => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
     requestAnimationFrame: () => 1, cancelAnimationFrame: noop,
-    fetch: (url, options) => new Promise((resolve) => requests.push({ url, body: JSON.parse(options.body), options, resolve })),
+    setTimeout: (callback, delay) => { const id = ++nextTimer; timers.set(id, { callback, delay }); return id; },
+    clearTimeout: (id) => timers.delete(id),
+    fetch: (url, options) => new Promise((resolve, reject) => requests.push({ url, body: JSON.parse(options.body), options, resolve, reject })),
   });
   const { code } = await transform(await fs.readFile(file, 'utf8'), {
     filename: file, jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'automatic' } } },
@@ -81,8 +87,16 @@ async function harness(file, path, stored = {}) {
   });
   await pageModule.evaluate();
   return {
-    requests, storage, browser, navigations,
-    login(token = 'signed-in') { authSession = { access_token: token }; },
+    requests, storage, browser, navigations, navigate, timers,
+    runRetryTimer() {
+      assert.equal(timers.size, 1, 'exactly one retry is scheduled');
+      const [id, timer] = [...timers][0];
+      assert.equal(timer.delay, 2000, 'retry waits two seconds');
+      timers.delete(id); timer.callback();
+    },
+    unmount() { slots.forEach((slot) => slot?.cleanup?.()); },
+    login(token = 'signed-in', userId = 'user-1') { authSession = { access_token: token, user: { id: userId } }; },
+    notifyAuth() { authSession = authSession && { ...authSession }; clearAuthError = () => null; },
     remount() { slots.forEach((slot) => slot?.cleanup?.()); slots = []; },
     restartEffects() { slots.filter((slot) => slot?.effect).forEach((slot) => { slot.cleanup?.(); slot.cleanup = slot.effect(); }); },
     render() {
@@ -96,6 +110,7 @@ async function harness(file, path, stored = {}) {
       requests.at(-1).resolve({ ok: status < 400, status, json: async () => data });
       await flush();
     },
+    async failNetwork() { requests.at(-1).reject(new TypeError('Failed to fetch')); await flush(); },
   };
 }
 
@@ -149,17 +164,115 @@ numberPage.remount(); numberPage.render();
 assert.equal(numberPage.requests.at(-1).body.lookup_id, numberId);
 await numberPage.finish({ cadastral_number: number });
 
+// A completed failure belongs to this search, including after auth notifications.
+for (const type of ['number', 'address']) {
+  const lookupId = crypto.randomUUID();
+  const path = type === 'number'
+    ? `/ro/cadastru/rezultat?source=number&cadastral_number=${number}&lookup_id=${lookupId}`
+    : `/ro/cadastru/rezultat?source=address&lookup=1&lookup_id=${lookupId}`;
+  const stored = type === 'address' ? { [addressKey]: JSON.stringify({ ...address, lookup_id: lookupId }) } : {};
+  const failed = await harness(pageFile, path, stored);
+  failed.login(); failed.render();
+  await failed.finish({ error: 'service_unavailable' }, 503);
+  failed.notifyAuth(); failed.render();
+  assert.equal(failed.requests.length, 1, `${type}: auth notification does not retry a failed lookup`);
+  failed.login('refreshed'); failed.render();
+  assert.equal(failed.requests.length, 1, `${type}: token refresh does not retry a failed lookup`);
+
+  // A deliberate new submission still runs, and token refresh shares pending work.
+  failed.navigate(path.replace(lookupId, crypto.randomUUID()));
+  if (type === 'address') failed.storage.set(addressKey, JSON.stringify({ ...address,
+    lookup_id: new URL(failed.browser.location.href).searchParams.get('lookup_id') }));
+  failed.render();
+  assert.equal(failed.requests.length, 2, `${type}: new search ID starts a lookup`);
+  failed.login('refreshed-during-request'); failed.render();
+  assert.equal(failed.requests.length, 2, `${type}: token refresh shares an in-flight lookup`);
+  await failed.failNetwork();
+  failed.notifyAuth(); failed.render();
+  assert.equal(failed.requests.length, 2, `${type}: network errors do not retry on auth notifications`);
+  failed.login('different-user', 'user-2'); failed.render();
+  assert.equal(failed.requests.length, 3, `${type}: switching authenticated users fetches their result`);
+  await failed.finish({ error: 'service_unavailable' }, 503);
+
+  const anonymous = await harness(pageFile, path, stored);
+  anonymous.render();
+  await anonymous.finish({ error: 'service_unavailable' }, 503);
+  anonymous.login(); anonymous.render();
+  assert.equal(anonymous.requests.length, 2, `${type}: login after an anonymous failure still fetches authorized data`);
+  await anonymous.finish();
+}
+
+// Recovery is deliberate and bounded, and success must reach the displayed card.
+for (const type of ['number', 'address']) {
+  const lookupId = crypto.randomUUID();
+  const path = type === 'number'
+    ? `/ro/cadastru/rezultat?source=number&cadastral_number=${number}&lookup_id=${lookupId}`
+    : `/ro/cadastru/rezultat?source=address&lookup=1&lookup_id=${lookupId}`;
+  const stored = type === 'address' ? { [addressKey]: JSON.stringify({ ...address, lookup_id: lookupId }) } : {};
+  const success = type === 'number' ? { cadastral_number: number } : result;
+  const recover = await harness(pageFile, path, stored);
+  recover.login(); recover.render();
+  await recover.finish({ error: 'service_unavailable' }, 503);
+  let tree = recover.render();
+  assert(walk(tree).some((node) => node.props?.children === 'cadastru.retrying'), `${type}: retrying is visible`);
+  recover.notifyAuth(); recover.render();
+  assert.equal(recover.requests.length, 1);
+  recover.runRetryTimer(); recover.render();
+  assert.equal(recover.requests.length, 2);
+  assert.deepEqual(recover.requests[1].body, recover.requests[0].body, `${type}: retry preserves query and grouping`);
+  recover.login('refreshed'); recover.render();
+  assert.equal(recover.requests.length, 2, `${type}: auth refresh cannot duplicate the retry`);
+  await recover.finish(success);
+  tree = recover.render();
+  assert(walk(tree).some((node) => node.props?.cadastral === success), `${type}: successful retry displays the result`);
+  assert(!walk(tree).some((node) => node.props?.children === 'cadastru.retrying'));
+  assert.equal(recover.timers.size, 0);
+
+  const exhausted = await harness(pageFile, path, stored);
+  exhausted.render(); await exhausted.failNetwork(); exhausted.render();
+  exhausted.runRetryTimer(); exhausted.render();
+  await exhausted.finish({ error: 'service_unavailable' }, 503);
+  tree = exhausted.render();
+  assert.equal(exhausted.timers.size, 0, `${type}: no third automatic attempt`);
+  const retryButton = walk(tree).find((node) => node.type === 'button' && node.props.children === 'cadastru.retrySearch');
+  assert(retryButton, `${type}: exhausted retry offers a manual action`);
+  exhausted.notifyAuth(); exhausted.render();
+  assert.equal(exhausted.requests.length, 2);
+  retryButton.props.onClick(); exhausted.render();
+  assert.equal(exhausted.requests.length, 3);
+  assert.equal(exhausted.requests[2].body.lookup_id, lookupId);
+  await exhausted.finish(success);
+  assert(walk(exhausted.render()).some((node) => node.props?.cadastral === success), `${type}: manual retry displays success`);
+
+  for (const status of [400, 401, 403, 404, 422, 429]) {
+    const rejected = await harness(pageFile, path, stored);
+    rejected.render(); await rejected.finish({ error: 'not_found' }, status);
+    tree = rejected.render();
+    assert.equal(rejected.timers.size, 0, `${type}: HTTP ${status} does not retry automatically`);
+    assert(!walk(tree).some((node) => node.props?.children === 'cadastru.retrySearch'));
+  }
+  for (const status of [408, 504]) {
+    const timeout = await harness(pageFile, path, stored);
+    timeout.render(); await timeout.finish({ error: 'timeout' }, status); timeout.render();
+    assert.equal(timeout.timers.size, 1, `${type}: HTTP ${status} schedules recovery`);
+    timeout.unmount();
+    assert.equal(timeout.timers.size, 0, `${type}: leaving the page cancels the scheduled retry`);
+  }
+}
+
 // Real form handlers: two intentional submissions of identical input get new IDs.
 const form = await harness('src/components/CadastruSearchForm.js', '/ro/cadastru');
 const submit = (label) => walk(form.render()).find((node) => node.type === 'button' && node.props.children === label).props.onClick();
+const enterNumber = () => walk(form.render()).find((node) => node.type === 'input'
+  && node.props.placeholder === 'form.cadastralPlaceholder').props.onChange({ target: { value: number } });
 submit('cadastru.searchButton');
 const first = new URL(form.browser.location.href).searchParams.get('lookup_id');
 assert.equal(JSON.parse(form.storage.get(addressKey)).lookup_id, first);
 form.remount(); submit('cadastru.searchButton');
 assert.notEqual(new URL(form.browser.location.href).searchParams.get('lookup_id'), first);
-form.remount(); submit('cadastru.numberSearchButton');
+form.remount(); enterNumber(); submit('cadastru.numberSearchButton');
 const numberFirst = new URL(form.browser.location.href).searchParams.get('lookup_id');
 assert(!form.storage.has(addressKey), 'number submission clears stale address request');
-form.remount(); submit('cadastru.numberSearchButton');
+form.remount(); enterNumber(); submit('cadastru.numberSearchButton');
 assert.notEqual(new URL(form.browser.location.href).searchParams.get('lookup_id'), numberFirst);
-console.log('Search identity passed: real form submissions, OAuth reload, effect restarts, token refresh, remounts, explicit corrections and address-to-number handoff.');
+console.log('Search identity passed: submissions, OAuth reload, effect restarts, failure and in-flight token refresh, user changes, remounts, explicit corrections and address-to-number handoff.');

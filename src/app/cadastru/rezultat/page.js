@@ -17,6 +17,7 @@ import FeaturePricingAction from "@/components/FeaturePricingAction";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { matchCity, validateCadastralNumber } from "@/lib/validation";
+import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
 import { buildFullAccessAddressResultParams, resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
 import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
@@ -51,6 +52,11 @@ function readLookupError(payload, t) {
 function isLookupUnavailable(response) {
   return response.status === 408 || response.status >= 500 ||
     ["service_unavailable", "timeout", "external_cadastru_timeout", "external_cadastru_unreachable"].includes(response.data?.error);
+}
+
+function lookupRetryState(response, key, attempt) {
+  const retry = response.status === 408 || response.status >= 500 ? { key, attempt } : null;
+  return { retry, retrying: Boolean(retry && attempt === 0) };
 }
 
 function formatLookupAddress(address) {
@@ -465,6 +471,7 @@ function CadastruResultContent() {
   );
   const isPendingAddressLookup = source === "address" && searchParams.get("lookup") === "1";
   const [retryRequest, setRetryRequest] = useState(null);
+  const [lookupRetry, setLookupRetry] = useState(null);
   const pendingAddressRequest = (!cadastralNumber ? retryRequest : null) || (isPendingAddressLookup ? readAddressLookupRequest() : null);
   const addressRequestKey = pendingAddressRequest ? JSON.stringify(pendingAddressRequest) : "";
   const savedAddress = (!cadastralNumber ? retryRequest : null) || getSavedCadastruAddress(searchParams);
@@ -625,6 +632,7 @@ function CadastruResultContent() {
       ...address,
       lookup_id: crypto.randomUUID(),
       ...(typeof suggestion === "string" ? { street: suggestion } : {}),
+      ...(correction?.city ? { city: correction.city } : {}),
       ...(correction?.street ? { street: correction.street } : {}),
       ...(correction?.house_number ? { house_number: correction.house_number } : {}),
       ...(correction?.road_type ? { road_type: correction.road_type } : {}),
@@ -658,18 +666,20 @@ function CadastruResultContent() {
 
     if (isAddressPreviewHandoff || isPendingAddressLookup || savedAddressKey) {
       const lookupId = ensureCadastruLookupId(pendingRequest?.lookup_id || searchLookupId || lookupTracking.current?.id);
-      const accessMode = session?.access_token ? "authenticated" : "anonymous";
+      const accessMode = session?.user?.id || (session?.access_token ? "authenticated" : "anonymous");
       const requestKey = `address-preview|${lookupId}|${savedAddressKey}|${addressRequestKey}|${accessMode}|${skipCache ? "skipcache" : "cache"}|${isHistoryAddress ? "history" : "search"}`;
-      if (loadedRequestKey.current === requestKey) return;
+      const attempt = lookupRetry?.key === requestKey ? lookupRetry.attempt : 0;
+      const attemptKey = `${requestKey}|${attempt}`;
+      if (loadedRequestKey.current === attemptKey) return;
 
       const preview = savedAddressKey ? null : readAddressResultPreview();
       if (isAddressResultHandoff && preview) {
-        loadedRequestKey.current = requestKey;
+        loadedRequestKey.current = attemptKey;
         setState({ loading: false, error: "", data: preview });
         return;
       }
       if (!isAuthenticated && !savedAddressKey && !isPendingAddressLookup) {
-        loadedRequestKey.current = requestKey;
+        loadedRequestKey.current = attemptKey;
         setState({
           loading: false,
           error: preview ? "" : t("cadastru.lookupError"),
@@ -682,7 +692,7 @@ function CadastruResultContent() {
         ? { ...getSavedCadastruAddress(new URLSearchParams(savedAddressKey)), ...(isHistoryAddress ? {} : { search_context: "cadastru" }) }
         : readAddressLookupRequest());
       if (!addressRequest) {
-        loadedRequestKey.current = requestKey;
+        loadedRequestKey.current = attemptKey;
         setState({
           loading: false,
           error: preview ? "" : t("cadastru.lookupError"),
@@ -693,11 +703,13 @@ function CadastruResultContent() {
 
       let active = true;
       async function loadAddressData() {
-        setState({ loading: true, error: "", data: null });
+        setState((current) => attempt > 0
+          ? { ...current, retry: null, retrying: true }
+          : { loading: true, error: "", data: null });
         try {
           const body = { ...addressRequest, ...(skipCache ? { skip_cache: true } : {}) };
           const lookup = fetchAddressLookup(
-            `${requestKey}|${JSON.stringify(body)}|${session?.access_token || "anonymous"}`,
+            `${attemptKey}|${JSON.stringify(body)}`,
             body,
             session?.access_token,
             { id: lookupId, query: [formatLookupAddress(body), body.apartment_number ? `ap. ${body.apartment_number}` : ""].filter(Boolean).join(", ") }
@@ -707,10 +719,26 @@ function CadastruResultContent() {
           const response = await lookup;
           if (!response.ok) {
             if (!active) return;
-            loadedRequestKey.current = requestKey;
+            loadedRequestKey.current = attemptKey;
             const failure = response.data;
             const confirmationRequired = response.status === 422 && failure?.error === "address_confirmation_required";
-            const errorMessage = confirmationRequired
+            const addressCorrections = confirmationRequired && Array.isArray(failure.address_suggestions)
+              ? failure.address_suggestions.filter((value) => value && value.road_type === body.road_type
+                && typeof value.street === "string" && value.street.length <= STREET_MAX_LENGTH
+                && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)
+                && ((value.city === body.city && value.house_number.startsWith(`${body.house_number}/`))
+                  || (body.city === "Chișinău" && value.city !== body.city && CADASTRU_SUPPORTED_CITIES.includes(value.city)
+                    && value.house_number === body.house_number))
+                && (body.apartment_number ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
+                  && Number(value.apartment_number) === Number(body.apartment_number) : !value.apartment_number)).slice(0, 3)
+              : failure?.error === "address_fields_conflict" && Array.isArray(failure.corrections)
+              ? failure.corrections.filter((value) => typeof value?.street === "string" && value.street.length <= STREET_MAX_LENGTH
+                && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)) : [];
+            const localityConfirmation = confirmationRequired && addressCorrections.some((value) => value.city !== body.city);
+            const errorMessage = localityConfirmation
+              ? t("cadastru.localityAlternativeIntro", { city: body.city, street: body.street, house: body.house_number,
+                localities: [...new Set(addressCorrections.filter((value) => value.city !== body.city).map((value) => value.city))].join(", ") })
+              : confirmationRequired
               ? t(body.apartment_number ? "cadastru.addressAlternativeIntro" : "cadastru.buildingAlternativeIntro",
                 { street: body.street, house: body.house_number, apartment: body.apartment_number })
               : failure?.error === "address_fields_conflict"
@@ -722,22 +750,15 @@ function CadastruResultContent() {
             setState({
               loading: false,
               data: null,
+              ...lookupRetryState(response, requestKey, attempt),
               fallbackAddress: isLookupUnavailable(response) ? formatLookupAddress(body) : "",
               didYouMean: response.status === 404 && failure?.error === "not_found",
+              requestedCity: body.city,
               requestedStreet: body.street,
               requestedRoad: t(roadTypes.find(({ value }) => value === body.road_type)?.fullLabel),
               suggestionRecoveryToken: failure?.suggestion_recovery_token || null,
               confirmationRequired,
-              addressCorrections: confirmationRequired && Array.isArray(failure.address_suggestions)
-                ? failure.address_suggestions.filter((value) => value?.city === body.city && value.road_type === body.road_type
-                  && typeof value.street === "string" && value.street.length <= STREET_MAX_LENGTH
-                  && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)
-                  && value.house_number.startsWith(`${body.house_number}/`)
-                  && (body.apartment_number ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
-                    && Number(value.apartment_number) === Number(body.apartment_number) : !value.apartment_number)).slice(0, 3)
-                : failure?.error === "address_fields_conflict" && Array.isArray(failure.corrections)
-                ? failure.corrections.filter((value) => typeof value?.street === "string" && value.street.length <= STREET_MAX_LENGTH
-                  && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)) : [],
+              addressCorrections,
               suggestions: (failure?.error === "ambiguous_street" || (response.status === 404 && failure?.error === "not_found")) && Array.isArray(failure.suggestions)
                 ? failure.suggestions.filter((value) => typeof value === "string" && value.length <= STREET_MAX_LENGTH) : [],
               roadTypeSuggestions: (response.status === 404 || response.status === 503) && Array.isArray(failure?.road_type_suggestions)
@@ -752,7 +773,7 @@ function CadastruResultContent() {
             const data = response.data;
             if (isPendingAddressLookup && data?.cadastral_number && !data?.locked_sections?.cadastru_details) {
               addressResultHandoff.current = { data, accessToken: session?.access_token, skipCache };
-              loadedRequestKey.current = requestKey;
+              loadedRequestKey.current = attemptKey;
               setState({ loading: false, error: "", data });
               const resolution = data.street_resolution;
               const params = buildFullAccessAddressResultParams(data, {
@@ -768,12 +789,16 @@ function CadastruResultContent() {
               router.replace(`/${lang}/cadastru/rezultat?${params.toString()}`);
               return;
             }
-            loadedRequestKey.current = requestKey;
+            loadedRequestKey.current = attemptKey;
             setState({ loading: false, error: data ? "" : t("cadastru.lookupError"), data });
           }
         } catch {
-          if (active) setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: null,
-            fallbackAddress: formatLookupAddress(addressRequest) });
+          if (active) {
+            loadedRequestKey.current = attemptKey;
+            setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: null,
+              ...lookupRetryState({ status: 503 }, requestKey, attempt),
+              fallbackAddress: formatLookupAddress(addressRequest) });
+          }
         }
       }
 
@@ -789,10 +814,12 @@ function CadastruResultContent() {
     }
 
     const searchSource = source === "address" || source === "number" ? source : "";
-    const accessMode = session?.access_token ? "authenticated" : "anonymous";
+    const accessMode = session?.user?.id || (session?.access_token ? "authenticated" : "anonymous");
     const lookupId = ensureCadastruLookupId(searchLookupId || lookupTracking.current?.id);
     const requestKey = `${lookupId}|${cadastralNumber}|${searchSource}|${accessMode}|${skipCache ? "skipcache" : "cache"}`;
-    if (loadedRequestKey.current === requestKey) return;
+    const attempt = lookupRetry?.key === requestKey ? lookupRetry.attempt : 0;
+    const attemptKey = `${requestKey}|${attempt}`;
+    if (loadedRequestKey.current === attemptKey) return;
 
     let active = true;
     const handoff = addressResultHandoff.current;
@@ -801,7 +828,9 @@ function CadastruResultContent() {
 
     async function loadCadastralData() {
       // Keep the successful address result visible while number details load.
-      setState({ loading: !addressData, error: "", data: addressData });
+      setState((current) => attempt > 0
+        ? { ...current, retry: null, retrying: true }
+        : { loading: !addressData, error: "", data: addressData });
 
       try {
         const body = {
@@ -811,11 +840,13 @@ function CadastruResultContent() {
           ...(searchSource === "address" ? { preview_origin: "address" } : {}),
         };
 
-        const lookup = fetchCadastralLookup(`${requestKey}|${session?.access_token || "anonymous"}`, body, session?.access_token,
+        const lookup = fetchCadastralLookup(attemptKey, body, session?.access_token,
           { id: lookupId, query: (searchSource === "address" && lookupTracking.current?.query) || cadastralNumber });
         lookupTracking.current = lookup.lookupTracking;
         const response = await lookup;
 
+        // Completed failures are attempts too; auth notifications must not retry them.
+        if (active) loadedRequestKey.current = attemptKey;
         if (!response.ok) {
           if (response.status === 401) {
             clearAuthError();
@@ -823,13 +854,13 @@ function CadastruResultContent() {
             return;
           }
           if (active) setState({ loading: false, error: isLookupUnavailable(response) ? t("cadastru.serviceUnavailable") : readLookupError(response.data, t), data: addressData,
+            ...lookupRetryState(response, requestKey, attempt),
             fallbackAddress: !addressData && source === "address" && isLookupUnavailable(response)
               ? formatLookupAddress(readAddressLookupRequest()) : "" });
           return;
         }
 
         if (active) {
-          loadedRequestKey.current = requestKey;
           setState({ loading: false, error: "", data: addressData && response.data ? {
             ...response.data,
             request_address: response.data.request_address || addressData.request_address,
@@ -837,8 +868,12 @@ function CadastruResultContent() {
           } : response.data });
         }
       } catch {
-        if (active) setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: addressData,
-          fallbackAddress: !addressData && source === "address" ? formatLookupAddress(readAddressLookupRequest()) : "" });
+        if (active) {
+          loadedRequestKey.current = attemptKey;
+          setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: addressData,
+            ...lookupRetryState({ status: 503 }, requestKey, attempt),
+            fallbackAddress: !addressData && source === "address" ? formatLookupAddress(readAddressLookupRequest()) : "" });
+        }
       }
     }
 
@@ -847,7 +882,13 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, router, savedAddressKey, searchLookupId, session?.access_token, skipCache, source, t]);
+  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, lookupRetry, router, savedAddressKey, searchLookupId, session?.access_token, session?.user?.id, skipCache, source, t]);
+
+  useEffect(() => {
+    if (!state.retry || state.retry.attempt !== 0) return;
+    const timer = setTimeout(() => setLookupRetry({ key: state.retry.key, attempt: 1 }), 2000);
+    return () => clearTimeout(timer);
+  }, [state.retry]);
 
   useEffect(() => {
     if (isAuthenticated) setIsAuthModalOpen(false);
@@ -1032,7 +1073,7 @@ function CadastruResultContent() {
           )}
 
           {(state.error || (!cadastralNumber && !state.loading && !state.data)) && (
-            <div role="status" className={`rounded-2xl border p-6 text-sm font-medium shadow-sm sm:p-8 ${state.suggestions?.length || state.roadTypeSuggestions?.length || state.addressCorrections?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
+            <div role="status" aria-busy={state.retrying || undefined} className={`rounded-2xl border p-6 text-sm font-medium shadow-sm sm:p-8 ${state.retrying || state.suggestions?.length || state.roadTypeSuggestions?.length || state.addressCorrections?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
               <p className="flex items-start gap-2">{state.didYouMean && (state.suggestions?.length > 0 || state.roadTypeSuggestions?.length > 0)
                 ? <>
                   <svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1042,24 +1083,36 @@ function CadastruResultContent() {
                   </svg>
                   <span>{t("cadastru.notFoundWithSuggestion", { road: state.requestedRoad, street: state.requestedStreet })}</span>
                 </>
-                : state.error || t("cadastru.lookupError")}</p>
+                : state.retrying ? t("cadastru.retrying") : state.error || t("cadastru.lookupError")}</p>
+              {state.retry && !state.retrying && <button type="button"
+                className="mt-3 cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-2 text-sm hover:bg-red-50 disabled:cursor-not-allowed"
+                disabled={authLoading}
+                onClick={() => {
+                  setLookupRetry({ key: state.retry.key, attempt: state.retry.attempt + 1 });
+                  setState((current) => ({ ...current, retrying: true }));
+                }}>
+                {t("cadastru.retrySearch")}
+              </button>}
               {state.fallbackAddress && <p className="mt-2 font-normal text-gray-700">
                 {t("cadastru.otherDataAvailable")}
               </p>}
               {state.addressCorrections?.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {state.addressCorrections.map((correction) => (
-                    <div key={`${correction.street}:${correction.house_number}`}>
+                    <div key={`${correction.city}:${correction.street}:${correction.house_number}`}>
                       {state.confirmationRequired && state.addressCorrections.length === 1 && <p className="mb-2 text-sm">
-                        {t(correction.apartment_number ? "cadastru.addressAlternativeFound" : "cadastru.buildingAlternativeFound",
-                          { street: correction.street, house: correction.house_number,
-                          apartment: correction.apartment_number })}
+                        {correction.city !== state.requestedCity ? t("cadastru.localityAlternativeConfirm")
+                          : t(correction.apartment_number ? "cadastru.addressAlternativeFound" : "cadastru.buildingAlternativeFound",
+                            { street: correction.street, house: correction.house_number,
+                            apartment: correction.apartment_number })}
                       </p>}
                       <button type="button"
                         className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
                         disabled={state.loading || authLoading}
                         onClick={() => retryAddressSearch(correction)}>
-                        {state.confirmationRequired ? t("cadastru.searchSuggestedHouse", { house: correction.house_number })
+                        {state.confirmationRequired && correction.city !== state.requestedCity
+                          ? t("cadastru.searchSuggestedLocality", { city: correction.city, street: correction.street, house: correction.house_number })
+                          : state.confirmationRequired ? t("cadastru.searchSuggestedHouse", { house: correction.house_number })
                           : t("cadastru.useAddressCorrection", { street: correction.street, house: correction.house_number })}
                       </button>
                     </div>

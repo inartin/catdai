@@ -1,4 +1,7 @@
 {
+  "cadastru.localityAlternativeIntro": "Не удалось найти адрес {street}, дом {house}, в городе {city}. Такой же адрес найден в {localities}.",
+  "cadastru.localityAlternativeConfirm": "Это нужный вам адрес?",
+  "cadastru.searchSuggestedLocality": "Найти «{city}, {street} {house}»",
   "cadastru.buildingNotLocated": "Не удалось точно определить местоположение дома {house} на улице {street}. Проверьте полный номер дома, включая дробь. Без точного местоположения мы не можем искать информацию об окрестностях.",
   "cadastru.buildingAlternativeIntro": "Не удалось точно определить местоположение дома {house} на улице {street}. Выберите нужный адрес из проверенных вариантов, чтобы найти и информацию об окрестностях.",
   "cadastru.buildingAlternativeFound": "Найден дом {house} на улице {street}. Это нужный вам адрес?",
@@ -305,6 +308,8 @@
   "cadastru.searching": "Поиск...",
   "cadastru.lookupError": "Не удалось найти кадастровые данные. Проверьте введенные данные.",
   "cadastru.serviceUnavailable": "Кадастровый сервис временно недоступен. Попробуйте позже.",
+  "cadastru.retrying": "Повторяем поиск…",
+  "cadastru.retrySearch": "Попробовать снова",
   "cadastru.otherDataAvailable": "Продолжаем поиск и покажем другую доступную информацию по этому адресу.",
   "cadastru.missingAddressFields": "Укажите улицу и номер дома.",
   "cadastru.invalidAddressFields": "Номер дома должен содержать только цифры и при необходимости /",

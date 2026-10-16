@@ -1476,3 +1476,38 @@ await assert.rejects(buildingAdapter.fetchExternalCadastruAddressData(buildingFi
   assert.equal(error.fallbackEligible, false); return true;
 });
 console.log("Building confirmation passed: Киев normalization, optional apartment, scoped choices, no writes or credits before selection, confirmed lookup and adapter propagation.");
+
+// A locality correction changes only the city and requires the usual confirmed lookup.
+const localityFields = { city: 'Chișinău', road_type: 'strada', street: 'Cartușa', house_number: '95/4', skip_cache: true };
+let localityWrites = 0, localityCredits = 0;
+let localityChoice;
+const localityRoute = await load('src/app/api/cadastru/address/route.js', {
+  ...routeMocks,
+  '@/lib/cadastru-records': { getCadastruRecordByAddress: async () => null,
+    persistCadastruAddressResult: async (payload, options) => {
+      localityWrites++; assert(options.requestAddress.startsWith('Durlești, str Cartușa 95/4')); return payload;
+    } },
+  '@/lib/paid-feature-usage': { ...routeMocks['@/lib/paid-feature-usage'],
+    checkFeatureAccess: async () => { localityCredits++; return { allowed: true }; },
+    consumeFeatureCredit: async () => { localityCredits++; return { allowed: true }; } },
+  '@/lib/cadastru-external-api': { fetchExternalCadastruAddressData: async (fields) => {
+    if (fields.city === 'Durlești') return { lands: [{ cadastral_number: '0121106.001', address: 'mun. Chișinău, or. Durlești, str. Cartușa 95/4' }] };
+    throw Object.assign(new Error('confirm locality'), { code: 'address_confirmation_required', status: 422,
+      addressSuggestions: [localityChoice, { ...localityChoice, city: 'Unknown' }, { ...localityChoice, street: 'Cartușa Nouă' },
+        { ...localityChoice, house_number: '95/5' }, { ...localityChoice, road_type: 'bulevard' },
+        { ...localityChoice, apartment_number: '8' }, null] });
+  } },
+});
+for (const apartment_number of ['', '7']) {
+  localityChoice = { city: 'Durlești', road_type: 'strada', street: 'Cartușa', house_number: '95/4',
+    ...(apartment_number ? { apartment_number } : {}) };
+  const response = await localityRoute.POST(request({ ...localityFields, apartment_number }));
+  const localityPayload = await response.json();
+  assert.equal(response.status, 422, JSON.stringify(localityPayload));
+  assert.deepEqual(clone(localityPayload.address_suggestions), [localityChoice]);
+}
+assert.equal(localityWrites, 0); assert.equal(localityCredits, 0);
+const confirmedLocality = await localityRoute.POST(request({ ...localityFields, city: 'Durlești' }));
+assert.equal(confirmedLocality.status, 200);
+assert.equal(localityWrites, 1); assert.equal(localityCredits, 1);
+console.log('Locality confirmation route passed: exact street/type/house/unit, supported city, no writes or credits before selection, normal confirmed lookup.');

@@ -37,6 +37,12 @@ The sync script adapts only the loader and records worker source hashes in `sour
 
 The isolated storage/route regression suite covers original/resolved aliases, shared cache reuse, current-request metadata, masked previews, ambiguous suggestions, worker 422 propagation and canonical local fallback. It also checks pasted-address conflicts before cache/provider calls and redundant-input cleanup. These mocks do not establish live cadastral availability or browser interaction.
 
+## Verified locality alternatives
+
+Durlești is included in the app city allowlist, matching the worker, so confirmed requests are accepted.
+
+If a Chișinău lookup cannot find an exact property, the worker can offer the same street, road type, house (including suffix) and optional apartment in a settlement explicitly identified inside Chișinău municipality. Autocomplete must be confirmed by a matching registry section and a land/building link, or the exact apartment link for unit searches. The app preserves these 422 `address_confirmation_required` choices. Only locality corrections say that the same address was found in the named alternative locality; house-suffix confirmations keep their existing copy. It displays the proposed locality and full street/house in a localized button; only clicking it changes the city and retries. Original matches take precedence. Suggestions do not save property data or consume credits; normal access, persistence and recovery tracking apply after confirmation. No cross-city inference from street names or map pins is used.
+
 ## Verified house-number alternatives
 
 With multiple verified addresses, the result screen shows the shared explanation and one button per house number without repeating the confirmation sentence for each option. A single alternative retains its address confirmation sentence.

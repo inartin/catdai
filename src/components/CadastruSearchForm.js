@@ -10,9 +10,9 @@ import { useAuth } from "@/context/AuthContext";
 import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 
 const roadTypes = [
-  { value: "strada", label: "cadastru.roadTypeStreet" },
-  { value: "str-la", label: "cadastru.roadTypeLane" },
-  { value: "bulevard", label: "cadastru.roadTypeBoulevard" },
+  { value: "strada", label: "cadastru.roadTypeStreetFull" },
+  { value: "str-la", label: "cadastru.roadTypeLaneFull" },
+  { value: "bulevard", label: "cadastru.roadTypeBoulevardFull" },
 ];
 const STREET_MAX_LENGTH = 80;
 const HOUSE_NUMBER_MAX_LENGTH = 10;

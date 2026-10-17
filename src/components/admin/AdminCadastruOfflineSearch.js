@@ -9,9 +9,9 @@ import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 import { useTranslation } from "@/context/LanguageContext";
 
 const roadTypes = [
-  { value: "strada", label: "cadastru.roadTypeStreet", ro: "Strada" },
-  { value: "str-la", label: "cadastru.roadTypeLane", ro: "Stradelă" },
-  { value: "bulevard", label: "cadastru.roadTypeBoulevard", ro: "Bulevard" },
+  { value: "strada", label: "cadastru.roadTypeStreetFull", ro: "Strada" },
+  { value: "str-la", label: "cadastru.roadTypeLaneFull", ro: "Stradelă" },
+  { value: "bulevard", label: "cadastru.roadTypeBoulevardFull", ro: "Bulevard" },
 ];
 
 const STREET_MAX_LENGTH = 80;

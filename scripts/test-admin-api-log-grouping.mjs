@@ -234,6 +234,7 @@ assert.equal(nodes(render(), (node) => node.type === "tr" && node.props.role ===
 // Daily aggregates include history beyond the latest 200 event details.
 mocks["@/lib/supabase-admin"] = { supabaseAdmin: {} };
 mocks["@/lib/admin-auth"] = { requireAdminApiAuth: () => null };
+mocks["@/lib/admin-cadastru-favorites"] = { loadCadastruFavorites: async (rows) => rows };
 mocks["next/server"] = { NextResponse: {} };
 const { buildExternalApiUsageStats } = await load("src/app/api/admin/stats/route.js",
   "\nexport { buildExternalApiUsageStats };");

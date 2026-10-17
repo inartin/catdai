@@ -9,6 +9,7 @@ Implemented and active.
 - Profile lists both result types under `Salvate` (RO) / `Сохранённые` (RU) and allows removal.
 - Cadastru bookmarks use a stable localized result URL with the cadastral number, or the exact address fields for multi-property and masked address results. They omit temporary preview handoffs and cache-bypass flags, so they reopen without browser session storage and apply the viewer's current access rules.
 - Favorites are persisted when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`; otherwise development responses do not write `user_favorites`.
+- Admin user and dashboard favorites totals include both result types. Cadastru usage rows show whether that user currently has a matching number or full-address bookmark; repeat searches can match the same saved favorite without increasing its count.
 
 ## Sharing
 - Estimate result can create a short share URL through `/api/share`.

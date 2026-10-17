@@ -55,12 +55,15 @@ export default function CadastruPage() {
             <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
               {t("cadastru.pageTitle")}
             </h1>
-            <p className="mt-3 max-w-2xl text-base text-gray-600">
+            <p className="mt-3 hidden max-w-2xl text-base text-gray-600 sm:block">
               {t("cadastru.subtitle")}
             </p>
           </div>
 
           <CadastruSearchForm allowAnonymousSearch onSearchStart={setLoadingSearch} />
+          <p className="mt-6 text-base text-gray-600 sm:hidden">
+            {t("cadastru.subtitle")}
+          </p>
           <CadastruSourceNote />
           <details className="group mt-6 rounded-2xl border border-gray-200 bg-white open:shadow-sm">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left font-semibold text-gray-900 [&::-webkit-details-marker]:hidden">

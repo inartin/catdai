@@ -16,6 +16,7 @@ Implemented and active, with partial fallback.
 ## Address-Based Page
 - `/ro/cadastru` and `/ru/cadastru` are the indexable localized search pages; direct `/cadastru` is a noindex duplicate that canonicals to the current language version.
 - `/cadastru` lets users find official cadastral data by exact address or by entering a cadastral number directly.
+- Street-type dropdowns use full localized names: `Strada`, `Stradela`, `Bulevardul` in Romanian and `Улица`, `Переулок`, `Бульвар` in Russian.
 - `/evaluare` without result query parameters reuses the same cadastru search form and source note, placing the compact cadastral-number quick-fill card first under the `Locație` category header.
 - Anonymous users can submit searches from the standalone page. The APIs perform the lookup and return the same server-masked preview used by the cadastru credit paywall; clicking a blurred value opens the shared login popup.
 - The cadastru search form persists the address and cadastral-number draft in browser storage so OAuth return to `/cadastru` restores the fields the anonymous user filled before logging in; the result page clears that draft after data loads, so failed searches can return to the filled form.

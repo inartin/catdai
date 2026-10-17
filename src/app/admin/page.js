@@ -563,10 +563,10 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[64rem] table-fixed text-sm">
+      <table className="w-full min-w-[70rem] table-fixed text-sm">
         <colgroup>
           <col className="w-52" /><col className="w-24" /><col className="w-28" /><col />
-          <col className="w-24" /><col className="w-28" /><col className="w-36" /><col className="w-24" />
+          <col className="w-24" /><col className="w-28" /><col className="w-24" /><col className="w-36" /><col className="w-24" />
         </colgroup>
         <thead className="sticky top-0">
           <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
@@ -576,6 +576,7 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
             <th className="px-4 py-3">Search</th>
             <th className="px-4 py-3">District</th>
             <th className="px-4 py-3">Evaluation</th>
+            <th className="px-4 py-3">Favorite</th>
             <th className="px-4 py-3">User</th>
             <th className="px-4 py-3 text-right">Action</th>
           </tr>
@@ -621,6 +622,7 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                     {row.valuation_completed_at ? "Completed" : row.valuation_clicked_at ? "Started" : "\u2014"}
                   </td>
+                  <td className="px-4 py-3 text-gray-600">{fmtBool(row.favorited)}</td>
                   <td className="px-4 py-3 text-gray-600 break-all">
                     {row.user_name || userName || "Anonymous"}
                   </td>
@@ -637,7 +639,7 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
                   </td>
                 </tr>
                 {isExpanded && (
-                  <tr><td colSpan={8} className="bg-gray-50">
+                  <tr><td colSpan={9} className="bg-gray-50">
                     <CadastruSearchDetails row={row} userName={userName} />
                   </td></tr>
                 )}

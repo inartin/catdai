@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { loadCadastruFavorites } from "@/lib/admin-cadastru-favorites";
 
 const PAGE_SIZE = 50;
 const SEARCH_COLUMNS = "id, search_type, user_id, district, cadastral_number, search_address, result_type, valuation_clicked_at, valuation_completed_at, created_at";
@@ -30,7 +31,13 @@ export async function GET(request) {
     return NextResponse.json({ error: "Failed to load cadastru searches." }, { status: 500 });
   }
 
-  return NextResponse.json({ searches: (data || []).slice(0, PAGE_SIZE), hasMore: (data || []).length > PAGE_SIZE });
+  try {
+    const searches = await loadCadastruFavorites((data || []).slice(0, PAGE_SIZE));
+    return NextResponse.json({ searches, hasMore: (data || []).length > PAGE_SIZE });
+  } catch (error) {
+    console.error("[admin-cadastru-searches] favorites read failed:", error.message);
+    return NextResponse.json({ error: "Failed to load cadastru favorites." }, { status: 500 });
+  }
 }
 
 export async function DELETE(request) {

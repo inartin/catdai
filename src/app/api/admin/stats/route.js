@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
+import { loadCadastruFavorites } from "@/lib/admin-cadastru-favorites";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -12,7 +13,7 @@ const PERIODS = {
   "30d": 30 * 24 * 60 * 60 * 1000,
 };
 const DASHBOARD_PERIODS = {
-  day: { label: "Last day", ms: PERIODS["24h"] },
+  day: { label: "Today", ms: PERIODS["24h"] },
   week: { label: "Last week", ms: PERIODS["7d"] },
   month: { label: "Last month", ms: PERIODS["30d"] },
   all: { label: "All time", ms: null },
@@ -47,6 +48,24 @@ function applySince(query, column, since) {
 function filterRowsSince(rows, column, since) {
   if (!since) return rows;
   return rows.filter((row) => row[column] && row[column] >= since);
+}
+
+function getChisinauMidnight(now = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Chisinau",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  });
+  const localTime = (date) => {
+    const p = Object.fromEntries(formatter.formatToParts(date).map(({ type, value }) => [type, value]));
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+  };
+  const localDate = new Date(localTime(now));
+  const midnight = Date.UTC(localDate.getUTCFullYear(), localDate.getUTCMonth(), localDate.getUTCDate());
+  let start = midnight;
+  // Resolve the offset at midnight itself, including days when daylight saving changes.
+  for (let i = 0; i < 2; i++) start += midnight - localTime(new Date(start));
+  return new Date(start).toISOString();
 }
 
 function getMarketTrendsPeriodStart(period) {
@@ -728,12 +747,14 @@ export async function GET(request) {
   const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
   const period = parseDashboardPeriod(request.nextUrl.searchParams.get("period"));
   const periodConfig = DASHBOARD_PERIODS[period];
-  const periodSince = periodConfig.ms ? new Date(Date.now() - periodConfig.ms).toISOString() : null;
+  const periodSince = period === "day" ? getChisinauMidnight()
+    : periodConfig.ms ? new Date(Date.now() - periodConfig.ms).toISOString() : null;
   const periodSinceDate = periodSince ? periodSince.slice(0, 10) : null;
   const marketTrendsSinceDate = getMarketTrendsPeriodStart(period);
   const cacheKey = period;
 
-  if (!bypassCache && cache[cacheKey] && Date.now() - cache[cacheKey].ts < CACHE_TTL_MS) {
+  if (!bypassCache && cache[cacheKey] && Date.now() - cache[cacheKey].ts < CACHE_TTL_MS
+      && (period !== "day" || cache[cacheKey].data.periodSince === periodSince)) {
     return NextResponse.json(cache[cacheKey].data);
   }
 
@@ -803,7 +824,15 @@ export async function GET(request) {
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
   const filteredUsers = filterRowsSince(users, "created_at", periodSince);
-  const cadastruSearchesWithUsers = attachUserNames(cadastruSearchEvents, usersById);
+  let cadastruSearches;
+  try {
+    const searchesWithFavorites = await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50));
+    cadastruSearches = buildCadastruSearchStats(attachUserNames(cadastruSearchEvents, usersById), cutoffs);
+    cadastruSearches.recent = attachUserNames(searchesWithFavorites, usersById);
+  } catch (error) {
+    console.error("Failed to load cadastru favorites:", error.message);
+    return NextResponse.json({ error: "Failed to load cadastru favorites" }, { status: 500 });
+  }
   const correlatedExternalApiEvents = correlateExternalApiUsers(externalApiUsageEvents.rows || [], {
     cadastruSearchEvents,
     listingLinkAnalysisEvents,
@@ -840,7 +869,7 @@ export async function GET(request) {
     totalTelegramAlerts: telegramAlerts.length,
     telegramAlerts,
     pdfGeneration: buildPdfStats(pdfEvents, cutoffs),
-    cadastruSearches: buildCadastruSearchStats(cadastruSearchesWithUsers, cutoffs),
+    cadastruSearches,
     listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
     externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiEventsWithUsers),

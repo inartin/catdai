@@ -174,13 +174,16 @@ function render(component, props, initial) {
 }
 const { CadastruSearchTable, CadastruSearchDetails, ExternalApiEventTable } = page.namespace;
 let deleted = null;
-const props = { rows: [search], onDelete: (row) => { deleted = row.id; } };
+const props = { rows: [{ ...search, favorited: true }], onDelete: (row) => { deleted = row.id; } };
 let tree = render(CadastruSearchTable, props, []);
+assert.equal(nodes(tree, (node) => node.type === "th" && node.props.children === "Favorite").length, 1);
+assert.equal(nodes(tree, (node) => node.type === "td" && node.props.children === "Yes").length, 1);
 let row = nodes(tree, (node) => node.type === "tr" && node.props.role === "button")[0];
 assert.equal(row.props["aria-expanded"], false);
 row.props.onKeyDown({ key: "Enter", preventDefault() {} });
 tree = render(CadastruSearchTable, props);
 assert.equal(nodes(tree, (node) => node.type === CadastruSearchDetails).length, 1);
+assert.equal(nodes(tree, (node) => node.type === "td" && node.props.colSpan === 9).length, 1);
 let stopped = false;
 nodes(tree, (node) => node.type === "button")[0].props.onClick({ stopPropagation() { stopped = true; } });
 assert.equal(deleted, search.id);

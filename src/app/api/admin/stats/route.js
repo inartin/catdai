@@ -632,78 +632,27 @@ function buildPaymentCheckoutStats(rows, cutoffs) {
   };
 }
 
-async function fetchPaidUserSummary(since) {
-  const paidOrders = await fetchAllRows(() =>
-    applySince(
+async function fetchPaymentSummary(since) {
+  const orders = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await applySince(
       supabaseAdmin
         .from("reporting_payment_orders")
-        .select("user_id, product_key, paid_at, created_at")
-        .in("status", ["paid", "partially_refunded"])
-        .not("user_id", "is", null),
-      "created_at",
+        .select("id, provider, user_id, product_key, status, amount_minor, currency_code, refunded_minor, paid_at, created_at")
+        .in("status", ["paid", "partially_refunded"]),
+      "paid_at",
       since
     )
-      .order("created_at", { ascending: false })
-  );
-  const activeCredits = await fetchAllRows(() =>
-    supabaseAdmin
-      .from("reporting_feature_credit_balances")
-      .select("user_id, remaining_uses")
-      .gt("remaining_uses", 0)
-      .not("user_id", "is", null)
-  );
-
-  const paidUsersById = new Map();
-  for (const order of paidOrders) {
-    if (!order.user_id) continue;
-    const current = paidUsersById.get(order.user_id) || {
-      userId: order.user_id,
-      paidOrders: 0,
-      latestPaidAt: null,
-      latestProductKey: null,
-    };
-    current.paidOrders += 1;
-
-    const paidAt = order.paid_at || order.created_at || null;
-    if (!current.latestPaidAt || (paidAt && Date.parse(paidAt) > Date.parse(current.latestPaidAt))) {
-      current.latestPaidAt = paidAt;
-      current.latestProductKey = order.product_key || null;
-    }
-    paidUsersById.set(order.user_id, current);
+      .order("paid_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: false })
+      .order("provider", { ascending: false })
+      .range(from, from + PAGE - 1);
+    // A failed page must not turn real payments into a zero or partial count.
+    if (error) throw new Error(`reporting_payment_orders query failed: ${error.message}`);
+    orders.push(...(data || []));
+    if (!data || data.length < PAGE) break;
   }
-
-  const remainingCreditsByUser = new Map();
-  for (const credit of activeCredits) {
-    const userId = credit.user_id;
-    if (!userId) continue;
-    remainingCreditsByUser.set(
-      userId,
-      (remainingCreditsByUser.get(userId) || 0) + Math.max(Number(credit.remaining_uses) || 0, 0)
-    );
-  }
-
-  for (const [userId, paidUser] of Array.from(paidUsersById.entries())) {
-    const remainingPaidCredits = remainingCreditsByUser.get(userId) || 0;
-    if (remainingPaidCredits <= 0) {
-      paidUsersById.delete(userId);
-      continue;
-    }
-    paidUser.remainingPaidCredits = remainingPaidCredits;
-  }
-
-  const filteredPaidOrders = paidOrders.filter((order) => paidUsersById.has(order.user_id));
-
-  return {
-    totalPaidUsers: paidUsersById.size,
-    paidOrders: filteredPaidOrders.length,
-    remainingPaidCredits: Array.from(paidUsersById.values()).reduce(
-      (sum, user) => sum + (Number(user.remainingPaidCredits) || 0),
-      0
-    ),
-    users: Array.from(paidUsersById.values()).sort((a, b) =>
-      Date.parse(b.latestPaidAt || 0) - Date.parse(a.latestPaidAt || 0)
-    ),
-  };
+  return { available: true, total: orders.length, orders };
 }
 
 export async function DELETE(request) {
@@ -795,9 +744,9 @@ export async function GET(request) {
       fetchExternalApiUsageEvents(periodSince),
       fetchPaymentCheckoutEvents(periodSince),
       fetchMarketTrendsPopupStats(marketTrendsSinceDate),
-      fetchPaidUserSummary(periodSince).catch((error) => {
-        console.error("Failed to load paid user stats:", error.message);
-        return { available: false, totalPaidUsers: 0, paidOrders: 0 };
+      fetchPaymentSummary(periodSince).catch((error) => {
+        console.error("Failed to load payment stats:", error.message);
+        return { available: false, total: null, orders: [] };
       }),
     ]);
   } catch (err) {
@@ -819,7 +768,7 @@ export async function GET(request) {
     externalApiUsageEvents,
     paymentCheckoutEvents,
     marketTrendsPopup,
-    paidUserSummary,
+    paymentSummary,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
@@ -841,15 +790,14 @@ export async function GET(request) {
     ...externalApiUsageEvents,
     rows: attachUserNames(correlatedExternalApiEvents, usersById),
   };
-  const paidUsers = {
-    ...paidUserSummary,
-    users: (paidUserSummary.users || []).map((item) => {
-      const user = authUsersById.get(item.userId);
+  const payments = {
+    ...paymentSummary,
+    orders: paymentSummary.orders.map((item) => {
+      const user = authUsersById.get(item.user_id);
       return {
         ...item,
-        name: user ? userDisplayName(user) : item.userId,
+        name: user ? userDisplayName(user) : item.user_id,
         email: user?.email || null,
-        registeredAt: user?.created_at || null,
       };
     }),
   };
@@ -875,7 +823,7 @@ export async function GET(request) {
     externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiEventsWithUsers),
     paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
     marketTrendsPopup,
-    paidUsers,
+    payments,
   };
 
   if (!bypassCache) {

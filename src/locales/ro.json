@@ -1018,7 +1018,6 @@
   "maib.receiptBody": [
     "Confirmarea plății",
     "{sandbox}",
-    "Comerciant: {merchant}",
     "Website/aplicație: CatDai — {siteUrl}",
     "Numărul comenzii: {orderId}",
     "Data achitării: {paidAt} (Europe/Chisinau)",

@@ -6,7 +6,7 @@ const { checked, reconcileOrder } = await import('../src/lib/maib/service.mjs');
 const { environment } = await import('../src/lib/maib/client.mjs');
 const { deliverReceipts, receiptConfig } = await import('../src/lib/maib/receipts.mjs');
 const mailConfig = receiptConfig();
-if (!mailConfig) console.warn('[maib-worker] Payment receipt delivery is disabled: configure MAIB_SMTP_* / MAIB_RECEIPT_FROM / MAIB_MERCHANT_NAME.');
+if (!mailConfig) console.warn('[maib-worker] Payment receipt delivery is disabled: configure MAIB_SMTP_* / MAIB_RECEIPT_FROM.');
 let stopped = false;
 let wake;
 for (const signal of ['SIGTERM','SIGINT']) process.on(signal, () => { stopped = true; wake?.(); });

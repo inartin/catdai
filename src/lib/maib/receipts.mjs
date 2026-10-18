@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import { MERCHANT } from '../merchant.mjs';
 import { paymentSiteOrigin } from '../payment-urls.mjs';
 import { MAIB_FEATURE_LABELS, purchaseMessages, receiptEmail } from './purchase.mjs';
 import { maibOrderQuantity } from './products.mjs';
@@ -7,16 +6,15 @@ import { maibOrderQuantity } from './products.mjs';
 export function receiptConfig(env = process.env) {
   const port = Number(env.MAIB_SMTP_PORT || 587);
   const from = receiptEmail(env.MAIB_RECEIPT_FROM);
-  const merchant = env.MAIB_MERCHANT_NAME?.trim() || MERCHANT.legalName;
-  if (!env.MAIB_SMTP_HOST || !env.MAIB_SMTP_USER || !env.MAIB_SMTP_PASSWORD || !from || !merchant || !Number.isInteger(port) || port < 1 || port > 65535) return null;
-  return { from, merchant, transport: {
+  if (!env.MAIB_SMTP_HOST || !env.MAIB_SMTP_USER || !env.MAIB_SMTP_PASSWORD || !from || !Number.isInteger(port) || port < 1 || port > 65535) return null;
+  return { from, transport: {
     host: env.MAIB_SMTP_HOST, port, secure: port === 465, requireTLS: port !== 465,
     auth: { user: env.MAIB_SMTP_USER, pass: env.MAIB_SMTP_PASSWORD },
     connectionTimeout: 15_000, greetingTimeout: 15_000, socketTimeout: 30_000,
   } };
 }
 
-export function buildReceipt(order, merchant) {
+export function buildReceipt(order) {
   if (!receiptEmail(order.receipt_email) || !order.paid_at || !order.product_title) throw new Error('Incomplete receipt');
   const messages = purchaseMessages(order.language);
   const origin = paymentSiteOrigin();
@@ -25,7 +23,7 @@ export function buildReceipt(order, merchant) {
   });
   const amount = (order.amount_minor / 100).toLocaleString(order.language === 'ru' ? 'ru-MD' : 'ro-MD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const values = {
-    merchant, siteUrl: origin, orderId: order.id, paidAt, amount,
+    siteUrl: origin, orderId: order.id, paidAt, amount,
     currency: order.currency_code, productTitle: order.product_title, quantity: maibOrderQuantity(order),
     sandbox: order.environment === 'sandbox' ? messages['maib.sandbox'] : '',
     features: Object.entries(order.grants).filter(([feature]) => MAIB_FEATURE_LABELS[feature])
@@ -65,10 +63,10 @@ export async function deliverReceipts(db, bankEnvironment, { config = receiptCon
       let submitted = false;
       try {
         const order = await checked(db.from('maib_payment_orders').select('*').eq('id', claim.order_id).eq('environment', bankEnvironment).single());
-        const receipt = buildReceipt(order, config.merchant);
+        const receipt = buildReceipt(order);
         submitted = true;
         const info = await transport.sendMail({
-          from: { name: config.merchant, address: config.from }, to: order.receipt_email,
+          from: { name: 'CatDai', address: config.from }, to: order.receipt_email,
           messageId: `<maib-${order.id}@catdai.md>`, ...receipt,
         });
         if (!info.accepted?.some(email => email.toLowerCase() === order.receipt_email.toLowerCase())) throw Object.assign(new Error('Recipient rejected'), { definitive: true });

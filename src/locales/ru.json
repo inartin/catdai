@@ -1018,7 +1018,6 @@
   "maib.receiptBody": [
     "Подтверждение оплаты",
     "{sandbox}",
-    "Продавец: {merchant}",
     "Сайт/приложение: CatDai — {siteUrl}",
     "Номер заказа: {orderId}",
     "Дата оплаты: {paidAt} (Europe/Chisinau)",

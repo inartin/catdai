@@ -1,4 +1,4 @@
-// Public merchant details shared by legal pages and payment confirmations.
+// Public merchant details shared by legal pages and payment details.
 export const MERCHANT = {
   legalName: 'Antreprenor Independent Artin Alexandru',
   idno: '1026023011448',

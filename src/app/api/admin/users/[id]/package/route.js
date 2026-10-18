@@ -1,3 +1,4 @@
+import { sharedPaidCreditBalance, sharedFreeMonthlyCredit } from "@/lib/shared-credit-balance.mjs";
 import { NextResponse } from "next/server";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -87,6 +88,10 @@ export async function PATCH(request, context) {
       ok: true,
       packageKey,
       credits: rowsForResponse(grants),
+      sharedCredits: sharedPaidCreditBalance(Object.values(grants).map(uses => ({
+        remaining_uses: uses, total_granted: uses, total_used: 0,
+      }))),
+      freeMonthlyCredit: sharedFreeMonthlyCredit(),
       freeMonthlyCredits: FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
         const limit = getFreeMonthlyFeatureLimit(featureKey);
         return {

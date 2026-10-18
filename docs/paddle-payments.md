@@ -8,7 +8,7 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
 ## Scope
 - Paddle handles one-time payments for Standard, Pro, and single-feature products.
 - Extra uses a monthly Paddle subscription.
-- Paddle is the only payment processor CatDai uses for now.
+- MAIB is the default processor; Paddle remains available as backup.
 - Paynet is not used whatsoever. Any old Paynet code is dormant compatibility code and must not be wired into checkout.
 
 ## Routes
@@ -74,6 +74,8 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
   - not linked from pricing or public navigation
 
 ## Product Model
+All source grants below are pooled into universal credits: Standard 12, Pro 60, Extra 300 per paid period, and single products 1. Source labels remain for lifecycle accounting, not access restrictions. One shared free credit per UTC month is used first. Apply the [shared-credit migration](access-paywall.md#shared-credit-rollout) after this provider schema.
+
 - Paddle uses the CatDai product keys:
   - `standard_pack`
   - `pro_pack`
@@ -88,7 +90,7 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
 - Standard and Pro grant 2 and 10 uses respectively for every paid feature, with no time expiry.
 - Extra is a monthly subscription and resets to 50 uses for every paid feature each paid billing period.
 - Extra credits do not roll over; without a successful renewal, remaining Extra credits are cleared.
-- Single-feature products grant one use for their feature and stack onto existing package credits.
+- Single-feature product keys grant one universal use and stack onto existing package credits.
 
 ## Paddle Requirements
 - Each supported product key needs a Paddle `price_id` in env.

@@ -41,7 +41,7 @@ function isMissingFreeUsageRpc(error) {
   const message = String(error?.message || "");
   return code === "42883"
     || code === "PGRST202"
-    || message.includes("consume_free_monthly_feature_usage")
+    || message.includes("consume_free_monthly_credit")
     || message.includes("free monthly usage is not supported for feature key");
 }
 
@@ -93,7 +93,6 @@ export async function checkFreeMonthlyFeatureUsage({
     .from("user_feature_usage_events")
     .select("id", { count: "exact", head: true })
     .eq("user_id", userId)
-    .eq("feature_key", featureKey)
     .eq("source", "free_monthly")
     .gte("created_at", startIso)
     .lt("created_at", endIso);
@@ -104,84 +103,6 @@ export async function checkFreeMonthlyFeatureUsage({
   return used < featureLimit
     ? { allowed: true, reason: "has_free_credit", remaining_uses: featureLimit - used }
     : { allowed: false, reason: "free_monthly_limit_reached", remaining_uses: 0 };
-}
-
-async function consumeFreeMonthlyFeatureUsageFallback({
-  userId,
-  featureKey,
-  idempotencyKey,
-  limit,
-  metadata,
-  monthStart,
-  monthEnd,
-}) {
-  const { data: existing, error: existingError } = await supabaseAdmin
-    .from("user_feature_usage_events")
-    .select("id, source")
-    .eq("user_id", userId)
-    .eq("feature_key", featureKey)
-    .eq("idempotency_key", idempotencyKey)
-    .maybeSingle();
-
-  if (existingError) throw existingError;
-
-  const countQuery = supabaseAdmin
-    .from("user_feature_usage_events")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("feature_key", featureKey)
-    .eq("source", "free_monthly")
-    .gte("created_at", monthStart)
-    .lt("created_at", monthEnd);
-
-  const { count, error: countError } = await countQuery;
-  if (countError) throw countError;
-
-  const used = count || 0;
-  if (existing) {
-    return {
-      allowed: true,
-      usage_event_id: existing.id,
-      source: existing.source,
-      used_count: used,
-      remaining_uses: Math.max(limit - used, 0),
-      reason: "already_consumed",
-    };
-  }
-
-  if (used >= limit) {
-    return {
-      allowed: false,
-      usage_event_id: null,
-      source: null,
-      used_count: used,
-      remaining_uses: 0,
-      reason: "free_monthly_limit_reached",
-    };
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("user_feature_usage_events")
-    .insert({
-      user_id: userId,
-      feature_key: featureKey,
-      source: "free_monthly",
-      idempotency_key: idempotencyKey,
-      metadata: metadata || {},
-    })
-    .select("id")
-    .single();
-
-  if (error) throw error;
-
-  return {
-    allowed: true,
-    usage_event_id: data?.id || null,
-    source: "free_monthly",
-    used_count: used + 1,
-    remaining_uses: Math.max(limit - used - 1, 0),
-    reason: "consumed",
-  };
 }
 
 export async function consumeFreeMonthlyFeatureUsage({
@@ -250,19 +171,11 @@ export async function consumeFreeMonthlyFeatureUsage({
     p_metadata: metadata || {},
   };
 
-  const { data, error } = await supabaseAdmin.rpc("consume_free_monthly_feature_usage", rpcArgs);
+  const { data, error } = await supabaseAdmin.rpc("consume_free_monthly_credit", rpcArgs);
   let result;
 
   if (error && isMissingFreeUsageRpc(error)) {
-    result = await consumeFreeMonthlyFeatureUsageFallback({
-      userId,
-      featureKey,
-      idempotencyKey,
-      limit: featureLimit,
-      metadata,
-      monthStart: startIso,
-      monthEnd: endIso,
-    });
+    throw new Error("Credit schema incomplete: apply the universal_paid_credits migration.");
   } else if (error) {
     throw error;
   } else {

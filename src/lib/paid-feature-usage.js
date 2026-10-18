@@ -42,7 +42,7 @@ export function buildFeatureCreditRequiredPayload(featureKey, reason = "no_credi
 function isMissingPaidUsageRpc(error) {
   const code = String(error?.code || "");
   const message = String(error?.message || "");
-  return code === "42883" || code === "PGRST202" || message.includes("consume_user_feature_credit");
+  return code === "42883" || code === "PGRST202" || message.includes("consume_user_credit");
 }
 
 export async function getPaidFeatureUsageEvent({ userId, featureKey, idempotencyKey }) {
@@ -70,10 +70,9 @@ export async function getUserFeatureCreditBalance({ userId, featureKey }) {
   }
 
   const { data, error } = await supabaseAdmin
-    .from("user_feature_credit_balances")
+    .from("user_credit_balances")
     .select("remaining_uses, total_granted, total_used")
     .eq("user_id", userId)
-    .eq("feature_key", featureKey)
     .maybeSingle();
 
   if (error) throw error;
@@ -173,11 +172,11 @@ export async function consumePaidFeatureCredit({
     p_metadata: metadata || {},
   };
 
-  const { data, error } = await supabaseAdmin.rpc("consume_user_feature_credit", rpcArgs);
+  const { data, error } = await supabaseAdmin.rpc("consume_user_credit", rpcArgs);
   let result;
 
   if (error && isMissingPaidUsageRpc(error)) {
-    throw new Error("Payment credit schema incomplete: apply db/maib_payments.sql.");
+    throw new Error("Payment credit schema incomplete: apply the universal_paid_credits migration.");
   } else if (error) {
     throw error;
   } else {

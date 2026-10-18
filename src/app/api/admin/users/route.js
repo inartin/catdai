@@ -1,16 +1,16 @@
+import { sharedPaidCreditBalance, sharedFreeMonthlyCredit } from "@/lib/shared-credit-balance.mjs";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 import {
   FREE_MONTHLY_FEATURE_KEYS,
-  getFreeMonthlyFeatureLimit,
   getFreeMonthlyFeatureUsageWindow,
 } from "@/lib/free-monthly-feature-usage";
 import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 60 * 1000;
-const CACHE_VERSION = 11;
+const CACHE_VERSION = 12;
 const PACKAGE_PRODUCT_KEYS = new Set(["standard_pack", "pro_pack", "extra_pack"]);
 let cache = { data: null, ts: 0 };
 
@@ -291,24 +291,10 @@ function normalizeCreditRows(rows) {
 }
 
 function normalizeFreeMonthlyRows({ usageRows = [] } = {}) {
-  const usedByFeature = new Map();
-
-  for (const row of usageRows || []) {
-    usedByFeature.set(row.feature_key, (usedByFeature.get(row.feature_key) || 0) + 1);
-  }
-
-  return FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
-    const featureLimit = getFreeMonthlyFeatureLimit(featureKey);
-    const used = usedByFeature.get(featureKey) || 0;
-    return {
-      featureKey,
-      remainingUses: Math.max(featureLimit - used, 0),
-      totalGranted: featureLimit,
-      totalUsed: Math.min(used, featureLimit),
-      source: "free_monthly",
-      eligible: featureLimit > 0,
-    };
-  });
+  return FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => ({
+    featureKey,
+    ...sharedFreeMonthlyCredit(usageRows),
+  }));
 }
 
 function groupRowsByUser(rows) {
@@ -381,6 +367,8 @@ export async function GET(request) {
           packageSource: adminPackageKey ? "admin" : paidPackage ? "paid" : "free",
           packagePaidAt: paidPackage?.paidAt || null,
           credits: normalizeCreditRows(userCredits),
+          sharedCredits: sharedPaidCreditBalance(userCredits),
+          freeMonthlyCredit: sharedFreeMonthlyCredit(freeMonthlyUsageByUser.get(user.id) || []),
           freeMonthlyCredits: normalizeFreeMonthlyRows({
             usageRows: freeMonthlyUsageByUser.get(user.id) || [],
           }),

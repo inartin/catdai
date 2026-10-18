@@ -17,14 +17,6 @@ import { getCadastruFavoritePath } from "@/lib/cadastru-favorites";
 const HISTORY_PAGE_SIZE = 10;
 const TRANSACTIONS_PAGE_SIZE = 10;
 const PACKAGE_PRODUCT_KEYS = ["extra_pack", "pro_pack", "standard_pack"];
-const CREDIT_FEATURE_LABEL_KEYS = {
-  sale_estimate: "pricing.featureSale",
-  rent_estimate: "pricing.featureRent",
-  listing_analysis: "pricing.feature999",
-  cadastru_lookup: "pricing.featureCadastru",
-  yield_calculator: "pricing.featureYield",
-  pdf_report: "pricing.featurePdf",
-};
 function formatNumber(value, lang, options = {}) {
   const number = Number(value);
   if (!Number.isFinite(number)) return value;
@@ -127,12 +119,7 @@ function formatPaymentStatus(status, t) {
   return translated === key ? t("payment.orderStatusUnknown") : translated;
 }
 
-function formatCreditFeature(featureKey, t) {
-  const key = CREDIT_FEATURE_LABEL_KEYS[featureKey];
-  return key ? t(key) : featureKey || "—";
-}
-
-function getProfileAccessBadge({ transactions, credits, creditsLoading, t }) {
+function getProfileAccessBadge({ transactions, sharedCredits, creditsLoading, t }) {
   if (creditsLoading) {
     return { label: t("profile.accessChecking"), tone: "neutral" };
   }
@@ -144,7 +131,7 @@ function getProfileAccessBadge({ transactions, credits, creditsLoading, t }) {
     return { label: formatPaymentProduct(paidPackage.productKey, t), tone: "paid" };
   }
 
-  const hasPaidCredit = (credits || []).some((row) => Number(row.remainingUses) > 0);
+  const hasPaidCredit = Number(sharedCredits?.remainingUses) > 0;
   if (hasPaidCredit) {
     return { label: t("profile.accessPaid"), tone: "paid" };
   }
@@ -190,15 +177,15 @@ export default function ProfilePage() {
   const [transactionsLoading, setTransactionsLoading] = useState(true);
   const [transactionsLoadingMore, setTransactionsLoadingMore] = useState(false);
   const [transactionsNextCursor, setTransactionsNextCursor] = useState(null);
-  const [credits, setCredits] = useState([]);
-  const [freeMonthlyCredits, setFreeMonthlyCredits] = useState([]);
+  const [sharedCredits, setSharedCredits] = useState(null);
+  const [freeMonthlyCredit, setFreeMonthlyCredit] = useState(null);
   const [creditsLoading, setCreditsLoading] = useState(true);
   const [extraSubscription, setExtraSubscription] = useState(null);
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const [subscriptionCanceling, setSubscriptionCanceling] = useState(false);
   const profileName = getProfileName(user);
   const profileSubtitle = getProfileSubtitle(user);
-  const accessBadge = getProfileAccessBadge({ transactions, credits, creditsLoading, t });
+  const accessBadge = getProfileAccessBadge({ transactions, sharedCredits, creditsLoading, t });
 
   useEffect(() => {
     document.title = `${t("nav.profile")} | Catdai`;
@@ -349,8 +336,8 @@ export default function ProfilePage() {
         setHistoryNextCursor(historyData.nextCursor || null);
         setTransactions(transactionsData.transactions || []);
         setTransactionsNextCursor(transactionsData.nextCursor || null);
-        setCredits(creditsData.credits || []);
-        setFreeMonthlyCredits(creditsData.freeMonthlyCredits || []);
+        setSharedCredits(creditsData.sharedCredits ?? null);
+        setFreeMonthlyCredit(creditsData.freeMonthlyCredit ?? null);
         setExtraSubscription(subscriptionData.subscription || null);
       })
       .catch(() => {})
@@ -445,19 +432,19 @@ export default function ProfilePage() {
             </div>
             <div className="mt-8 border-t border-gray-100 pt-6">
               <ProfileCreditBalances
-                credits={credits}
-                freeMonthlyCredits={freeMonthlyCredits}
+                sharedCredits={sharedCredits}
+                freeMonthlyCredit={freeMonthlyCredit}
                 loading={creditsLoading}
                 labels={{
                   title: t("profile.creditBalances"),
                   description: t("profile.creditBalanceDesc"),
-                  remaining: t("profile.creditRemaining"),
-                  used: ({ used, total }) => t("profile.creditUsed", { used, total }),
-                  feature: (featureKey) => formatCreditFeature(featureKey, t),
+                  purchased: t("profile.usesPurchased"),
+                  freeMonthly: t("profile.usesFreeMonthly"),
+                  addUses: t("profile.addUses"),
+                  loading: t("auth.loading"),
                 }}
                 formatValue={(value) => formatNumber(value, lang, { maximumFractionDigits: 0 })}
                 className="mb-6"
-                isDarkMode={false}
               />
               {extraSubscription && (
                 <div className="mb-6 rounded-lg border border-gray-100 bg-gray-50 p-4">

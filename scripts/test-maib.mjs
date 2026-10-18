@@ -1,3 +1,4 @@
+import { sharedPaidCreditBalance, sharedFreeMonthlyCredit } from "../src/lib/shared-credit-balance.mjs";
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -14,7 +15,7 @@ process.env.MAIB_SIGNATURE_KEY='test-signature-key';
 process.env.MAIB_CLIENT_ID='test-client'; process.env.MAIB_CLIENT_SECRET='test-secret';
 assert.equal(getPaymentProvider(),'maib');
 process.env.PAYMENT_PROVIDER='paddle'; assert.equal(getPaymentProvider(),'paddle'); delete process.env.PAYMENT_PROVIDER;
-for (const [key,amount,uses] of [['standard_pack',99,2],['pro_pack',199,10],['extra_pack',499,50],['sale_estimate_single',25,1],['rent_estimate_single',25,1],['listing_analysis_single',25,1],['cadastru_lookup_single',25,1],['yield_calculator_single',25,1],['pdf_report_single',25,1]]) {
+for (const [key,amount,uses] of [['standard_pack',99,2],['pro_pack',199,10],['extra_pack',499,50],['sale_estimate_single',15,1],['rent_estimate_single',15,1],['listing_analysis_single',15,1],['cadastru_lookup_single',15,1],['yield_calculator_single',15,1],['pdf_report_single',15,1]]) {
   const p=maibProduct(key);assert.equal(p.amount_minor,amount*100);assert.equal(p.billingMode,'one_time');
   assert.deepEqual(Object.values(p.grants),Array(key.endsWith('_pack')?6:1).fill(uses));
 }
@@ -36,10 +37,10 @@ for (const [key, count, amount] of [['all_features_5', 5, 99], ['all_features_20
 }
 for(const key of ['__proto__','constructor','',null,{}]) assert.equal(maibProduct(key),null);
 for (const key of ['sale_estimate_single','rent_estimate_single','listing_analysis_single','cadastru_lookup_single','yield_calculator_single','pdf_report_single']) {
-  for (const [quantity, amount, percent] of [[1,25,0],[2,45,10],[3,65,13],[4,77,23],[5,89,29],[6,105,30],[7,121,31],[8,137,32],[9,153,32],[10,169,32],[11,179,35],[19,259,45],[20,269,46],[21,282.45,46],[25,336.25,46],[100,1345,46]]) {
+  for (const [quantity, amount, percent] of [[1,15,0],[2,30,0],[3,45,0],[4,60,0],[5,75,0],[20,300,0],[100,1500,0]]) {
     const product = maibProduct(key, quantity);
     assert.equal(product.amount_minor, Math.round(amount * 100));
-    assert.equal(product.discount_mdl, Math.round((quantity * 25 - amount) * 100) / 100);
+    assert.equal(product.discount_mdl, Math.round((quantity * 15 - amount) * 100) / 100);
     assert.equal(product.discount_percent, percent);
     assert.deepEqual(Object.values(product.grants), [quantity]);
     assert.equal(maibOrderQuantity({ product_key: key, grants: product.grants }), quantity);
@@ -260,13 +261,13 @@ for (const key of ['all_features_5', 'all_features_20', 'pdf_report_single']) {
   assert.deepEqual(insertSnapshot.grants, product.grants, 'checkout snapshots server grants for the selected offer');
 }
 const bulkBody={...purchaseBody,product_key:'cadastru_lookup_single',quantity:4,request_key:crypto.randomUUID(),amount_minor:1,grants:{cadastru_lookup:999}};
-expectedBankAmount=77;
+expectedBankAmount=60;
 assert.equal((await create.POST(createRequest(bulkBody))).status,200);
-assert.equal(insertSnapshot.amount_minor,7700);
+assert.equal(insertSnapshot.amount_minor,6000);
 assert.deepEqual(insertSnapshot.grants,{cadastru_lookup:4});
 assert.equal(insertSnapshot.product_title,maibProductTitle('cadastru_lookup_single','ro',4));
 assert.equal(service.publicOrder(insertSnapshot).quantity,4);
-assert.equal(bankPayload.orderInfo.items[0].amount,77,'bank receives the discounted bundle total');
+assert.equal(bankPayload.orderInfo.items[0].amount,60,'bank receives the discounted bundle total');
 assert.equal(bankPayload.orderInfo.items[0].quantity,1,'non-uniform unit pricing is submitted as one bundle');
 for (const quantity of [null,0,-1,1.5,'4',MAX_SINGLE_QUANTITY + 1]) {
   assert.equal((await create.POST(createRequest({...bulkBody,quantity}))).status,400);
@@ -280,7 +281,7 @@ assert.equal((await replayResponse.json()).amount_minor,9400,'existing orders re
 assert.equal(bankCreates,bankCreatesBeforeReplay,'identical bulk request reuses its order');
 assert.equal((await create.POST(createRequest({...bulkBody,quantity:3}))).status,409,'a reused request key cannot change quantity');
 existingSnapshot=null;
-for (const [quantity, amount] of [[1,25],[3,65],[5,89],[10,169],[20,269],[21,282.45],[25,336.25],[100,1345]]) {
+for (const [quantity, amount] of [[1,15],[3,45],[5,75],[10,150],[20,300],[21,315],[25,375],[100,1500]]) {
   expectedBankAmount=amount;
   assert.equal((await create.POST(createRequest({...bulkBody,quantity,request_key:crypto.randomUUID()}))).status,200);
   assert.equal(insertSnapshot.amount_minor,Math.round(amount * 100),'checkout uses the server price tier');
@@ -299,6 +300,22 @@ assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey
 assert.equal((await freeUsage.consumeFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,true);
 assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'sale_estimate',idempotencyKey:'one'})).allowed,true);
 assert.equal(freeDbCalls,0,'development mode does not persist free usage');
+// Real monthly access helper counts usage across all features and fails closed without RPC.
+let freeRpcError = null;
+const sharedFreeUsage=await loadRoute('src/lib/free-monthly-feature-usage.js',{
+  'node:crypto':{default:crypto},
+  '@/lib/runtime-persistence':{shouldPersistRuntimeData:()=>true},
+  '@/lib/supabase-admin':{supabaseAdmin:{
+    from(){const filters=new Map();const query={select(){return query;},eq(k,v){filters.set(k,v);return query;},gte(){return query;},lt(){return query;},
+      maybeSingle:async()=>({data:null,error:null}),
+      then(resolve,reject){assert.equal(filters.has('feature_key'),false,'monthly count spans all features');return Promise.resolve({count:1,error:null}).then(resolve,reject);}};return query;},
+    async rpc(name,args){assert.equal(name,'consume_free_monthly_credit');assert.equal(args.p_limit,1);return {data:{allowed:false,reason:'free_monthly_limit_reached',used_count:1,remaining_uses:0},error:freeRpcError};},
+  }},
+});
+assert.equal((await sharedFreeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'pdf_report',idempotencyKey:'new'})).allowed,false);
+assert.equal((await sharedFreeUsage.consumeFreeMonthlyFeatureUsage({userId:id,featureKey:'pdf_report',idempotencyKey:'new'})).allowed,false);
+freeRpcError={code:'PGRST202',message:'missing function'};
+await assert.rejects(sharedFreeUsage.consumeFreeMonthlyFeatureUsage({userId:id,featureKey:'pdf_report',idempotencyKey:'new'}),/universal_paid_credits/);
 let freeUses=1, paidUses=2, paidConsumptionCalls=0;
 const paidEvents=new Map();
 const freeEvents=new Set();
@@ -307,10 +324,10 @@ const paidFeature=await loadRoute('src/lib/paid-feature-usage.js',{
   '@/lib/supabase-admin':{supabaseAdmin:{
     from(table){const filters=new Map();const query={select(){return query;},eq(key,value){filters.set(key,value);return query;},async maybeSingle(){
       if(table==='user_feature_usage_events')return {data:paidEvents.get(filters.get('idempotency_key'))||null,error:null};
-      if(table==='user_feature_credit_balances')return {data:{remaining_uses:paidUses,total_granted:2,total_used:2-paidUses},error:null};
+      if(table==='user_credit_balances'){assert.equal(filters.has('feature_key'),false);return {data:{remaining_uses:paidUses,total_granted:2,total_used:2-paidUses},error:null};}
       throw Error(`Unexpected table ${table}`);
     }};return query;},
-    async rpc(name,args){assert.equal(name,'consume_user_feature_credit');paidConsumptionCalls++;
+    async rpc(name,args){assert.equal(name,'consume_user_credit');paidConsumptionCalls++;
       const existing=paidEvents.get(args.p_idempotency_key);
       if(existing)return {data:{allowed:true,reason:'already_consumed',source:existing.source,usage_event_id:existing.id,remaining_uses:paidUses},error:null};
       if(paidUses===0)return {data:{allowed:false,reason:'no_credit',remaining_uses:0},error:null};
@@ -344,6 +361,7 @@ freeUses=1;paidUses=0;freeEvents.clear();
 assert.equal((await paidFeature.consumeFeatureCredit(featureRequest('third'))).source,'free_monthly','past purchases do not suppress next month\'s free use');
 let reportedFreeEvents=[];
 const profileCredits=await loadRoute('src/app/api/profile/credits/route.js',{
+  '@/lib/shared-credit-balance.mjs':{sharedPaidCreditBalance,sharedFreeMonthlyCredit},
   ...next,
   '@/lib/access-tier':{resolveAccessTier:async()=>({user_id:id})},
   '@/lib/free-monthly-feature-usage':{
@@ -362,9 +380,13 @@ const saleFree=profilePayload.freeMonthlyCredits.find(row=>row.featureKey==='sal
 assert.equal(saleFree.remainingUses,1,'a paid buyer still sees the monthly free use');
 assert.equal(saleFree.eligible,true);
 assert.equal(profilePayload.freeMonthlyCredits.find(row=>row.featureKey==='cadastru_lookup').totalGranted,1);
+assert.equal(profilePayload.sharedCredits.remainingUses,2);
+assert.equal(profilePayload.freeMonthlyCredit.remainingUses,1);
 reportedFreeEvents=[{feature_key:'sale_estimate'}];
 const usedProfilePayload=await (await profileCredits.GET(new Request('https://catdai.test/api/profile/credits'))).json();
 assert.equal(usedProfilePayload.freeMonthlyCredits.find(row=>row.featureKey==='sale_estimate').remainingUses,0,'free usage is counted independently of paid credits');
+assert.equal(usedProfilePayload.freeMonthlyCredit.remainingUses,0);
+assert.ok(usedProfilePayload.freeMonthlyCredits.every(row=>row.remainingUses===0),'free use on one feature exhausts all feature access projections');
 for (const [key,value] of Object.entries(savedUrlEnv)) { if(value===undefined)delete process.env[key];else process.env[key]=value; }
 process.env.PAYMENT_PROVIDER='paddle';assert.equal((await create.POST(createRequest({}))).status,409);delete process.env.PAYMENT_PROVIDER;
 for(const lang of ['ro','ru']) {
@@ -398,5 +420,7 @@ for (const mode of ['development','production']) {
   assert.equal(checkout.searchParams.get('existing'),'1');
 }
 delete process.env.PAYMENT_PROVIDER;
+assert.equal(usedProfilePayload.freeMonthlyCredit.remainingUses,0);
+assert.ok(usedProfilePayload.freeMonthlyCredits.every(row=>row.remainingUses===0),'free use on one feature exhausts all feature access projections');
 for (const [key,value] of Object.entries(savedUrlEnv)) { if(value===undefined)delete process.env[key];else process.env[key]=value; }
 console.log('Development/production payment origins, MAIB callback/return URLs and Paddle checkout URLs passed.');

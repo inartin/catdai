@@ -1,8 +1,8 @@
+import { sharedPaidCreditBalance, sharedFreeMonthlyCredit } from "@/lib/shared-credit-balance.mjs";
 import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import {
   FREE_MONTHLY_FEATURE_KEYS,
-  getFreeMonthlyFeatureLimit,
   getFreeMonthlyFeatureUsageWindow,
 } from "@/lib/free-monthly-feature-usage";
 import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
@@ -28,30 +28,16 @@ function normalizeCreditRows(rows) {
 }
 
 function normalizeFreeMonthlyRows({ usageRows = [] } = {}) {
-  const usedByFeature = new Map();
-
-  for (const row of usageRows || []) {
-    usedByFeature.set(row.feature_key, (usedByFeature.get(row.feature_key) || 0) + 1);
-  }
-
-  return FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
-    const featureLimit = getFreeMonthlyFeatureLimit(featureKey);
-    const used = usedByFeature.get(featureKey) || 0;
-    return {
-      featureKey,
-      remainingUses: Math.max(featureLimit - used, 0),
-      totalGranted: featureLimit,
-      totalUsed: Math.min(used, featureLimit),
-      source: "free_monthly",
-      eligible: featureLimit > 0,
-    };
-  });
+  return FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => ({
+    featureKey,
+    ...sharedFreeMonthlyCredit(usageRows),
+  }));
 }
 
 export async function GET(request) {
   const access = await resolveAccessTier(request);
   if (!access.user_id) {
-    return NextResponse.json({ credits: [] });
+    return NextResponse.json({ credits: [], sharedCredits: null, freeMonthlyCredit: null });
   }
 
   const { data, error } = await supabaseAdmin
@@ -63,6 +49,8 @@ export async function GET(request) {
     if (isMissingSchemaError(error)) {
       return NextResponse.json({
         credits: normalizeCreditRows([]),
+        sharedCredits: null,
+        freeMonthlyCredit: null,
         freeMonthlyCredits: normalizeFreeMonthlyRows(),
       });
     }
@@ -70,6 +58,8 @@ export async function GET(request) {
     console.error("[profile-credits] credits failed:", error.message);
     return NextResponse.json({
       credits: normalizeCreditRows([]),
+      sharedCredits: null,
+      freeMonthlyCredit: null,
       freeMonthlyCredits: normalizeFreeMonthlyRows(),
     });
   }
@@ -90,6 +80,8 @@ export async function GET(request) {
 
   return NextResponse.json({
     credits: normalizeCreditRows(data || []),
+    sharedCredits: sharedPaidCreditBalance(data || []),
+    freeMonthlyCredit: freeUsageError ? null : sharedFreeMonthlyCredit(freeUsageData || []),
     freeMonthlyCredits: normalizeFreeMonthlyRows({
       usageRows: freeUsageError ? [] : freeUsageData || [],
     }),

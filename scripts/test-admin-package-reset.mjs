@@ -1,3 +1,4 @@
+import { sharedPaidCreditBalance, sharedFreeMonthlyCredit } from "../src/lib/shared-credit-balance.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
@@ -22,6 +23,7 @@ const supabaseAdmin = {
   } },
 };
 const mocks = {
+  "@/lib/shared-credit-balance.mjs": { sharedPaidCreditBalance, sharedFreeMonthlyCredit },
   "next/server": { NextResponse: { json: Response.json } },
   "@/lib/admin-auth": { requireAdminApiAuth: () => null },
   "@/lib/supabase-admin": { supabaseAdmin },
@@ -50,6 +52,8 @@ let response = await setPackage("free");
 assert.equal(response.status, 200);
 let body = await response.json();
 assert.equal(body.packageKey, "free");
+assert.equal(body.sharedCredits.remainingUses, 0);
+assert.equal(body.freeMonthlyCredit.remainingUses, 1);
 assert.deepEqual(body.credits, []);
 assert.equal(body.freeMonthlyCredits.length, 6);
 assert.ok(body.freeMonthlyCredits.every(row => row.remainingUses === 1 && row.totalUsed === 0));
@@ -67,6 +71,8 @@ calls.length = 0;
 response = await setPackage("standard_pack");
 body = await response.json();
 assert.equal(response.status, 200);
+assert.equal(body.sharedCredits.remainingUses, 12);
+assert.equal(body.freeMonthlyCredit.remainingUses, 1);
 assert.ok(body.credits.every(row => row.remainingUses === 2 && row.totalUsed === 0));
 assert.ok(body.freeMonthlyCredits.every(row => row.remainingUses === 1 && row.totalUsed === 0));
 assert.equal(calls.find(call => call[0] === "rpc")[2].p_clear, false);

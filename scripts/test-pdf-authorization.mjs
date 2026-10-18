@@ -36,7 +36,7 @@ const payment = await load('src/lib/paid-feature-usage.js', {
   'node:crypto': { default: crypto },
   '@/lib/runtime-persistence': { shouldPersistRuntimeData: () => true },
   '@/lib/payment-products': { isKnownPaymentFeature: key => key === 'pdf_report',
-    getFeaturePurchaseOffer: () => ({ product_key: 'pdf_report_single', price_mdl: 25 }) },
+    getFeaturePurchaseOffer: () => ({ product_key: 'pdf_report_single', price_mdl: 15 }) },
   '@/lib/free-monthly-feature-usage': {
     makeMonthlyFeatureUsageKey: (key, payload) => `${key}:${payload.idempotencyKey}`,
     checkFreeMonthlyFeatureUsage: noop,
@@ -53,7 +53,7 @@ const payment = await load('src/lib/paid-feature-usage.js', {
       eq(field, value) { if (field === 'idempotency_key') key = value; return query; },
       maybeSingle: async () => ({ data: paidEvents.get(key) || null }) }; return query; },
     async rpc(name, args) {
-      assert.equal(name, 'consume_user_feature_credit');
+      assert.equal(name, 'consume_user_credit');
       assert.equal(args.p_feature_key, 'pdf_report'); paidCalls++;
       if (!pdfCredits) return { data: { allowed: false, reason: 'no_credit' } };
       pdfCredits--; paidEvents.set(args.p_idempotency_key, { id: 'pdf-use', source: 'maib' });
@@ -151,7 +151,7 @@ function text(node) {
 for (lang of ['ro', 'ru']) {
   slots = []; cursor = 0;
   const offer = pricing.default({ offer: { product_key: 'pdf_report_single' } });
-  assert.match(text(offer), /25 lei/);
+  assert.match(text(offer), /15 lei/);
   assert.match(text(offer), new RegExp(messages[lang]['pricing.featurePdf']));
   assert(find(offer, node => node.type === 'button' && !node.props.disabled).length,
     `${lang}: purchase action is available immediately`);

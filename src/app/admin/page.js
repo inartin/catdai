@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Tooltip from "@/components/Tooltip";
 import { groupExternalApiEvents } from "@/lib/admin-external-api-groups";
-import ProfileCreditBalances from "@/components/ProfileCreditBalances";
+import AdminUserCredits from "@/components/AdminUserCredits";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 
 function fmtNum(n) {
@@ -730,6 +730,7 @@ export default function AdminDashboard() {
   const [selectedUserPackageSaving, setSelectedUserPackageSaving] = useState(false);
   const [selectedUserPackageError, setSelectedUserPackageError] = useState(null);
   const [selectedUserCreditResetConfirming, setSelectedUserCreditResetConfirming] = useState(false);
+  const [selectedUserCreditsAdjusting, setSelectedUserCreditsAdjusting] = useState(false);
   const [selectedUserCreditResetSaving, setSelectedUserCreditResetSaving] = useState(false);
   const [selectedUserCreditResetError, setSelectedUserCreditResetError] = useState(null);
   const [activeEstimationsType, setActiveEstimationsType] = useState(null);
@@ -827,7 +828,7 @@ export default function AdminDashboard() {
     if (!selectedUser) return undefined;
 
     const handlePointerDown = (event) => {
-      if (selectedUserPopupRef.current?.contains(event.target)) return;
+      if (selectedUserCreditsAdjusting || selectedUserPackageSaving || selectedUserCreditResetSaving || selectedUserPopupRef.current?.contains(event.target)) return;
       setSelectedUser(null);
     };
 
@@ -838,7 +839,7 @@ export default function AdminDashboard() {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("touchstart", handlePointerDown);
     };
-  }, [selectedUser]);
+  }, [selectedUser, selectedUserCreditsAdjusting, selectedUserPackageSaving, selectedUserCreditResetSaving]);
 
   const loadUsers = async () => {
     setUsersLoading(true);
@@ -864,7 +865,7 @@ export default function AdminDashboard() {
   };
 
   const saveSelectedUserPackage = async () => {
-    if (!selectedUser?.id || !selectedUserPackageDraft || selectedUserPackageDraft === selectedUser.packageKey) return;
+    if (selectedUserCreditsAdjusting || !selectedUser?.id || !selectedUserPackageDraft || selectedUserPackageDraft === selectedUser.packageKey) return;
 
     setSelectedUserPackageSaving(true);
     setSelectedUserPackageError(null);
@@ -882,6 +883,8 @@ export default function AdminDashboard() {
         ...selectedUser,
         packageKey: data.packageKey,
         packageSource: "admin",
+        sharedCredits: data.sharedCredits,
+        freeMonthlyCredit: data.freeMonthlyCredit,
         credits: Array.isArray(data.credits) ? data.credits : selectedUser.credits,
         freeMonthlyCredits: Array.isArray(data.freeMonthlyCredits) ? data.freeMonthlyCredits : selectedUser.freeMonthlyCredits,
       };
@@ -898,7 +901,7 @@ export default function AdminDashboard() {
   };
 
   const resetSelectedUserCredits = async () => {
-    if (!selectedUser?.id || !selectedUser.packageKey) return;
+    if (selectedUserCreditsAdjusting || !selectedUser?.id || !selectedUser.packageKey) return;
 
     setSelectedUserCreditResetSaving(true);
     setSelectedUserCreditResetError(null);
@@ -916,6 +919,8 @@ export default function AdminDashboard() {
         ...selectedUser,
         packageKey: data.packageKey,
         packageSource: "admin",
+        sharedCredits: data.sharedCredits,
+        freeMonthlyCredit: data.freeMonthlyCredit,
         credits: Array.isArray(data.credits) ? data.credits : selectedUser.credits,
         freeMonthlyCredits: Array.isArray(data.freeMonthlyCredits) ? data.freeMonthlyCredits : selectedUser.freeMonthlyCredits,
       };
@@ -1107,7 +1112,7 @@ export default function AdminDashboard() {
                               setSelectedUserPackageMenuOpen(false);
                               setSelectedUserPackageError(null);
                             }}
-                            disabled={selectedUserPackageSaving}
+                            disabled={selectedUserPackageSaving || selectedUserCreditsAdjusting || selectedUserCreditResetSaving}
                             className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:text-gray-400"
                           >
                             Anulează
@@ -1115,7 +1120,7 @@ export default function AdminDashboard() {
                           <button
                             type="button"
                             onClick={saveSelectedUserPackage}
-                            disabled={selectedUserPackageSaving}
+                            disabled={selectedUserPackageSaving || selectedUserCreditsAdjusting || selectedUserCreditResetSaving}
                             className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white hover:bg-primary-dark disabled:bg-gray-300"
                           >
                             {selectedUserPackageSaving ? "Salvare..." : "Salvează"}
@@ -1142,7 +1147,7 @@ export default function AdminDashboard() {
                   </button>
                   {selectedUserCreditResetConfirming && (
                     <div className="absolute right-0 top-full z-10 mt-2 w-52 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                      <p className="text-xs font-medium text-gray-700">Resetezi utilizările pentru pachetul curent?</p>
+                      <p className="text-xs font-medium text-gray-700">Restabilești creditele pachetului curent și creditul gratuit lunar?</p>
                       <div className="mt-2 flex items-center justify-end gap-2">
                         <button
                           type="button"
@@ -1150,7 +1155,7 @@ export default function AdminDashboard() {
                             setSelectedUserCreditResetConfirming(false);
                             setSelectedUserCreditResetError(null);
                           }}
-                          disabled={selectedUserCreditResetSaving}
+                          disabled={selectedUserCreditResetSaving || selectedUserCreditsAdjusting || selectedUserPackageSaving}
                           className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:text-gray-400"
                         >
                           Anulează
@@ -1158,7 +1163,7 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={resetSelectedUserCredits}
-                          disabled={selectedUserCreditResetSaving}
+                          disabled={selectedUserCreditResetSaving || selectedUserCreditsAdjusting || selectedUserPackageSaving}
                           className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white hover:bg-primary-dark disabled:bg-gray-300"
                         >
                           {selectedUserCreditResetSaving ? "Resetare..." : "Confirmă"}
@@ -1173,6 +1178,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setSelectedUser(null)}
+                  disabled={selectedUserCreditsAdjusting || selectedUserPackageSaving || selectedUserCreditResetSaving}
                   className="rounded-full border border-gray-200 px-2.5 py-1 text-sm font-medium text-gray-500 hover:bg-gray-50"
                   aria-label="Close"
                 >
@@ -1181,10 +1187,15 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="max-h-[75vh] overflow-y-auto p-4 sm:p-5">
-              <ProfileCreditBalances
-                credits={selectedUser.credits || []}
-                freeMonthlyCredits={selectedUser.freeMonthlyCredits || []}
-                isDarkMode
+              <AdminUserCredits
+                key={selectedUser.id}
+                user={selectedUser}
+                disabled={selectedUserPackageSaving || selectedUserCreditResetSaving}
+                onBusyChange={setSelectedUserCreditsAdjusting}
+                onUpdate={(userId, sharedCredits) => {
+                  setSelectedUser(current => current?.id === userId ? { ...current, sharedCredits } : current);
+                  setUsers(items => items.map(item => item.id === userId ? { ...item, sharedCredits } : item));
+                }}
               />
               <div className="mt-5">
                 <h3 className="mb-3 text-base font-semibold text-gray-900">Plăți</h3>

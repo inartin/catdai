@@ -149,12 +149,12 @@ for(const row of await allBalances()) assert.equal(row.remaining_uses,row.featur
 const quantityUser=crypto.randomUUID();
 await q('insert into auth.users values($1)',[quantityUser]);
 const quantityOrder=await purchaseProduct('cadastru_lookup_single',quantityUser,4);
-assert.equal(quantityOrder.amount_minor,7700);
+assert.equal(quantityOrder.amount_minor,6000);
 const quantityBalance=async () => (await q("select remaining_uses,total_used from user_feature_credit_balances where user_id=$1 and feature_key='cadastru_lookup'",[quantityUser]))[0];
 assert.equal((await quantityBalance()).remaining_uses,4,'four discounted searches are granted once despite duplicate confirmations');
 await q("select consume_user_feature_credit($1,'cadastru_lookup',$2,'{}')",[quantityUser,'quantity-search']);
 assert.equal((await quantityBalance()).remaining_uses,3);
-const quantityRefund=[quantityOrder.id,'sandbox',quantityOrder.checkout,quantityOrder.payment,7700,'MDL','refunded',7700];
+const quantityRefund=[quantityOrder.id,'sandbox',quantityOrder.checkout,quantityOrder.payment,6000,'MDL','refunded',6000];
 await q('select apply_maib_payment($1,$2,$3,$4,$5,$6,$7,$8,now())',quantityRefund);
 assert.equal((await quantityBalance()).remaining_uses,0,'bulk refund removes only the unused searches');
 assert.equal((await quantityBalance()).total_used,1);

@@ -1,3 +1,4 @@
+import { withCadastruOutcome } from "@/lib/cadastru-outcome";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { suggestRoadTypes, suggestStreets } from "@/lib/cadastru-street-suggestions";
 import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSuggestionRecovery } from "@/lib/cadastru-suggestion-recovery";
@@ -128,7 +129,7 @@ function validateAddressFields({ street, houseNumber, apartmentNumber }) {
   return { valid: true };
 }
 
-export async function POST(request) {
+async function handlePost(request) {
   const ip = getClientIp(request);
   const { allowed, remaining, retryAfter } = limiter.check(ip);
 
@@ -306,9 +307,14 @@ export async function POST(request) {
         lookup_source: lookupSource || null,
       },
     };
-    const creditUsage = process.env.NODE_ENV === "development" && shouldTrackCadastruSearch
-      ? await checkFeatureAccess(creditArgs)
-      : await consumeFeatureCredit(creditArgs);
+    let creditUsage;
+    try {
+      creditUsage = process.env.NODE_ENV === "development" && shouldTrackCadastruSearch
+        ? await checkFeatureAccess(creditArgs)
+        : await consumeFeatureCredit(creditArgs);
+    } catch (cause) {
+      throw Object.assign(new Error("Cadastru credit authorization failed", { cause }), { code: "credit_authorization_failed" });
+    }
     if (creditUsage.allowed) return null;
     const response = NextResponse.json(
       {
@@ -373,6 +379,7 @@ export async function POST(request) {
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
+    if (error?.code === "credit_authorization_failed") throw error;
     if (shouldRefreshStoredDistrict) return respondWithStored();
     if (!skipCache && apartmentNumber && ![400, 401, 403, 422].includes(error?.status)) {
       const stale = await getCadastruRecordByAddress(lookupAddress, { structuredAddress, allowExpired: true, requireUnitDetails: true });
@@ -469,6 +476,7 @@ export async function POST(request) {
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
+    if (error?.code === "credit_authorization_failed") throw error;
     console.error("[cadastru/address] lookup failed:", {
       message: error?.message || String(error),
       address: rawAddress,
@@ -502,3 +510,5 @@ export async function POST(request) {
     );
   }
 }
+
+export const POST = withCadastruOutcome(handlePost);

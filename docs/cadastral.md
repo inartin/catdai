@@ -3,6 +3,8 @@
 ## Stage
 Implemented and active, with partial fallback.
 
+Server-side 5xx outcomes from standalone searches are recorded as `error`, including failures after cached data is found. Retries update the same event outcome without resetting its timestamp or valuation progress. Unhandled application/credit errors return `internal_error` and a localized internal-error message, not the cadastral-provider outage message. Network failures still cannot establish whether the browser received a successful response.
+
 ## What It Does
 - User enters a cadastral number in the valuation form.
 - User can also add a cadastral number from the PDF export dialog when the current evaluation lacks official cadastral data.

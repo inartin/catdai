@@ -81,6 +81,7 @@ Shows:
 - Admin uploads use the `img` Supabase Storage bucket by default, or `SUPABASE_IMAGE_BUCKET` when set. Files are saved at the bucket root with a unique sanitized filename. The bucket must be public to use the returned `getPublicUrl` URL without an expiration date; signed URLs are not used.
 
 ## Data Views
+- Cadastru search rows show `Failed` for recorded server-side 5xx outcomes, and the result summary includes failed searches. Apply `20261018090933_cadastru_failed_search_results.sql` before deploying this logging. Retries update the existing event's result type; external API statistics remain worker-only. Historical success rows cannot establish final response delivery and are not automatically reclassified.
 - Listings list with search, active filter, rooms filter, sorting, pagination.
 - Listings page loads `/api/admin/listings/stats` for total listings, active/inactive listings, owner count, average price, average price per m2, market direction for 24h/7d/30d, distributions by district/rooms/renovation/building type, and recent listings.
 - Listings page also shows listings with multiple price-history entries, displays the total count for that group, loads the newest 10 first, has a `Load more` button for 10 more rows, and lets the loaded rows be sorted by history count.

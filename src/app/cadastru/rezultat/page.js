@@ -39,6 +39,7 @@ const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
 const ADDRESS_LOOKUP_REQUEST_STORAGE_KEY = "catdai:cadastru-address-lookup-request:v1";
 
 function readLookupError(payload, t) {
+  if (payload?.error === "internal_error") return t("cadastru.internalError");
   if (payload?.error === "unauthorized") return t("cadastru.loginToUse");
   if (payload?.error === "invalid_format") return t("form.cadastralInvalid");
   if (payload?.error === "missing_fields") return t("cadastru.missingAddressFields");
@@ -50,6 +51,7 @@ function readLookupError(payload, t) {
 }
 
 function isLookupUnavailable(response) {
+  if (response.data?.error === "internal_error") return false;
   return response.status === 408 || response.status >= 500 ||
     ["service_unavailable", "timeout", "external_cadastru_timeout", "external_cadastru_unreachable"].includes(response.data?.error);
 }

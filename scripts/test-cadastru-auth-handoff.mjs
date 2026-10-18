@@ -276,3 +276,18 @@ assert(!form.storage.has(addressKey), 'number submission clears stale address re
 form.remount(); enterNumber(); submit('cadastru.numberSearchButton');
 assert.notEqual(new URL(form.browser.location.href).searchParams.get('lookup_id'), numberFirst);
 console.log('Search identity passed: submissions, OAuth reload, effect restarts, failure and in-flight token refresh, user changes, remounts, explicit corrections and address-to-number handoff.');
+
+for (const type of ['address', 'number']) {
+  const internal = await harness(pageFile, type === 'number'
+    ? `/ro/cadastru/rezultat?source=number&cadastral_number=${number}`
+    : '/ro/cadastru/rezultat?source=address&lookup=1',
+    type === 'address' ? { [addressKey]: JSON.stringify(address) } : {});
+  internal.login(); internal.render();
+  await internal.finish({ error: 'internal_error' },500);
+  internal.render(); internal.runRetryTimer(); internal.render();
+  await internal.finish({ error: 'internal_error' },500);
+  const content = JSON.stringify(internal.render());
+  assert(content.includes('cadastru.internalError'),type);
+  assert(!content.includes('cadastru.serviceUnavailable'),type);
+}
+console.log('Internal application errors use distinct copy after the bounded retry.');

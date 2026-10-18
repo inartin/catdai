@@ -307,6 +307,7 @@
   "cadastru.numberSearchButton": "Verifică numărul cadastral",
   "cadastru.searching": "Se caută...",
   "cadastru.lookupError": "Nu am putut găsi date cadastrale. Verifică datele introduse.",
+  "cadastru.internalError": "Nu am putut finaliza cererea din cauza unei erori interne. Încearcă din nou mai târziu.",
   "cadastru.serviceUnavailable": "Serviciul cadastral este temporar indisponibil. Încearcă din nou mai târziu.",
   "cadastru.retrying": "Nu am primit datele cadastrale la prima încercare. Reîncercăm căutarea…",
   "cadastru.retrySearch": "Încearcă din nou",

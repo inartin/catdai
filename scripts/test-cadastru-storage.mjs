@@ -1511,3 +1511,37 @@ const confirmedLocality = await localityRoute.POST(request({ ...localityFields, 
 assert.equal(confirmedLocality.status, 200);
 assert.equal(localityWrites, 1); assert.equal(localityCredits, 1);
 console.log('Locality confirmation route passed: exact street/type/house/unit, supported city, no writes or credits before selection, normal confirmed lookup.');
+
+// A successful snapshot must not hide a failed credit authorization in telemetry.
+for (const mode of ['cached-address', 'fresh-address', 'number']) {
+  const failures = [];
+  const brokenCredits = await load(mode === 'number' ? 'src/app/api/cadastral/route.js' : 'src/app/api/cadastru/address/route.js', {
+    ...routeMocks,
+    '@/lib/paid-feature-usage': {
+      ...routeMocks['@/lib/paid-feature-usage'],
+      checkFeatureAccess: async () => ({ allowed: true }),
+      consumeFeatureCredit: async () => { throw new Error('Credit schema incomplete'); },
+    },
+    '@/lib/cadastru-records': {
+      ...storage,
+      getCadastruRecordByAddress: async () => ({ payload: { ...expected, district: 'Botanica' }, lookupSource: 'api' }),
+      getCadastruRecordByNumber: async () => ({ payload: expected, lookupSource: 'api' }),
+      persistCadastruAddressResult: async value => value,
+      persistCadastruRecord: async value => value,
+    },
+    '@/lib/cadastru-external-api': {
+      fetchExternalCadastruAddressData: async () => expected,
+      fetchExternalCadastralData: async () => expected,
+    },
+    '@/lib/cadastru-search-events': { logCadastruSearchEvent: async (_, type, options) => failures.push({ type, ...options }) },
+  });
+  const lookupId = crypto.randomUUID();
+  const response = await brokenCredits.POST(request(mode === 'number'
+    ? { cadastral_number: number, lookup_id: lookupId }
+    : { ...addressBody, lookup_id: lookupId, skip_cache: mode === 'fresh-address' }));
+  assert.equal(response.status,500,mode);
+  assert.equal((await response.json()).error,'internal_error',mode);
+  assert.equal(failures.at(-1).resultType,'error',mode);
+  assert.equal(failures.at(-1).lookupId,lookupId,mode);
+}
+console.log('Credit failure regressions passed: cached/fresh addresses and number results report internal errors and failed search outcomes.');

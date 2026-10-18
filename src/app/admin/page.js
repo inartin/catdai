@@ -133,6 +133,7 @@ function fmtCadastruResultSummary(byResultType) {
     ["land_only", "land"],
     ["address_only", "address"],
     ["no_data", "none"],
+    ["error", "failed"],
   ]
     .map(([key, label]) => counts[key] ? `${fmtNum(counts[key])} ${label}` : null)
     .filter(Boolean);
@@ -604,10 +605,10 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
                   </td>
                   <td className="px-4 py-3">
                     {row.result_type ? (
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "no_data"
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "error" ? "bg-red-50 text-red-700" : row.result_type === "no_data"
                         ? "bg-gray-100 text-gray-600"
                         : "bg-green-50 text-green-700"}`}>
-                        {row.result_type === "no_data" ? "No result" : "Success"}
+                        {row.result_type === "error" ? "Failed" : row.result_type === "no_data" ? "No result" : "Success"}
                       </span>
                     ) : "\u2014"}
                   </td>

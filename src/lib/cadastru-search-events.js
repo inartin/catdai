@@ -6,7 +6,7 @@ import { createCadastruEvaluationToken } from "@/lib/cadastru-evaluation-trackin
 import { normalizeCadastruLookupId } from "@/lib/cadastru-lookup-tracking";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
-const RESULT_TYPES = new Set(["no_data", "address_only", "land_only", "apartment_only", "full_data"]);
+const RESULT_TYPES = new Set(["error", "no_data", "address_only", "land_only", "apartment_only", "full_data"]);
 const LOOKUP_SOURCES = new Set(["api", "local"]);
 
 function normalizeSearchType(searchType) {
@@ -139,10 +139,9 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
     }
 
     if (error?.code === "23505" && row.event_key) {
-      // Concurrent retries return the original event without resetting its time
-      // or evaluation progress. The database unique index arbitrates the race.
+      // Retain event identity/time/progress, but reflect the latest attempt outcome.
       ({ data, error } = await supabaseAdmin.from("cadastru_search_events")
-        .select("id").eq("event_key", row.event_key).single());
+        .update({ result_type: row.result_type }).eq("event_key", row.event_key).select("id").single());
     }
 
     if (error && !isMissingSchemaError(error)) {

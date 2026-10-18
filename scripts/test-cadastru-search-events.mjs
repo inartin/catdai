@@ -32,21 +32,24 @@ await db.exec("insert into cadastru_records(cadastral_number,result_type) values
 await assert.rejects(db.exec("insert into cadastru_records(cadastral_number,result_type) values ('5520202.183','unknown');"), /check constraint/);
 await assert.rejects(db.exec("insert into cadastru_search_events(search_type,result_type) values ('number','unknown');"), /check constraint/);
 
+await db.exec(await fs.readFile("supabase/migrations/20261018090933_cadastru_failed_search_results.sql", "utf8"));
+
 const errors = [];
 let persist = true;
 const environment = { NODE_ENV: "production", ADMIN_TOKEN: "isolated-test-secret" };
 const admin = {
   from(table) {
     assert.equal(table, "cadastru_search_events");
-    let row, key;
+    let row, key, updated;
     return {
       insert(value) { row = { ...value }; return this; },
+      update(value) { updated = value; return this; },
       select() { return this; },
       eq(column, value) { assert.equal(column, "event_key"); key = value; return this; },
       async single() {
         try {
           const columns = row && Object.keys(row);
-          const result = row
+          const result = updated ? await db.query("update cadastru_search_events set result_type=$1 where event_key=$2 returning id", [updated.result_type, key]) : row
             ? await db.query(`insert into cadastru_search_events (${columns.join(",")}) values (${columns.map((_, i) => `$${i + 1}`).join(",")}) returning id`,
               columns.map((column) => typeof row[column] === "object" && row[column] !== null ? JSON.stringify(row[column]) : row[column]))
             : await db.query("select id from cadastru_search_events where event_key=$1", [key]);
@@ -100,6 +103,11 @@ const anonymousId = eventId(await search({}, null));
 assert.notEqual(anonymousId, id, "anonymous preview retains separate attribution");
 assert.equal(eventId(await search({}, null)), anonymousId, "anonymous retries also dedupe");
 assert.equal(eventId(await search({ lookupId: options.lookupId.toUpperCase() })), id);
+assert.equal(eventId(await search({ resultType: "error" })), id);
+assert.equal((await getRow(id)).result_type, "error", "failed delivery replaces premature lookup success");
+await search();
+assert.equal((await getRow(id)).result_type, "address_only", "successful retry repairs the outcome");
+assert((await getRow(id)).valuation_clicked_at);
 const noData = { lookupId: crypto.randomUUID(), resultType: "no_data" };
 assert.equal(eventId(await search(noData)), eventId(await search(noData)), "no-result retries dedupe");
 const number = { lookupId: crypto.randomUUID(), cadastralNumber: "0100104.003.01" };

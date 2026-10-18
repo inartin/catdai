@@ -1,3 +1,4 @@
+import { withCadastruOutcome } from "@/lib/cadastru-outcome";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
@@ -426,7 +427,7 @@ async function enrichWithCadastruMdDetails(payload, cadastralNumber, accessTier)
   return detailPayload ? mergeCadastruMdDetailPayload(payload, detailPayload) : payload;
 }
 
-export async function POST(request) {
+async function handlePost(request) {
   const ip = getClientIp(request);
   const { allowed, remaining, retryAfter } = limiter.check(ip);
 
@@ -741,3 +742,5 @@ export async function POST(request) {
     );
   }
 }
+
+export const POST = withCadastruOutcome(handlePost);

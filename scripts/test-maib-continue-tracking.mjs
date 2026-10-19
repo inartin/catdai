@@ -52,6 +52,7 @@ assert.equal(events.length, 3);
 
 const rows = [];
 const mocks = {
+  "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
   'next/server': { NextResponse: { json: (body, options) => Response.json(body, options) } },
   '@/lib/access-tier': { resolveAccessTier: async () => ({ user_id: 'buyer' }) },
   '@/lib/rate-limit': { rateLimit: () => ({ check: () => ({ allowed: true }) }) },

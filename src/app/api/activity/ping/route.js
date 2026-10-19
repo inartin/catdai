@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { NextResponse } from "next/server";
@@ -9,7 +10,8 @@ function isMissingSchemaError(error) {
   return code === "42703" || code === "42P01";
 }
 
-export async function POST(request) {
+async function handlePost(request) {
+  if (!shouldCollectStatistics()) return NextResponse.json({ ok: true, persisted: false });
   const access = await resolveAccessTier(request);
   const userId = access.user_id;
 
@@ -64,3 +66,5 @@ export async function POST(request) {
 
   return NextResponse.json({ ok: true, updated: false });
 }
+
+export const POST = withStatisticsContext(handlePost);

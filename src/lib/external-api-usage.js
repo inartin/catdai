@@ -1,3 +1,4 @@
+import { shouldCollectStatistics } from "@/lib/statistics-context";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -46,7 +47,7 @@ export function getExternalApiDiagnosticHeaders(response) {
 }
 
 export function trackExternalApiUsage(service, status, details = {}) {
-  if (!shouldPersistRuntimeData()) return;
+  if (!shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
   if (!SERVICES.has(service) || !STATUSES.has(status)) return;
 
   return Promise.resolve().then(async () => {

@@ -4,6 +4,7 @@
 -- ============================================================
 
 create table if not exists user_listing_alerts (
+  collect_statistics boolean not null default true,
   id                text primary key default gen_random_uuid()::text,
   user_id           uuid not null references auth.users(id) on delete cascade,
 

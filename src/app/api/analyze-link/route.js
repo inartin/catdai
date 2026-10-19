@@ -1,3 +1,4 @@
+import { withStatisticsContext } from "@/lib/statistics-context";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { resolveAccessTier } from "@/lib/access-tier";
@@ -266,7 +267,7 @@ async function fetchAndParseListing(externalId, listingUrl, options = {}) {
   return { parsed, source: "local" };
 }
 
-export async function POST(request) {
+async function handlePost(request) {
   const ip = getClientIp(request);
   const { allowed, retryAfter } = limiter.check(ip);
   if (!allowed) {
@@ -360,3 +361,5 @@ export async function POST(request) {
     payload: buildSuccessPayload(externalId, parsed, mapped.params),
   });
 }
+
+export const POST = withStatisticsContext(handlePost);

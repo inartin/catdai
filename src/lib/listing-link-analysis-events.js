@@ -1,3 +1,4 @@
+import { shouldCollectStatistics } from "@/lib/statistics-context";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -34,7 +35,7 @@ function cleanInteger(value) {
 }
 
 export async function logListingLinkAnalysisEvent(request, event) {
-  if (!shouldPersistRuntimeData()) return;
+  if (!shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
 
   const status = STATUSES.has(event?.status) ? event.status : null;
   if (!status) return;

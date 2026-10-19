@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
@@ -43,7 +44,7 @@ export async function GET(request) {
   return NextResponse.json({ alerts: data || [] });
 }
 
-export async function POST(request) {
+async function handlePost(request) {
   const ip = getClientIp(request);
   const { allowed } = limiter.check(ip);
 
@@ -116,6 +117,7 @@ export async function POST(request) {
   const { data, error } = await supabaseAdmin
     .from("user_listing_alerts")
     .insert({
+      collect_statistics: shouldCollectStatistics(),
       user_id: access.user_id,
       label: normalizeText(body.label),
       website_enabled: body.website_enabled !== false,
@@ -194,3 +196,5 @@ export async function DELETE(request) {
 
   return NextResponse.json({ deleted: !!data });
 }
+
+export const POST = withStatisticsContext(handlePost);

@@ -1,5 +1,17 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
+const requestUsers = new WeakMap();
+
+export function getRequestUser(request) {
+  if (!requestUsers.has(request)) {
+    const token = getBearerToken(request);
+    requestUsers.set(request, token
+      ? supabaseAdmin.auth.getUser(token)
+      : Promise.resolve({ data: { user: null }, error: null }));
+  }
+  return requestUsers.get(request);
+}
+
 function getBearerToken(request) {
   const authorization = request.headers.get("authorization");
   if (!authorization) return null;
@@ -29,5 +41,6 @@ export async function resolveAccessTierFromToken(token) {
 }
 
 export async function resolveAccessTier(request) {
-  return resolveAccessTierFromToken(getBearerToken(request));
+  const { data, error } = await getRequestUser(request);
+  return { tier: "free", user_id: error ? null : data?.user?.id || null };
 }

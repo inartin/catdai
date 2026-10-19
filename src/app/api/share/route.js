@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
@@ -57,7 +58,7 @@ const PARAM_KEYS = [
   "cadastral_number",
 ];
 
-export async function POST(request) {
+async function handlePost(request) {
   const ip = getClientIp(request);
   const { allowed, remaining, retryAfter } = limiter.check(ip);
 
@@ -167,6 +168,7 @@ export async function POST(request) {
       slug,
       params: JSON.parse(canonical),
       params_hash: paramsHash,
+      collect_statistics: shouldCollectStatistics(),
       sharer_user_id: sharerUserId,
       sharer_is_paid: sharerIsPaid,
     });
@@ -192,3 +194,5 @@ function getAppBaseUrl(request) {
   if (host.includes("catdai.md")) return "https://catdai.md";
   return `${proto}://${host}`;
 }
+
+export const POST = withStatisticsContext(handlePost);

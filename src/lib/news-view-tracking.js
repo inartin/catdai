@@ -1,9 +1,11 @@
+import { fetchWithStatisticsAuth } from "@/lib/statistics-client";
+
 // Serialize view requests in this tab so simultaneous mounts cannot create
 // multiple visitor cookies before the browser has accepted the first one.
 let pendingView = Promise.resolve();
 
 async function sendView(postId) {
-  const response = await fetch("/api/news/views", {
+  const response = await fetchWithStatisticsAuth("/api/news/views", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },

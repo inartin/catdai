@@ -43,6 +43,8 @@ const supabaseAdmin = {
   },
 };
 const mocks = {
+  "@/lib/statistics-client": { fetchWithStatisticsAuth: (...args) => context.fetch(...args) },
+  "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
   "node:crypto": crypto,
   "@/lib/supabase-admin": { supabaseAdmin },
   "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => persist },

@@ -1,3 +1,4 @@
+import { shouldCollectStatistics } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -43,7 +44,7 @@ export function readSuggestionRecoveryToken(token, address) {
 }
 
 export async function recordSuggestionRecovery(recovery, { address, lookupSource }) {
-  if (!recovery || process.env.NODE_ENV === "development" || !shouldPersistRuntimeData()) return;
+  if (!recovery || process.env.NODE_ENV === "development" || !shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
   try {
     const { error } = await supabaseAdmin.from("external_api_usage_events")
       .update({ suggestion_recovery: {

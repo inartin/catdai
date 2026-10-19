@@ -1,3 +1,4 @@
+import { withStatisticsContext } from "@/lib/statistics-context";
 import { withCadastruOutcome } from "@/lib/cadastru-outcome";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { rateLimit } from "@/lib/rate-limit";
@@ -743,4 +744,4 @@ async function handlePost(request) {
   }
 }
 
-export const POST = withCadastruOutcome(handlePost);
+export const POST = withStatisticsContext(withCadastruOutcome(handlePost));

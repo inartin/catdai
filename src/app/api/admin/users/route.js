@@ -10,7 +10,7 @@ import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 60 * 1000;
-const CACHE_VERSION = 12;
+const CACHE_VERSION = 14;
 const PACKAGE_PRODUCT_KEYS = new Set(["standard_pack", "pro_pack", "extra_pack"]);
 let cache = { data: null, ts: 0 };
 
@@ -43,11 +43,9 @@ async function fetchUserIdRows(table, column) {
   let from = 0;
 
   while (true) {
-    const { data, error } = await supabaseAdmin
-      .from(table)
-      .select(column)
-      .not(column, "is", null)
-      .range(from, from + PAGE - 1);
+    let query = supabaseAdmin.from(table).select(column).not(column, "is", null);
+    if (["shared_links", "user_favorites"].includes(table)) query = query.eq("collect_statistics", true);
+    const { data, error } = await query.range(from, from + PAGE - 1);
 
     if (error) {
       if (isMissingSchemaError(error)) return [];
@@ -362,6 +360,7 @@ export async function GET(request) {
           id: user.id,
           name: userDisplayName(user),
           email: user.email || null,
+          isAdmin: user.app_metadata?.catdai_is_admin === true,
           authProvider: userAuthProvider(user),
           packageKey,
           packageSource: adminPackageKey ? "admin" : paidPackage ? "paid" : "free",

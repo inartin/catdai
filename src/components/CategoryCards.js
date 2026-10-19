@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fetchWithStatisticsAuth } from "@/lib/statistics-client";
 import { createPortal } from "react-dom";
 import { useTranslation } from "@/context/LanguageContext";
 import { useLivePrices } from "@/lib/useLivePrices";
@@ -30,12 +31,7 @@ const MARKET_SERIES = {
 
 function trackDistrictTrendsPopupOpen() {
   const send = () => {
-    if (typeof navigator.sendBeacon === "function") {
-      navigator.sendBeacon("/api/market-trends-popup-events");
-      return;
-    }
-
-    fetch("/api/market-trends-popup-events", {
+    fetchWithStatisticsAuth("/api/market-trends-popup-events", {
       method: "POST",
       keepalive: true,
     }).catch(() => {});

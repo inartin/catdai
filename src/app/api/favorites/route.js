@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
@@ -80,7 +81,7 @@ export async function GET(request) {
  * If already favorited → remove. If not → add.
  * Returns { favorited: boolean }
  */
-export async function POST(request) {
+async function handlePost(request) {
   const ip = getClientIp(request);
   const { allowed } = limiter.check(ip);
 
@@ -123,6 +124,7 @@ export async function POST(request) {
 
     devFavorites.set(key, {
       id: key,
+      collect_statistics: shouldCollectStatistics(),
       user_id: access.user_id,
       url_path,
       label: label || null,
@@ -153,6 +155,7 @@ export async function POST(request) {
   const { error: insertError } = await supabaseAdmin
     .from("user_favorites")
     .insert({
+      collect_statistics: shouldCollectStatistics(),
       user_id: access.user_id,
       url_path,
       label: label || null,
@@ -172,3 +175,5 @@ export async function POST(request) {
 
   return NextResponse.json({ favorited: true });
 }
+
+export const POST = withStatisticsContext(handlePost);

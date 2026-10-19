@@ -1,3 +1,4 @@
+import { shouldCollectStatistics } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
@@ -93,7 +94,7 @@ function resultValueForSearch(searchType, payload) {
 }
 
 export async function logCadastruSearchEvent(request, searchType, options = {}) {
-  if (process.env.NODE_ENV === "development" || !shouldPersistRuntimeData()) return;
+  if (process.env.NODE_ENV === "development" || !shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
 
   const normalizedType = normalizeSearchType(searchType);
   if (!normalizedType) return;

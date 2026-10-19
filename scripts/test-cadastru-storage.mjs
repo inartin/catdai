@@ -46,6 +46,7 @@ const supabaseAdmin = {
   },
 };
 const baseMocks = {
+  "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
   "node:crypto": { default: crypto },
   "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => persistEnabled },
   "@/lib/supabase-admin": { supabaseAdmin },

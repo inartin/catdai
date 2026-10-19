@@ -46,6 +46,7 @@ const supabase = {
 };
 const cache = new Map();
 const mocks = {
+  "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
   "@/lib/supabase-admin": { supabaseAdmin: supabase },
   "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => true },
   "@/lib/cache": { getSharedCache: async (key) => cache.has(key) ? { value: clone(cache.get(key)) } : null,

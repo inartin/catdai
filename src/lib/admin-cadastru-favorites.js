@@ -46,7 +46,7 @@ export async function loadCadastruFavorites(searches) {
   const favorites = [];
   for (let offset = 0; ; offset += PAGE_SIZE) {
     const { data, error } = await supabaseAdmin.from("user_favorites")
-      .select("id, user_id, url_path").in("user_id", userIds)
+      .select("id, user_id, url_path").eq("collect_statistics", true).in("user_id", userIds)
       .order("id", { ascending: true }).range(offset, offset + PAGE_SIZE - 1);
     if (error) throw new Error(`Cadastru favorites query failed: ${error.message}`);
     favorites.push(...(data || []));

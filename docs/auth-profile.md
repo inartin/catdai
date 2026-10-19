@@ -41,6 +41,7 @@ Implemented and active.
 ## Activity Tracking
 - Authenticated sessions ping `/api/activity/ping`.
 - Server updates `user_activity.last_seen_at`, throttled to 10 minutes.
+- Users marked Admin skip new activity/statistics writes; existing history remains. Payment and paid/free credit usage records continue normally. See [analytics](seo-analytics.md).
 
 ## Account Deletion
 - `/api/profile/delete` deletes the Supabase auth user.

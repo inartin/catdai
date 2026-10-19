@@ -720,11 +720,14 @@ export default function AdminDashboard() {
   const [showUsersList, setShowUsersList] = useState(false);
   const [showPaymentsList, setShowPaymentsList] = useState(false);
   const [users, setUsers] = useState([]);
+  const [lastVisitSort, setLastVisitSort] = useState(null);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState(null);
   const [expandedUserCadastruId, setExpandedUserCadastruId] = useState(null);
   const [userCadastruVersion, setUserCadastruVersion] = useState(0);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUserAdminSaving, setSelectedUserAdminSaving] = useState(false);
+  const [selectedUserAdminError, setSelectedUserAdminError] = useState(null);
   const [selectedUserTransactions, setSelectedUserTransactions] = useState([]);
   const [selectedUserTransactionsLoading, setSelectedUserTransactionsLoading] = useState(false);
   const [selectedUserPackageMenuOpen, setSelectedUserPackageMenuOpen] = useState(false);
@@ -824,13 +827,14 @@ export default function AdminDashboard() {
     setSelectedUserCreditResetConfirming(false);
     setSelectedUserCreditResetSaving(false);
     setSelectedUserCreditResetError(null);
+    setSelectedUserAdminError(null);
   }, [selectedUser?.id, selectedUser?.packageKey]);
 
   useEffect(() => {
     if (!selectedUser) return undefined;
 
     const handlePointerDown = (event) => {
-      if (selectedUserCreditsAdjusting || selectedUserPackageSaving || selectedUserCreditResetSaving || selectedUserPopupRef.current?.contains(event.target)) return;
+      if (selectedUserAdminSaving || selectedUserCreditsAdjusting || selectedUserPackageSaving || selectedUserCreditResetSaving || selectedUserPopupRef.current?.contains(event.target)) return;
       setSelectedUser(null);
     };
 
@@ -841,7 +845,7 @@ export default function AdminDashboard() {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("touchstart", handlePointerDown);
     };
-  }, [selectedUser, selectedUserCreditsAdjusting, selectedUserPackageSaving, selectedUserCreditResetSaving]);
+  }, [selectedUser, selectedUserAdminSaving, selectedUserCreditsAdjusting, selectedUserPackageSaving, selectedUserCreditResetSaving]);
 
   const loadUsers = async () => {
     setUsersLoading(true);
@@ -867,7 +871,7 @@ export default function AdminDashboard() {
   };
 
   const saveSelectedUserPackage = async () => {
-    if (selectedUserCreditsAdjusting || !selectedUser?.id || !selectedUserPackageDraft || selectedUserPackageDraft === selectedUser.packageKey) return;
+    if (selectedUserAdminSaving || selectedUserCreditsAdjusting || !selectedUser?.id || !selectedUserPackageDraft || selectedUserPackageDraft === selectedUser.packageKey) return;
 
     setSelectedUserPackageSaving(true);
     setSelectedUserPackageError(null);
@@ -903,7 +907,7 @@ export default function AdminDashboard() {
   };
 
   const resetSelectedUserCredits = async () => {
-    if (selectedUserCreditsAdjusting || !selectedUser?.id || !selectedUser.packageKey) return;
+    if (selectedUserAdminSaving || selectedUserCreditsAdjusting || !selectedUser?.id || !selectedUser.packageKey) return;
 
     setSelectedUserCreditResetSaving(true);
     setSelectedUserCreditResetError(null);
@@ -934,6 +938,28 @@ export default function AdminDashboard() {
       setSelectedUserCreditResetError(err.message || "Nu s-a putut reseta accesul");
     } finally {
       setSelectedUserCreditResetSaving(false);
+    }
+  };
+
+  const toggleSelectedUserAdmin = async () => {
+    if (!selectedUser?.id || selectedUserAdminSaving || selectedUserPackageSaving || selectedUserCreditResetSaving || selectedUserCreditsAdjusting) return;
+    const userId = selectedUser.id;
+    setSelectedUserAdminSaving(true);
+    setSelectedUserAdminError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/admin`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isAdmin: !selectedUser.isAdmin }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Nu s-a putut salva statutul de admin.");
+      setSelectedUser(current => current?.id === userId ? { ...current, isAdmin: data.isAdmin } : current);
+      setUsers(items => items.map(item => item.id === userId ? { ...item, isAdmin: data.isAdmin } : item));
+    } catch (err) {
+      setSelectedUserAdminError(err.message || "Nu s-a putut salva statutul de admin.");
+    } finally {
+      setSelectedUserAdminSaving(false);
     }
   };
 
@@ -1067,6 +1093,13 @@ export default function AdminDashboard() {
   }
 
   const s = stats;
+  const sortedUsers = lastVisitSort ? [...users].sort((a, b) => {
+    const aTime = Date.parse(a.lastVisitAt);
+    const bTime = Date.parse(b.lastVisitAt);
+    if (!Number.isFinite(aTime)) return Number.isFinite(bTime) ? 1 : 0;
+    if (!Number.isFinite(bTime)) return -1;
+    return lastVisitSort === "desc" ? bTime - aTime : aTime - bTime;
+  }) : users;
   const externalApiEvents = Array.isArray(s.externalApiUsage?.events)
     ? s.externalApiUsage.events
     : [];
@@ -1081,6 +1114,16 @@ export default function AdminDashboard() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{selectedUser.name || "\u2014"}</h2>
                 {selectedUser.email && <p className="mt-0.5 text-sm text-gray-500">{selectedUser.email}</p>}
+                <button
+                  type="button"
+                  aria-pressed={!!selectedUser.isAdmin}
+                  onClick={toggleSelectedUserAdmin}
+                  disabled={selectedUserAdminSaving || selectedUserPackageSaving || selectedUserCreditResetSaving || selectedUserCreditsAdjusting}
+                  className={`mt-2 cursor-pointer rounded-md border px-2.5 py-1 text-xs font-medium disabled:opacity-50 ${selectedUser.isAdmin ? "border-sky-200 bg-sky-50 text-sky-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+                >
+                  {selectedUserAdminSaving ? "Salvare..." : selectedUser.isAdmin ? "Admin · Elimină" : "Marchează ca admin"}
+                </button>
+                {selectedUserAdminError && <p role="alert" className="mt-1 text-xs text-red-600">{selectedUserAdminError}</p>}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative">
@@ -1114,7 +1157,7 @@ export default function AdminDashboard() {
                               setSelectedUserPackageMenuOpen(false);
                               setSelectedUserPackageError(null);
                             }}
-                            disabled={selectedUserPackageSaving || selectedUserCreditsAdjusting || selectedUserCreditResetSaving}
+                            disabled={selectedUserAdminSaving || selectedUserPackageSaving || selectedUserCreditsAdjusting || selectedUserCreditResetSaving}
                             className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:text-gray-400"
                           >
                             Anulează
@@ -1122,7 +1165,7 @@ export default function AdminDashboard() {
                           <button
                             type="button"
                             onClick={saveSelectedUserPackage}
-                            disabled={selectedUserPackageSaving || selectedUserCreditsAdjusting || selectedUserCreditResetSaving}
+                            disabled={selectedUserAdminSaving || selectedUserPackageSaving || selectedUserCreditsAdjusting || selectedUserCreditResetSaving}
                             className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white hover:bg-primary-dark disabled:bg-gray-300"
                           >
                             {selectedUserPackageSaving ? "Salvare..." : "Salvează"}
@@ -1157,7 +1200,7 @@ export default function AdminDashboard() {
                             setSelectedUserCreditResetConfirming(false);
                             setSelectedUserCreditResetError(null);
                           }}
-                          disabled={selectedUserCreditResetSaving || selectedUserCreditsAdjusting || selectedUserPackageSaving}
+                          disabled={selectedUserAdminSaving || selectedUserCreditResetSaving || selectedUserCreditsAdjusting || selectedUserPackageSaving}
                           className="rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:text-gray-400"
                         >
                           Anulează
@@ -1165,7 +1208,7 @@ export default function AdminDashboard() {
                         <button
                           type="button"
                           onClick={resetSelectedUserCredits}
-                          disabled={selectedUserCreditResetSaving || selectedUserCreditsAdjusting || selectedUserPackageSaving}
+                          disabled={selectedUserAdminSaving || selectedUserCreditResetSaving || selectedUserCreditsAdjusting || selectedUserPackageSaving}
                           className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-white hover:bg-primary-dark disabled:bg-gray-300"
                         >
                           {selectedUserCreditResetSaving ? "Resetare..." : "Confirmă"}
@@ -1180,7 +1223,7 @@ export default function AdminDashboard() {
                 <button
                   type="button"
                   onClick={() => setSelectedUser(null)}
-                  disabled={selectedUserCreditsAdjusting || selectedUserPackageSaving || selectedUserCreditResetSaving}
+                  disabled={selectedUserAdminSaving || selectedUserCreditsAdjusting || selectedUserPackageSaving || selectedUserCreditResetSaving}
                   className="rounded-full border border-gray-200 px-2.5 py-1 text-sm font-medium text-gray-500 hover:bg-gray-50"
                   aria-label="Close"
                 >
@@ -1192,7 +1235,7 @@ export default function AdminDashboard() {
               <AdminUserCredits
                 key={selectedUser.id}
                 user={selectedUser}
-                disabled={selectedUserPackageSaving || selectedUserCreditResetSaving}
+                disabled={selectedUserAdminSaving || selectedUserPackageSaving || selectedUserCreditResetSaving}
                 onBusyChange={setSelectedUserCreditsAdjusting}
                 onUpdate={(userId, sharedCredits) => {
                   setSelectedUser(current => current?.id === userId ? { ...current, sharedCredits } : current);
@@ -1262,9 +1305,9 @@ export default function AdminDashboard() {
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-12 gap-4">
           <StatCard
-            label="Registered Users"
-            value={fmtNum(s.totalUsers)}
-            detail={showUsersList ? "Click to hide list" : "Click to view all users"}
+            label="Active Users"
+            value={s.activeUsers == null ? "Unavailable" : fmtNum(s.activeUsers)}
+            detail={<><span className="block">New users: {fmtNum(s.newUsers)}</span>{dashboardPeriod === "all" && <span className="block">Total users: {fmtNum(s.totalUsers)}</span>}</>}
             onClick={toggleUsersList}
             active={showUsersList}
           />
@@ -1441,7 +1484,16 @@ export default function AdminDashboard() {
                       <th className="px-4 py-3">Package</th>
                       <th className="px-4 py-3">Registered Type</th>
                       <th className="px-4 py-3">Registered Date</th>
-                      <th className="px-4 py-3">Last Visit</th>
+                      <th className="px-4 py-3" aria-sort={lastVisitSort === "desc" ? "descending" : lastVisitSort === "asc" ? "ascending" : "none"}>
+                        <button
+                          type="button"
+                          onClick={() => setLastVisitSort((current) => current === "desc" ? "asc" : "desc")}
+                          className="inline-flex cursor-pointer items-center gap-1 whitespace-nowrap uppercase hover:text-gray-700"
+                        >
+                          Last Visit
+                          <span aria-hidden="true">{lastVisitSort === "desc" ? "↓" : lastVisitSort === "asc" ? "↑" : "↕"}</span>
+                        </button>
+                      </th>
                       <th className="px-4 py-3 text-right">Estimations</th>
                       <th className="px-4 py-3 text-right">Cadastru Searches</th>
                       <th className="px-4 py-3 text-right">Calculator Usage</th>
@@ -1452,9 +1504,9 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {users.map((u) => (
+                    {sortedUsers.map((u) => (
                       <Fragment key={u.id}>
-                        <tr className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
+                        <tr className={`${u.isAdmin ? "admin-user-row" : "hover:bg-gray-50"} [&>*+*]:border-l [&>*+*]:border-gray-100`}>
                           <td className="px-4 py-3 text-gray-900 font-medium">
                             <button
                               type="button"

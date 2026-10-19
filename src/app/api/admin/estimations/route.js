@@ -123,7 +123,7 @@ async function listAllUsers() {
 async function fetchSharedLinks() {
   const { data, error } = await supabaseAdmin
     .from("shared_links")
-    .select("id, params, sharer_user_id");
+    .select("id, params, sharer_user_id").eq("collect_statistics", true);
 
   if (error) {
     if (isMissingSchemaError(error)) return [];
@@ -136,7 +136,7 @@ async function fetchSharedLinks() {
 async function fetchFavorites() {
   const { data, error } = await supabaseAdmin
     .from("user_favorites")
-    .select("id, user_id, url_path");
+    .select("id, user_id, url_path").eq("collect_statistics", true);
 
   if (error) {
     if (isMissingSchemaError(error)) return [];

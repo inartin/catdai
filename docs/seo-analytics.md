@@ -29,7 +29,7 @@ Implemented.
 - About page includes `AboutPage`.
 
 ## Analytics And Consent
-- Google tag loads once and configures `NEXT_PUBLIC_GA_ID` plus Google Ads-provided tag `AW-18184166002`.
+- Google tag loads once and configures `NEXT_PUBLIC_GA_ID` plus Google Ads-provided tag `AW-18184166002`. Loading is independent of auth/admin status; Google traffic exclusion is managed in Google, without an app policy request or session check.
 - The shared Google tag script loads with the Ads ID first so Ads diagnostics see the expected source ID.
 - CSP allows Google Ads collection endpoints used by remarketing, consent mode, and view-through conversion checks.
 - CSP allows `https:` images so admin-authored news cover images and rich-description image links can render from external image hosts.
@@ -51,6 +51,9 @@ Implemented.
 - Runtime DB persistence for estimation logs, PDF events, cadastru search events, long-lived cadastru records, 999.md analysis events, shared links, favorites, and free monthly feature usage runs when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`.
 - In local `pnpm dev`, `/cadastru` and its localized/result routes skip Google tag configuration, ad-source events, checkout-popup events, and authenticated activity pings. Cadastru search and worker-usage statistics are also skipped while other pages follow their existing persistence rules.
 - Calculator result usage is stored in `calculator_usage_events` under the same runtime persistence rule, including property filters, investment fields, tax selection, result rent/yield/payback metrics, and registered/anonymous attribution.
+- `withStatisticsContext` in `src/lib/statistics-context.js` resolves current auth `app_metadata.catdai_is_admin` once per request and carries the collection policy through async/background work. Statistics writers check `shouldCollectStatistics`; routes that initiate worker calls use the same wrapper. Failed authenticated status checks suppress statistics. A new statistics-producing route must use this wrapper and predicate; runtime property caches and payment/credit accounting keep their separate persistence rules.
+- Browser tracking helpers attach the current session bearer token, including news views, market-trends popups and secondary Cadastru requests. Signed-out visits remain anonymous and are tracked normally.
+- Admin exclusion affects future statistics only. Operational favorites, shares and alerts store a creation-time `collect_statistics` flag; statistics queries use eligible rows while profile/favorite/share/alert functionality still uses all rows. Migration `20261019132539_admin_statistics_exclusion.sql` gives existing records the default `true`; no historical events are deleted or reclassified. Explicit news upvotes remain a user action, not passive view tracking.
 
 ## Related Files
 - `src/app/layout.js`
@@ -60,6 +63,8 @@ Implemented.
 - `src/components/CookieBanner.js`
 - `src/components/AdSourceTracker.js`
 - `src/lib/tracking.js`
+- `src/lib/statistics-context.js`
+- `src/lib/statistics-client.js`
 - `src/lib/admin-ad-tracking.js`
 - `src/lib/calculator-usage-events.js`
 - `src/lib/runtime-persistence.js`

@@ -1,3 +1,4 @@
+import { shouldCollectStatistics } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -551,7 +552,7 @@ export async function persistCadastruRecord(payload, options = {}) {
     }
 
     const now = new Date().toISOString();
-    const countLookup = options.countLookup !== false;
+    const countLookup = shouldCollectStatistics() && options.countLookup !== false;
     const shouldKeepExistingDetail = !sharedBuilding && existing && isFreshCadastru(recordExpiry(existing)) && row.raw_payload.method === "address" && hasDetailedPayload(existing.raw_payload) && !hasDetailedPayload(row.raw_payload);
     const retainedPayload = shouldKeepExistingDetail
       ? {

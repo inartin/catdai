@@ -1,3 +1,5 @@
+import { fetchWithStatisticsAuth } from "@/lib/statistics-client";
+
 const DEVICE_KEY = "catdai-device-id";
 const SESSION_KEY = "catdai-session-id";
 const AD_SOURCE_KEY = "catdai-ad-source";
@@ -82,15 +84,7 @@ export function trackAdSourceEvent(eventName, metadata = {}) {
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   try {
-    if (!accessToken && navigator.sendBeacon) {
-      const blob = new Blob([body], { type: "application/json" });
-      navigator.sendBeacon("/api/ad-source-events", blob);
-      return;
-    }
-  } catch {}
-
-  try {
-    fetch("/api/ad-source-events", {
+    fetchWithStatisticsAuth("/api/ad-source-events", {
       method: "POST",
       headers,
       body,
@@ -118,7 +112,7 @@ export function trackPaymentCheckoutEvent(eventType, metadata = {}) {
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   try {
-    fetch("/api/payment-checkout-events", {
+    fetchWithStatisticsAuth("/api/payment-checkout-events", {
       method: "POST",
       headers,
       body,

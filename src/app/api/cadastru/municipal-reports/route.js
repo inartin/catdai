@@ -1,3 +1,4 @@
+import { withStatisticsContext } from "@/lib/statistics-context";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
@@ -18,7 +19,7 @@ function clientIp(request) {
     || "unknown";
 }
 
-export async function POST(request) {
+async function handlePost(request) {
   const { allowed, retryAfter } = await limiter.check(clientIp(request));
   if (!allowed) return NextResponse.json({ error: "rate_limited" }, {
     status: 429, headers: { "Retry-After": String(retryAfter) },
@@ -73,3 +74,5 @@ export async function POST(request) {
     return NextResponse.json({ error: "municipal_reports_unavailable" }, { status: 503 });
   }
 }
+
+export const POST = withStatisticsContext(handlePost);

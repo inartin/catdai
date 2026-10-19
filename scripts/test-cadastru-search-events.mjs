@@ -62,6 +62,7 @@ const admin = {
 const context = vm.createContext({ crypto, Buffer, URL, console: { error: (...args) => errors.push(args) }, process: { env: environment } });
 const modules = new Map();
 const mocks = {
+  "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
   "node:crypto": { default: crypto },
   "@/lib/access-tier": { resolveAccessTier: async (request) => ({ user_id: request.userId }) },
   "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => persist },

@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
@@ -263,7 +264,7 @@ function hashIp(ip) {
 }
 
 function logEstimate(row) {
-  if (!shouldPersistRuntimeData()) return;
+  if (!shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
   supabaseAdmin
     .from("estimate_log")
     .upsert(row, { onConflict: "id" })
@@ -921,7 +922,7 @@ function buildEstimatePreview(payload, { hideMarketEstimate = false } = {}) {
   };
 }
 
-export async function POST(request) {
+async function handlePost(request) {
   const ip = getClientIp(request);
   const { allowed, remaining, retryAfter } = limiter.check(ip);
 
@@ -1200,3 +1201,5 @@ export async function POST(request) {
   res.headers.set("X-Estimate-Cache", "MISS");
   return res;
 }
+
+export const POST = withStatisticsContext(handlePost);

@@ -30,6 +30,7 @@ Selecting first floor or last floor clears the numeric floor filter fields becau
 ## Delivery Fields
 Alerts store `website_enabled`, `telegram_enabled`, and `telegram_chat_id`.
 Current UI saves alerts with website enabled and Telegram disabled by default.
+New alerts created by marked admins store `collect_statistics=false` and stay usable while being omitted from dashboard alert counts/lists. Historical eligibility is unchanged; see [analytics](seo-analytics.md).
 
 ## Missing Piece
 No in-repo job currently checks listings against alerts or sends notifications.

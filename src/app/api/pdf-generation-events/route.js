@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
@@ -20,7 +21,8 @@ function cleanText(value, maxLength = 120) {
   return trimmed ? trimmed.slice(0, maxLength) : null;
 }
 
-export async function POST(request) {
+async function handlePost(request) {
+  if (!shouldCollectStatistics()) return NextResponse.json({ ok: true, persisted: false });
   const limit = limiter.check(getClientIp(request));
   if (!limit.allowed) {
     return NextResponse.json(
@@ -66,3 +68,5 @@ export async function POST(request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export const POST = withStatisticsContext(handlePost);

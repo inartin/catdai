@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
@@ -41,7 +42,8 @@ function isMissingSchemaError(error) {
   return code === "42P01" || code === "42703" || code === "PGRST204" || code === "PGRST205" || message.includes("schema cache");
 }
 
-export async function POST(request) {
+async function handlePost(request) {
+  if (!shouldCollectStatistics()) return NextResponse.json({ ok: true, persisted: false });
   const ip = getClientIp(request);
   const limit = limiter.check(ip);
   if (!limit.allowed) {
@@ -97,3 +99,5 @@ export async function POST(request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export const POST = withStatisticsContext(handlePost);

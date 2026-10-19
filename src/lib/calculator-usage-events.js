@@ -1,3 +1,4 @@
+import { shouldCollectStatistics } from "@/lib/statistics-context";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -48,7 +49,7 @@ function calculateYieldMetrics(monthlyRent, calculator) {
 }
 
 export async function logCalculatorUsageEvent(request, event) {
-  if (!shouldPersistRuntimeData()) return;
+  if (!shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
   if (!event?.calculator_usage) return;
 
   const calculator = event.calculator_usage;

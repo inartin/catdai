@@ -96,22 +96,25 @@ function getMarketTrendsPeriodStart(period) {
 async function listAllUsers() {
   let users = [];
   let page = 1;
-  try {
-    while (true) {
-      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
-      if (error) {
-        console.error("Failed to list users:", error);
-        break;
-      }
-      if (!data || !data.users) break;
-      users = users.concat(data.users);
-      if (data.users.length < 1000) break;
-      page++;
-    }
-  } catch (err) {
-    console.error("Error in listAllUsers:", err);
+  while (true) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: PAGE });
+    if (error) throw new Error(`Failed to list users: ${error.message}`);
+    if (!data?.users) throw new Error("Missing user list");
+    users = users.concat(data.users);
+    if (data.users.length < PAGE) break;
+    page++;
   }
   return users;
+}
+
+async function fetchActiveUserCount(since) {
+  const { count, error } = await applySince(
+    supabaseAdmin.from("user_activity").select("*", { count: "exact", head: true }),
+    "last_seen_at",
+    since
+  );
+  if (error) throw new Error(`user_activity query failed: ${error.message}`);
+  return count;
 }
 
 function userDisplayName(user) {
@@ -142,7 +145,8 @@ async function fetchTelegramAlerts(since) {
         .select(
           "id, user_id, label, is_active, website_enabled, telegram_chat_id, base_filters, alert_filters, created_at, last_notified_at"
         )
-        .eq("telegram_enabled", true),
+        .eq("telegram_enabled", true)
+        .eq("collect_statistics", true),
       "created_at",
       since
     ).order("created_at", { ascending: false })
@@ -719,12 +723,12 @@ export async function GET(request) {
       listAllUsers(),
       fetchEstimationCounts(periodSince),
       applySince(
-        supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }),
+        supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }).eq("collect_statistics", true),
         "created_at",
         periodSince
       ),
       applySince(
-        supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }),
+        supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }).eq("collect_statistics", true),
         "created_at",
         periodSince
       ),
@@ -749,6 +753,10 @@ export async function GET(request) {
         console.error("Failed to load payment stats:", error.message);
         return { available: false, total: null, orders: [] };
       }),
+      fetchActiveUserCount(periodSince).catch((error) => {
+        console.error("Failed to load active users:", error.message);
+        return null;
+      }),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -770,6 +778,7 @@ export async function GET(request) {
     paymentCheckoutEvents,
     marketTrendsPopup,
     paymentSummary,
+    activeUsers,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
@@ -807,7 +816,9 @@ export async function GET(request) {
     period,
     periodLabel: periodConfig.label,
     periodSince,
-    totalUsers: filteredUsers.length,
+    activeUsers,
+    newUsers: filteredUsers.length,
+    totalUsers: users.length,
     totalEstimations: estimationCounts.sale || 0,
     totalSaleEstimations: estimationCounts.sale || 0,
     totalRentEstimations: estimationCounts.rent || 0,

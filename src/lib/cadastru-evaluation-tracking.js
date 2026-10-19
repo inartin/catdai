@@ -1,3 +1,4 @@
+import { shouldCollectStatistics } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -36,7 +37,7 @@ export function readCadastruEvaluationToken(token) {
 
 export async function recordCadastruEvaluationStep(token, step) {
   const eventId = readCadastruEvaluationToken(token);
-  if (!eventId || !shouldPersistRuntimeData() || process.env.NODE_ENV === "development") return false;
+  if (!eventId || !shouldCollectStatistics() || !shouldPersistRuntimeData() || process.env.NODE_ENV === "development") return false;
   const column = step === "click" ? "valuation_clicked_at" : step === "complete" ? "valuation_completed_at" : null;
   if (!column) return false;
 

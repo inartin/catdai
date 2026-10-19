@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -51,7 +52,8 @@ function cleanMetadata(metadata) {
   );
 }
 
-export async function POST(request) {
+async function handlePost(request) {
+  if (!shouldCollectStatistics()) return NextResponse.json({ ok: true, persisted: false });
   const ip = getClientIp(request);
   const limit = limiter.check(ip);
   if (!limit.allowed) {
@@ -98,3 +100,5 @@ export async function POST(request) {
 
   return NextResponse.json({ ok: true });
 }
+
+export const POST = withStatisticsContext(handlePost);

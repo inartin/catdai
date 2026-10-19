@@ -911,7 +911,7 @@ function CadastruResultContent() {
         try {
           const response = await fetch("/api/cadastru/nearby", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
             body: JSON.stringify({
               lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
               lookup_query: lookupTracking.current.query,
@@ -931,7 +931,7 @@ function CadastruResultContent() {
       cancelAnimationFrame(firstFrame);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, secondaryAvailable]);
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, secondaryAvailable, session?.access_token]);
 
   useEffect(() => {
     if (!secondaryAvailable || !nearbySearchAvailable) return;
@@ -947,7 +947,7 @@ function CadastruResultContent() {
         try {
           const response = await fetch("/api/cadastru/public-transport", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
             body: JSON.stringify({
               lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
               lookup_query: lookupTracking.current.query,
@@ -967,7 +967,7 @@ function CadastruResultContent() {
       cancelAnimationFrame(firstFrame);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, secondaryAvailable]);
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, secondaryAvailable, session?.access_token]);
 
   useEffect(() => {
     if (!secondaryAvailable || !nearbySearchAvailable || !reportsAvailable) return;
@@ -984,7 +984,7 @@ function CadastruResultContent() {
         try {
           const response = await fetch("/api/cadastru/municipal-reports", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
             body: JSON.stringify({
               lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
               lookup_query: lookupTracking.current.query,
@@ -1011,7 +1011,7 @@ function CadastruResultContent() {
       cancelAnimationFrame(firstFrame);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, reportsAvailable, secondaryAvailable]);
+  }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, reportsAvailable, secondaryAvailable, session?.access_token]);
 
   if (state.loading) return <CadastruLoadingPage
     cadastralNumber={cadastralNumber}
@@ -1196,7 +1196,7 @@ function CadastruResultContent() {
                     try {
                       await fetch("/api/cadastru/evaluation", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
                         body: JSON.stringify({ token: evaluationToken }),
                       });
                     } catch {

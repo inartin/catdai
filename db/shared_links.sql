@@ -4,6 +4,7 @@
 -- ============================================================
 
 create table if not exists shared_links (
+  collect_statistics boolean not null default true,
   id              text primary key default gen_random_uuid()::text,
   slug            text not null unique,
   params          jsonb not null,

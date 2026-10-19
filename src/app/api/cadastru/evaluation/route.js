@@ -1,7 +1,8 @@
+import { withStatisticsContext } from "@/lib/statistics-context";
 import { NextResponse } from "next/server";
 import { readCadastruEvaluationToken, recordCadastruEvaluationStep } from "@/lib/cadastru-evaluation-tracking";
 
-export async function POST(request) {
+async function handlePost(request) {
   let token;
   try {
     ({ token } = await request.json());
@@ -14,3 +15,5 @@ export async function POST(request) {
   const recorded = await recordCadastruEvaluationStep(token, "click");
   return NextResponse.json({ recorded });
 }
+
+export const POST = withStatisticsContext(handlePost);

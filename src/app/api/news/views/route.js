@@ -1,3 +1,4 @@
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isValidNewsPostId } from "@/lib/news-upvotes";
@@ -26,7 +27,7 @@ function setVisitorCookie(response, token, request) {
   return response;
 }
 
-export async function POST(request) {
+async function handlePost(request) {
   const origin = request.headers.get("origin");
   // The reverse proxy can expose the public HTTPS site while request.url
   // contains the internal HTTP origin. Keep the configured public origin valid.
@@ -53,7 +54,7 @@ export async function POST(request) {
   }
 
   let visitorToken;
-  if (shouldPersistRuntimeData()) {
+  if (shouldCollectStatistics() && shouldPersistRuntimeData()) {
     let visitorId;
     try {
       visitorId = readNewsVisitorCookie(request.cookies.get(NEWS_VISITOR_COOKIE)?.value);
@@ -90,3 +91,5 @@ export async function POST(request) {
   });
   return visitorToken ? setVisitorCookie(response, visitorToken, request) : response;
 }
+
+export const POST = withStatisticsContext(handlePost);

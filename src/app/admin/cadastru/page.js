@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import AdminCadastruOfflineSearch from "@/components/admin/AdminCadastruOfflineSearch";
+import AdminCadastruAddressReuse from "@/components/admin/AdminCadastruAddressReuse";
 
 const fmtNum = (value) => Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
 const percent = (value, total) => total ? Math.round(value / total * 100) : 0;
@@ -25,6 +26,8 @@ function StatCard({ label, value, detail, accent = false }) {
 export default function AdminCadastruPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedCity, setSelectedCity] = useState(null);
+  const [reuseRefresh, setReuseRefresh] = useState(0);
   const loadStats = useCallback(async (fresh = false) => {
     setLoading(true);
     try {
@@ -48,7 +51,7 @@ export default function AdminCadastruPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {stats?.available && <span className="text-xs text-gray-500">Updated {new Date(stats.updatedAt).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}</span>}
-          <button type="button" onClick={() => loadStats(true)} disabled={loading}
+          <button type="button" onClick={() => { setReuseRefresh((value) => value + 1); loadStats(true); }} disabled={loading}
             className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary/40 hover:text-primary disabled:text-gray-400">
             {loading ? "Refreshing…" : "Hard refresh"}
           </button>
@@ -125,7 +128,8 @@ export default function AdminCadastruPage() {
 
           <section aria-labelledby="city-heading" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 p-5 sm:px-6">
-              <h2 id="city-heading" className="text-lg font-semibold text-gray-900">Stored data by city</h2>
+              <div><h2 id="city-heading" className="text-lg font-semibold text-gray-900">Stored data by city</h2>
+                <p className="mt-1 text-xs text-gray-500">Select a city to see stored properties and search counts.</p></div>
               <p className="text-sm text-gray-500"><span className="font-semibold tabular-nums text-gray-900">{fmtNum(stats.total)}</span> unique cadastral numbers overall</p>
             </div>
             <div className="overflow-x-auto">
@@ -135,10 +139,21 @@ export default function AdminCadastruPage() {
                     <th key={label} scope="col" className={`whitespace-nowrap px-5 py-3 font-medium ${align}`}>{label}</th>)}
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
-                  {stats.byCity.map((row) => <tr key={row.city} className="hover:bg-gray-50">
-                    <th scope="row" className="px-5 py-3 text-left font-medium text-gray-700">{row.city}</th>
-                    {[row.buildings, row.apartments, row.other].map((value, index) => <td key={index} className="px-5 py-3 text-right tabular-nums text-gray-900">{fmtNum(value)}</td>)}
-                  </tr>)}
+                  {stats.byCity.map((row, index) => <Fragment key={row.city}>
+                    <tr onClick={() => setSelectedCity((current) => current === row.city ? null : row.city)}
+                      className={`cursor-pointer hover:bg-gray-50 ${selectedCity === row.city ? "bg-primary/5" : ""}`}>
+                      <th scope="row" className="px-5 py-3 text-left font-medium text-gray-700">
+                        <button type="button" aria-expanded={selectedCity === row.city} aria-controls={`city-reuse-${index}`}
+                          className="flex items-center gap-2 rounded text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+                          <span aria-hidden="true" className={`text-xs transition-transform ${selectedCity === row.city ? "rotate-90" : ""}`}>▶</span>{row.city}
+                        </button>
+                      </th>
+                      {[row.buildings, row.apartments, row.other].map((value, index) => <td key={index} className="px-5 py-3 text-right tabular-nums text-gray-900">{fmtNum(value)}</td>)}
+                    </tr>
+                    {selectedCity === row.city && <tr id={`city-reuse-${index}`}><td colSpan={4} className="bg-gray-50">
+                      <AdminCadastruAddressReuse key={`${row.city}:${reuseRefresh}`} city={row.city} />
+                    </td></tr>}
+                  </Fragment>)}
                   {!stats.byCity.length && <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-500">No cadastru data stored yet.</td></tr>}
                 </tbody>
               </table>

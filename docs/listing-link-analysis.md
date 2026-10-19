@@ -19,6 +19,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 - URL language determines initial HTML and metadata, with reciprocal hreflang. The existing navbar language choice navigates to the corresponding URL.
 - Page-local RO/RU copy covers price history, comparison methodology and limitations, and potential duplicate matching. Three responsive example cards use explicitly fictional data and make no analysis requests.
 - The Romanian title, H1 and description target apartment-price checks on 999.md; translated metadata and sections are server-rendered for Russian searches too. Shared analyzer/result components and other pages retain their behavior.
+- The search page opens with the shared dark-green budget-page hero style, an illustrative listing card, and three compact steps. The existing link analyzer sits in the light section below; the explanatory sections and analysis flow remain unchanged.
 
 ## Parsing (`src/lib/parse-999-listing.js`)
 - Reads the seller-selected attributes only; the free-text description is ignored.

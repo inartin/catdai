@@ -1,0 +1,34 @@
+.hero { position: relative; overflow: hidden; background: radial-gradient(circle at 78% 22%, #246659 0, #174b43 30%, #103b35 72%, #0e322e 100%); color: white; }
+.hero::after { content: ""; position: absolute; inset: 0; background-image: linear-gradient(120deg, transparent 70%, rgba(255,255,255,.035) 70.2%, transparent 70.5%), linear-gradient(120deg, transparent 78%, rgba(255,255,255,.035) 78.2%, transparent 78.5%); pointer-events: none; }
+.heroGlow { position: absolute; width: 600px; height: 600px; right: -100px; top: -250px; border-radius: 50%; background: radial-gradient(circle, rgba(141,220,184,.16), transparent 65%); }
+.heroInner { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(340px, .95fr); align-items: center; gap: 35px; max-width: 1200px; margin: auto; padding: 74px 28px 94px; }
+.heroCopy { max-width: 690px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 10px; color: #bce9d4; font-size: 11px; font-weight: 800; letter-spacing: .17em; }
+.eyebrowDot { width: 7px; height: 7px; border-radius: 50%; background: #bce9d4; box-shadow: 0 0 0 5px rgba(188,233,212,.15); }
+.hero h1 { max-width: 680px; margin: 22px 0 18px; font-size: clamp(39px, 4.5vw, 60px); font-weight: 730; letter-spacing: -.055em; line-height: 1.07; }
+.heroCopy > p { max-width: 570px; color: #d4e8df; font-size: 16px; line-height: 1.65; }
+.heroBadge { display: inline-flex; align-items: center; gap: 9px; margin-top: 29px; padding: 10px 14px; border: 1px solid rgba(188,233,212,.27); border-radius: 100px; background: rgba(255,255,255,.08); color: #d6f4e5; font-size: 12px; font-weight: 650; }
+.heroArt { position: relative; min-height: 335px; display: flex; justify-content: center; align-items: center; }
+.artOrbit { position: absolute; width: 350px; height: 350px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; box-shadow: 0 0 0 42px rgba(255,255,255,.025), 0 0 0 84px rgba(255,255,255,.018); }
+.artCard { position: relative; width: 285px; padding: 18px; border: 1px solid rgba(255,255,255,.7); border-radius: 18px; background: #f1f8ef; box-shadow: 22px 24px 0 -11px #5caa88, 0 35px 60px rgba(0,0,0,.22); color: #234c3c; transform: rotate(-4deg); }
+.artCardTop { display: flex; justify-content: space-between; align-items: center; gap: 7px; color: #83a08d; font-size: 9px; font-weight: 700; }
+.artLogo { display: inline-flex; align-items: center; padding: 6px 8px; border-radius: 7px; background: #ddefdf; color: #2b8c61; font-size: 11px; font-weight: 850; letter-spacing: -.03em; }
+.artBuilding { display: grid; grid-template-columns: repeat(3, 16px); grid-template-rows: repeat(2, 14px); justify-content: center; align-content: center; gap: 9px 15px; height: 105px; margin-top: 14px; border-radius: 9px; background: linear-gradient(160deg, #dceee2, #c0ddce); }
+.artBuilding span { border-radius: 2px; background: #5c9e8c; box-shadow: inset 3px 0 rgba(255,255,255,.2); }
+.artProperty { margin: 12px 0 11px; color: #729080; font-size: 9px; font-weight: 650; }
+.artPriceLine { display: flex; align-items: baseline; justify-content: space-between; gap: 9px; padding: 7px 0; border-top: 1px solid #dbe8dc; font-size: 10px; color: #718d78; }
+.artPriceLine strong { color: #2c6649; font-size: 14px; white-space: nowrap; }
+.artBars { display: grid; gap: 5px; margin-top: 10px; }
+.artBars span { display: block; height: 5px; border-radius: 10px; background: #e0eae0; }
+.artBars span:first-child { width: 100%; background: #cfaa75; }
+.artBars span:last-child { width: 91%; background: #5cae80; }
+.artCallout { position: absolute; right: -8px; bottom: 4px; display: flex; align-items: center; gap: 7px; padding: 11px 14px; border: 1px solid rgba(255,255,255,.5); border-radius: 13px; background: #eff8ed; box-shadow: 0 15px 35px rgba(0,0,0,.15); color: #327b51; font-size: 10px; font-weight: 800; transform: rotate(3deg); }
+.artCallout span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #e3eecf; color: #a47a49; font-size: 14px; }
+.topContent { padding: 0 20px 8px; background: #f6f8f5; }
+.steps { position: relative; z-index: 2; display: flex; align-items: center; width: fit-content; max-width: 100%; margin: -27px auto 41px; padding: 8px 16px; border: 1px solid #e0eae2; border-radius: 100px; background: white; box-shadow: 0 12px 32px rgba(20,72,53,.07); }
+.step { display: flex; align-items: center; gap: 9px; padding: 7px 20px; color: #71847a; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.step + .step { border-left: 1px solid #e6ece7; }
+.step span { color: #2e9c70; font-size: 11px; font-weight: 850; }
+@media (max-width: 900px) { .heroInner { grid-template-columns: 1fr .7fr; padding: 70px 24px 86px; } .heroArt { transform: scale(.84); } }
+@media (max-width: 700px) { .heroInner { display: block; padding: 53px 20px 82px; } .hero h1 { max-width: 560px; font-size: clamp(37px, 9vw, 48px); } .heroCopy > p { font-size: 15px; } .heroArt { display: none; } .topContent { padding-inline: 16px; } .steps { margin: -22px auto 30px; padding: 7px 4px; } .step { padding: 5px 9px; gap: 4px; font-size: 10px; } .step span { font-size: 9px; } }
+@media (max-width: 400px) { .step { padding-inline: 5px; font-size: 9px; } .hero h1 { font-size: 36px; } }

@@ -36,7 +36,7 @@ export default async function VerificaAnuntPage({ searchParams }) {
     <LanguageProvider key={lang} initialLang={lang}>
       <div lang={lang} className="min-h-screen flex flex-col bg-gray-50">
         <Navbar />
-        <main className="flex-1 px-4 py-12 sm:py-16">
+        <main className="flex-1">
           <ListingAnalyzerPageContent showEstimateBack={params?.from === "estimeaza"} />
         </main>
         <Footer />

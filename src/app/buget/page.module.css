@@ -14,7 +14,7 @@
 .heroArtOrbit { position: absolute; width: 345px; height: 345px; border: 1px solid rgba(255,255,255,.12); border-radius: 50%; box-shadow: 0 0 0 42px rgba(255,255,255,.025), 0 0 0 84px rgba(255,255,255,.018); transform: rotate(-15deg); }
 .heroArtCard { position: relative; width: 226px; height: 214px; margin-top: 25px; border-radius: 14px 14px 9px 9px; background: linear-gradient(145deg, #d4ede0, #95c7ad); box-shadow: 24px 26px 0 -12px #5caa88, 0 35px 60px rgba(0,0,0,.22); transform: rotate(-5deg); }
 .heroArtCard::after { content: ""; position: absolute; bottom: -9px; left: -22px; width: 270px; height: 16px; background: #619b7a; border-radius: 50%; }
-.heroArtRoof { position: absolute; top: -54px; left: -13px; width: 252px; height: 95px; background: #f1f8ec; clip-path: polygon(50% 0, 100% 85%, 100% 100%, 0 100%, 0 85%); }
+.heroArtRoof { position: absolute; top: -75px; left: -13px; width: 252px; height: 95px; background: #f1f8ec; clip-path: polygon(50% 0, 100% 85%, 100% 100%, 0 100%, 0 85%); }
 .heroArtWindows { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px 38px; padding: 44px 44px 0; }
 .heroArtWindows span { height: 37px; border-radius: 5px; background: #2a7264; box-shadow: inset 4px 0 rgba(255,255,255,.18), inset 0 -5px rgba(255,255,255,.17); }
 .heroArtDoor { position: absolute; bottom: 0; left: 91px; width: 46px; height: 67px; border-radius: 7px 7px 0 0; background: #2a7264; }

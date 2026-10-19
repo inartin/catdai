@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getPaymentProvider } from "@/lib/payment-provider";
 
 const limiter = rateLimit({ interval: 60_000, limit: 120, namespace: "payment-checkout-events" });
-const ALLOWED_EVENTS = new Set(["checkout_popup_opened", "checkout_page_opened", "pricing_page_opened", "checkout_order_created"]);
+const ALLOWED_EVENTS = new Set(["checkout_popup_opened", "checkout_page_opened", "pricing_page_opened", "checkout_order_created", "maib_continue_clicked"]);
 
 function getClientIp(request) {
   const cfIp = request.headers.get("cf-connecting-ip");

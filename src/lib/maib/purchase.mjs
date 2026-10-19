@@ -18,7 +18,13 @@ export function receiptEmail(value) {
 }
 
 export function purchaseMessages(language) { return language === 'ru' ? ru : ro; }
-export function maibProductTitle(key, language, quantity = 1) {
-  const title = purchaseMessages(language)[`profile.paymentProduct.${key}`];
+export function maibProductTitle(key, language, quantity = 1, checkoutSource) {
+  const messages = purchaseMessages(language);
+  const title = messages[`profile.paymentProduct.${key}`];
+  if (title && checkoutSource === 'pricing' && key.endsWith('_single')) {
+    const plural = new Intl.PluralRules(language === 'ru' ? 'ru' : 'ro').select(quantity);
+    const separator = language !== 'ru' && plural === 'other' ? ' de ' : ' ';
+    return `${quantity}${separator}${messages[`pricing.quantityUnit.${plural}`]}`;
+  }
   return title && quantity > 1 ? `${title} × ${quantity}` : title;
 }

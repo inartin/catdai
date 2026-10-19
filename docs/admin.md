@@ -31,6 +31,7 @@ Shows:
 - Refunded and chargeback Paddle orders still show in the user's full payment history, but are excluded from the paid package badge and dashboard Payments count.
 - Payment dashboard regression check: `pnpm exec node --experimental-vm-modules scripts/test-admin-payments.mjs`.
 - checkout popup opens, checkout page opens, and standalone pricing page opens as separate dashboard cards, each showing total opens plus unique user/device visitors for the selected period
+- `Continue to MAIB Clicked` sits beside `Checkout Page Opened` and counts valid checkout submissions before the bank request, including failed attempts and deliberate retries. It shows total clicks and unique users for the selected period. Apply `20261019121745_maib_continue_click_events.sql` before deploying; historical clicks cannot be backfilled.
 - landing market-trends popup opens appear as a simple dashboard count for the selected period, summed from one aggregate row per Chișinău calendar day
 - In the user popup, clicking the package badge opens a package dropdown. Selecting a different Start, Standard, Pro, or Extra package shows save/cancel actions. Saving updates the user's active admin package directly, resets all paid feature-credit balances to the selected package grants, deletes paid feature-credit rows when Start is selected, and does not create or require a payment.
 - The reset button next to the popup package badge asks for confirm/cancel and then resets the current package's paid feature credits and current UTC-month free usage back to full unused counts.

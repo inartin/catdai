@@ -628,6 +628,7 @@ function buildPaymentCheckoutStats(rows, cutoffs) {
     total: rows.length,
     popup: buildEventType("checkout_popup_opened"),
     page: buildEventType("checkout_page_opened"),
+    maibContinue: buildEventType("maib_continue_clicked"),
     pricingPage: buildEventType("pricing_page_opened"),
   };
 }

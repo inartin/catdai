@@ -1260,7 +1260,7 @@ export default function AdminDashboard() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-12 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-12 gap-4">
           <StatCard
             label="Registered Users"
             value={fmtNum(s.totalUsers)}
@@ -1289,6 +1289,11 @@ export default function AdminDashboard() {
             label="Checkout Page Opened"
             value={fmtNum(s.paymentCheckout?.page?.total)}
             detail={fmtCheckoutSummary(s.paymentCheckout?.page)}
+          />
+          <StatCard
+            label="Continue to MAIB Clicked"
+            value={fmtNum(s.paymentCheckout?.maibContinue?.total)}
+            detail={fmtCheckoutSummary(s.paymentCheckout?.maibContinue)}
           />
           <StatCard
             label="Prețuri actuale Popup"

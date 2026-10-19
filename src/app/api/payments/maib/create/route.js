@@ -31,7 +31,7 @@ export async function POST(request) {
     const order = await checked(db.from('maib_payment_orders').insert({
       user_id: user.id, environment: environment(), request_key: body.request_key, product_key: product.key,
       amount_minor: product.amount_minor, currency_code: 'MDL', grants: product.grants, language: lang,
-      product_title: maibProductTitle(product.key, lang, product.quantity), receipt_email: email,
+      product_title: maibProductTitle(product.key, lang, product.quantity, body.checkout_source), receipt_email: email,
       terms_version: MAIB_TERMS_VERSION, terms_accepted_at: new Date().toISOString(),
       return_to: safeReturnTo(body.return_to), next_check_at: new Date(Date.now() + 60_000).toISOString(),
     }).select('*').single());

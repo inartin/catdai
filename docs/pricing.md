@@ -12,9 +12,11 @@ The standalone `/pricing` page sells individual feature uses and all-feature pac
 - `/payment/paddle/test` is a temporary standalone test page for creating a `cadastru_lookup_single` Paddle checkout and is not linked from pricing.
 
 ## Content
-- Three localized RO/RU cards sell 1 universal use for 15 MDL, 30 for 99 MDL, and 120 for 299 MDL. The middle card has a green border and filled primary button; the other buttons use green outlines/text with hover feedback.
+- Three localized RO/RU cards sell 1 universal use for 15 MDL, 30 for 99 MDL, and 120 for 299 MDL. The 15 MDL card is recommended, with a green border and filled primary button; the other buttons use green outlines/text with hover feedback.
 - Usage counts are the main heading, with total price and per-use price (15 / 3.30 / 2.49 MDL). There are no feature lists, feature selection, quantity controls, or conditional upsells.
 - Shared-use rules are explained once above/below the cards. Checkout retains the existing product keys (`cadastru_lookup_single`, `all_features_5`, `all_features_20`); source labels do not restrict usage.
+- Pricing links include `checkout_source=pricing`: the 15 MDL checkout uses the generic `1 utilizare` label, while feature-popup checkout retains the selected feature name. The 99/299 MDL checkout titles match the pricing card's 30/120 universal uses. The create API snapshots the same localized title for new orders and MAIB; existing orders keep their saved titles on retries. Checkout copy explains that credits work with any function.
+- When the checkout title already shows the use count, the subtitle shows only `Plată unică` (localized), without repeating that count.
 - All six MAIB single-use product keys now cost 15 MDL. Legacy quantity URLs/API requests remain supported at 15 MDL per use; the old quantity discount tiers are removed. Existing orders retain their immutable saved prices/grants. Pack prices and totals are unchanged.
 - Prices come from the server catalog; browser-supplied amounts are ignored. Confirmed payments add uses once. The shared-credit migration must be applied before releasing this page.
 - Each user has one shared free credit per UTC month. See [Access and Paywall](access-paywall.md).

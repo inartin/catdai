@@ -11,7 +11,15 @@ for (const file of ['paynet_payments.sql','paddle_payments.sql','maib_payments.s
   await db.exec((await fs.readFile(`db/${file}`, 'utf8')).replaceAll('create extension if not exists pgcrypto;', ''));
 }
 await db.exec(await fs.readFile('db/maib_payments.sql', 'utf8')); // repeatable migration
+const clickMigration = await fs.readFile('supabase/migrations/20261019121745_maib_continue_click_events.sql', 'utf8');
+await db.exec(clickMigration);
+await db.exec(clickMigration);
 const q = async (sql, args = []) => (await db.query(sql, args)).rows;
+for (const event of ['checkout_popup_opened', 'checkout_page_opened', 'pricing_page_opened', 'checkout_order_created', 'maib_continue_clicked']) {
+  await q('insert into payment_checkout_events(event_type) values($1)', [event]);
+}
+assert.equal((await q("select count(*)::integer n from payment_checkout_events where event_type='maib_continue_clicked'"))[0].n, 1);
+await assert.rejects(q("insert into payment_checkout_events(event_type) values('unknown_event')"), /check constraint/);
 const user = crypto.randomUUID();
 await q('insert into auth.users values($1)', [user]);
 const grants = { sale_estimate: 2, rent_estimate: 2, listing_analysis: 2, cadastru_lookup: 2, yield_calculator: 2, pdf_report: 2 };

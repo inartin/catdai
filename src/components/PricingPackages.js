@@ -30,6 +30,7 @@ export default function PricingPackages() {
   const startCheckout = (productKey) => {
     const url = new URL("/payment/maib/checkout", paymentSiteOrigin(window.location.origin));
     url.searchParams.set("product_key", productKey);
+    url.searchParams.set("checkout_source", "pricing");
     url.searchParams.set("lang", lang);
     window.location.assign(url.toString());
   };
@@ -45,7 +46,7 @@ export default function PricingPackages() {
           {offers.map(({ key, productKey }) => {
             const product = maibProduct(productKey);
             const uses = Object.values(product.grants).reduce((sum, count) => sum + count, 0);
-            const recommended = key === "five";
+            const recommended = key === "single";
             const locale = lang === "ru" ? "ru-MD" : "ro-MD";
             const unitPrice = (product.amount_mdl / uses).toLocaleString(locale, {
               minimumFractionDigits: uses === 1 ? 0 : 2, maximumFractionDigits: 2,

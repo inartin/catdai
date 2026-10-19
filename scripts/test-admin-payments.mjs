@@ -11,6 +11,7 @@ class FixedDate extends Date {
 }
 let authorized = true;
 let orders = [];
+let checkoutEvents = [];
 let failingPage = null;
 const queries = [];
 const user = { id: "buyer", email: "buyer@example.com", user_metadata: { full_name: "Buyer" } };
@@ -29,10 +30,11 @@ const mocks = {
         const query = { table, filters: [], orderBy: [], from: 0, to: Infinity };
         queries.push(query);
         const result = () => {
-          if (table !== "reporting_payment_orders") return { data: [], count: 0, error: null };
-          if (query.from === failingPage) return { data: null, error: { message: "Payment read failed" } };
+          if (!["reporting_payment_orders", "payment_checkout_events"].includes(table)) return { data: [], count: 0, error: null };
+          if (table === "reporting_payment_orders" && query.from === failingPage) return { data: null, error: { message: "Payment read failed" } };
           // The reporting view excludes MAIB sandbox orders.
-          let data = orders.filter((row) => row.provider === "paddle" || row.environment === "production");
+          let data = table === "payment_checkout_events" ? [...checkoutEvents]
+            : orders.filter((row) => row.provider === "paddle" || row.environment === "production");
           for (const [op, column, value] of query.filters) {
             data = data.filter((row) => op === "in" ? value.includes(row[column]) : row[column] && Date.parse(row[column]) >= Date.parse(value));
           }
@@ -122,4 +124,17 @@ for (failingPage of [0, 1000]) {
 failingPage = null;
 orders = [payment("recovered")];
 assert.equal((await (await get()).json()).payments.total, 1, "Hard refresh recovers after a database failure");
+
+checkoutEvents = [
+  ...["click-1", "retry"].map((id) => ({ id, event_type: "maib_continue_clicked", user_id: user.id, created_at: "2026-10-18T09:00:00Z" })),
+  { id: "second-user", event_type: "maib_continue_clicked", user_id: "other", created_at: "2026-10-18T09:05:00Z" },
+  { id: "old", event_type: "maib_continue_clicked", user_id: user.id, created_at: "2026-10-17T20:59:59Z" },
+  { id: "open", event_type: "checkout_page_opened", user_id: user.id, created_at: "2026-10-18T09:00:00Z" },
+  { id: "created", event_type: "checkout_order_created", user_id: user.id, created_at: "2026-10-18T09:00:00Z" },
+];
+response = await (await get("period=day&fresh=1")).json();
+assert.equal(response.paymentCheckout.maibContinue.total, 3, "Count attempts separately from page opens and orders");
+assert.equal(response.paymentCheckout.maibContinue.uniqueVisitors, 2, "Retries count once per user in the visitor total");
+assert.equal(response.paymentCheckout.page.total, 1);
+assert.equal((await (await get()).json()).paymentCheckout.maibContinue.total, 4, "All time includes older clicks");
 console.log("Admin payment dashboard checks passed.");

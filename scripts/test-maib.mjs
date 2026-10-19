@@ -36,6 +36,15 @@ for (const [key, count, amount] of [['all_features_5', 5, 99], ['all_features_20
   for (const lang of ['ro', 'ru']) assert.ok(maibProductTitle(key, lang));
 }
 for(const key of ['__proto__','constructor','',null,{}]) assert.equal(maibProduct(key),null);
+for (const [lang, single, five, twenty] of [['ro', '1 utilizare', '30 utilizări', '120 utilizări'], ['ru', '1 использование', '30 использований', '120 использований']]) {
+  assert.equal(maibProductTitle('cadastru_lookup_single', lang, 1, 'pricing'), single, 'Pricing single-use checkout uses the universal package name');
+  assert.equal(maibProductTitle('all_features_5', lang), five);
+  assert.equal(maibProductTitle('all_features_20', lang), twenty);
+  assert.equal(maibProductTitle('cadastru_lookup_single', lang), lang === 'ro' ? 'Date cadastrale' : 'Кадастровые данные', 'Feature popups retain their selected feature');
+  assert.equal(maibProductTitle('cadastru_lookup_single', lang, 1, 'arbitrary title'), maibProductTitle('cadastru_lookup_single', lang), 'Unknown sources cannot supply display text');
+}
+assert.equal(maibProductTitle('cadastru_lookup_single', 'ro', 20, 'pricing'), '20 de utilizări');
+assert.equal(maibProductTitle('pdf_report_single', 'ro'), 'Raport PDF');
 for (const key of ['sale_estimate_single','rent_estimate_single','listing_analysis_single','cadastru_lookup_single','yield_calculator_single','pdf_report_single']) {
   for (const [quantity, amount, percent] of [[1,15,0],[2,30,0],[3,45,0],[4,60,0],[5,75,0],[20,300,0],[100,1500,0]]) {
     const product = maibProduct(key, quantity);
@@ -200,12 +209,13 @@ const entry=await loadRoute('src/app/payment/checkout/page.js',{
 for(const mode of ['development','production']) for(const provider of ['maib','paddle']) {
   process.env.NODE_ENV=mode;
   process.env.PAYMENT_PROVIDER=provider;
-  await entry.default({searchParams:Promise.resolve({product_key:'extra_pack',quantity:'4',lang:'ru',return_to:'/evaluare?a=1',injected:'discard'})});
+  await entry.default({searchParams:Promise.resolve({product_key:'extra_pack',quantity:'4',lang:'ru',return_to:'/evaluare?a=1',checkout_source:'pricing',injected:'discard'})});
   const parsed=new URL(redirectedTo,'https://catdai.test');
   assert.equal(parsed.pathname,`/payment/${provider}/checkout`);
   assert.equal(parsed.origin,mode==='development'?'https://dev.catdai.md':'https://catdai.test');
   assert.equal(parsed.searchParams.get('lang'),'ru');assert.equal(parsed.searchParams.get('product_key'),'extra_pack');
   assert.equal(parsed.searchParams.get('quantity'),'4');
+  assert.equal(parsed.searchParams.get('checkout_source'),'pricing');
   assert.equal(parsed.searchParams.get('return_to'),'/evaluare?a=1');assert.equal(parsed.searchParams.has('injected'),false);
 }
 delete process.env.PAYMENT_PROVIDER;
@@ -261,6 +271,17 @@ for (const key of ['all_features_5', 'all_features_20', 'pdf_report_single']) {
   assert.deepEqual(insertSnapshot.grants, product.grants, 'checkout snapshots server grants for the selected offer');
 }
 const bulkBody={...purchaseBody,product_key:'cadastru_lookup_single',quantity:4,request_key:crypto.randomUUID(),amount_minor:1,grants:{cadastru_lookup:999}};
+expectedBankAmount=15;
+for (const lang of ['ro', 'ru']) {
+  for (const checkout_source of ['pricing', undefined]) {
+    assert.equal((await create.POST(createRequest({...purchaseBody, product_key:'cadastru_lookup_single', request_key:crypto.randomUUID(), lang, checkout_source}))).status,200);
+    const title = checkout_source === 'pricing' ? (lang === 'ro' ? '1 utilizare' : '1 использование') : (lang === 'ro' ? 'Date cadastrale' : 'Кадастровые данные');
+    assert.equal(insertSnapshot.product_title, title, 'New orders snapshot the context-specific title');
+    assert.equal(bankPayload.orderInfo.items[0].title, title, 'MAIB receives the same title as checkout');
+    assert.equal(insertSnapshot.amount_minor, 1500);
+    assert.deepEqual(insertSnapshot.grants, {cadastru_lookup:1}, 'Display context does not change credit grants');
+  }
+}
 expectedBankAmount=60;
 assert.equal((await create.POST(createRequest(bulkBody))).status,200);
 assert.equal(insertSnapshot.amount_minor,6000);

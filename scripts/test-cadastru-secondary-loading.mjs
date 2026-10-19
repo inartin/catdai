@@ -47,6 +47,7 @@ let effects = [];
 const frames = new Map();
 let nextFrame = 0;
 const requests = new Map();
+const trackedOpens = [];
 const useState = (initial) => {
   const index = cursor++;
   if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
@@ -70,6 +71,7 @@ const router = { push: noop, replace: (url) => {
 const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
   "./loading": { default: noop },
   "@/lib/cadastru-lookup-tracking": { ensureCadastruLookupId },
+  "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: (slug) => trackedOpens.push(slug) },
   react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
   "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
   "next/navigation": { useRouter: () => router, useSearchParams: () => searchParams },
@@ -466,3 +468,44 @@ for (const locale of ["ro", "ru"]) {
 }
 for (const slot of slots) slot?.cleanup?.();
 console.log("Compact land input passed: RO/RU result-page validation and canonical main/secondary requests.");
+
+// Shared reports load a public saved result, ignoring ordinary query criteria.
+for (const locale of ["ro", "ru"]) {
+  lang = locale;
+  for (const slot of slots) slot?.cleanup?.();
+  slots.length = 0;
+  requests.clear();
+  frames.clear();
+  addressRequest = null;
+  authSession = null;
+  const slug = "a".repeat(48);
+  trackedOpens.length = 0;
+  searchParams = new URLSearchParams({ share_slug: slug, cadastral_number: "1014203418",
+    source: "address", city: "Orhei", street: "Injected", house_number: "999", skipcache: "true" });
+  render();
+  assert.equal(requests.size, 1);
+  assert(requests.has(`/api/cadastru/share/${slug}`));
+  assert.equal(trackedOpens.length, 0, "Loading requests do not count as opened reports");
+  const snapshot = { cadastral_number: number, apartment: { area_m2: 52 },
+    form_fields: { city: "Chișinău" }, map_location: { latitude: 47.02, longitude: 28.83 } };
+  requests.get(`/api/cadastru/share/${slug}`).resolve({ ok: true, json: async () => ({ cadastral: snapshot }) });
+  await flush();
+  const tree = render();
+  assert.deepEqual(trackedOpens, [slug], "Only a loaded shared report records an open");
+  const sharedCard = findNode(tree, (node) => node.props?.cadastral === snapshot);
+  assert(sharedCard, "anonymous viewers see the saved full report");
+  assert(findNode(sharedCard.props.children, (node) => node.type === "iframe"), "public reports retain their map");
+  paint();
+  paint();
+  for (const endpoint of ["nearby", "public-transport", "municipal-reports"]) {
+    const request = requests.get(`/api/cadastru/${endpoint}`);
+    assert(request);
+    const body = JSON.parse(request.options.body);
+    assert.equal(body.cadastral_number, number, "secondary cards use the shared report, ignoring edited query numbers");
+    assert(!body.skip_cache);
+  }
+  assert(!requests.has("/api/cadastral"), "shared reports do not perform a credit-gated main lookup");
+  assert(!requests.has("/api/cadastru/address"));
+}
+for (const slot of slots) slot?.cleanup?.();
+console.log("Shared report viewer passed: anonymous RO/RU report, map and concurrent secondary cards, tamper-proof criteria and no gated lookup.");

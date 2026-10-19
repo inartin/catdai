@@ -14,6 +14,7 @@ const mocks = {
     requireAdminApiAuth: () => authorized ? null : json({ error: "Unauthorized" }, { status: 401 }),
   },
   "@/lib/admin-cadastru-favorites": { loadCadastruFavorites: async (rows) => rows },
+  "@/lib/cadastru-share-statistics": { loadCadastruShareStatistics: async (rows) => rows },
   "@/lib/supabase-admin": {
     supabaseAdmin: {
       async rpc(name, params) {

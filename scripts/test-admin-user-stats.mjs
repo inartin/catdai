@@ -29,6 +29,7 @@ const mocks = {
   "next/server": { NextResponse: { json } },
   "@/lib/admin-auth": { requireAdminApiAuth: () => authorized ? null : json({ error: "Unauthorized" }, { status: 401 }) },
   "@/lib/admin-cadastru-favorites": { loadCadastruFavorites: async (rows) => rows },
+  "@/lib/cadastru-share-statistics": { loadCadastruShareStatistics: async (rows) => rows },
   "@/lib/supabase-admin": {
     supabaseAdmin: {
       auth: { admin: { listUsers: async ({ page, perPage }) => page === failingUserPage

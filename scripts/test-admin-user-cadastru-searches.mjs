@@ -10,6 +10,8 @@ let databaseError = null;
 let rows = [];
 let favorites = [];
 let favoritesError = null;
+let shareStatsError = null;
+let shareStats = [];
 const queries = [];
 const json = (data, { status = 200 } = {}) => Response.json(data, { status });
 const mocks = {
@@ -19,6 +21,11 @@ const mocks = {
   },
   "@/lib/supabase-admin": {
     supabaseAdmin: {
+      async rpc(name, args) {
+        assert.equal(name, "cadastru_share_statistics");
+        assert.deepEqual(Array.from(args.p_search_ids), rows.slice(0, 50).map((row) => row.id));
+        return { data: shareStats, error: shareStatsError };
+      },
       from(table) {
         const query = { table, orders: [] };
         queries.push(query);
@@ -38,6 +45,7 @@ const mocks = {
       },
     },
   },
+  "@/lib/cadastru-evaluation-tracking": { readCadastruEvaluationToken: () => null },
 };
 const context = vm.createContext({ console: { error() {} }, URL });
 const modules = new Map();
@@ -83,7 +91,7 @@ assert.equal(firstPage.searches.length, 50);
 assert.equal(firstPage.hasMore, true);
 assert.equal(firstPage.searches.at(-1).id, 51);
 rows = [{ id: 50, user_id: userId }];
-assert.deepEqual(await (await get(`userId=${userId}&offset=50`)).json(), { searches: [{ ...rows[0], favorited: false }], hasMore: false });
+assert.deepEqual(await (await get(`userId=${userId}&offset=50`)).json(), { searches: [{ ...rows[0], favorited: false, share_count: 0, unique_viewers: 0 }], hasMore: false });
 const searchQuery = queries.findLast((query) => query.table === "cadastru_search_events");
 assert.deepEqual(searchQuery.range, [50, 100]);
 assert.deepEqual(searchQuery.filter, ["user_id", userId], "Later pages retain the user filter");
@@ -104,6 +112,14 @@ favorites = [
   { id: 5, user_id: userId, url_path: "http://[invalid" },
 ];
 const result = await (await get(`userId=${userId}`)).json();
+shareStats = [{ search_event_id: 1, share_count: 4, unique_viewers: 2 }];
+const sharedRows = (await (await get(`userId=${userId}`)).json()).searches;
+assert.equal(sharedRows[0].share_count, 4);
+assert.equal(sharedRows[0].unique_viewers, 2);
+assert.equal(sharedRows[1].share_count, 0, "A repeated search has its own statistics");
+shareStatsError = { message: "Share statistics unavailable" };
+assert.equal((await get(`userId=${userId}`)).status, 500, "Failed statistics reads cannot show zero viewers");
+shareStatsError = null;
 assert.deepEqual(result.searches.map((row) => row.favorited), [true, true, false, true, false],
   "Match localized number/address bookmarks, retaining apartment, user and result type boundaries");
 assert.deepEqual(queries.at(-1).filter, ["user_id", [userId]], "Only load bookmarks for the displayed users");

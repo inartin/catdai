@@ -46,6 +46,7 @@ async function harness(file, path, stored = {}) {
     effects.push(() => { slots[index].cleanup = effect(); });
   };
   const mocks = {
+    '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'next/navigation': { useRouter: () => router, useSearchParams: () => new URL(browser.location.href).searchParams },

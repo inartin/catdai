@@ -1055,5 +1055,8 @@
   "pricing.sharedDelivery": "Plată unică prin maib. Utilizările se adaugă automat în cont.",
   "profile.usesPurchased": "Cumpărate",
   "profile.usesFreeMonthly": "Gratuite luna aceasta",
-  "profile.addUses": "Adaugă utilizări"
+  "profile.addUses": "Adaugă utilizări",
+  "cadastru.shareReport": "Distribuie acest raport",
+  "cadastru.shareError": "Raportul nu poate fi distribuit sau deschis acum. Încearcă din nou.",
+  "cadastru.sharedReportNotFound": "Linkul către raport nu există sau nu mai este disponibil."
 }

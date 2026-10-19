@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { loadCadastruFavorites } from "@/lib/admin-cadastru-favorites";
+import { loadCadastruShareStatistics } from "@/lib/cadastru-share-statistics";
 
 const PAGE_SIZE = 50;
 const SEARCH_COLUMNS = "id, search_type, user_id, district, cadastral_number, search_address, result_type, valuation_clicked_at, valuation_completed_at, created_at";
@@ -32,11 +33,11 @@ export async function GET(request) {
   }
 
   try {
-    const searches = await loadCadastruFavorites((data || []).slice(0, PAGE_SIZE));
+    const searches = await loadCadastruShareStatistics(await loadCadastruFavorites((data || []).slice(0, PAGE_SIZE)));
     return NextResponse.json({ searches, hasMore: (data || []).length > PAGE_SIZE });
   } catch (error) {
-    console.error("[admin-cadastru-searches] favorites read failed:", error.message);
-    return NextResponse.json({ error: "Failed to load cadastru favorites." }, { status: 500 });
+    console.error("[admin-cadastru-searches] statistics read failed:", error.message);
+    return NextResponse.json({ error: "Failed to load cadastru search statistics." }, { status: 500 });
   }
 }
 

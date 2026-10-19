@@ -93,6 +93,8 @@ async function checkPageAction(isAuthenticated) {
   const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
     "./loading": { default: noop },
     "@/lib/cadastru-lookup-tracking": { ensureCadastruLookupId },
+    "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: () => {} },
+    "@/lib/cadastru-supported-cities": { CADASTRU_SUPPORTED_CITIES: ["Chișinău", "Durlești"] },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0],
       useEffect: (effect) => effects.push(effect) },
     "next/navigation": { useRouter: () => ({ push: noop }),
@@ -109,7 +111,7 @@ async function checkPageAction(isAuthenticated) {
     "@/components/AuthRequiredModal": { default: AuthRequiredModal },
     "@/components/FeaturePricingAction": { default: FeaturePricingAction },
   }, {
-    window: {}, localStorage: { removeItem: noop },
+    window: {}, navigator: { userAgent: "" }, localStorage: { removeItem: noop },
     sessionStorage: { getItem: (key) => storage.get(key) ?? null },
     fetch: async (url) => {
       assert(isAuthenticated, "anonymous result uses its saved preview");

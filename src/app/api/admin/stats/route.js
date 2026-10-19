@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 import { loadCadastruFavorites } from "@/lib/admin-cadastru-favorites";
+import { loadCadastruShareStatistics } from "@/lib/cadastru-share-statistics";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -785,12 +786,12 @@ export async function GET(request) {
   const filteredUsers = filterRowsSince(users, "created_at", periodSince);
   let cadastruSearches;
   try {
-    const searchesWithFavorites = await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50));
+    const searchesWithFavorites = await loadCadastruShareStatistics(await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50)));
     cadastruSearches = buildCadastruSearchStats(attachUserNames(cadastruSearchEvents, usersById), cutoffs);
     cadastruSearches.recent = attachUserNames(searchesWithFavorites, usersById);
   } catch (error) {
-    console.error("Failed to load cadastru favorites:", error.message);
-    return NextResponse.json({ error: "Failed to load cadastru favorites" }, { status: 500 });
+    console.error("Failed to load cadastru search statistics:", error.message);
+    return NextResponse.json({ error: "Failed to load cadastru search statistics" }, { status: 500 });
   }
   const correlatedExternalApiEvents = correlateExternalApiUsers(externalApiUsageEvents.rows || [], {
     cadastruSearchEvents,

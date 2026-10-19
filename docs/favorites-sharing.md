@@ -21,6 +21,16 @@ Implemented and active.
 - Short shared links are persisted when `NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`; otherwise development returns a direct `/evaluare` URL instead of creating a `shared_links` row.
 - Opened shared results are read-only for viewers: criteria edit, compare, and new-estimate actions are hidden.
 
+### Cadastru reports
+- An authenticated user can click `Distribuie acest raport` / `Поделиться отчётом` on an unlocked Cadastru result. `/api/cadastru/share` verifies the lookup was already unlocked with a free or paid credit and saves the official server payload in `cadastru_shared_reports`. Sharing never consumes another credit. Development lookups may use their existing non-consuming access check.
+- The generated localized `/cadastru/rezultat?share_slug=...` link opens the saved cadastral report for anyone, including logged-out viewers, with the existing map and secondary location cards. Viewers can copy the same public link; the valuation action and ordinary favorites are hidden in this view.
+- Copying the original number/address URL does not grant access: it still performs a normal lookup under the viewer's own credit/login rules. Shared views ignore other query criteria and load only the report associated with the share slug.
+- Links use random 192-bit slugs, and unchanged reports are deduplicated per sharer and originating search. The API validates the signed search token, owner and matching property before assigning `search_event_id`; separate searches for the same property retain separate counters. Re-sharing retains the original report/search. Only server APIs can read/write the tables; browser roles cannot list reports or insert public grants. The saved main report survives source cache expiry; secondary location cards continue to use their existing independent caches.
+- Apply `supabase/migrations/20261019184740_cadastru_shared_reports.sql` before deploying. Sharing requires runtime persistence (`NODE_ENV=production` or `ENABLE_RUNTIME_PERSISTENCE=true`); disabled persistence or failed storage returns an error, never a normal URL disguised as a public link.
+- Apply `supabase/migrations/20261019185731_cadastru_share_statistics.sql` as well. Both admin Cadastru lists show lifetime `Shares` (explicit share-button clicks after obtaining a public link, including repeat clicks and re-shares) and `Unique viewers` for that search. Click UUIDs make retried delivery idempotent. Viewers are deduplicated across all snapshots of the search by account, or by signed one-year HTTP-only browser cookie when logged out. A different anonymous browser, cleared/expired cookie, or switching between logged-out and logged-in identities can count separately; these are visitor identities, not verified people. Cookie-blocked anonymous visits are not counted.
+- Both sharing schemas are applied to production as of 2026-10-19; the statistics RPC and fresh authenticated dashboard response were verified after application.
+- Opens are recorded after a shared report loads, through a separate POST; API fetches/prefetches alone do not count. The signed-in sharer's own opens, marked-admin activity, admin-created excluded reports, and development activity do not count. Failed tracking never prevents opening/copying a report. Counters start with this rollout; older opens and unattributed links are not guessed or backfilled. Deleting a search detaches its analytics without breaking the public link.
+
 ## Access Detail
 - Shared links store whether the sharer was paid.
 - A paid sharer can expose full analysis to viewers through `share_slug`.
@@ -32,6 +42,9 @@ Implemented and active.
 - `src/app/imobil/[slug]/page.js`
 - `src/components/EstimateResult.js`
 - `src/components/CadastruFavoriteButton.js`
+- `src/components/CadastruShareButton.js`
+- `src/app/api/cadastru/share/route.js`
+- `src/app/api/cadastru/share/[slug]/route.js`
 - `src/app/cadastru/rezultat/page.js`
 - `src/lib/cadastru-favorites.js`
 - `src/lib/runtime-persistence.js`

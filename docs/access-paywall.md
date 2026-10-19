@@ -55,6 +55,8 @@ Shared paywall and PDF dialogs render above reusable tooltip portals so locked-s
 ## Share Exception
 If a shared link was created by a paid user, `/api/estimate` allows full result access through `share_slug`.
 
+Cadastru sharing is separate: only an already-unlocked result can be published through `/api/cadastru/share`, using either the monthly free use or a paid credit. The generated `share_slug` opens a saved official report for all viewers without consuming credits. Ordinary Cadastru result URLs continue to use the viewer's own access checks. See [sharing](favorites-sharing.md#cadastru-reports).
+
 ## Related Files
 - `src/lib/access-tier.js`
 - `src/lib/free-monthly-feature-usage.js`

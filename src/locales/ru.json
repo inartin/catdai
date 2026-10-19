@@ -1055,5 +1055,8 @@
   "pricing.sharedDelivery": "Разовая оплата через maib. Использования автоматически добавляются в аккаунт.",
   "profile.usesPurchased": "Купленные",
   "profile.usesFreeMonthly": "Бесплатные в этом месяце",
-  "profile.addUses": "Добавить использования"
+  "profile.addUses": "Добавить использования",
+  "cadastru.shareReport": "Поделиться отчётом",
+  "cadastru.shareError": "Сейчас не удалось поделиться отчётом или открыть его. Попробуйте ещё раз.",
+  "cadastru.sharedReportNotFound": "Ссылка на отчёт не существует или больше недоступна."
 }

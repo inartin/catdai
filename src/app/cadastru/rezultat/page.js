@@ -10,6 +10,7 @@ import CadastruNearbyCard from "@/components/CadastruNearbyCard";
 import CadastruPublicTransportCard from "@/components/CadastruPublicTransportCard";
 import CadastruMunicipalReportsCard from "@/components/CadastruMunicipalReportsCard";
 import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
+import CadastruShareButton from "@/components/CadastruShareButton";
 import CadastruLoadingPage from "@/components/CadastruLoadingPage";
 import CadastruRouteLoading from "./loading";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
@@ -22,6 +23,7 @@ import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru
 import { buildFullAccessAddressResultParams, resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
 import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
 import { ensureCadastruLookupId } from "@/lib/cadastru-lookup-tracking";
+import { recordCadastruShareOpen } from "@/lib/cadastru-share-tracking";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet", fullLabel: "cadastru.roadTypeStreetFull" },
@@ -460,13 +462,14 @@ function CadastruResultContent() {
   const searchParams = useSearchParams();
   const { lang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
-  const rawCadastralNumber = searchParams.get("cadastral_number") || "";
+  const shareSlug = searchParams.get("share_slug") || "";
+  const rawCadastralNumber = shareSlug ? "" : searchParams.get("cadastral_number") || "";
   const cadastralNumber = validateCadastralNumber(rawCadastralNumber).value || rawCadastralNumber;
-  const source = searchParams.get("source") || "";
+  const source = shareSlug ? "" : searchParams.get("source") || "";
   const searchLookupId = searchParams.get("lookup_id") || "";
-  const originalStreetParam = (searchParams.get("original_street") || "").slice(0, 80);
-  const resolvedStreetParam = (searchParams.get("resolved_street") || "").slice(0, 80);
-  const skipCache = searchParams.get("skipcache") === "true";
+  const originalStreetParam = shareSlug ? "" : (searchParams.get("original_street") || "").slice(0, 80);
+  const resolvedStreetParam = shareSlug ? "" : (searchParams.get("resolved_street") || "").slice(0, 80);
+  const skipCache = !shareSlug && searchParams.get("skipcache") === "true";
   const isAddressResultHandoff = source === "address" && searchParams.get("result") === "1";
   const isAddressPreviewHandoff = source === "address" && (
     searchParams.get("preview") === "1" || searchParams.get("result") === "1"
@@ -476,7 +479,7 @@ function CadastruResultContent() {
   const [lookupRetry, setLookupRetry] = useState(null);
   const pendingAddressRequest = (!cadastralNumber ? retryRequest : null) || (isPendingAddressLookup ? readAddressLookupRequest() : null);
   const addressRequestKey = pendingAddressRequest ? JSON.stringify(pendingAddressRequest) : "";
-  const savedAddress = (!cadastralNumber ? retryRequest : null) || getSavedCadastruAddress(searchParams);
+  const savedAddress = shareSlug ? null : (!cadastralNumber ? retryRequest : null) || getSavedCadastruAddress(searchParams);
   const isHistoryAddress = searchParams.get("history") === "1";
   const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
   const lookupTracking = useRef(null);
@@ -513,7 +516,7 @@ function CadastruResultContent() {
 
   const valuationPrefill = buildValuationPrefill(state.data, source === "address" ? searchParams.get("district") : null);
   const evaluationToken = searchParams.get("cadastru_evaluation") || state.data?.cadastru_evaluation_token;
-  const favoritePath = state.data ? getCadastruFavoritePath({
+  const favoritePath = state.data && !shareSlug ? getCadastruFavoritePath({
     lang,
     cadastralNumber,
     cadastral: state.data,
@@ -524,13 +527,13 @@ function CadastruResultContent() {
   const favoriteAddress = state.data?.resolved_address || state.data?.request_address ||
     state.data?.matched_address || state.data?.apartment?.address || state.data?.building?.address;
   const favoriteLabel = [t("nav.cadastru"), favoriteNumber, favoriteAddress].filter(Boolean).join(" · ");
-  const nearbyAddress = state.fallbackAddress || (source === "address"
+  const nearbyAddress = state.fallbackAddress || (source === "address" || shareSlug
     ? state.data?.request_address || state.data?.resolved_address || (savedAddress
       ? `${savedAddress.city}, ${savedAddress.road_type} ${savedAddress.street} ${savedAddress.house_number}${savedAddress.apartment_number ? ` ap ${savedAddress.apartment_number}` : ""}`
       : "")
     : "");
   const nearbyNumber = cadastralNumber || (!state.data?.locked_sections?.cadastral_number ? state.data?.cadastral_number : "") || "";
-  const nearbyKey = `${nearbyAddress || nearbyNumber}|${isAuthenticated ? "authenticated" : "anonymous"}|${skipCache}|${state.fallbackAddress ? "address-fallback" : "result"}`;
+  const nearbyKey = `${shareSlug}|${nearbyAddress || nearbyNumber}|${isAuthenticated ? "authenticated" : "anonymous"}|${skipCache}|${state.fallbackAddress ? "address-fallback" : "result"}`;
   const nearbyData = nearbyState.key === nearbyKey ? nearbyState.data : null;
   const mapLocation = [
     state.data?.map_location,
@@ -654,15 +657,34 @@ function CadastruResultContent() {
   };
 
   useEffect(() => {
-    if (!state.data) return;
+    if (!state.data || shareSlug) return;
     try {
       localStorage.removeItem(CADASTRU_DRAFT_STORAGE_KEY);
     } catch {
       // Draft cleanup is best-effort after a successful result.
     }
-  }, [state.data]);
+  }, [shareSlug, state.data]);
 
   useEffect(() => {
+    if (shareSlug) {
+      let active = true;
+      loadedRequestKey.current = "";
+      setState({ loading: true, error: "", data: null });
+      fetch(`/api/cadastru/share/${encodeURIComponent(shareSlug)}`)
+        .then(async (response) => {
+          const result = await response.json();
+          if (!active) return;
+          if (!response.ok || !result.cadastral) {
+            setState({ loading: false, error: t(response.status === 404 ? "cadastru.sharedReportNotFound" : "cadastru.shareError"), data: null });
+            return;
+          }
+          setState({ loading: false, error: "", data: result.cadastral, shareSlug });
+        })
+        .catch(() => {
+          if (active) setState({ loading: false, error: t("cadastru.shareError"), data: null });
+        });
+      return () => { active = false; };
+    }
     if (authLoading) return;
     const pendingRequest = addressRequestKey ? JSON.parse(addressRequestKey) : null;
 
@@ -884,7 +906,12 @@ function CadastruResultContent() {
     return () => {
       active = false;
     };
-  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, lookupRetry, router, savedAddressKey, searchLookupId, session?.access_token, session?.user?.id, skipCache, source, t]);
+  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, lookupRetry, router, savedAddressKey, searchLookupId, session?.access_token, session?.user?.id, shareSlug, skipCache, source, t]);
+
+  useEffect(() => {
+    if (authLoading || !shareSlug || state.shareSlug !== shareSlug || !state.data) return;
+    void recordCadastruShareOpen(shareSlug);
+  }, [authLoading, session?.user?.id, shareSlug, state.data, state.shareSlug]);
 
   useEffect(() => {
     if (!state.retry || state.retry.attempt !== 0) return;
@@ -1050,7 +1077,16 @@ function CadastruResultContent() {
               {t("cadastru.resultPageTitle")}
             </h1>
             {state.data && (
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-wrap items-start gap-2">
+                {!isLockedPreview && (isAuthenticated || shareSlug) && (
+                  <CadastruShareButton
+                    key={`${shareSlug}:${favoritePath || favoriteNumber || favoriteAddress}`}
+                    cadastralNumber={!savedAddress ? favoriteNumber : undefined}
+                    address={state.data.resolved_address || state.data.request_address || favoriteAddress}
+                    shareSlug={shareSlug}
+                    searchToken={evaluationToken}
+                  />
+                )}
                 {favoritePath && (
                   <CadastruFavoriteButton
                     key={`${session?.user?.id || "anonymous"}:${favoritePath}`}
@@ -1185,7 +1221,7 @@ function CadastruResultContent() {
               unavailable={!nearbySearchAvailable || (nearbyState.key === nearbyKey && nearbyState.error)}
             />
           )}
-          {valuationPrefill && (
+          {valuationPrefill && !shareSlug && (
             <div className="mt-8 flex justify-center">
               <button
                 type="button"

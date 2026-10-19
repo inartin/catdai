@@ -81,6 +81,7 @@ export default function LinkAnalyzer({
   titleTag: TitleTag = "p",
   className = "mt-5",
   showFeaturePapers = false,
+  prominent = false,
 }) {
   const { t } = useTranslation();
   const { session } = useAuth();
@@ -126,14 +127,16 @@ export default function LinkAnalyzer({
     }
   };
 
-  const cardClassName = showFeaturePapers
+  const cardClassName = prominent
+    ? "relative z-10 rounded-2xl border-2 border-emerald-200 bg-white p-5 shadow-[0_12px_40px_-12px_rgba(5,150,105,0.25)] sm:p-7"
+    : showFeaturePapers
     ? "relative z-10 rotate-[-0.4deg] rounded-sm border border-gray-200 bg-white p-5"
     : "relative z-10 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm";
 
   return (
     <div className={`${className} relative isolate`}>
       <div className={cardClassName}>
-        {showFeaturePapers && (
+        {showFeaturePapers && !prominent && (
           <>
             <span
               aria-hidden="true"
@@ -158,7 +161,7 @@ export default function LinkAnalyzer({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <div className={`flex flex-col sm:flex-row ${prominent ? "mt-5 gap-3" : "mt-4 gap-2"}`}>
           <input
             type="url"
             inputMode="url"
@@ -168,13 +171,17 @@ export default function LinkAnalyzer({
             placeholder={t("linkAnalyzer.placeholder")}
             disabled={loading}
             aria-label={t("linkAnalyzer.title")}
-            className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"
+            className={prominent
+              ? "min-h-14 min-w-0 flex-1 rounded-xl border-2 border-emerald-300 bg-white px-4 py-4 text-base text-gray-900 placeholder:text-gray-500 outline-none transition-colors focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100 disabled:opacity-60"
+              : "min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-colors focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-60"}
           />
           <button
             type="button"
             onClick={analyze}
             disabled={loading || !url.trim()}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+            className={prominent
+              ? "inline-flex min-h-14 shrink-0 items-center justify-center gap-3 rounded-xl bg-emerald-700 px-7 py-4 text-base font-bold text-white shadow-md shadow-emerald-900/15 transition-colors enabled:hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-700/80 disabled:shadow-none"
+              : "inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"}
           >
             {loading ? (
               <>

@@ -14,6 +14,12 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 6. `/anunt` runs the usual sale estimate and renders the listing-vs-market comparison through the shared result component. Users without a `listing_analysis` credit receive the same blurred preview pattern used by `/evaluare` and rent results.
 7. At the bottom of the `/anunt` result, the page embeds `LinkAnalyzer` directly so users can start another 999.md listing check without returning to `/verifica-anunt`.
 
+## Search landing page (`/verifica-anunt`)
+- Romanian uses `/verifica-anunt`; `/ro/verifica-anunt` canonicals to it. Russian uses `/ru/verifica-anunt` through the existing language rewrite.
+- URL language determines initial HTML and metadata, with reciprocal hreflang. The existing navbar language choice navigates to the corresponding URL.
+- Page-local RO/RU copy covers price history, comparison methodology and limitations, and potential duplicate matching. Three responsive example cards use explicitly fictional data and make no analysis requests.
+- The Romanian title, H1 and description target apartment-price checks on 999.md; translated metadata and sections are server-rendered for Russian searches too. Shared analyzer/result components and other pages retain their behavior.
+
 ## Parsing (`src/lib/parse-999-listing.js`)
 - Reads the seller-selected attributes only; the free-text description is ignored.
 - Price/currency/external id come from `product:*` meta tags; location from JSON-LD `name`.

@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import {
   FREE_MONTHLY_FEATURE_KEYS,
-  getFreeMonthlyFeatureUsageWindow,
 } from "@/lib/free-monthly-feature-usage";
 import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -64,15 +63,10 @@ export async function GET(request) {
     });
   }
 
-  const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
   const { data: freeUsageData, error: freeUsageError } = await supabaseAdmin
-    .from("user_feature_usage_events")
-    .select("feature_key")
-    .eq("user_id", access.user_id)
-    .eq("source", "free_monthly")
-    .in("feature_key", FREE_MONTHLY_FEATURE_KEYS)
-    .gte("created_at", startIso)
-    .lt("created_at", endIso);
+    .from("user_retained_free_credits")
+    .select("remaining_uses")
+    .eq("user_id", access.user_id);
 
   if (freeUsageError && !isMissingSchemaError(freeUsageError)) {
     console.error("[profile-credits] free monthly usage failed:", freeUsageError.message);

@@ -48,9 +48,9 @@ export default function AdminUserCredits({ user, disabled = false, onUpdate, onB
           <p className="mt-1 text-xs text-gray-500">{paid?.totalUsed ?? "—"} utilizate · {paid?.totalGranted ?? "—"} acordate</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3">
-          <p className="text-xs text-gray-500">Credit gratuit lunar</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">{free?.remainingUses ?? "—"} / 1</p>
-          <p className="mt-1 text-xs text-gray-500">Comun tuturor funcțiilor</p>
+          <p className="text-xs text-gray-500">Credit gratuit păstrat</p>
+          <p className="mt-1 text-2xl font-semibold text-gray-900">{free?.remainingUses ?? "—"}</p>
+          <p className="mt-1 text-xs text-gray-500">Nu se reînnoiește</p>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-2">
@@ -65,7 +65,7 @@ export default function AdminUserCredits({ user, disabled = false, onUpdate, onB
         <button type="button" onClick={() => adjust("remove")} disabled={busy || !valid || !paid || count > paid.remainingUses}
           className="rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40">Retrage</button>
       </div>
-      <p className="mt-2 text-xs text-gray-500">Adăugarea și retragerea modifică doar creditele disponibile, fără creditul gratuit lunar.</p>
+      <p className="mt-2 text-xs text-gray-500">Adăugarea și retragerea modifică doar creditele disponibile, fără creditul gratuit păstrat.</p>
       {saving && <p role="status" className="mt-2 text-xs text-gray-500">Se salvează...</p>}
       {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
     </section>

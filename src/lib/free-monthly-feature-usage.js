@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 
+// Compatibility names remain for existing callers; only retained credits can be spent.
 export const FREE_MONTHLY_FEATURE_LIMIT = 1;
 export function getFreeMonthlyFeatureLimit() {
   return FREE_MONTHLY_FEATURE_LIMIT;
@@ -51,7 +52,6 @@ export async function checkFreeMonthlyFeatureUsage({
   idempotencyKey,
   limit = FREE_MONTHLY_FEATURE_LIMIT,
 }) {
-  const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
   const featureLimit = Math.min(limit, getFreeMonthlyFeatureLimit(featureKey));
 
   if (!userId) {
@@ -67,7 +67,7 @@ export async function checkFreeMonthlyFeatureUsage({
   }
 
   if (!shouldPersistRuntimeData()) {
-    return { allowed: true, reason: "runtime_persistence_disabled", remaining_uses: featureLimit };
+    return { allowed: false, reason: "free_monthly_limit_reached", remaining_uses: 0 };
   }
 
   const { data: existing, error: existingError } = await supabaseAdmin
@@ -89,19 +89,15 @@ export async function checkFreeMonthlyFeatureUsage({
     };
   }
 
-  const { count, error: countError } = await supabaseAdmin
-    .from("user_feature_usage_events")
-    .select("id", { count: "exact", head: true })
+  const { data: retained, error } = await supabaseAdmin
+    .from("user_retained_free_credits")
+    .select("remaining_uses")
     .eq("user_id", userId)
-    .eq("source", "free_monthly")
-    .gte("created_at", startIso)
-    .lt("created_at", endIso);
-
-  if (countError) throw countError;
-
-  const used = count || 0;
-  return used < featureLimit
-    ? { allowed: true, reason: "has_free_credit", remaining_uses: featureLimit - used }
+    .maybeSingle();
+  if (error) throw error;
+  const remaining = Math.min(featureLimit, retained?.remaining_uses || 0);
+  return remaining > 0
+    ? { allowed: true, reason: "has_free_credit", remaining_uses: remaining }
     : { allowed: false, reason: "free_monthly_limit_reached", remaining_uses: 0 };
 }
 
@@ -113,7 +109,7 @@ export async function consumeFreeMonthlyFeatureUsage({
   limit = FREE_MONTHLY_FEATURE_LIMIT,
 }) {
   const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
-  const resetAt = endIso;
+  const resetAt = null; // Retained credits never renew.
   const featureLimit = Math.min(limit, getFreeMonthlyFeatureLimit(featureKey));
 
   if (!userId) {
@@ -151,12 +147,12 @@ export async function consumeFreeMonthlyFeatureUsage({
 
   if (!shouldPersistRuntimeData()) {
     return {
-      allowed: true,
-      reason: "runtime_persistence_disabled",
+      allowed: false,
+      reason: "free_monthly_limit_reached",
       source: "free_monthly",
       limit: featureLimit,
       used_count: 0,
-      remaining_uses: featureLimit,
+      remaining_uses: 0,
       reset_at: resetAt,
     };
   }

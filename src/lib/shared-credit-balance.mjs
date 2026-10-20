@@ -7,12 +7,14 @@ export function sharedPaidCreditBalance(rows = []) {
   }), { remainingUses: 0, totalGranted: 0, totalUsed: 0 });
 }
 
-export function sharedFreeMonthlyCredit(usageRows = []) {
+// Legacy response name; this is a one-time retained balance, never a monthly grant.
+export function sharedFreeMonthlyCredit(rows = []) {
+  const retained = rows[0];
   return {
-    remainingUses: usageRows.length ? 0 : 1,
-    totalGranted: 1,
-    totalUsed: Math.min(usageRows.length, 1),
-    source: "free_monthly",
-    eligible: true,
+    remainingUses: Math.max(Number(retained?.remaining_uses) || 0, 0),
+    totalGranted: retained ? 1 : 0,
+    totalUsed: retained ? 1 - Math.max(Number(retained.remaining_uses) || 0, 0) : 0,
+    source: "retained_free",
+    eligible: !!retained,
   };
 }

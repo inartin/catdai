@@ -74,7 +74,7 @@ Paddle payment flow is connected for one-time packages, the Extra monthly subscr
   - not linked from pricing or public navigation
 
 ## Product Model
-All source grants below are pooled into universal credits: Standard 12, Pro 60, Extra 300 per paid period, and single products 1. Source labels remain for lifecycle accounting, not access restrictions. One shared free credit per UTC month is used first. Apply the [shared-credit migration](access-paywall.md#shared-credit-rollout) after this provider schema.
+All source grants below are pooled into universal credits: Standard 12, Pro 60, Extra 300 per paid period, and single products 1. Source labels remain for lifecycle accounting, not access restrictions. Any retained free credit is used first; monthly free grants are retired. Apply the [shared-credit migration](access-paywall.md#shared-credit-rollout) after this provider schema.
 
 - Paddle uses the CatDai product keys:
   - `standard_pack`

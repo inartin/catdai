@@ -5,8 +5,6 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { PAYMENT_FEATURE_KEYS, getPaymentProducts } from "@/lib/payment-products";
 import {
   FREE_MONTHLY_FEATURE_KEYS,
-  getFreeMonthlyFeatureLimit,
-  getFreeMonthlyFeatureUsageWindow,
 } from "@/lib/free-monthly-feature-usage";
 
 const PACKAGE_PRODUCT_KEYS = new Set(["free", "standard_pack", "pro_pack", "extra_pack"]);
@@ -31,16 +29,7 @@ async function resetUserCredits({ userId, grants }) {
   });
   if (error) throw error;
 
-  const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
-  const { error: freeUsageError } = await supabaseAdmin
-    .from("user_feature_usage_events")
-    .delete()
-    .eq("user_id", userId)
-    .eq("source", "free_monthly")
-    .in("feature_key", FREE_MONTHLY_FEATURE_KEYS)
-    .gte("created_at", startIso)
-    .lt("created_at", endIso);
-  if (freeUsageError) throw freeUsageError;
+
 }
 
 export async function PATCH(request, context) {
@@ -84,6 +73,10 @@ export async function PATCH(request, context) {
 
     if (updateError) throw updateError;
 
+    const { data: retained, error: retainedError } = await supabaseAdmin
+      .from("user_retained_free_credits").select("remaining_uses").eq("user_id", id);
+    if (retainedError) throw retainedError;
+
     return NextResponse.json({
       ok: true,
       packageKey,
@@ -91,18 +84,10 @@ export async function PATCH(request, context) {
       sharedCredits: sharedPaidCreditBalance(Object.values(grants).map(uses => ({
         remaining_uses: uses, total_granted: uses, total_used: 0,
       }))),
-      freeMonthlyCredit: sharedFreeMonthlyCredit(),
-      freeMonthlyCredits: FREE_MONTHLY_FEATURE_KEYS.map((featureKey) => {
-        const limit = getFreeMonthlyFeatureLimit(featureKey);
-        return {
-          featureKey,
-          remainingUses: limit,
-          totalGranted: limit,
-          totalUsed: 0,
-          source: "free_monthly",
-          eligible: limit > 0,
-        };
-      }),
+      freeMonthlyCredit: sharedFreeMonthlyCredit(retained),
+      freeMonthlyCredits: FREE_MONTHLY_FEATURE_KEYS.map(featureKey => ({
+        featureKey, ...sharedFreeMonthlyCredit(retained),
+      })),
     });
   } catch (error) {
     console.error("[admin-user-package] update failed:", error);

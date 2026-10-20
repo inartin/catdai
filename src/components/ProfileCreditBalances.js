@@ -6,7 +6,7 @@ const DEFAULT_LABELS = {
   title: "Utilizări disponibile",
   description: "Pentru orice funcție Cat Dai, în orice combinație.",
   purchased: "Cumpărate",
-  freeMonthly: "Gratuite luna aceasta",
+  freeMonthly: "Credite gratuite păstrate",
   addUses: "Adaugă utilizări",
   loading: "Se încarcă...",
 };
@@ -54,10 +54,10 @@ export default function ProfileCreditBalances({
             <dt>{copy.purchased}</dt>
             <dd className="font-semibold text-gray-900 tabular-nums">{display(paid)}</dd>
           </div>
-          <div className="flex items-center gap-2">
+          {free > 0 && <div className="flex items-center gap-2">
             <dt>{copy.freeMonthly}</dt>
             <dd className="font-semibold text-gray-900 tabular-nums">{display(free)}</dd>
-          </div>
+          </div>}
         </dl>
       )}
     </section>

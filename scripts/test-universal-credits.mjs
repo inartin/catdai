@@ -130,5 +130,37 @@ for (const role of ['anon','authenticated']) {
 assert.equal((await q("select has_function_privilege('service_role','consume_user_credit(uuid,text,text,jsonb)','EXECUTE') ok"))[0].ok,true);
 assert.deepEqual(sharedPaidCreditBalance([{remaining_uses:2,total_granted:3,total_used:1},{remaining_uses:4,total_granted:4,total_used:0}]),{remainingUses:6,totalGranted:7,totalUsed:1});
 assert.equal(sharedFreeMonthlyCredit([{feature_key:'sale_estimate'}]).remainingUses,0);
+// Retirement snapshots only unused existing allowances and never replenishes them.
+const retainedUser = await newUser();
+const spentUser = await newUser();
+await free(spentUser, 'pdf_report', 'before-retirement');
+const paidBeforeRetirement = await balance(packs);
+const retirement = await fs.readFile('supabase/migrations/20261020081326_retire_monthly_free_credits.sql', 'utf8');
+await db.exec(retirement);
+const newcomer = await newUser();
+await db.exec(retirement); // Reapplying must neither add new users nor refill a credit.
+assert.equal((await free(newcomer, 'sale_estimate')).allowed, false);
+assert.equal((await free(spentUser, 'sale_estimate')).allowed, false);
+assert.equal((await free(spentUser, 'pdf_report', 'before-retirement')).reason, 'already_consumed');
+assert.deepEqual(await balance(packs), paidBeforeRetirement, 'paid ledgers are unchanged');
+const retainedRows = await q('select remaining_uses from user_retained_free_credits where user_id=$1', [retainedUser]);
+assert.equal(sharedFreeMonthlyCredit(retainedRows).remainingUses, 1);
+assert.equal(sharedFreeMonthlyCredit([]).remainingUses, 0, 'missing rows never imply a grant');
+const retainedAttempts = await Promise.all(features.map(feature => free(retainedUser, feature, 'retained-' + feature)));
+assert.equal(retainedAttempts.filter(r => r.allowed).length, 1, 'one retained credit across all features');
+assert.equal((await free(retainedUser, 'sale_estimate', 'retained-sale_estimate')).reason, 'already_consumed');
+await db.exec(retirement);
+assert.equal((await free(retainedUser, 'pdf_report', 'after-reapply')).allowed, false);
+const [futureFree] = await q("select * from consume_free_monthly_credit($1,'pdf_report','future',now()+interval '1 month',now()+interval '2 months',99)", [retainedUser]);
+assert.equal(futureFree.allowed, false, 'future months and larger limits cannot mint credits');
+assert.equal((await free(newcomer, 'pdf_report', 'legacy', 'consume_free_monthly_feature_usage')).allowed, false);
+await q("select grant_user_feature_credits($1,'sale_estimate',1)", [newcomer]);
+assert.equal((await consume(newcomer, 'cadastru_lookup')).allowed, true, 'paid access still works');
+for (const role of ['anon', 'authenticated']) {
+  for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+    assert.equal((await q("select has_table_privilege($1,'user_retained_free_credits',$2) ok", [role, privilege]))[0].ok, false);
+  }
+}
+assert.equal((await q("select relrowsecurity from pg_class where oid='user_retained_free_credits'::regclass"))[0].relrowsecurity, true);
 await db.close();
-console.log('Universal credits: cross-feature purchases, preserved totals, refunds, free month, idempotency, overspend, lifecycle and privileges passed.');
+console.log('Universal credits: cross-feature purchases, preserved totals, refunds, retired free allowance, idempotency, overspend, lifecycle and privileges passed.');

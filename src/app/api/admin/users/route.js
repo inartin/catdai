@@ -4,7 +4,6 @@ import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 import {
   FREE_MONTHLY_FEATURE_KEYS,
-  getFreeMonthlyFeatureUsageWindow,
 } from "@/lib/free-monthly-feature-usage";
 import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
 
@@ -139,25 +138,20 @@ async function fetchFeatureCreditRows() {
   return rows;
 }
 
-async function fetchFreeMonthlyUsageRows() {
+async function fetchRetainedFreeCreditRows() {
   let rows = [];
   let from = 0;
-  const { startIso, endIso } = getFreeMonthlyFeatureUsageWindow();
 
   while (true) {
     const { data, error } = await supabaseAdmin
-      .from("user_feature_usage_events")
-      .select("user_id, feature_key")
-      .eq("source", "free_monthly")
-      .in("feature_key", FREE_MONTHLY_FEATURE_KEYS)
-      .gte("created_at", startIso)
-      .lt("created_at", endIso)
+      .from("user_retained_free_credits")
+      .select("user_id, remaining_uses")
       .not("user_id", "is", null)
       .range(from, from + PAGE - 1);
 
     if (error) {
       if (isMissingSchemaError(error)) return [];
-      throw new Error(`user_feature_usage_events free monthly query failed: ${error.message}`);
+      throw new Error(`user_retained_free_credits query failed: ${error.message}`);
     }
 
     if (!data || data.length === 0) break;
@@ -329,7 +323,7 @@ export async function GET(request) {
       fetchUserIdRows("listing_link_analysis_events", "user_id"),
       fetchPaidPackageRows(),
       fetchFeatureCreditRows(),
-      fetchFreeMonthlyUsageRows(),
+      fetchRetainedFreeCreditRows(),
     ]);
 
     const estimationsByUser = toCountMap(estimationRows, "user_id");

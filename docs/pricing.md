@@ -19,7 +19,7 @@ The standalone `/pricing` page sells individual feature uses and all-feature pac
 - When the checkout title already shows the use count, the subtitle shows only `Plată unică` (localized), without repeating that count.
 - All six MAIB single-use product keys now cost 15 MDL. Legacy quantity URLs/API requests remain supported at 15 MDL per use; the old quantity discount tiers are removed. Existing orders retain their immutable saved prices/grants. Pack prices and totals are unchanged.
 - Prices come from the server catalog; browser-supplied amounts are ignored. Confirmed payments add uses once. The shared-credit migration must be applied before releasing this page.
-- Each user has one shared free credit per UTC month. See [Access and Paywall](access-paywall.md).
+- There are no new or recurring free credits. Existing unused allowances are retained once. See [Access and Paywall](access-paywall.md).
 
 ## Env
 ```env

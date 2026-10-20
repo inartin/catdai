@@ -1197,7 +1197,7 @@ export default function AdminDashboard() {
                   </button>
                   {selectedUserCreditResetConfirming && (
                     <div className="absolute right-0 top-full z-10 mt-2 w-52 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                      <p className="text-xs font-medium text-gray-700">Restabilești creditele pachetului curent și creditul gratuit lunar?</p>
+                      <p className="text-xs font-medium text-gray-700">Restabilești creditele pachetului curent?</p>
                       <div className="mt-2 flex items-center justify-end gap-2">
                         <button
                           type="button"

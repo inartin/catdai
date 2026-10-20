@@ -129,7 +129,7 @@ Checks: `pnpm exec node --experimental-vm-modules scripts/test-cadastru-building
 
 ## Access
 - The standalone `/cadastru` search accepts anonymous address and cadastral-number submissions and returns a server-masked preview.
-- Blurred preview values open the shared login popup for anonymous users. Authenticated users consume the shared monthly free credit, then shared paid credits for new full-detail lookups. Reopening an already-consumed lookup does not spend another use; locked previews offer the 15 MDL single result and link to the pricing page.
+- Blurred preview values open the purchase popup for anonymous and authenticated users; checkout handles login and preserves the selected result. Authenticated users consume any retained free credit, then shared paid credits for new full-detail lookups. No monthly free credits are granted. Reopening an already-consumed lookup does not spend another use; locked previews offer the 15 MDL single result and link to the pricing page.
 - `/api/cadastral` and `/api/cadastru/address` allow anonymous requests only when the request explicitly carries the standalone `search_context: "cadastru"`; other callers still require a valid bearer token.
 - Authenticated users need an available shared free or paid credit for unblurred full details.
 - Address search and the follow-up cadastral-number result share the cadastral-number paid idempotency key when possible, so the same lookup is not charged twice.

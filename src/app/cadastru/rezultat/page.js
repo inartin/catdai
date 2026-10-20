@@ -502,7 +502,7 @@ function CadastruResultContent() {
   const originalStreet = originalStreetParam || String(state.data?.street_resolution?.original || "").slice(0, 80);
   const resolvedStreet = resolvedStreetParam || String(state.data?.street_resolution?.resolved || "").slice(0, 80);
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
-  const purchaseOffer = state.data?.access_limit?.purchase || null;
+  const purchaseOffer = state.data?.access_limit?.purchase || (isLockedPreview ? { product_key: "cadastru_lookup_single" } : null);
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
   const [device, setDevice] = useState({ isMobile: false, isIOS: false });
@@ -1054,7 +1054,7 @@ function CadastruResultContent() {
         onClose={() => setIsAuthModalOpen(false)}
       />
       <AuthRequiredModal
-        open={isPaywallModalOpen && isAuthenticated}
+        open={isPaywallModalOpen}
         copyKey="payment.buyAccess"
         showAuthOptions={false}
         showCopy={false}
@@ -1199,15 +1199,8 @@ function CadastruResultContent() {
                 cadastral={state.data}
                 locked={isLockedPreview}
                 showRevealButton={isLockedPreview}
-                revealButtonLabel={t(isAuthenticated ? "cadastru.payToUnlock" : "cadastru.unlockData")}
-                onLockedClick={isLockedPreview ? () => {
-                  if (isAuthenticated) {
-                    setIsPaywallModalOpen(true);
-                  } else {
-                    setAuthModalCopyKey("cadastru.loginToUse");
-                    setIsAuthModalOpen(true);
-                  }
-                } : undefined}
+                revealButtonLabel={t("cadastru.payToUnlock")}
+                onLockedClick={isLockedPreview ? () => setIsPaywallModalOpen(true) : undefined}
               >
                 {map}
               </CadastralDataCard>

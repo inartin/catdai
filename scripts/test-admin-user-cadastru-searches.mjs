@@ -33,6 +33,7 @@ const mocks = {
           select(columns) { query.columns = columns; return builder; },
           eq(column, value) { query.filter = [column, value]; return builder; },
           in(column, value) { query.filter = [column, Array.from(value)]; return builder; },
+          is(column, value) { assert.equal(column, "duplicate_of"); assert.equal(value, null); return builder; },
           order(column, options) { query.orders.push([column, options.ascending]); return builder; },
           range(from, to) {
             query.range = [from, to];

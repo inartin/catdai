@@ -234,7 +234,7 @@ async function fetchCadastruRows(columns, defaults = {}, since) {
     applySince(
       supabaseAdmin
         .from("cadastru_search_events")
-        .select(columns),
+        .select(columns).is("duplicate_of", null),
       "created_at",
       since
     ).order("created_at", { ascending: false });
@@ -429,21 +429,10 @@ function buildCalculatorUsageStats(rows, cutoffs) {
   };
 }
 
-async function fetchExternalApiUsageRows(sinceDate) {
-  const { data, error } = await applySince(
-    supabaseAdmin
-      .from("external_api_usage_daily")
-      .select("usage_date, service, status, count, updated_at"),
-    "usage_date",
-    sinceDate
-  )
-    .order("usage_date", { ascending: false });
-
-  if (!error) return data || [];
-
-  const code = String(error?.code || "");
-  if (code === "42P01" || code === "42703" || code === "PGRST204") return [];
-  throw new Error(`external_api_usage_daily query failed: ${error.message}`);
+async function fetchExternalApiUsageRows(since) {
+  const { data, error } = await supabaseAdmin.rpc("admin_external_api_usage_since", { p_since: since });
+  if (error) throw new Error(`external_api_usage query failed: ${error.message}`);
+  return data || [];
 }
 
 async function fetchExternalApiUsageEvents(since) {
@@ -704,7 +693,6 @@ export async function GET(request) {
   const periodConfig = DASHBOARD_PERIODS[period];
   const periodSince = period === "day" ? getChisinauMidnight()
     : periodConfig.ms ? new Date(Date.now() - periodConfig.ms).toISOString() : null;
-  const periodSinceDate = periodSince ? periodSince.slice(0, 10) : null;
   const marketTrendsSinceDate = getMarketTrendsPeriodStart(period);
   const cacheKey = period;
 
@@ -746,7 +734,7 @@ export async function GET(request) {
       fetchCadastruSearchEvents(periodSince),
       fetchListingLinkAnalysisEvents(periodSince),
       fetchCalculatorUsageEvents(periodSince),
-      fetchExternalApiUsageRows(periodSinceDate),
+      fetchExternalApiUsageRows(periodSince),
       fetchExternalApiUsageEvents(periodSince),
       fetchPaymentCheckoutEvents(periodSince),
       fetchMarketTrendsPopupStats(marketTrendsSinceDate),

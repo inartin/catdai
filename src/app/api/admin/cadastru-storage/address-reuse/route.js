@@ -12,7 +12,7 @@ async function readRows(table, columns, order, searches = false) {
   const rows = [];
   for (let from = 0; ; from += PAGE) {
     let query = supabaseAdmin.from(table).select(columns);
-    if (searches) query = query.eq("search_type", "address");
+    if (searches) query = query.eq("search_type", "address").is("duplicate_of", null);
     const { data, error } = await query.order(order, { ascending: true }).range(from, from + PAGE - 1);
     if (error) throw new Error(`${table}: ${error.message}`);
     rows.push(...(data || []));

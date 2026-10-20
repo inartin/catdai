@@ -36,12 +36,16 @@ export function readCadastruEvaluationToken(token) {
 }
 
 export async function recordCadastruEvaluationStep(token, step) {
-  const eventId = readCadastruEvaluationToken(token);
+  let eventId = readCadastruEvaluationToken(token);
   if (!eventId || !shouldCollectStatistics() || !shouldPersistRuntimeData() || process.env.NODE_ENV === "development") return false;
   const column = step === "click" ? "valuation_clicked_at" : step === "complete" ? "valuation_completed_at" : null;
   if (!column) return false;
 
   try {
+    const { data: search, error: readError } = await supabaseAdmin.from("cadastru_search_events")
+      .select("duplicate_of").eq("id", eventId).maybeSingle();
+    if (readError) throw readError;
+    if (search?.duplicate_of) eventId = search.duplicate_of;
     let query = supabaseAdmin.from("cadastru_search_events")
       .update({ [column]: new Date().toISOString() })
       .eq("id", eventId)

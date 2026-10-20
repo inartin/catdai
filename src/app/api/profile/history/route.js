@@ -159,7 +159,7 @@ async function fetchCadastruHistory(userId, cursor, pageSize) {
     const res = await applyCursor(
       supabaseAdmin
         .from("cadastru_search_events")
-        .select(columns)
+        .select(columns).is("duplicate_of", null)
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(pageSize + 1),

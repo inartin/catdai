@@ -1404,6 +1404,7 @@ const parcelAddressRoute = await load("src/app/api/cadastru/address/route.js", p
 hasCredit = true;
 const parcelFull = await (await parcelNumberRoute.POST(request({ cadastral_number: parcelNumber.replaceAll(".", "") }))).json();
 assert.equal(parcelFull.cadastral_number, parcelNumber);
+assert.equal(searchLogs.at(-1).lookupSource, "api", "fresh number search records an API result");
 const parcelCreditKey = creditCalls.at(-1).idempotencyKey;
 const dottedParcel = await (await parcelNumberRoute.POST(request({ cadastral_number: parcelNumber }))).json();
 assert.equal(dottedParcel.cadastral_number, parcelNumber);
@@ -1419,6 +1420,7 @@ await caching.writeCadastruCache("number", parcelNumber, {
 hasCredit = false;
 const parcelPreview = await (await parcelNumberRoute.POST(request({ cadastral_number: parcelNumber }))).json();
 assert.equal(searchLogs.at(-1).resultType, "land_only", "legacy cached number classification is corrected");
+assert.equal(searchLogs.at(-1).lookupSource, "cache", "cached number search is explicitly labeled cached");
 assert.equal(parcelPreview.full_access, false);
 assert.notEqual(parcelPreview.lands[0].area_m2, "1352", "land classification preserves credit masking");
 const parcelAddressBody = { ...addressBody, apartment_number: "", skip_cache: true };
@@ -1429,6 +1431,7 @@ await caching.writeCadastruCache("address", storage.normalizeCadastruAddressForD
 });
 await parcelAddressRoute.POST(request({ ...parcelAddressBody, skip_cache: false }));
 assert.equal(searchLogs.at(-1).resultType, "land_only", "legacy cached address classification is corrected");
+assert.equal(searchLogs.at(-1).lookupSource, "cache", "cached address search is explicitly labeled cached");
 console.log("Land regressions passed: storage, number/address searches, legacy cache metadata and preview masking.");
 
 // Address-only confirmation uses canonical street names and never persists or charges before selection.

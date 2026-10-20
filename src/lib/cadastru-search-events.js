@@ -8,7 +8,7 @@ import { normalizeCadastruLookupId } from "@/lib/cadastru-lookup-tracking";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
 const RESULT_TYPES = new Set(["error", "no_data", "address_only", "land_only", "apartment_only", "full_data"]);
-const LOOKUP_SOURCES = new Set(["api", "local"]);
+const LOOKUP_SOURCES = new Set(["api", "local", "cache"]);
 
 function normalizeSearchType(searchType) {
   const value = String(searchType || "").trim();
@@ -121,17 +121,20 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
       lookup_source: normalizeLookupSource(options.lookupSource),
     };
     const lookupId = normalizeCadastruLookupId(options.lookupId);
+    const searchSession = normalizeCadastruLookupId(request.headers?.get("x-catdai-search-session"));
     if (lookupId) {
-      // Scope to the verified viewer and query so shared URLs cannot merge users.
+      row.lookup_id = lookupId;
+      // Browser journey survives login. Legacy clients retain their viewer-scoped key.
       row.event_key = crypto.createHash("sha256").update(JSON.stringify([
-        lookupId, userId, normalizedType, row.search_address || row.cadastral_number,
+        lookupId, searchSession ? `session:${searchSession}` : userId,
+        normalizedType, row.search_address || row.cadastral_number,
       ])).digest("hex");
     }
 
     let { data, error } = await supabaseAdmin.from("cadastru_search_events").insert(row).select("id").single();
 
-    for (let attempt = 0; attempt < 9 && error; attempt++) {
-      const missingColumn = ["event_key", "search_request", "result_value", "search_address", "city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
+    for (let attempt = 0; attempt < 10 && error; attempt++) {
+      const missingColumn = ["lookup_id", "event_key", "search_request", "result_value", "search_address", "city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
         column in row && isMissingColumnError(error, column)
       );
       if (!missingColumn) break;
@@ -140,6 +143,17 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
     }
 
     if (error?.code === "23505" && row.event_key) {
+      if (userId && searchSession) {
+        // Atomically attribute an anonymous journey on login; never overwrite a known user.
+        const attribution = await supabaseAdmin.from("cadastru_search_events")
+          .update({ user_id: userId }).eq("event_key", row.event_key).is("user_id", null);
+        if (attribution.error) throw attribution.error;
+      }
+      if (row.lookup_source) {
+        const source = await supabaseAdmin.from("cadastru_search_events")
+          .update({ lookup_source: row.lookup_source }).eq("event_key", row.event_key).is("lookup_source", null);
+        if (source.error) throw source.error;
+      }
       // Retain event identity/time/progress, but reflect the latest attempt outcome.
       ({ data, error } = await supabaseAdmin.from("cadastru_search_events")
         .update({ result_type: row.result_type }).eq("event_key", row.event_key).select("id").single());

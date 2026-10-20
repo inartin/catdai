@@ -4,6 +4,21 @@ export function normalizeCadastruLookupId(id) {
     ? id.toLowerCase() : null;
 }
 
+let searchSessionId;
+// Kept out of result URLs so copying a URL to another browser starts a separate journey.
+// sessionStorage survives the login redirect without tying identity to authentication.
+export function getCadastruSearchSessionId() {
+  if (searchSessionId) return searchSessionId;
+  try {
+    searchSessionId = normalizeCadastruLookupId(sessionStorage.getItem("cadastru-search-session"))
+      || crypto.randomUUID();
+    sessionStorage.setItem("cadastru-search-session", searchSessionId);
+  } catch {
+    searchSessionId = crypto.randomUUID();
+  }
+  return searchSessionId;
+}
+
 // Keep the search identity through OAuth redirects and result-page remounts.
 // A new form submission or explicit correction supplies a fresh preferred ID.
 export function ensureCadastruLookupId(preferredId) {

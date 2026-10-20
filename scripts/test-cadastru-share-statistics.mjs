@@ -16,6 +16,7 @@ const owner = crypto.randomUUID(), viewer = crypto.randomUUID(), otherOwner = cr
 await db.query("insert into auth.users values ($1),($2),($3)", [owner, viewer, otherOwner]);
 const number = "0100106.131.01.097";
 await db.query("insert into cadastru_search_events values (1,$1,$2,null),(2,$1,$2,null),(3,$3,$2,null),(4,$1,null,'Chișinău, strada Test 1 ap 2')", [owner, number, otherOwner]);
+await db.exec("alter table cadastru_search_events add column duplicate_of bigint;");
 const slugs = ["a", "b", "c", "d"].map((value) => value.repeat(48));
 for (let i = 0; i < slugs.length; i++) {
   await db.query("insert into cadastru_shared_reports(slug,sharer_user_id,report_hash,payload,search_event_id,collect_statistics) values($1,$2,$3,'{}',$4,$5)",

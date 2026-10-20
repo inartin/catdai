@@ -56,6 +56,7 @@ const route = await loadAppModule("src/app/api/admin/cadastru-storage/address-re
     return {
       select(columns) { assert(!columns.includes("raw_payload")); return this; },
       eq(key, value) { assert.equal(key, "search_type"); assert.equal(value, "address"); return this; },
+      is(key, value) { assert.equal(key, "duplicate_of"); assert.equal(value, null); return this; },
       order(key) { assert.equal(key, table === "cadastru_buildings" ? "cadastral_number" : "id"); return this; },
       async range(from, to) {
         const rows = table === "cadastru_records" ? storedRecords : table === "cadastru_buildings" ? sharedBuildings : events;

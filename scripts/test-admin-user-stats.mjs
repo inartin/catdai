@@ -35,12 +35,14 @@ const mocks = {
       auth: { admin: { listUsers: async ({ page, perPage }) => page === failingUserPage
         ? { data: null, error: { message: "User read failed" } }
         : { data: { users: users.slice((page - 1) * perPage, page * perPage) } } } },
+      async rpc(name) { assert.equal(name, "admin_external_api_usage_since"); return { data: [], error: null }; },
       from(table) {
         const query = { filters: [] };
         if (table === "user_activity") activityQueries.push(query);
         const builder = {
           select(columns, options) { Object.assign(query, { columns, options }); return builder; },
           gte(column, value) { query.filters.push([column, value]); return builder; },
+          is() { return builder; },
           in() { return builder; },
           eq() { return builder; },
           order() { return builder; },

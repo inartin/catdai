@@ -144,6 +144,7 @@ function fmtCadastruSourceSummary(byLookupSource) {
   const counts = byLookupSource || {};
   const parts = [
     ["api", "API"],
+    ["cache", "cached"],
     ["local", "local"],
   ]
     .map(([key, label]) => counts[key] ? `${fmtNum(counts[key])} ${label}` : null)
@@ -532,7 +533,7 @@ function CadastruSearchDetails({ row, userName }) {
           <h4 className="font-semibold text-gray-900">Search details</h4>
           <p>Result type: {search.result_type || "Not recorded"}</p>
           <p>Returned value: {search.result_value || "Not recorded"}</p>
-          <p>Lookup source: {search.lookup_source === "api" ? "External API" : search.lookup_source === "local" ? "Local fallback" : "Not recorded"}</p>
+          <p>Lookup source: {search.lookup_source === "cache" ? "Cached" : search.lookup_source === "api" ? "External API" : search.lookup_source === "local" ? "Local fallback" : "Not recorded"}</p>
         </div>
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Saved search request</p>
@@ -1721,7 +1722,7 @@ export default function AdminDashboard() {
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900">Cadastru Searches</h3>
               <p className="mt-1 text-xs text-gray-500">
-                {fmtNum(s.cadastruSearches?.periods?.["24h"])} in 24h · {fmtNum(s.cadastruSearches?.periods?.["7d"])} in 7 days · {fmtNum(s.cadastruSearches?.registered)} registered / {fmtNum(s.cadastruSearches?.anonymous)} anonymous
+                {fmtNum(s.cadastruSearches?.total)} searches · {s.periodLabel} · {fmtNum(s.cadastruSearches?.registered)} registered / {fmtNum(s.cadastruSearches?.anonymous)} anonymous
               </p>
               <p className="mt-1 text-xs text-gray-500">
                 {fmtNum(s.cadastruSearches?.address)} address / {fmtNum(s.cadastruSearches?.number)} number · {fmtCadastruResultSummary(s.cadastruSearches?.byResultType)}

@@ -43,6 +43,7 @@ async function fetchUserIdRows(table, column) {
 
   while (true) {
     let query = supabaseAdmin.from(table).select(column).not(column, "is", null);
+    if (table === "cadastru_search_events") query = query.is("duplicate_of", null);
     if (["shared_links", "user_favorites"].includes(table)) query = query.eq("collect_statistics", true);
     const { data, error } = await query.range(from, from + PAGE - 1);
 

@@ -34,28 +34,42 @@ await assert.rejects(db.exec("insert into cadastru_search_events(search_type,res
 
 await db.exec(await fs.readFile("supabase/migrations/20261018090933_cadastru_failed_search_results.sql", "utf8"));
 
+await db.exec(`create role anon; create role authenticated; create role service_role;
+  create table external_api_usage_daily(usage_date date, service text, status text, count bigint);
+  create table external_api_usage_events(created_at timestamptz, service text, status text);`);
+await db.exec(await fs.readFile("supabase/migrations/20261020093634_cadastru_search_journeys.sql", "utf8"));
+
 const errors = [];
 let persist = true;
 const environment = { NODE_ENV: "production", ADMIN_TOKEN: "isolated-test-secret" };
 const admin = {
   from(table) {
     assert.equal(table, "cadastru_search_events");
-    let row, key, updated;
+    let row, key, updated, nullColumn, keyColumn = "event_key", selected = "id";
+    const execute = async () => {
+      try {
+        const columns = Object.keys(updated || row || {});
+        const values = columns.map(column => {
+          const value = (updated || row)[column];
+          return typeof value === "object" && value !== null ? JSON.stringify(value) : value;
+        });
+        const result = updated
+          ? await db.query(`update cadastru_search_events set ${columns.map((c, i) => `${c}=$${i + 1}`).join(",")}
+              where ${keyColumn}=$${columns.length + 1}${nullColumn ? ` and ${nullColumn} is null` : ""} returning id`, [...values, key])
+          : row ? await db.query(`insert into cadastru_search_events (${columns.join(",")}) values (${columns.map((_, i) => `$${i + 1}`).join(",")}) returning id`, values)
+          : await db.query(`select ${selected} from cadastru_search_events where ${keyColumn}=$1`, [key]);
+        return { data: result.rows[0] || null, error: null };
+      } catch (error) { return { data: null, error: { code: error.code, message: error.message } }; }
+    };
     return {
       insert(value) { row = { ...value }; return this; },
       update(value) { updated = value; return this; },
-      select() { return this; },
-      eq(column, value) { assert.equal(column, "event_key"); key = value; return this; },
-      async single() {
-        try {
-          const columns = row && Object.keys(row);
-          const result = updated ? await db.query("update cadastru_search_events set result_type=$1 where event_key=$2 returning id", [updated.result_type, key]) : row
-            ? await db.query(`insert into cadastru_search_events (${columns.join(",")}) values (${columns.map((_, i) => `$${i + 1}`).join(",")}) returning id`,
-              columns.map((column) => typeof row[column] === "object" && row[column] !== null ? JSON.stringify(row[column]) : row[column]))
-            : await db.query("select id from cadastru_search_events where event_key=$1", [key]);
-          return { data: result.rows[0] || null, error: null };
-        } catch (error) { return { data: null, error: { code: error.code, message: error.message } }; }
-      },
+      select(value) { selected = value || "id"; return this; },
+      eq(column, value) { keyColumn = column; key = value; return this; },
+      is(column, value) { assert.equal(value, null); nullColumn = column; return this; },
+      single: execute,
+      maybeSingle: execute,
+      then(resolve, reject) { return execute().then(result => ({ ...result, data: result.data ? [result.data] : [] })).then(resolve, reject); },
     };
   },
 };
@@ -119,6 +133,74 @@ assert.equal((await getRow(landId)).result_type, "land_only", "land result type 
 for (const lookupId of [undefined, "invalid"]) {
   assert.notEqual(eventId(await search({ lookupId })), eventId(await search({ lookupId })), "legacy/invalid IDs retain existing behavior");
 }
+
+// Browser identity is separate from the URL and stays stable through OAuth.
+const sessionId = crypto.randomUUID();
+const journey = { ...number, lookupId: crypto.randomUUID(), resultType: "land_only", lookupSource: "api" };
+const sessionSearch = (userId, session = sessionId, overrides = {}) => log({ userId,
+  headers: { get: () => session } }, "number", { ...journey, ...overrides });
+const firstId = eventId(await sessionSearch(null));
+const started = await getRow(firstId);
+const loginIds = await Promise.all([sessionSearch(userA, sessionId, { lookupSource: "cache" }), sessionSearch(null)]);
+assert(loginIds.every(token => eventId(token) === firstId), "login and concurrent anonymous replay share one search");
+const loggedIn = await getRow(firstId);
+assert.equal(loggedIn.user_id, userA);
+assert.equal(loggedIn.created_at.toISOString(), started.created_at.toISOString());
+assert.equal(loggedIn.lookup_source, "api", "login cache reload does not relabel the initial API search");
+assert.equal(loggedIn.lookup_id, journey.lookupId);
+assert.notEqual(eventId(await sessionSearch(userB, crypto.randomUUID())), firstId, "copied URL in another browser stays separate");
+assert.notEqual(eventId(await sessionSearch(userA, sessionId, { lookupId: crypto.randomUUID() })), firstId, "deliberate resubmission stays separate");
+const cachedId = eventId(await sessionSearch(null, crypto.randomUUID(), { lookupSource: "cache" }));
+assert.equal((await getRow(cachedId)).lookup_source, "cache", "cached results count as searches");
+const retrySession = crypto.randomUUID();
+const failedId = eventId(await sessionSearch(null, retrySession, { resultType: "error", lookupSource: null }));
+assert.equal(eventId(await sessionSearch(null, retrySession)), failedId);
+assert.equal((await getRow(failedId)).lookup_source, "api", "successful retry fills an initially unknown source");
+
+// Exact local midnight excludes earlier calls in the same UTC boundary day.
+await db.exec(`insert into external_api_usage_daily values
+  ('2026-10-19','cadastru_number','success',99), ('2026-10-20','cadastru_number','success',3);
+  insert into external_api_usage_events values
+  ('2026-10-19 20:59:59+00','cadastru_number','success'),
+  ('2026-10-19 21:00:00+00','cadastru_number','success'),
+  ('2026-10-20 00:00:00+00','cadastru_number','success');`);
+assert.equal(Number((await db.query("select count from admin_external_api_usage_since('2026-10-19 21:00:00+00')")).rows[0].count), 4);
+assert.equal(Number((await db.query("select count from admin_external_api_usage_since(null)")).rows[0].count), 102);
+await db.exec(`insert into external_api_usage_daily values ('2026-10-25','cadastru_number','success',2);
+  insert into external_api_usage_events values ('2026-10-24 21:00:00+00','cadastru_number','success');`);
+assert.equal(Number((await db.query("select count from admin_external_api_usage_since('2026-10-25 00:00:00 Europe/Chisinau')")).rows[0].count), 3, "DST midnight uses timestamp boundary");
+
+// Verify the conservative repair using original legacy hashes, including preserved tokens.
+await db.exec(`alter table external_api_usage_events add column response_headers jsonb;
+  create table cadastru_shared_reports(search_event_id bigint);`);
+const repairPairs = [];
+for (const cadastralNumber of ["4145107.0337", "9420109.243"]) {
+  const lookupId = crypto.randomUUID();
+  const opts = { cadastralNumber, lookupId, resultType: "land_only", lookupSource: "api" };
+  const originalId = eventId(await search(opts, null, "number"));
+  const replayToken = await search(opts, userA, "number");
+  const replayId = eventId(replayToken);
+  repairPairs.push({ originalId, replayId, replayToken });
+  await db.query("update cadastru_search_events set lookup_id=null,created_at='2026-10-20 06:46:14+00' where id=$1", [originalId]);
+  await db.query("update cadastru_search_events set lookup_id=null,created_at='2026-10-20 06:46:38+00' where id=$1", [replayId]);
+  await db.query("insert into external_api_usage_events(created_at,service,status,response_headers) values('2026-10-20 06:46:13+00',$1,'success',$2)",
+    [cadastralNumber === "9420109.243" ? "cadastru_nearby" : "cadastru_number", JSON.stringify({ "x-catdai-lookup-id": lookupId })]);
+  await db.query("insert into cadastru_shared_reports values ($1)", [replayId]);
+}
+await db.exec("insert into cadastru_records(cadastral_number,last_official_fetch_at,next_refresh_after) values ('9420109.243','2026-10-12 00:00:00+00','2026-11-11 00:00:00+00');");
+const repairSql = await fs.readFile("supabase/migrations/20261020094041_cadastru_verified_journey_repair.sql", "utf8");
+await db.exec(repairSql);
+await db.exec(repairSql);
+for (const { originalId, replayId, replayToken } of repairPairs) {
+  assert.equal((await getRow(originalId)).user_id, userA);
+  assert.equal(Number((await getRow(replayId)).duplicate_of), originalId);
+  assert.equal(Number((await db.query("select count(*) n from cadastru_search_events where id in ($1,$2) and duplicate_of is null", [originalId,replayId])).rows[0].n), 1);
+  assert.equal(Number((await db.query("select count(*) n from cadastru_shared_reports where search_event_id=$1", [originalId])).rows[0].n), 1);
+  const { recordCadastruEvaluationStep } = modules.get("@/lib/cadastru-evaluation-tracking").namespace;
+  assert.equal(await recordCadastruEvaluationStep(replayToken, "click"), true);
+  assert((await getRow(originalId)).valuation_clicked_at, "old duplicate token updates original search");
+}
+assert.equal((await getRow(repairPairs[1].originalId)).lookup_source, "cache");
 environment.NODE_ENV = "development";
 assert.equal(await search(), undefined);
 environment.NODE_ENV = "production";

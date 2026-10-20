@@ -124,6 +124,10 @@ assert.ok(queries.some((query) => query.filters.some(([op, column, value]) => op
 storedEvents = Array.from({ length: 205 }, (_, index) => ({ ...secondary, id: 100 + index }));
 details = await (await get()).json();
 assert.equal(details.events.length, 205, "Search calls are paginated beyond the dashboard's latest-200 limit");
+savedSearch = { ...keyed, lookup_id: lookupId, created_at: "2026-10-17T12:00:00Z" };
+storedEvents = [main, secondary, other, late];
+assert.deepEqual((await (await get()).json()).events.map(event => event.id), [20, 21, 23],
+  "stored lookup ID links calls even when login or delayed requests fall outside the discovery window");
 storedEvents = [];
 assert.deepEqual((await (await get()).json()).events, []);
 savedSearch = search;

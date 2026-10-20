@@ -22,7 +22,7 @@ import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
 import { buildFullAccessAddressResultParams, resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
 import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
-import { ensureCadastruLookupId } from "@/lib/cadastru-lookup-tracking";
+import { ensureCadastruLookupId, getCadastruSearchSessionId } from "@/lib/cadastru-lookup-tracking";
 import { recordCadastruShareOpen } from "@/lib/cadastru-share-tracking";
 
 const roadTypes = [
@@ -390,6 +390,7 @@ function fetchCadastralLookup(cacheKey, body, accessToken, tracking) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-catdai-search-session": getCadastruSearchSessionId(),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
     body: JSON.stringify({ ...body, lookup_id: lookupTracking.id, lookup_query: lookupTracking.query }),
@@ -417,6 +418,7 @@ function fetchAddressLookup(cacheKey, body, accessToken, tracking) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "x-catdai-search-session": getCadastruSearchSessionId(),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
     body: JSON.stringify({ ...body, lookup_id: lookupTracking.id, lookup_query: lookupTracking.query }),

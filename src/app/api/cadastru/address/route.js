@@ -335,7 +335,7 @@ async function handlePost(request) {
   const respondWithStored = async () => {
     const payload = withResolution(stored.payload);
     const payloadResultType = classifyAddressPayload(payload);
-    const evaluationToken = await recordAddressSearch(payload, stored.lookupSource,
+    const evaluationToken = await recordAddressSearch(payload, "cache",
       payloadResultType === "land_only" ? payloadResultType : stored.resultType || payloadResultType);
     const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource, evaluationToken);
     await recoverSuggestion(payload, "cache");
@@ -386,7 +386,7 @@ async function handlePost(request) {
       const stale = await getCadastruRecordByAddress(lookupAddress, { structuredAddress, allowExpired: true, requireUnitDetails: true });
       if (stale?.buildingNumber) {
         const payload = withResolution(stale.payload);
-        const evaluationToken = await recordAddressSearch(payload, stale.lookupSource, stale.resultType);
+        const evaluationToken = await recordAddressSearch(payload, "cache", stale.resultType);
         const creditResponse = await consumeCadastruCredit(payload, stale.lookupSource, evaluationToken);
         if (creditResponse) return creditResponse;
         return NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });

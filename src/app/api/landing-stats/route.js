@@ -14,9 +14,9 @@ function isMissingEstimateTypeError(error) {
 }
 
 async function countRows(table) {
-  const { count, error } = await supabaseAdmin
-    .from(table)
-    .select("*", { count: "exact", head: true });
+  let query = supabaseAdmin.from(table).select("*", { count: "exact", head: true });
+  if (table === "cadastru_search_events") query = query.is("duplicate_of", null);
+  const { count, error } = await query;
 
   if (error) throw new Error(`${table} count failed: ${error.message}`);
   return count || 0;

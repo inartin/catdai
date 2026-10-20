@@ -7,13 +7,13 @@ export async function resolveCadastruShareSearch(token, userId, number, address,
   const id = readCadastruEvaluationToken(token);
   if (!id) return null;
   const { data, error } = await supabaseAdmin.from("cadastru_search_events")
-    .select("id, cadastral_number, search_address").eq("id", id).eq("user_id", userId).maybeSingle();
+    .select("id, duplicate_of, cadastral_number, search_address").eq("id", id).eq("user_id", userId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  if (number && data.cadastral_number) return data.cadastral_number === number ? data.id : null;
+  if (number && data.cadastral_number) return data.cadastral_number === number ? data.duplicate_of || data.id : null;
   const sameAddress = data.search_address && [!number && address, payload.request_address, payload.resolved_address]
     .some((value) => value && normalizeAddress(value) === normalizeAddress(data.search_address));
-  return sameAddress ? data.id : null;
+  return sameAddress ? data.duplicate_of || data.id : null;
 }
 
 export async function loadCadastruShareStatistics(searches) {

@@ -485,16 +485,16 @@ async function handlePost(request) {
   });
 
   let lookupSource = null;
-  const recordCadastruSearch = async (payload, resultType = null) => {
+  const recordCadastruSearch = async (payload, resultType = null, optionsLookupSource = null) => {
     if (!cadastruSearchType) return;
-    await logCadastruSearchEvent(request, cadastruSearchType, {
+    return logCadastruSearchEvent(request, cadastruSearchType, {
       lookupId: getCadastruLookupTracking(body).lookupId,
       cadastralNumber: payload?.cadastral_number || trimmed,
       resultPayload: payload,
       city: resolveCityFromPayload(payload),
       district: resolveDistrictFromPayload(payload),
       resultType: resultType || classifyCadastralResult(payload),
-      lookupSource,
+      lookupSource: optionsLookupSource || lookupSource,
     });
   };
   const respondWithCadastralPayload = async (payload, options = {}) => {
@@ -512,7 +512,7 @@ async function handlePost(request) {
         payload: cleanCadastruPayload(payload), lookupSource, expiresAt: cadastruExpiresAt(),
       });
     }
-    const evaluationToken = await recordCadastruSearch(payload);
+    const evaluationToken = await recordCadastruSearch(payload, null, options.cached ? "cache" : null);
     if (!creditCheck.allowed) {
       const preview = buildCadastruPreviewPayload(payload, creditCheck.reason || "no_credit", {
         maskCadastralNumber: maskPreviewCadastralNumber,
@@ -570,7 +570,7 @@ async function handlePost(request) {
     lookupSource = stored.lookupSource;
     return respondWithCadastralPayload(
       normalizeCadastralPayload(stored.payload, trimmed, access.tier),
-      { countLookup: true, resultType: classifyCadastralResult(stored.payload), expiresAt: stored.expiresAt }
+      { cached: true, countLookup: true, resultType: classifyCadastralResult(stored.payload), expiresAt: stored.expiresAt }
     );
   }
 
@@ -596,7 +596,7 @@ async function handlePost(request) {
       if (stale?.buildingNumber) {
         lookupSource = stale.lookupSource;
         return respondWithCadastralPayload(normalizeCadastralPayload(stale.payload, trimmed, access.tier),
-          { expiresAt: stale.expiresAt });
+          { cached: true, expiresAt: stale.expiresAt });
       }
       const partial = await getBuildingFallback({ number: trimmed });
       if (partial) {

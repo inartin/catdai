@@ -21,7 +21,7 @@ export async function GET(request) {
 
   const { data, error } = await supabaseAdmin
     .from("cadastru_search_events")
-    .select(SEARCH_COLUMNS)
+    .select(SEARCH_COLUMNS).is("duplicate_of", null)
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })

@@ -27,10 +27,24 @@ export async function GET(request, { params }) {
   }
 
   try {
-    const { data: search, error } = await supabaseAdmin.from("cadastru_search_events")
+    let { data: search, error } = await supabaseAdmin.from("cadastru_search_events")
       .select("*").eq("id", id).maybeSingle();
     if (error) throw new Error(error.message);
     if (!search) return NextResponse.json({ error: "Cadastru search not found." }, { status: 404 });
+    if (search.duplicate_of) {
+      ({ data: search, error } = await supabaseAdmin.from("cadastru_search_events")
+        .select("*").eq("id", search.duplicate_of).single());
+      if (error || !search) throw new Error(error?.message || "Missing original search");
+    }
+    if (search.lookup_id) {
+      const calls = await readAll(() => supabaseAdmin.from("external_api_usage_events")
+        .select("*").in("service", SERVICES)
+        .eq("response_headers->>x-catdai-lookup-id", search.lookup_id));
+      const { event_key: _eventKey, ...details } = search;
+      return NextResponse.json({ search: details,
+        events: calls.filter((event) => !event.user_id || event.user_id === search.user_id),
+        match: calls.length ? "lookup_id" : null });
+    }
 
     const time = Date.parse(search.created_at);
     // Discover the UUID from lightweight log metadata near the saved search,

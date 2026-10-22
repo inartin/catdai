@@ -5,10 +5,21 @@ import vm from "node:vm";
 import crypto from "node:crypto";
 
 const env = { CADASTRU_EXTERNAL_API_BASE_URL: "https://pi.test", CADASTRU_EXTERNAL_API_SECRET: "test-secret" };
-const attempts = [], events = [];
+const attempts = [], events = [], healthChecks = [];
+const offlineHealth = () => { throw new TypeError("health unreachable"); };
+let healthReply = offlineHealth;
 let reply = () => Response.json({ ok: true, data: { marker: "success" } });
 const context = vm.createContext({ console, process: { env }, Date, URL, AbortSignal,
   fetch: async (url, options) => {
+    if (new URL(url).pathname === "/health") {
+      healthChecks.push({ url: String(url), options });
+      assert.equal(options.headers, undefined, "health probes send no credentials");
+      assert.equal(options.body, undefined);
+      assert.equal(options.cache, "no-store");
+      assert.equal(options.redirect, "error");
+      assert(options.signal instanceof AbortSignal);
+      return healthReply(url, options);
+    }
     attempts.push({ url, options });
     const secret = new URL(url).pathname === "/v1/999/listing"
       ? env.LISTING999_EXTERNAL_API_SECRET || env.CADASTRU_EXTERNAL_API_SECRET : env.CADASTRU_EXTERNAL_API_SECRET;
@@ -53,7 +64,7 @@ const workers = await load("@/lib/api-workers");
 const cadastru = await load("@/lib/cadastru-external-api");
 const listing = await load("@/lib/listing999-external-api");
 const clone = (value) => JSON.parse(JSON.stringify(value));
-const reset = () => { attempts.length = 0; events.length = 0; };
+const reset = () => { attempts.length = 0; events.length = 0; healthChecks.length = 0; healthReply = offlineHealth; };
 const success = (name) => Response.json({ ok: true, data: { marker: name } }, {
   headers: { "x-catdai-node": name, "x-catdai-app-version": "abc123", "x-catdai-node-version": "v24.10.0" },
 });
@@ -97,12 +108,21 @@ const routes = [
 ];
 for (const [request, body, path] of routes) {
   reset();
-  reply = (url) => new URL(url).hostname === "curiosity.test" ? success("curiosity")
-    : Response.json({ ok: false, error: "service_unavailable" }, { status: 502 });
+  reply = (url) => {
+    if (new URL(url).hostname !== "curiosity.test") throw new TypeError("worker unreachable");
+    return success("curiosity");
+  };
   assert.equal((await request(body)).marker, "curiosity");
   assert.deepEqual(attempts.map((attempt) => new URL(attempt.url).hostname), ["pi.test", "mac.test", "curiosity.test"]);
   assert(attempts.every((attempt) => new URL(attempt.url).pathname === path));
   assert.deepEqual(events.map((event) => event.status), ["failure", "failure", "success"]);
+  assert.deepEqual(healthChecks.map((call) => call.url), ["https://pi.test/health", "https://mac.test/health"]);
+
+  reset();
+  reply = () => Response.json({ ok: false, error: "service_unavailable" }, { status: 503 });
+  await assert.rejects(request(body), (error) => error.status === 503);
+  assert.equal(attempts.length, 1, `${path}: provider outages do not move between workers`);
+  assert.equal(healthChecks.length, 0, "the worker error response already proves it is available");
 }
 
 for (const [request, body] of [routes[0], routes[5]]) {
@@ -110,8 +130,9 @@ for (const [request, body] of [routes[0], routes[5]]) {
     reset();
     reply = (url) => new URL(url).hostname === "pi.test"
       ? Response.json({ ok: false, error: "service_unavailable" }, { status }) : success("mac");
-    assert.equal((await request(body)).marker, "mac");
-    assert.equal(attempts.length, 2);
+    await assert.rejects(request(body), (error) => error.status === status);
+    assert.equal(attempts.length, 1, `worker HTTP ${status} is terminal`);
+    assert.equal(healthChecks.length, 0);
   }
   for (const status of [400, 401, 403, 404, 422]) {
     reset();
@@ -119,6 +140,20 @@ for (const [request, body] of [routes[0], routes[5]]) {
     await assert.rejects(request(body), (error) => error.status === status);
     assert.equal(attempts.length, 1, `HTTP ${status} is a terminal response`);
   }
+  // An unavailable gateway is distinct from the worker's provider-error JSON.
+  for (const status of [500, 502, 503, 504, 521, 522, 523, 524, 530]) {
+    reset();
+    reply = (url) => new URL(url).hostname === "pi.test" ? new Response("gateway unavailable", { status }) : success("mac");
+    assert.equal((await request(body)).marker, "mac");
+    assert.equal(attempts.length, 2);
+    assert.equal(healthChecks.length, 1);
+  }
+  reset();
+  reply = () => new Response("rate limited", { status: 429 });
+  await assert.rejects(request(body), (error) => error.status === 429);
+  assert.equal(attempts.length, 1);
+  assert.equal(healthChecks.length, 0, "rate limits do not cause host failover");
+
   for (const failure of [() => { throw new DOMException("expired", "TimeoutError"); },
     () => new Response("<html>gateway</html>"),
     () => ({ ok: true, status: 200, headers: new Headers(), text: async () => { throw new Error("body interrupted"); } })]) {
@@ -126,7 +161,47 @@ for (const [request, body] of [routes[0], routes[5]]) {
     reply = (url) => new URL(url).hostname === "pi.test" ? failure() : success("mac");
     assert.equal((await request(body)).marker, "mac");
     assert.equal(attempts.length, 2);
+    assert.equal(healthChecks.length, 1);
+
+    reset();
+    healthReply = () => Response.json({ ok: true });
+    reply = (url) => new URL(url).hostname === "pi.test" ? failure() : success("mac");
+    await assert.rejects(request(body));
+    assert.equal(attempts.length, 1, "a healthy worker's slow/broken lookup is not repeated on another host");
+    assert.equal(healthChecks.length, 1);
+    assert.equal(events.length, 1, "health probes are not counted as API usage");
   }
+  for (const failureReply of [
+    () => Response.json({ error: "service_unavailable" }, { status: 503 }),
+    () => new Response("interrupted", { status: 502, headers: { "x-catdai-node": "pi" } }),
+    () => Response.json({ ok: true }, { status: 200 }),
+  ]) {
+    reset();
+    reply = failureReply;
+    await assert.rejects(request(body));
+    assert.equal(attempts.length, 1, "legacy worker errors, node headers and malformed worker results prove availability");
+    assert.equal(healthChecks.length, 0);
+  }
+  for (const healthFailure of [
+    () => Response.json({ ok: false }),
+    () => new Response("gateway down", { status: 502 }),
+    () => new Response("invalid health body"),
+    () => { throw new DOMException("health timed out", "TimeoutError"); },
+  ]) {
+    reset();
+    healthReply = healthFailure;
+    reply = (url) => {
+      if (new URL(url).hostname === "pi.test") throw new DOMException("lookup timed out", "TimeoutError");
+      return success("mac");
+    };
+    assert.equal((await request(body)).marker, "mac");
+    assert.equal(attempts.length, 2);
+  }
+  reset();
+  healthReply = () => Response.json({ ok: true });
+  reply = () => new Response("gateway error", { status: 502 });
+  await assert.rejects(request(body), (error) => error.status === 502);
+  assert.equal(attempts.length, 1, "a gateway lookup error does not move hosts when the worker still answers health");
 }
 reset();
 const choice = { city: "Durlești", road_type: "strada", street: "Cartușa", house_number: "95/4" };
@@ -148,11 +223,12 @@ await listing.fetchExternal999Listing("12345678");
 delete env.LISTING999_EXTERNAL_API_SECRET;
 
 reset();
-reply = () => Response.json({ ok: false, error: "service_unavailable" }, { status: 503 });
+reply = () => new Response("gateway unavailable", { status: 503 });
 await assert.rejects(cadastru.fetchExternalCadastralData("0100101.001.01.001"), (error) => error.status === 503);
 assert.equal(attempts.length, 3);
+assert.equal(healthChecks.length, 2, "no health probe is needed when there are no fallback hosts left");
 delete env.CADASTRU_EXTERNAL_API_SECRET;
 reset();
 await assert.rejects(cadastru.fetchExternalCadastralData("0100101.001.01.001"), (error) => error.code === "external_cadastru_not_configured");
 assert.equal(attempts.length, 0);
-console.log("Worker fallbacks passed: legacy configuration, all six endpoints, signing, telemetry, availability failures, terminal results, body failures and secret overrides.");
+console.log("Worker fallbacks passed: all six endpoints, host outages, provider errors, healthy-worker timeouts, health-probe isolation, legacy responses, signing and telemetry.");

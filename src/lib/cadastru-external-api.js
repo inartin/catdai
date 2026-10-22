@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { getApiWorkerEndpoints, withApiWorkerFallback } from "@/lib/api-workers";
+import { getApiWorkerEndpoints, isApiWorkerResponse, withApiWorkerFallback } from "@/lib/api-workers";
 import { getExternalApiDiagnosticHeaders, trackExternalApiUsage } from "@/lib/external-api-usage";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
@@ -24,6 +24,7 @@ function externalError(message, options = {}) {
   error.code = options.code || "external_cadastru_failed";
   error.status = options.status || null;
   error.fallbackEligible = Boolean(options.fallbackEligible);
+  error.workerResponded = Boolean(options.workerResponded);
   error.suggestions = Array.isArray(options.suggestions) ? options.suggestions.filter((value) => typeof value === "string" && value.length <= 80) : [];
   error.addressSuggestions = Array.isArray(options.addressSuggestions) ? options.addressSuggestions
     .filter((value) => ["city", "road_type", "street", "house_number"].every((key) => typeof value?.[key] === "string")
@@ -146,6 +147,7 @@ async function fetchSignedExternalCadastruAttempt(url, body, service, options = 
   throw externalError(message, {
     code,
     status: response.status,
+    workerResponded: isApiWorkerResponse(response, payload),
     suggestions: payload?.suggestions,
     addressSuggestions: payload?.address_suggestions,
     fallbackEligible,

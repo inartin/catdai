@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { getApiWorkerEndpoints, withApiWorkerFallback } from "@/lib/api-workers";
+import { getApiWorkerEndpoints, isApiWorkerResponse, withApiWorkerFallback } from "@/lib/api-workers";
 import { getExternalApiDiagnosticHeaders, trackExternalApiUsage } from "@/lib/external-api-usage";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -24,6 +24,7 @@ function externalError(message, options = {}) {
   error.code = options.code || "external_listing999_failed";
   error.status = options.status || null;
   error.fallbackEligible = Boolean(options.fallbackEligible);
+  error.workerResponded = Boolean(options.workerResponded);
   return error;
 }
 
@@ -125,6 +126,7 @@ async function fetchExternal999ListingAttempt(url, externalId, options) {
   throw externalError(message, {
     code,
     status: response.status,
+    workerResponded: isApiWorkerResponse(response, payload),
     fallbackEligible: true,
   });
 }

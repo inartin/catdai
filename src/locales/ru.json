@@ -595,6 +595,7 @@
   "result.freeMonthlyLimitReached": "Откройте полную оценку за один кредит.",
   "payment.featureAccessTitle": "Купить полную оценку",
   "payment.buyAccess": "Открыть полную оценку",
+  "payment.unlock": "Открыть",
   "payment.limitPackageSubtitle": "Выберите пакет, чтобы открыть полную оценку.",
   "payment.standardPackageTitle": "Standard — {price}",
   "payment.extraPackageTitle": "Extra — {price}/мес.",

@@ -595,6 +595,7 @@
   "result.freeMonthlyLimitReached": "Deblochează evaluarea completă cu un credit.",
   "payment.featureAccessTitle": "Cumpără evaluarea completă",
   "payment.buyAccess": "Deblochează evaluarea completă",
+  "payment.unlock": "Deblochează",
   "payment.limitPackageSubtitle": "Alege un pachet pentru a debloca evaluarea completă.",
   "payment.standardPackageTitle": "Standard — {price}",
   "payment.extraPackageTitle": "Extra — {price}/lună",

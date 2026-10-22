@@ -13,8 +13,10 @@ const adapted = original.replace('import { readFileSync } from "node:fs";',
   'import streets from "./data/streets.json";\nimport corrections from "./data/street-corrections.json";')
   .replace(loader, 'const readData = (name) => name === "streets.json" ? streets : corrections;');
 await writeFile(new URL("street-resolver.js", target), adapted);
-const hashes = { "street-resolver.js": createHash("sha256").update(original).digest("hex") };
-for (const name of ["supported-cities.js", "data/streets.json", "data/street-corrections.json"]) {
+const localitySource = await readFile(`${source}/locality-catalogue.js`, "utf8");
+await writeFile(new URL("locality-catalogue.js", target), localitySource.replace('import { readFileSync } from "node:fs";', 'import catalogue from "./data/localities.json";').replace(/^const catalogue = .*;$/m, ''));
+const hashes = { "locality-catalogue.js": createHash("sha256").update(localitySource).digest("hex"), "street-resolver.js": createHash("sha256").update(original).digest("hex") };
+for (const name of ["data/localities.json", "supported-cities.js", "data/streets.json", "data/street-corrections.json"]) {
   await copyFile(`${source}/${name}`, new URL(name, target));
   hashes[name] = createHash("sha256").update(await readFile(`${source}/${name}`)).digest("hex");
 }

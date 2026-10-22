@@ -2052,7 +2052,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
           )}
           {!isReadOnlyResult && onReset && <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />}
           {purchaseOffer ? (
-            <FeaturePricingAction offer={purchaseOffer} />
+            <FeaturePricingAction offer={purchaseOffer} mobileDock={!compactLayout} />
           ) : null}
         </aside>
       </div>
@@ -3304,7 +3304,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
           )}
 
           {purchaseOffer ? (
-            <FeaturePricingAction offer={purchaseOffer} />
+            <FeaturePricingAction offer={purchaseOffer} mobileDock={!compactLayout} />
           ) : null}
 
           {/* Actions */}

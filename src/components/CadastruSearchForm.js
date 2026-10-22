@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import CadastruLocalityInput from "@/components/CadastruLocalityInput";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
 import CadastruResultLoading from "@/components/CadastruResultLoading";
@@ -141,7 +142,7 @@ export default function CadastruSearchForm({
   };
 
   const submitAddressSearch = () => {
-    if (requireAuth()) return;
+    if (!addressForm.city || requireAuth()) return;
     clearAddressResultPreview();
     const requestBody = {
       city: addressForm.city,
@@ -261,19 +262,9 @@ export default function CadastruSearchForm({
           <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_180px]">
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">
-                {t("cadastru.city")}
+                {lang === "ru" ? "Населённый пункт" : "Localitate"}
               </span>
-              <select
-                value={addressForm.city}
-                onChange={(event) => setAddressField("city", event.target.value)}
-                className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base font-medium text-gray-900 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary-light"
-              >
-                {CADASTRU_SUPPORTED_CITIES.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))}
-              </select>
+              <CadastruLocalityInput value={addressForm.city} lang={lang} onChange={(value) => setAddressField("city", value)} />
             </label>
 
             <label className="block">
@@ -346,7 +337,7 @@ export default function CadastruSearchForm({
             <button
               type="button"
               onClick={() => submitAddressSearch()}
-              disabled={authLoading}
+              disabled={authLoading || !addressForm.city}
               className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-800 sm:w-auto"
             >
               {t("cadastru.searchButton")}

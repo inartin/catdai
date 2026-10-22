@@ -1,47 +1,7 @@
 import { resolveSupportedCityFromAddress } from "./cadastru-streets/supported-cities.js";
 
-export const CADASTRU_SUPPORTED_CITIES = [
-  "Anenii Noi",
-  "Bacioi",
-  "Bălți",
-  "Braila",
-  "Bubuieci",
-  "Budesti",
-  "Buneți",
-  "Bîc",
-  "Ceroborta",
-  "Cheltuitori",
-  "Chișinău",
-  "Ciorescu",
-  "Codru",
-  "Colonița",
-  "Condrița",
-  "Cricova",
-  "Cruzești",
-  "Dobrogea",
-  "Dumbrava",
-  "Durlești",
-  "Făurești",
-  "Frumușica",
-  "Ghidighici",
-  "Goian",
-  "Goianul Nou",
-  "Grătiești",
-  "Hulboaca",
-  "Humulești",
-  "Ialoveni",
-  "Orhei",
-  "Revaca",
-  "Sîngera",
-  "Stăuceni",
-  "Străisteni",
-  "Tiraspol",
-  "Tohatin",
-  "Trușeni",
-  "Vadul lui Vodă",
-  "Văduleni",
-  "Vatra",
-];
+import { LOCALITIES, resolveLocality } from "./cadastru-streets/locality-catalogue.js";
+export const CADASTRU_SUPPORTED_CITIES = LOCALITIES.map(row => row.city);
 
 function normalizeCity(value) {
   return String(value || "")
@@ -69,7 +29,7 @@ export function resolveCadastruSupportedCity(value) {
     .replace(/\b(?:municipiul|municipiu|mun|orasul|oras|or|satul|sat|raionul|raion)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return CADASTRU_CITY_ALIASES.get(normalized) || null;
+  return resolveLocality(value) || CADASTRU_CITY_ALIASES.get(normalized) || null;
 }
 
 export function resolveCadastruCityFromAddress(value) {

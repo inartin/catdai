@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { getApiWorkerEndpoints, withApiWorkerFallback } from "@/lib/api-workers";
 import { getExternalApiDiagnosticHeaders, trackExternalApiUsage } from "@/lib/external-api-usage";
 
 const DEFAULT_TIMEOUT_MS = 20_000;
@@ -12,19 +13,10 @@ function signBody(rawBody, secret, timestamp) {
     .digest("hex");
 }
 
-function resolveEndpointUrl(path, explicitUrl) {
-  const baseUrl = process.env.CADASTRU_EXTERNAL_API_BASE_URL || "";
-  if (baseUrl) {
-    return new URL(path, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
-  }
-  return explicitUrl || "";
-}
-
-function externalCadastruConfig(path, explicitUrl, defaultTimeoutMs = DEFAULT_TIMEOUT_MS) {
-  const url = resolveEndpointUrl(path, explicitUrl);
+function externalCadastruConfig(defaultTimeoutMs = DEFAULT_TIMEOUT_MS) {
   const secret = process.env.CADASTRU_EXTERNAL_API_SECRET || "";
   const timeoutMs = Number(process.env.CADASTRU_EXTERNAL_API_TIMEOUT_MS || defaultTimeoutMs);
-  return { url, secret, timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : defaultTimeoutMs };
+  return { secret, timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : defaultTimeoutMs };
 }
 
 function externalError(message, options = {}) {
@@ -42,7 +34,19 @@ function externalError(message, options = {}) {
 }
 
 async function fetchSignedExternalCadastru(path, body, explicitUrl, service, options = {}) {
-  const { url, secret, timeoutMs: configuredTimeoutMs } = externalCadastruConfig(path, explicitUrl, options.defaultTimeoutMs);
+  const workers = getApiWorkerEndpoints(path, explicitUrl);
+  if (!workers.length || !process.env.CADASTRU_EXTERNAL_API_SECRET) {
+    throw externalError("External cadastru API is not configured", {
+      code: "external_cadastru_not_configured", fallbackEligible: true,
+    });
+  }
+  return withApiWorkerFallback(workers, (worker) => fetchSignedExternalCadastruAttempt(
+    worker.url, body, service, { ...options, nodeName: worker.name }
+  ));
+}
+
+async function fetchSignedExternalCadastruAttempt(url, body, service, options = {}) {
+  const { secret, timeoutMs: configuredTimeoutMs } = externalCadastruConfig(options.defaultTimeoutMs);
   const timeoutMs = options.timeoutMs || configuredTimeoutMs;
   const shouldTrackUsage = options.trackUsage !== false;
   if (!url || !secret) {
@@ -57,10 +61,13 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
   const signature = signBody(rawBody, secret, timestamp);
   const startedAt = Date.now();
   const requestId = crypto.randomUUID();
-  const trackingHeaders = options.lookupId ? {
-    "x-catdai-lookup-id": options.lookupId,
-    ...(options.lookupQuery ? { "x-catdai-lookup-query": options.lookupQuery } : {}),
-  } : {};
+  const trackingHeaders = {
+    "x-catdai-target-node": options.nodeName,
+    ...(options.lookupId ? {
+      "x-catdai-lookup-id": options.lookupId,
+      ...(options.lookupQuery ? { "x-catdai-lookup-query": options.lookupQuery } : {}),
+    } : {}),
+  };
   let response;
 
   try {
@@ -116,7 +123,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
     return payload.data;
   }
 
-  const unavailable = response.status >= 500 || response.status === 429 ||
+  const unavailable = response.status >= 500 || response.status === 408 || response.status === 429 ||
     payload?.error === "service_unavailable" || (response.ok && (!payload?.ok || !payload?.data));
   const code = unavailable
     ? (options.preserveWorkerError && payload?.error) || "service_unavailable"

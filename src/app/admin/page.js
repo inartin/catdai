@@ -5,6 +5,7 @@ import Tooltip from "@/components/Tooltip";
 import { groupExternalApiEvents } from "@/lib/admin-external-api-groups";
 import AdminUserCredits from "@/components/AdminUserCredits";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
+import AdminWorkerStatus from "@/components/admin/AdminWorkerStatus";
 
 function fmtNum(n) {
   if (n == null) return "\u2014";
@@ -219,14 +220,20 @@ function fmtExternalApiService(service, endpoint = "") {
   return service || "\u2014";
 }
 
+function fmtExternalApiNodes(rows) {
+  return [...new Set(rows.map((row) => row.response_headers?.["x-catdai-node"]
+    || row.response_headers?.["x-catdai-target-node"] || "Not recorded"))].join(", ");
+}
+
 function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedExternalApiEventId,
   deletingExternalApiEventId, deleteExternalApiLogs }) {
   const canDelete = Boolean(deleteExternalApiLogs);
   return (
-    <table className="w-full min-w-[80rem] table-fixed text-sm">
+    <table className="w-full min-w-[88rem] table-fixed text-sm">
       <colgroup>
         <col className="w-52" />
         <col className="w-36" />
+        <col className="w-32" />
         <col className="w-28" />
         <col className="w-16" />
         <col className="w-24" />
@@ -239,6 +246,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
         <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
           <th className="px-4 py-3">Time</th>
           <th className="px-4 py-3">Service</th>
+          <th className="px-4 py-3">API</th>
           <th className="px-4 py-3">Status</th>
           <th className="px-4 py-3 text-right">HTTP</th>
           <th className="px-4 py-3 text-right">Duration</th>
@@ -281,6 +289,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                   </div>
                 </td>
                 <td className="px-4 py-3 font-medium text-gray-900">{fmtExternalApiService(row.service, row.endpoint)}</td>
+                <td className="break-words px-4 py-3 text-gray-600">{fmtExternalApiNodes([row])}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.status === "failure"
                     ? "bg-red-50 text-red-700"
@@ -325,7 +334,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
               </tr>
               {expanded && (
                 <tr>
-                  <td colSpan={canDelete ? 9 : 8} className="bg-gray-50 px-4 py-4">
+                  <td colSpan={canDelete ? 10 : 9} className="bg-gray-50 px-4 py-4">
                     <div className="grid min-w-0 gap-4 [overflow-wrap:anywhere] lg:grid-cols-2">
                       <div className="min-w-0 space-y-3">
                         <div>
@@ -718,6 +727,15 @@ function UserCadastruSearches({ user, onDelete, deletingId, deleteError }) {
 }
 
 export default function AdminDashboard() {
+  return (
+    <div className="space-y-6">
+      <AdminWorkerStatus />
+      <DashboardContent />
+    </div>
+  );
+}
+
+function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [statsRefreshing, setStatsRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
@@ -1109,7 +1127,8 @@ export default function AdminDashboard() {
   const externalApiEvents = Array.isArray(s.externalApiUsage?.events)
     ? s.externalApiUsage.events
     : [];
-  const externalApiGroups = groupExternalApiEvents(externalApiEvents, externalApiStatusFilter);
+  const cachedSearches = Array.isArray(s.externalApiUsage?.cachedSearches) ? s.externalApiUsage.cachedSearches : [];
+  const externalApiGroups = groupExternalApiEvents(externalApiEvents, externalApiStatusFilter, cachedSearches);
 
   return (
     <div className="space-y-8">
@@ -1819,6 +1838,7 @@ export default function AdminDashboard() {
                   {s.externalApiUsage?.otherFailure > 0 && ` · ${fmtNum(s.externalApiUsage.otherFailure)} other errors`}
                 </p>
                 <p className="mt-1 text-xs text-gray-500">Failed counts and the Failed filter include only Cadastru address and number lookup failures.</p>
+                <p className="mt-1 text-xs text-gray-500">Cached searches are included below and do not add API calls.</p>
               </div>
               <div className="inline-flex w-full rounded-lg border border-gray-200 bg-white p-1 sm:w-auto">
                 {EXTERNAL_API_STATUS_FILTERS.map((option) => (
@@ -1858,8 +1878,8 @@ export default function AdminDashboard() {
               <p role="alert" className="px-5 py-3 text-sm text-red-600">{externalApiDeleteError}</p>
             )}
 
-            {!s.externalApiUsage?.total && externalApiEvents.length === 0 ? (
-              <div className="px-5 py-8 text-center text-gray-400">No external API calls found</div>
+            {!s.externalApiUsage?.total && externalApiEvents.length === 0 && cachedSearches.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No external API calls or cached searches found</div>
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 border-b border-gray-100">
@@ -1883,10 +1903,11 @@ export default function AdminDashboard() {
                   </div>
                 ) : (
                   <div className="max-h-[36rem] overflow-auto [scrollbar-gutter:stable] [overflow-anchor:none]">
-                    <table className="w-full min-w-[56rem] table-fixed text-sm">
+                    <table className="w-full min-w-[64rem] table-fixed text-sm">
                       <colgroup>
                         <col className="w-52" />
                         <col />
+                        <col className="w-32" />
                         <col className="w-36" />
                         <col className="w-44" />
                         <col className="w-36" />
@@ -1895,6 +1916,7 @@ export default function AdminDashboard() {
                         <tr className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
                           <th className="px-4 py-3">Time</th>
                           <th className="px-4 py-3">Search / request</th>
+                          <th className="px-4 py-3">API</th>
                           <th className="px-4 py-3">Status</th>
                           <th className="px-4 py-3">API calls</th>
                           <th className="px-4 py-3">User</th>
@@ -1929,15 +1951,16 @@ export default function AdminDashboard() {
                                 </td>
                                 <td className="px-4 py-3">
                                   <p className="truncate font-medium text-gray-900" title={String(group.query)}>
-                                    {group.query || (group.linked || group.inferred ? "Cadastru search" : fmtExternalApiService(group.service, group.events[0].endpoint))}
+                                    {group.query || (group.linked || group.inferred || group.cachedSearch ? "Cadastru search" : fmtExternalApiService(group.service, group.events[0].endpoint))}
                                   </p>
                                   <p className="mt-1 text-xs text-gray-500">
-                                    {group.linked ? "Cadastru search" : group.inferred ? "Cadastru search (older logs)" : "Individual API log"}
+                                    {group.linked || group.cachedSearch ? "Cadastru search" : group.inferred ? "Cadastru search (older logs)" : "Individual API log"}
                                   </p>
                                 </td>
+                                <td className="break-words px-4 py-3 text-gray-600">{[group.cachedSearch && "Cached", fmtExternalApiNodes(group.events)].filter(Boolean).join(", ")}</td>
                                 <td className="px-4 py-3">
-                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${group.mainFailure ? "bg-red-50 text-red-700" : group.failure ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
-                                    {group.mainFailure ? "Failed" : group.failure ? "With failures" : "Successful"}
+                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${group.mainFailure || group.cachedSearch?.result_type === "error" ? "bg-red-50 text-red-700" : group.failure ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
+                                    {group.mainFailure || group.cachedSearch?.result_type === "error" ? "Failed" : group.failure ? "With failures" : group.cachedSearch?.result_type === "no_data" ? "No result" : "Successful"}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-600">
@@ -1951,15 +1974,15 @@ export default function AdminDashboard() {
                               </tr>
                               {expanded && (
                                 <tr>
-                                  <td colSpan={5} className="bg-sky-50/40 px-4 py-4">
+                                  <td colSpan={6} className="bg-sky-50/40 px-4 py-4">
                                     <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-                                      <ExternalApiEventTable
+                                      {group.events.length ? <ExternalApiEventTable
                                         rows={group.events}
                                         expandedExternalApiEventId={expandedExternalApiEventId}
                                         setExpandedExternalApiEventId={setExpandedExternalApiEventId}
                                         deletingExternalApiEventId={deletingExternalApiEventId}
                                         deleteExternalApiLogs={deleteExternalApiLogs}
-                                      />
+                                      /> : <CadastruSearchDetails row={group.cachedSearch} />}
                                     </div>
                                   </td>
                                 </tr>

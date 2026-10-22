@@ -193,3 +193,22 @@ The worker optionally uses `MAPMD_API` first, then `GEOAPIFY_API`, for strict bu
 The autocomplete bundles 1,682 settlement entries from the official BNS `https://statistica.gov.md/files/files/Clasificatoare/CUATM_25.xlsx`, checked 2026-10-22, with both RO/RU names and CUATM IDs. Opening the selected locality shows the full scrollable catalogue, with the current selection first. Filtering starts only after typing and shows all matches without a 20-result cutoff. Search is diacritic-insensitive and runs in memory; the versioned Next.js asset is browser-cached, with no typing-time provider requests. Names are not machine-translated. Administrative context distinguishes duplicate names in both suggestions and the selected input, localized to RO/RU; a selection is required before searching. Existing drafts retain their selected locality. The worker uses the same catalogue for address validation and matching. Update the worker snapshot from BNS and run the existing sync script before deploying both repositories. A release refreshes the asset cache; there is no automatic claim of perpetual source freshness. Provider coverage may still be incomplete.
 
 Russian picker labels use reviewed exonyms in `src/lib/cadastru-locality-labels.js`: Кишинёв, Бельцы, Оргеев, Дурлешты and Криково. The same labels appear in administrative context. Both display and original CUATM spellings remain searchable; Romanian labels, IDs and canonical request values are unchanged. Unreviewed names retain the catalogue spelling, with no automatic transliteration. References: [city tourism](https://visit.chisinau.md/ru/istoric/), [municipal suburb site](https://suburbii.chisinau.md/ru/durlesti/), [Moldova tourism](https://moldova.travel/ru/turisticheskiye-priklyucheniya/marshrut-codru/), and [local Russian news usage](https://point.md/ru/novosti/obschestvo/na-kishinev-prikhoditsia-pochti-tret-zhitelei-strany-bolee-700-tys-zhitelei/).
+
+## Worker host failover
+
+All six worker endpoints (cadastral number, address, nearby places, transport, municipal reports and 999 listing) try configured hosts in this order: `pi` → `mac` → `curiosity`. Set server-only values in the main CatDai app:
+
+```env
+CATDAI_API_PI_BASE_URL=https://cadastru-worker.catdai.md
+CATDAI_API_MAC_BASE_URL=https://cadastru-worker-mac.catdai.md
+CATDAI_API_CURIOSITY_BASE_URL=https://cadastru-worker-curiosity.catdai.md
+CADASTRU_EXTERNAL_API_SECRET=the-same-secret-on-all-workers
+```
+
+These are deployment hostname choices; the two new Cloudflare tunnel routes must be created before they work. Unset or invalid host URLs are skipped and appear as Not configured in admin. Duplicate endpoint URLs are tried only once. Explicit per-host values take precedence over legacy settings; with no new settings, existing `CADASTRU_EXTERNAL_API_BASE_URL`/endpoint overrides still configure `pi`. Existing listing-specific URL and signing-secret overrides remain supported.
+
+Failover is sequential and only follows network errors, timeouts, HTTP 408/429/5xx and unusable successful HTTP responses. Valid no-result, invalid-input, authentication and address-confirmation responses stop immediately. Each attempt gets a fresh HMAC timestamp and request ID; lookup correlation stays the same and never enters the signed body. Existing usage telemetry records each real attempt, its configured target node, and safe returned node/version headers. No schema migration is required.
+
+Existing timeouts apply per attempted host, including response body reads. Consequently three slow hosts can take up to three configured timeout periods; fast gateway/network failures proceed immediately. There is no background health poll or automatic source lookup from the main app. Admin health checks are independent of request routing and do not guarantee provider availability. Property persistence and credit authorization happen after the final lookup result, as before.
+
+Run `pnpm exec node --experimental-vm-modules scripts/test-api-worker-fallbacks.mjs` and `pnpm exec node --experimental-vm-modules scripts/test-admin-worker-status.mjs` for isolated failover and health checks.

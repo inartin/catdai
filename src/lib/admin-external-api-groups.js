@@ -53,7 +53,7 @@ function eventQuery(event) {
   ].filter(Boolean).join(", ") || payload.external_id || "";
 }
 
-export function groupExternalApiEvents(events, statusFilter = "all") {
+export function groupExternalApiEvents(events, statusFilter = "all", cachedSearches = []) {
   const groups = new Map();
   const legacySecondaryEvents = [];
   for (const event of events) {
@@ -82,24 +82,38 @@ export function groupExternalApiEvents(events, statusFilter = "all") {
     }
   }
 
+  for (const search of cachedSearches) {
+    if (search.lookup_source !== "cache") continue;
+    const id = search.lookup_id ? `search:${search.lookup_id}` : `cache:${search.id}`;
+    if (!groups.has(id)) groups.set(id, { id, linked: Boolean(search.lookup_id), events: [] });
+    groups.get(id).cachedSearch = search;
+  }
+
   return [...groups.values()].map((group) => {
     const events = [...group.events].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
     const primary = events.find((event) => event.service === "cadastru_address")
-      || events.find((event) => event.service === "cadastru_number") || events[0];
+      || events.find((event) => event.service === "cadastru_number") || events[0] || {
+        service: group.cachedSearch.search_type === "address" ? "cadastru_address" : "cadastru_number",
+        request_payload: { address: group.cachedSearch.search_address, cadastral_number: group.cachedSearch.cadastral_number },
+      };
+    const search = group.cachedSearch;
     return {
       ...group,
       events,
       service: primary.service,
-      query: primary.response_headers?.["x-catdai-lookup-query"] || eventQuery(primary),
-      created_at: events[0].created_at,
-      latest_at: events[events.length - 1].created_at,
-      user_name: primary.user_name || events.find((event) => event.user_name)?.user_name,
+      query: (search && (search.search_type === "address" ? search.search_address : search.cadastral_number))
+        || primary.response_headers?.["x-catdai-lookup-query"] || eventQuery(primary),
+      created_at: search?.created_at || events[0].created_at,
+      latest_at: [search?.created_at, events[events.length - 1]?.created_at].filter(Boolean)
+        .sort((a, b) => Date.parse(b) - Date.parse(a))[0],
+      user_name: search?.user_name || primary.user_name || events.find((event) => event.user_name)?.user_name,
       success: events.filter((event) => event.status === "success").length,
       failure: events.filter((event) => event.status === "failure").length,
       mainFailure: events.filter((event) => event.status === "failure"
         && (event.service === "cadastru_address" || event.service === "cadastru_number")).length,
     };
   }).filter((group) => statusFilter === "all" || (statusFilter === "failure"
-    ? group.mainFailure > 0 : group.events.some((event) => event.status === statusFilter)))
+    ? group.mainFailure > 0 : group.events.some((event) => event.status === statusFilter)
+      || (group.cachedSearch?.result_type && !["error", "no_data"].includes(group.cachedSearch.result_type))))
     .sort((a, b) => Date.parse(b.latest_at) - Date.parse(a.latest_at));
 }

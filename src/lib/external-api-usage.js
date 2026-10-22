@@ -10,6 +10,9 @@ const DIAGNOSTIC_RESPONSE_HEADERS = [
   "cf-ray",
   "x-request-id",
   "x-vercel-id",
+  "x-catdai-node",
+  "x-catdai-app-version",
+  "x-catdai-node-version",
 ];
 
 function isMissingSchemaError(error) {

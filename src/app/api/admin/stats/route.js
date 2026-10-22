@@ -224,6 +224,7 @@ function isMissingCadastruColumnError(error) {
     message.includes("cadastral_number") ||
     message.includes("result_type") ||
     message.includes("lookup_source") ||
+    message.includes("lookup_id") ||
     message.includes("valuation_clicked_at") ||
     message.includes("valuation_completed_at")
   );
@@ -252,6 +253,10 @@ async function fetchCadastruRows(columns, defaults = {}, since) {
 
 async function fetchCadastruSearchEvents(since) {
   const columnAttempts = [
+    {
+      columns: "id, search_type, user_id, district, cadastral_number, search_address, result_type, lookup_source, lookup_id, valuation_clicked_at, valuation_completed_at, created_at",
+      defaults: {},
+    },
     {
       columns: "id, search_type, user_id, district, cadastral_number, search_address, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
       defaults: {},
@@ -510,7 +515,7 @@ function correlateExternalApiUsers(events, { cadastruSearchEvents = [], listingL
   });
 }
 
-function buildExternalApiUsageStats(rows, events) {
+function buildExternalApiUsageStats(rows, events, searches = []) {
   const emptyService = () => ({ success: 0, failure: 0, total: 0 });
   const byService = {
     "999_listing": emptyService(),
@@ -537,6 +542,7 @@ function buildExternalApiUsageStats(rows, events) {
     recent: rows.slice(0, 60),
     detailsAvailable: events.available,
     events: events.rows,
+    cachedSearches: searches.filter((search) => search.lookup_source === "cache").slice(0, 200),
   };
 }
 
@@ -821,7 +827,8 @@ export async function GET(request) {
     cadastruSearches,
     listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
     calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
-    externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiEventsWithUsers),
+    externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiEventsWithUsers,
+      attachUserNames(cadastruSearchEvents, usersById)),
     paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
     marketTrendsPopup,
     payments,

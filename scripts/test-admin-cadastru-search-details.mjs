@@ -210,10 +210,10 @@ assert.equal(states[2], 1);
 tree = render(CadastruSearchDetails, { row: search }, [{ search, events: [main], match: "lookup_id" }, null, 0, null]);
 assert.equal(nodes(tree, (node) => node.type === ExternalApiEventTable).length, 1);
 tree = render(ExternalApiEventTable, { rows: [main], expandedExternalApiEventId: main.id, setExpandedExternalApiEventId() {} }, []);
-assert.equal(nodes(tree, (node) => node.type === "td" && node.props.colSpan === 8).length, 1);
+assert.equal(nodes(tree, (node) => node.type === "td" && node.props.colSpan === 9).length, 1);
 assert.equal(nodes(tree, (node) => node.type === "button").length, 0, "Search details reuse the API view without adding log deletion controls");
 tree = render(ExternalApiEventTable, { rows: [main], expandedExternalApiEventId: main.id, setExpandedExternalApiEventId() {},
   deletingExternalApiEventId: null, deleteExternalApiLogs() {} }, []);
-assert.equal(nodes(tree, (node) => node.type === "td" && node.props.colSpan === 9).length, 1);
+assert.equal(nodes(tree, (node) => node.type === "td" && node.props.colSpan === 10).length, 1);
 assert.equal(nodes(tree, (node) => node.type === "button").length, 1, "The External API table retains its delete action");
 console.log("Admin Cadastru search details passed: UUID/legacy matching, ambiguity, auth, pagination, errors, row interaction and shared API details.");

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { getApiWorkerEndpoints, withApiWorkerFallback } from "@/lib/api-workers";
 import { getExternalApiDiagnosticHeaders, trackExternalApiUsage } from "@/lib/external-api-usage";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -12,32 +13,10 @@ function signBody(rawBody, secret, timestamp) {
     .digest("hex");
 }
 
-function resolveEndpointUrl(path, explicitUrl) {
-  const baseUrl =
-    process.env.LISTING999_EXTERNAL_API_BASE_URL ||
-    process.env.CADASTRU_EXTERNAL_API_BASE_URL ||
-    "";
-
-  if (baseUrl) {
-    return new URL(path, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
-  }
-
-  return explicitUrl || "";
-}
-
-function externalListing999Config(path, explicitUrl) {
-  const url = resolveEndpointUrl(path, explicitUrl);
-  const secret =
-    process.env.LISTING999_EXTERNAL_API_SECRET ||
-    process.env.CADASTRU_EXTERNAL_API_SECRET ||
-    "";
+function externalListing999Config() {
+  const secret = process.env.LISTING999_EXTERNAL_API_SECRET || process.env.CADASTRU_EXTERNAL_API_SECRET || "";
   const timeoutMs = Number(process.env.LISTING999_EXTERNAL_API_TIMEOUT_MS || DEFAULT_TIMEOUT_MS);
-
-  return {
-    url,
-    secret,
-    timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS,
-  };
+  return { secret, timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS };
 }
 
 function externalError(message, options = {}) {
@@ -49,10 +28,20 @@ function externalError(message, options = {}) {
 }
 
 export async function fetchExternal999Listing(externalId, options = {}) {
-  const { url, secret, timeoutMs } = externalListing999Config(
-    "v1/999/listing",
-    process.env.LISTING999_EXTERNAL_API_URL
-  );
+  const workers = getApiWorkerEndpoints("v1/999/listing", process.env.LISTING999_EXTERNAL_API_URL,
+    process.env.LISTING999_EXTERNAL_API_BASE_URL || process.env.CADASTRU_EXTERNAL_API_BASE_URL || "");
+  if (!workers.length || !externalListing999Config().secret) {
+    throw externalError("External 999 listing API is not configured", {
+      code: "external_listing999_not_configured", fallbackEligible: true,
+    });
+  }
+  return withApiWorkerFallback(workers, (worker) => fetchExternal999ListingAttempt(
+    worker.url, externalId, { ...options, nodeName: worker.name }
+  ));
+}
+
+async function fetchExternal999ListingAttempt(url, externalId, options) {
+  const { secret, timeoutMs } = externalListing999Config();
 
   if (!url || !secret) {
     throw externalError("External 999 listing API is not configured", {
@@ -66,6 +55,8 @@ export async function fetchExternal999Listing(externalId, options = {}) {
   const timestamp = Date.now();
   const signature = signBody(rawBody, secret, timestamp);
   const startedAt = Date.now();
+  const requestId = crypto.randomUUID();
+  const trackingHeaders = { "x-request-id": requestId, "x-catdai-target-node": options.nodeName };
   let response;
 
   try {
@@ -73,6 +64,7 @@ export async function fetchExternal999Listing(externalId, options = {}) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-Request-Id": requestId,
         "X-Catdai-Timestamp": String(timestamp),
         "X-Catdai-Signature": `sha256=${signature}`,
       },
@@ -85,6 +77,7 @@ export async function fetchExternal999Listing(externalId, options = {}) {
     trackExternalApiUsage("999_listing", "failure", {
       endpoint: url,
       requestPayload,
+      responseHeaders: trackingHeaders,
       errorCode: code,
       errorMessage: message,
       durationMs: Date.now() - startedAt,
@@ -108,7 +101,7 @@ export async function fetchExternal999Listing(externalId, options = {}) {
       endpoint: url,
       requestPayload,
       responsePayload: payload,
-      responseHeaders: getExternalApiDiagnosticHeaders(response),
+      responseHeaders: { ...trackingHeaders, ...getExternalApiDiagnosticHeaders(response) },
       httpStatus: response.status,
       durationMs: Date.now() - startedAt,
       userId: options.userId ?? null,
@@ -122,7 +115,7 @@ export async function fetchExternal999Listing(externalId, options = {}) {
     endpoint: url,
     requestPayload,
     responsePayload: payload,
-    responseHeaders: getExternalApiDiagnosticHeaders(response),
+    responseHeaders: { ...trackingHeaders, ...getExternalApiDiagnosticHeaders(response) },
     errorCode: code,
     errorMessage: message,
     httpStatus: response.status,

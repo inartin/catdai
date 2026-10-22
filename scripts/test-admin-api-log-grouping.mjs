@@ -32,7 +32,10 @@ const mocks = {
 };
 async function load(file, extraSource = "") {
   const loadedModule = new vm.SourceTextModule((await fs.readFile(file, "utf8")) + extraSource, { context });
-  await loadedModule.link((name) => {
+  await loadedModule.link(async (name) => {
+    if (name === "@/lib/api-workers") {
+      return new vm.SourceTextModule(await fs.readFile("src/lib/api-workers.js", "utf8"), { context });
+    }
     const exports = mocks[name];
     assert(exports, `Unexpected import: ${name}`);
     return new vm.SyntheticModule(Object.keys(exports), function () {
@@ -143,7 +146,9 @@ console.log("Older API grouping passed: screenshot example, durations, number re
 const require = createRequire(import.meta.url);
 const { transform, loadBindings } = require("next/dist/build/swc");
 await loadBindings();
-const { code } = await transform(await fs.readFile("src/app/admin/page.js", "utf8"), {
+const dashboardSource = await fs.readFile("src/app/admin/page.js", "utf8");
+// Exercise dashboard content independently of the existing worker-status wrapper.
+const { code } = await transform(`${dashboardSource}\nexport { DashboardContent };`, {
   filename: "src/app/admin/page.js",
   jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } } },
   module: { type: "es6" },
@@ -174,7 +179,7 @@ await uiModule.link((name) => {
   }, { context: uiContext });
 });
 await uiModule.evaluate();
-function render() { cursor = 0; return uiModule.namespace.default(); }
+function render() { cursor = 0; return uiModule.namespace.DashboardContent(); }
 function nodes(node, predicate) {
   if (!node || typeof node !== "object") return [];
   if (Array.isArray(node)) return node.flatMap((child) => nodes(child, predicate));
@@ -231,14 +236,105 @@ rows[0].props.onClick();
 assert.equal(nodes(render(), (node) => node.type === "tr" && node.props.role === "button").length, 4,
   "the older combined row expands into its three individual calls");
 
+// The API column reports the responding worker, with the attempted host as a
+// fallback for older workers and network failures. Missing history stays unknown.
+slots[2] = { ...slots[2], externalApiUsage: { ...slots[2].externalApiUsage,
+  events: recorded.slice(0, 3).map((event, index) => ({ ...event,
+    response_headers: { ...event.response_headers,
+      "x-catdai-target-node": index === 2 ? "curiosity" : "pi",
+      ...(index === 1 ? { "x-catdai-node": "mac" } : {}),
+    },
+  })) } };
+tree = render();
+rows = nodes(tree, (node) => node.type === "tr" && node.props.role === "button");
+assert.equal(textOf(nodes(rows[0], (node) => node.type === "td")[2]), "pi, mac, curiosity");
+assert(nodes(tree, (node) => node.type === "th" && textOf(node) === "API").length > 0);
+rows[0].props.onClick();
+tree = render();
+rows = nodes(tree, (node) => node.type === "tr" && node.props.role === "button");
+assert.deepEqual(rows.slice(1).map((row) => textOf(nodes(row, (node) => node.type === "td")[2])),
+  ["pi", "mac", "curiosity"], "nested calls show their own worker rather than just the group summary");
+assert(nodes(tree, (node) => node.type === "td" && node.props.colSpan === 6).length > 0);
+slots[2] = { ...slots[2], externalApiUsage: { ...slots[2].externalApiUsage, events: historical } };
+assert(textOf(render()).includes("Not recorded"), "older logs do not invent a worker identity");
+console.log("Admin API column passed: serving host, attempted host, multiple workers and unknown history.");
+
+const cachedSearch = { id: 900, lookup_id: crypto.randomUUID(), search_type: "address",
+  search_address: query, lookup_source: "cache", result_type: "full_data", user_name: "Cached visitor",
+  created_at: "2026-10-22T16:00:00Z" };
+let cachedGroups = groupExternalApiEvents([], "all", [cachedSearch]);
+assert.equal(cachedGroups.length, 1);
+assert.equal(cachedGroups[0].query, query);
+assert.equal(cachedGroups[0].events.length, 0, "cache hits do not fabricate worker calls");
+assert.equal(cachedGroups[0].success, 0);
+assert.equal(groupExternalApiEvents([], "success", [cachedSearch]).length, 1);
+assert.equal(groupExternalApiEvents([], "failure", [cachedSearch]).length, 0);
+assert.equal(groupExternalApiEvents([], "success", [{ ...cachedSearch, result_type: "error" }]).length, 0,
+  "a failure after cache retrieval is not shown as a successful cached search");
+assert.equal(groupExternalApiEvents([], "success", [{ ...cachedSearch, result_type: "no_data" }]).length, 0);
+const cachedNumber = { ...cachedSearch, id: 901, lookup_id: null, search_type: "number",
+  cadastral_number: "0100106.131.01.097" };
+assert.equal(groupExternalApiEvents([], "all", [cachedNumber])[0].query, cachedNumber.cadastral_number);
+const secondary = { ...recorded[2], response_headers: { ...recorded[2].response_headers,
+  "x-catdai-lookup-id": cachedSearch.lookup_id } };
+cachedGroups = groupExternalApiEvents([secondary], "all", [cachedSearch]);
+assert.equal(cachedGroups.length, 1, "cached primary and linked secondary calls share one row");
+assert.equal(cachedGroups[0].events.length, 1);
+assert.equal(groupExternalApiEvents([secondary], "all", [cachedNumber]).length, 2,
+  "cache rows without search IDs never guess a match by address or timing");
+assert.equal(groupExternalApiEvents([], "all", [{ ...cachedSearch, lookup_source: "api" }]).length, 0);
+
+slots[2] = { ...slots[2], externalApiUsage: { total: 0, events: [], cachedSearches: [cachedSearch], byService: {} } };
+tree = render();
+rows = nodes(tree, (node) => node.type === "tr" && node.props.role === "button");
+assert.equal(rows.length, 1, "cache-only activity remains visible even with zero external calls");
+assert.equal(textOf(nodes(rows[0], (node) => node.type === "td")[2]), "Cached");
+assert(/0\s+calls/.test(textOf(rows[0])));
+assert(textOf(rows[0]).includes("Cached visitor"));
+assert(!nodes(tree, (node) => node.type === "button" && node.props["aria-label"]?.startsWith("Delete API log")).length,
+  "cached search rows cannot delete worker logs or change their counters");
+rows[0].props.onKeyDown({ key: "Enter", preventDefault() {} });
+assert(textOf(render()).includes("Loading search details"), "cached rows open existing saved-search details");
+slots[2] = { ...slots[2], externalApiUsage: { ...slots[2].externalApiUsage, total: 1, events: [secondary] } };
+tree = render();
+rows = nodes(tree, (node) => node.type === "tr" && node.props.role === "button");
+assert.equal(rows.length, 2, "the expanded cached search contains one secondary worker call");
+assert.equal(textOf(nodes(rows[1], (node) => node.type === "td")[2]), "pi");
+assert.equal(textOf(nodes(rows[0], (node) => node.type === "td")[2]), "Cached, pi",
+  "a cached primary still identifies the worker used for secondary data");
+console.log("Cached API rows passed: cache-only activity, linked secondary calls, filters, safe grouping and saved details.");
+
 // Daily aggregates include history beyond the latest 200 event details.
-mocks["@/lib/supabase-admin"] = { supabaseAdmin: {} };
+const searchQueries = [];
+let legacySearchSchema = false;
+mocks["@/lib/supabase-admin"] = { supabaseAdmin: { from(table) {
+  assert.equal(table, "cadastru_search_events");
+  const query = { table };
+  searchQueries.push(query);
+  const builder = {
+    select(columns) { query.columns = columns; return builder; },
+    is(column, value) { assert.equal(column, "duplicate_of"); assert.equal(value, null); return builder; },
+    gte(column, value) { query.since = [column, value]; return builder; },
+    order() { return builder; },
+    range() { return legacySearchSchema && query.columns.includes("lookup_id")
+      ? { data: null, error: { code: "42703", message: "column lookup_id does not exist" } }
+      : { data: [legacySearchSchema ? { ...cachedSearch, lookup_id: undefined } : cachedSearch], error: null }; },
+  };
+  return builder;
+} } };
 mocks["@/lib/admin-auth"] = { requireAdminApiAuth: () => null };
 mocks["@/lib/admin-cadastru-favorites"] = { loadCadastruFavorites: async (rows) => rows };
 mocks["@/lib/cadastru-share-statistics"] = { loadCadastruShareStatistics: async (rows) => rows };
 mocks["next/server"] = { NextResponse: {} };
-const { buildExternalApiUsageStats } = await load("src/app/api/admin/stats/route.js",
-  "\nexport { buildExternalApiUsageStats };");
+const { buildExternalApiUsageStats, fetchCadastruSearchEvents } = await load("src/app/api/admin/stats/route.js",
+  "\nexport { buildExternalApiUsageStats, fetchCadastruSearchEvents };");
+const since = "2026-10-21T21:00:00Z";
+assert.equal((await fetchCadastruSearchEvents(since))[0].lookup_id, cachedSearch.lookup_id);
+assert.deepEqual(searchQueries[0].since, ["created_at", since], "cache history uses the selected period");
+assert(searchQueries[0].columns.includes("lookup_id"));
+legacySearchSchema = true;
+assert.equal((await fetchCadastruSearchEvents(since)).length, 1, "older schema still supplies cached searches");
+assert(!searchQueries.at(-1).columns.includes("lookup_id"));
 const daily = [
   { service: "cadastru_address", status: "success", count: 300 },
   { service: "cadastru_address", status: "failure", count: 3 },
@@ -257,3 +353,14 @@ assert.equal(buildExternalApiUsageStats(daily, { available: false, rows: [] }).f
   "aggregate-only history uses the same classification when event details are unavailable");
 assert.equal(buildExternalApiUsageStats([], { available: true, rows: [] }).failure, 0);
 console.log("Admin API failure totals passed: primary failures, other errors, historical totals and unavailable details.");
+
+const withCache = buildExternalApiUsageStats(daily, { available: true, rows: recorded },
+  [cachedSearch, { ...cachedSearch, id: 902, lookup_source: "api" }]);
+assert.equal(withCache.cachedSearches.length, 1);
+assert.equal(withCache.total, usage.total, "cached searches do not increase API totals");
+assert.equal(withCache.success, usage.success);
+assert.equal(withCache.failure, usage.failure);
+assert.equal(buildExternalApiUsageStats([], { available: true, rows: [] },
+  Array.from({ length: 205 }, (_, id) => ({ ...cachedSearch, id }))).cachedSearches.length, 200,
+  "the response bounds cached history independently of worker logs");
+console.log("Cached stats query passed: search IDs, selected period, old schema fallback and unchanged API counters.");

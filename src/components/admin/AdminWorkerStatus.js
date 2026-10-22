@@ -48,7 +48,7 @@ export default function AdminWorkerStatus() {
     <section aria-label="API worker status" className="rounded-lg border border-gray-200 bg-white px-4 py-3">
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <h2 className="text-sm font-medium text-gray-900">API workers</h2>
-        {!checking && result?.checkedAt && (
+        {result?.checkedAt && (
           <time dateTime={result.checkedAt} className="text-xs text-gray-400">
             Checked {new Date(result.checkedAt).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}
           </time>
@@ -75,8 +75,8 @@ export default function AdminWorkerStatus() {
                 </span>
                 {!checking && worker?.status === "online" && <span className="text-xs text-gray-500">{worker.responseTimeMs} ms</span>}
               </div>
-              {!checking && (worker?.detail || result?.detail) && <p className="mt-1 text-xs text-gray-500">{worker?.detail || result.detail}</p>}
-              {!checking && worker?.status === "online" && (
+              {(worker?.detail || result?.detail) && <p className="mt-1 text-xs text-gray-500">{worker?.detail || result.detail}</p>}
+              {worker?.status === "online" && (
                 <p className="mt-1 break-words text-xs text-gray-500" title={version || undefined}>
                   {worker.nodeName && worker.nodeName !== name && <span>Responding as {worker.nodeName} · </span>}
                   App {shortVersion || "unknown"} · Node {worker.nodeVersion || "unknown"}

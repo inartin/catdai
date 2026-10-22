@@ -1,6 +1,12 @@
 [
   {
     "city": "Chișinău",
+    "road_type": "bd",
+    "street": "Ștefan cel Mare și Sfânt",
+    "aliases": ["Ștefan cel Mare"]
+  },
+  {
+    "city": "Chișinău",
     "road_type": "str",
     "street": "Kiev",
     "aliases": ["Киев"]

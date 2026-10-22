@@ -1,3 +1,5 @@
+import { getDeviceId } from "@/lib/visitor-browser";
+
 // App-side correlation only; these fields never enter the signed worker body.
 export function normalizeCadastruLookupId(id) {
   return typeof id === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
@@ -8,6 +10,7 @@ let searchSessionId;
 // Kept out of result URLs so copying a URL to another browser starts a separate journey.
 // sessionStorage survives the login redirect without tying identity to authentication.
 export function getCadastruSearchSessionId() {
+  getDeviceId();
   if (searchSessionId) return searchSessionId;
   try {
     searchSessionId = normalizeCadastruLookupId(sessionStorage.getItem("cadastru-search-session"))

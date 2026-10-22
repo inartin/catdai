@@ -232,7 +232,7 @@ function buildQrUrl(cadastralNumber = "") {
 async function trackPdfGeneration({ accessToken, estimateLogId, includedCadastral }) {
   if (!accessToken) return;
 
-  const headers = { "Content-Type": "application/json" };
+  const headers = { "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "" };
   headers.Authorization = `Bearer ${accessToken}`;
 
   try {
@@ -269,7 +269,7 @@ async function authorizePdfGeneration(accessToken, reportKey) {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "",
     },
     body: JSON.stringify({ report_key: reportKey }),
   });
@@ -795,7 +795,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
       const res = await fetch("/api/cadastral", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "",
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({ cadastral_number: validation.value }),

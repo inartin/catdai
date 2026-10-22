@@ -14,7 +14,7 @@ Implemented and active for apartments.
 - `/evaluare` reads URL params and calls `/api/estimate`; anonymous sale/buy users can submit the form and see only a preview result.
 - `/evaluare` without valuation query params shows the reusable cadastru search form from `/cadastru` instead of redirecting to the homepage.
 - Result-page URL cleanup preserves `type=rent`, so refreshing a rent result keeps the rent API path instead of falling back to sale valuation.
-- Anonymous sale/buy and rent evaluation results hide the headline estimate behind blurred fake values, while detailed values are blurred and open the purchase popup. Sale/buy previews also keep the sector/city trend card visible with fake blurred trend data.
+- Anonymous sale/buy and rent evaluation results hide the headline estimate behind blurred fake values, while detailed values are blurred and open the purchase popup. Sale/buy previews show real, unblurred sector/city trend data for anonymous users and users without credits, when available.
 - Monthly free grants are retired. Existing unused allowances remain as one-time retained credits across all features. Further full evaluations consume shared paid credits; once both are exhausted, the result falls back to the blurred preview. Paid evaluation snapshots are stored when a paid credit is used.
 - When no credit remains, the popup and the result action column both include the same reusable feature-price block with the sale/rent single-access price in EUR and the rounded MDL equivalent, plus a checkout button.
 - The sale and rent purchase flow both use `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE` as the Paddle price ID, show `PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST` in the UI, and grant one paid evaluation credit after Paddle confirms payment.
@@ -59,7 +59,7 @@ Implemented and active for apartments.
 - Rent computes the market monthly rent from the comparable median, while the result-page low and high levels come from the cheapest and most expensive matched rent listings and link directly to their 999.md pages.
 - Rent also returns price per m2 per month, range, confidence, district comparison, relevant rent listings, and the comparable listing count used for the result.
 - `/api/estimate` calls the RPC with the server-side Supabase admin client so server valuation work does not inherit the anonymous client timeout.
-- Anonymous `/api/estimate` responses remove the headline estimate and locked sale/buy values before returning JSON and mark `locked_sections` for the UI placeholders. Locked preview responses replace the real market trend with fake trend data before it reaches the browser.
+- Anonymous `/api/estimate` responses remove the headline estimate and locked sale/buy values before returning JSON and mark `locked_sections` for the UI placeholders. Sale/buy evaluation previews preserve the real market trend and leave it unlocked; listing-analysis previews retain their existing trend masking.
 - `/api/estimate` and gated `/api/estimate-rent` responses reuse an existing paid result first, then consume any retained free credit before shared paid credits. Retained credits do not renew and are independent of purchases. The free idempotency key is based on the UTC month and normalized estimate params so refreshes do not consume another use.
 - Paid-credit sale/rent responses update the same `user_feature_usage_events` row with an `evaluation_snapshot` containing normalized params and the immutable result payload.
 - Backend also runs seller-category estimates for owner vs agency/developer.

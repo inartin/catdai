@@ -1,4 +1,4 @@
-import { shouldCollectStatistics } from "@/lib/statistics-context";
+import { getStatisticsVisitor, getStatisticsUserId, shouldCollectStatistics } from "@/lib/statistics-context";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
@@ -60,6 +60,7 @@ export function trackExternalApiUsage(service, status, details = {}) {
     });
     const eventRow = {
       service,
+      visitor: getStatisticsVisitor(),
       status,
       endpoint: cleanText(details.endpoint, 500),
       request_payload: details.requestPayload ?? null,
@@ -70,9 +71,8 @@ export function trackExternalApiUsage(service, status, details = {}) {
       http_status: cleanInteger(details.httpStatus),
       duration_ms: cleanInteger(details.durationMs),
     };
-    if (details.userId) {
-      eventRow.user_id = details.userId;
-    }
+    const userId = getStatisticsUserId() || details.userId;
+    if (userId) eventRow.user_id = userId;
     let eventWrite = supabaseAdmin.from("external_api_usage_events").insert(eventRow);
     if (details.returnEventId) eventWrite = eventWrite.select("id");
 

@@ -183,6 +183,7 @@ function groupAdJourneys(events, usersById, purchasesByUser = new Map()) {
         key,
         sessionId: event.session_id || null,
         deviceId: event.device_id || null,
+        visitor: event.visitor || null,
         userId: null,
         user: null,
         firstSeenAt: event.created_at,
@@ -238,7 +239,7 @@ function normalizePagination({ journeyLimit, journeyOffset } = {}) {
 function buildAdEventsQuery(source, since) {
   let query = supabaseAdmin
     .from("ad_source_events")
-    .select("event_name, user_id, device_id, session_id, path, referrer, metadata, created_at")
+    .select("event_name, user_id, visitor, device_id, session_id, path, referrer, metadata, created_at")
     .eq("source", source);
 
   if (since) query = query.gte("created_at", since);

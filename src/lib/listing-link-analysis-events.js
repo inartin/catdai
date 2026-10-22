@@ -1,4 +1,4 @@
-import { shouldCollectStatistics } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics } from "@/lib/statistics-context";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -53,6 +53,7 @@ export async function logListingLinkAnalysisEvent(request, event) {
     const parsed = event.parsed || {};
     const row = {
       status,
+      visitor: getStatisticsVisitor(),
       error_code: status === "success" ? null : status,
       user_id: userId,
       external_id: cleanText(event.externalId, 64),

@@ -66,7 +66,7 @@ async function load(id) {
 const request = (token, body = {}) => new Request('https://catdai.test/api/test', {
   method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body),
 });
-const { withStatisticsContext, shouldCollectStatistics } = await load('@/lib/statistics-context');
+const { withStatisticsContext, shouldCollectStatistics, getStatisticsVisitor } = await load('@/lib/statistics-context');
 const { resolveAccessTier } = await load('@/lib/access-tier');
 const decision = withStatisticsContext(async req => {
   const access = await resolveAccessTier(req);
@@ -113,6 +113,27 @@ for (const table of ['external_api_usage_events', 'cadastru_search_events', 'cal
   assert.ok(writes.some(write => write.table === table), table);
 }
 assert.ok(writes.some(write => write.rpc === 'increment_external_api_usage'));
+
+// Device snapshots and server-resolved users flow through background worker writes.
+const browserId = '11111111-1111-4111-8111-111111111111';
+const browserRequest = request('member');
+browserRequest.headers.set('x-catdai-device-id', browserId);
+browserRequest.headers.set('user-agent', 'Mozilla/5.0 (Linux; Android 10; K) Chrome/143 Mobile Safari/537');
+writes.length = 0;
+await log(browserRequest);
+for (const write of writes.filter((write) => write.row?.visitor)) {
+  assert.equal(write.row.visitor.device_id, browserId);
+  assert.equal(write.row.visitor.os, 'Android');
+}
+assert.equal(writes.find((write) => write.table === 'external_api_usage_events').row.user_id, 'member-id');
+assert.equal(await withStatisticsContext(() => getStatisticsVisitor())(request('admin')), null);
+const [firstVisitor, secondVisitor] = await Promise.all([
+  withStatisticsContext(async () => { await new Promise(resolve => setTimeout(resolve, 5)); return getStatisticsVisitor(); })(browserRequest),
+  withStatisticsContext(() => getStatisticsVisitor())(request()),
+]);
+assert.equal(firstVisitor.device_id, browserId);
+assert.equal(secondVisitor.device_id, null);
+
 
 // Event-only endpoints accept excluded users without writing, including old
 // evaluation journey tokens, which must not update historical analytics.

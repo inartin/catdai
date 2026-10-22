@@ -1,4 +1,4 @@
-import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
@@ -363,6 +363,7 @@ function trackEstimate({
   logEstimate({
     id: body.log_id || undefined,
     estimate_type: "sale",
+    visitor: getStatisticsVisitor(),
     user_id: access.user_id || null,
     device_id: body.device_id,
     session_id: body.session_id || null,
@@ -614,6 +615,7 @@ function buildEstimateAccessPayload(data, estimateAccess) {
 
   const preview = buildEstimatePreview(data, {
     hideMarketEstimate: !estimateAccess.access?.user_id,
+    showMarketTrend: true,
   });
 
   return {
@@ -867,7 +869,7 @@ function buildMarketTrendPreview(input) {
   };
 }
 
-function buildEstimatePreview(payload, { hideMarketEstimate = false } = {}) {
+function buildEstimatePreview(payload, { hideMarketEstimate = false, showMarketTrend = false } = {}) {
   const maskEstimateData = (estData, { keepMarketRate = false } = {}) => {
     if (!estData) return null;
     return {
@@ -906,7 +908,7 @@ function buildEstimatePreview(payload, { hideMarketEstimate = false } = {}) {
       agency: maskEstimateData(payload.estimates_by_seller.agency),
     } : null,
     market_position: { marker_pct: 50 },
-    market_trend: buildMarketTrendPreview(payload.input),
+    market_trend: showMarketTrend ? payload.market_trend : buildMarketTrendPreview(payload.input),
     relevant_listings: [],
     listing_duplicates: null,
     locked_sections: {
@@ -915,7 +917,7 @@ function buildEstimatePreview(payload, { hideMarketEstimate = false } = {}) {
       market_position_numbers: true,
       district_comparison_values: true,
       market_stats_values: true,
-      market_trend: true,
+      market_trend: !showMarketTrend,
       seller_breakdown_values: true,
       listing_details: true,
     },

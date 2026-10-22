@@ -22,6 +22,7 @@ import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
 import { buildFullAccessAddressResultParams, resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
 import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } from "@/lib/cadastru-municipal-reports";
+import { getDeviceId } from "@/lib/visitor-browser";
 import { ensureCadastruLookupId, getCadastruSearchSessionId } from "@/lib/cadastru-lookup-tracking";
 import { recordCadastruShareOpen } from "@/lib/cadastru-share-tracking";
 
@@ -389,7 +390,7 @@ function fetchCadastralLookup(cacheKey, body, accessToken, tracking) {
   const promise = fetch("/api/cadastral", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "",
       "x-catdai-search-session": getCadastruSearchSessionId(),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
@@ -417,7 +418,7 @@ function fetchAddressLookup(cacheKey, body, accessToken, tracking) {
   const promise = fetch("/api/cadastru/address", {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "",
       "x-catdai-search-session": getCadastruSearchSessionId(),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
@@ -940,7 +941,7 @@ function CadastruResultContent() {
         try {
           const response = await fetch("/api/cadastru/nearby", {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+            headers: { "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
             body: JSON.stringify({
               lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
               lookup_query: lookupTracking.current.query,
@@ -976,7 +977,7 @@ function CadastruResultContent() {
         try {
           const response = await fetch("/api/cadastru/public-transport", {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+            headers: { "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
             body: JSON.stringify({
               lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
               lookup_query: lookupTracking.current.query,
@@ -1013,7 +1014,7 @@ function CadastruResultContent() {
         try {
           const response = await fetch("/api/cadastru/municipal-reports", {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+            headers: { "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
             body: JSON.stringify({
               lookup_id: (lookupTracking.current ||= { id: crypto.randomUUID(), query: nearbyAddress || nearbyNumber }).id,
               lookup_query: lookupTracking.current.query,
@@ -1227,7 +1228,7 @@ function CadastruResultContent() {
                     try {
                       await fetch("/api/cadastru/evaluation", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+                        headers: { "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
                         body: JSON.stringify({ token: evaluationToken }),
                       });
                     } catch {

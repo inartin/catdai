@@ -1,4 +1,4 @@
-import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
@@ -118,6 +118,7 @@ async function handlePost(request) {
     .from("user_listing_alerts")
     .insert({
       collect_statistics: shouldCollectStatistics(),
+      visitor: getStatisticsVisitor(),
       user_id: access.user_id,
       label: normalizeText(body.label),
       website_enabled: body.website_enabled !== false,

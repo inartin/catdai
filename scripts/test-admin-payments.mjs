@@ -25,6 +25,7 @@ const mocks = {
   "@/lib/cadastru-share-statistics": { loadCadastruShareStatistics: async (rows) => rows },
   "@/lib/supabase-admin": {
     supabaseAdmin: {
+      rpc: async () => ({ data: [], error: null }),
       auth: { admin: { listUsers: async () => ({ data: { users: [user] } }) } },
       from(table) {
         assert.notEqual(table, "reporting_feature_credit_balances", "Payments never depend on remaining credits");
@@ -53,6 +54,7 @@ const mocks = {
         const builder = {
           select() { return builder; },
           eq() { return builder; },
+          is() { return builder; },
           in(column, value) { query.filters.push(["in", column, Array.from(value)]); return builder; },
           gte(column, value) { query.filters.push(["gte", column, value]); return builder; },
           order(column, options) { query.orderBy.push([column, options]); return builder; },

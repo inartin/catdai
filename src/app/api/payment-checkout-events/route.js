@@ -1,4 +1,4 @@
-import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
@@ -70,6 +70,7 @@ async function handlePost(request) {
     : String(body.path || "").startsWith("/payment/paddle/") ? "paddle" : getPaymentProvider();
   const row = {
     event_type: eventType,
+    visitor: getStatisticsVisitor(),
     user_id: access.user_id || null,
     device_id: cleanText(body.device_id, 80),
     session_id: cleanText(body.session_id, 80),

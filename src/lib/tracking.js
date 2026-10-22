@@ -1,22 +1,10 @@
 import { fetchWithStatisticsAuth } from "@/lib/statistics-client";
 
-const DEVICE_KEY = "catdai-device-id";
+import { getDeviceId } from "@/lib/visitor-browser";
+export { getDeviceId };
 const SESSION_KEY = "catdai-session-id";
 const AD_SOURCE_KEY = "catdai-ad-source";
 const TRACKED_AD_SOURCES = new Set(["zdg", "reddit", "vtememd"]);
-
-export function getDeviceId() {
-  try {
-    let id = localStorage.getItem(DEVICE_KEY);
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem(DEVICE_KEY, id);
-    }
-    return id;
-  } catch {
-    return null;
-  }
-}
 
 export function getSessionId() {
   try {

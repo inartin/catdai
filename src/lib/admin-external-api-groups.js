@@ -37,6 +37,7 @@ function callKind(event) {
 function matchesLegacySearch(event, group) {
   if (group.linked || !CADASTRU_SERVICES.has(group.events[0].service)) return false;
   const primary = group.events[0];
+  if (event.visitor?.device_id && group.events.some((row) => row.visitor?.device_id && event.visitor.device_id !== row.visitor.device_id)) return false;
   if (event.user_id && group.events.some((row) => row.user_id && event.user_id !== row.user_id)) return false;
   const delay = callStart(event) - (primary.service === "cadastru_nearby"
     ? callStart(primary) : Date.parse(primary.created_at));
@@ -62,7 +63,7 @@ export function groupExternalApiEvents(events, statusFilter = "all", cachedSearc
       legacySecondaryEvents.push(event);
       continue;
     }
-    const id = lookupId ? `search:${lookupId}` : `event:${event.id}`;
+    const id = lookupId ? `search:${lookupId}${event.visitor?.device_id ? `:${event.visitor.device_id}` : ""}` : `event:${event.id}`;
     if (!groups.has(id)) groups.set(id, { id, linked: Boolean(lookupId), events: [] });
     groups.get(id).events.push(event);
   }
@@ -84,7 +85,7 @@ export function groupExternalApiEvents(events, statusFilter = "all", cachedSearc
 
   for (const search of cachedSearches) {
     if (search.lookup_source !== "cache") continue;
-    const id = search.lookup_id ? `search:${search.lookup_id}` : `cache:${search.id}`;
+    const id = search.lookup_id ? `search:${search.lookup_id}${search.visitor?.device_id ? `:${search.visitor.device_id}` : ""}` : `cache:${search.id}`;
     if (!groups.has(id)) groups.set(id, { id, linked: Boolean(search.lookup_id), events: [] });
     groups.get(id).cachedSearch = search;
   }
@@ -106,6 +107,8 @@ export function groupExternalApiEvents(events, statusFilter = "all", cachedSearc
       created_at: search?.created_at || events[0].created_at,
       latest_at: [search?.created_at, events[events.length - 1]?.created_at].filter(Boolean)
         .sort((a, b) => Date.parse(b) - Date.parse(a))[0],
+      user_id: search?.user_id || primary.user_id || events.find((event) => event.user_id)?.user_id || null,
+      visitor: search?.visitor || primary.visitor || events.find((event) => event.visitor)?.visitor || null,
       user_name: search?.user_name || primary.user_name || events.find((event) => event.user_name)?.user_name,
       success: events.filter((event) => event.status === "success").length,
       failure: events.filter((event) => event.status === "failure").length,

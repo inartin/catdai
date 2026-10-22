@@ -1,4 +1,4 @@
-import { shouldCollectStatistics } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
@@ -110,6 +110,7 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
   try {
     const row = {
       search_type: normalizedType,
+      visitor: getStatisticsVisitor(),
       user_id: userId,
       city: cleanCity(options.city),
       district: cleanDistrict(options.district),

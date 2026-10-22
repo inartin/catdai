@@ -1,4 +1,4 @@
-import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { NextResponse } from "next/server";
@@ -39,7 +39,7 @@ async function handlePost(request) {
   if (!current) {
     const { error: insertError } = await supabaseAdmin
       .from("user_activity")
-      .insert({ user_id: userId, last_seen_at: nowIso });
+      .insert({ user_id: userId, last_seen_at: nowIso, visitor: getStatisticsVisitor() });
 
     if (insertError && insertError.code !== "23505") {
       console.error("[activity] insert failed:", insertError.message);
@@ -53,7 +53,7 @@ async function handlePost(request) {
   if (Number.isNaN(lastSeenTs) || now - lastSeenTs >= LAST_SEEN_THROTTLE_MS) {
     const { error: updateError } = await supabaseAdmin
       .from("user_activity")
-      .update({ last_seen_at: nowIso })
+      .update({ last_seen_at: nowIso, visitor: getStatisticsVisitor() })
       .eq("user_id", userId);
 
     if (updateError) {

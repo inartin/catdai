@@ -144,7 +144,7 @@ async function fetchTelegramAlerts(since) {
       supabaseAdmin
         .from("user_listing_alerts")
         .select(
-          "id, user_id, label, is_active, website_enabled, telegram_chat_id, base_filters, alert_filters, created_at, last_notified_at"
+          "id, user_id, visitor, label, is_active, website_enabled, telegram_chat_id, base_filters, alert_filters, created_at, last_notified_at"
         )
         .eq("telegram_enabled", true)
         .eq("collect_statistics", true),
@@ -254,35 +254,35 @@ async function fetchCadastruRows(columns, defaults = {}, since) {
 async function fetchCadastruSearchEvents(since) {
   const columnAttempts = [
     {
-      columns: "id, search_type, user_id, district, cadastral_number, search_address, result_type, lookup_source, lookup_id, valuation_clicked_at, valuation_completed_at, created_at",
+      columns: "id, search_type, user_id, visitor, district, cadastral_number, search_address, result_type, lookup_source, lookup_id, valuation_clicked_at, valuation_completed_at, created_at",
       defaults: {},
     },
     {
-      columns: "id, search_type, user_id, district, cadastral_number, search_address, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
+      columns: "id, search_type, user_id, visitor, district, cadastral_number, search_address, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
       defaults: {},
     },
     {
-      columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
+      columns: "id, search_type, user_id, visitor, district, cadastral_number, result_type, lookup_source, valuation_clicked_at, valuation_completed_at, created_at",
       defaults: { search_address: null },
     },
     {
-      columns: "id, search_type, user_id, district, cadastral_number, result_type, lookup_source, created_at",
+      columns: "id, search_type, user_id, visitor, district, cadastral_number, result_type, lookup_source, created_at",
       defaults: { valuation_clicked_at: null, valuation_completed_at: null },
     },
     {
-      columns: "id, search_type, user_id, district, cadastral_number, result_type, created_at",
+      columns: "id, search_type, user_id, visitor, district, cadastral_number, result_type, created_at",
       defaults: { lookup_source: null, valuation_clicked_at: null, valuation_completed_at: null },
     },
     {
-      columns: "id, search_type, user_id, district, created_at",
+      columns: "id, search_type, user_id, visitor, district, created_at",
       defaults: { cadastral_number: null, result_type: null, lookup_source: null, valuation_clicked_at: null, valuation_completed_at: null },
     },
     {
-      columns: "id, search_type, user_id, cadastral_number, result_type, created_at",
+      columns: "id, search_type, user_id, visitor, cadastral_number, result_type, created_at",
       defaults: { district: null, lookup_source: null, valuation_clicked_at: null, valuation_completed_at: null },
     },
     {
-      columns: "id, search_type, user_id, created_at",
+      columns: "id, search_type, user_id, visitor, created_at",
       defaults: { district: null, cadastral_number: null, result_type: null, lookup_source: null, valuation_clicked_at: null, valuation_completed_at: null },
     },
   ];
@@ -344,7 +344,7 @@ async function fetchListingLinkAnalysisEvents(since) {
       supabaseAdmin
         .from("listing_link_analysis_events")
         .select(
-          "id, status, error_code, user_id, external_id, listing_url, city, district, rooms_count, listing_price, listing_currency, created_at"
+          "id, status, error_code, user_id, visitor, external_id, listing_url, city, district, rooms_count, listing_price, listing_currency, created_at"
         ),
       "created_at",
       since
@@ -386,7 +386,7 @@ async function fetchCalculatorUsageEvents(since) {
       supabaseAdmin
         .from("calculator_usage_events")
         .select(
-          "id, user_id, device_id, session_id, city, district, rooms_count, area_m2, building_type, renovation, apartment_price, additional_investments, total_investment, include_rent_tax, estimated_monthly_rent, annual_gross_yield_pct, effective_yield_pct, payback_years, created_at"
+          "id, user_id, visitor, device_id, session_id, city, district, rooms_count, area_m2, building_type, renovation, apartment_price, additional_investments, total_investment, include_rent_tax, estimated_monthly_rent, annual_gross_yield_pct, effective_yield_pct, payback_years, created_at"
         ),
       "created_at",
       since
@@ -441,7 +441,7 @@ async function fetchExternalApiUsageRows(since) {
 }
 
 async function fetchExternalApiUsageEvents(since) {
-  const baseColumns = "id, service, status, endpoint, request_payload, response_payload, response_headers, error_code, error_message, http_status, duration_ms, created_at";
+  const baseColumns = "id, visitor, service, status, endpoint, request_payload, response_payload, response_headers, error_code, error_message, http_status, duration_ms, created_at";
   const fetchEvents = (includeUserId, includeRecovery) => {
     let cols = baseColumns;
     if (includeUserId) cols += ", user_id";
@@ -484,7 +484,7 @@ async function fetchExternalApiUsageEvents(since) {
 function correlateExternalApiUsers(events, { cadastruSearchEvents = [], listingLinkAnalysisEvents = [] }) {
   if (!Array.isArray(events) || events.length === 0) return [];
   return events.map((event) => {
-    if (event.user_id) return event;
+    if (event.user_id || event.visitor) return event;
     const eventTime = event.created_at ? new Date(event.created_at).getTime() : 0;
     if (!eventTime) return event;
 
@@ -557,7 +557,7 @@ async function fetchPaymentCheckoutEvents(since) {
     applySince(
       supabaseAdmin
         .from("payment_checkout_events")
-        .select("id, event_type, user_id, device_id, session_id, order_id, product_key, source_product_key, path, created_at"),
+        .select("id, event_type, user_id, visitor, device_id, session_id, order_id, product_key, source_product_key, path, created_at"),
       "created_at",
       since
     ).order("created_at", { ascending: false });
@@ -732,7 +732,7 @@ export async function GET(request) {
         applySince(
           supabaseAdmin
             .from("pdf_generation_events")
-            .select("id, user_id, device_id, session_id, estimate_log_id, included_cadastral, created_at"),
+            .select("id, user_id, visitor, device_id, session_id, estimate_log_id, included_cadastral, created_at"),
           "created_at",
           periodSince
         ).order("created_at", { ascending: false })
@@ -795,6 +795,12 @@ export async function GET(request) {
     ...externalApiUsageEvents,
     rows: attachUserNames(correlatedExternalApiEvents, usersById),
   };
+  const paymentUserIds = [...new Set(paymentSummary.orders.map((row) => row.user_id).filter(Boolean))];
+  const paymentVisitors = new Map();
+  if (paymentUserIds.length) {
+    const { data } = await supabaseAdmin.from("user_activity").select("user_id, visitor").in("user_id", paymentUserIds);
+    for (const row of data || []) paymentVisitors.set(row.user_id, row.visitor);
+  }
   const payments = {
     ...paymentSummary,
     orders: paymentSummary.orders.map((item) => {
@@ -802,6 +808,7 @@ export async function GET(request) {
       return {
         ...item,
         name: user ? userDisplayName(user) : item.user_id,
+        visitor: paymentVisitors.get(item.user_id) || null,
         email: user?.email || null,
       };
     }),
@@ -822,14 +829,14 @@ export async function GET(request) {
     totalSharedLinks: countSharedLinks.count || 0,
     totalFavorites: countFavorites.count || 0,
     totalTelegramAlerts: telegramAlerts.length,
-    telegramAlerts,
-    pdfGeneration: buildPdfStats(pdfEvents, cutoffs),
+    telegramAlerts: attachUserNames(telegramAlerts, usersById),
+    pdfGeneration: buildPdfStats(attachUserNames(pdfEvents, usersById), cutoffs),
     cadastruSearches,
-    listingLinkAnalyses: buildListingLinkAnalysisStats(listingLinkAnalysisEvents, cutoffs),
-    calculatorUsage: buildCalculatorUsageStats(calculatorUsageEvents, cutoffs),
+    listingLinkAnalyses: buildListingLinkAnalysisStats(attachUserNames(listingLinkAnalysisEvents, usersById), cutoffs),
+    calculatorUsage: buildCalculatorUsageStats(attachUserNames(calculatorUsageEvents, usersById), cutoffs),
     externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiEventsWithUsers,
       attachUserNames(cadastruSearchEvents, usersById)),
-    paymentCheckout: buildPaymentCheckoutStats(paymentCheckoutEvents, cutoffs),
+    paymentCheckout: buildPaymentCheckoutStats(attachUserNames(paymentCheckoutEvents, usersById), cutoffs),
     marketTrendsPopup,
     payments,
   };

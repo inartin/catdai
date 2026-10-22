@@ -4,7 +4,7 @@ import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { NextResponse } from "next/server";
 
 const AD_TRACKING_CACHE_TTL_SECONDS = 10 * 60;
-const AD_TRACKING_CACHE_PREFIX = "catdai:admin-ad-tracking:v2";
+const AD_TRACKING_CACHE_PREFIX = "catdai:admin-ad-tracking:v3";
 const PERIODS = {
   day: 24 * 60 * 60 * 1000,
   week: 7 * 24 * 60 * 60 * 1000,

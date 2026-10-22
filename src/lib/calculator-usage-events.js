@@ -1,4 +1,4 @@
-import { shouldCollectStatistics } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics } from "@/lib/statistics-context";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -69,6 +69,7 @@ export async function logCalculatorUsageEvent(request, event) {
   try {
     const row = {
       event_id: cleanText(calculator.event_id, 80),
+      visitor: getStatisticsVisitor(),
       user_id: userId,
       device_id: cleanText(calculator.device_id, 80),
       session_id: cleanText(calculator.session_id, 80),

@@ -19,6 +19,7 @@ context.fetch = async (url, options) => {
     : { error: "service_unavailable", message: "offline" }, { status: mode === "success" ? 200 : 503 });
 };
 const mocks = {
+  "@/lib/visitor-browser": { getDeviceId: () => null },
   "node:crypto": { default: crypto },
   "@/lib/external-api-usage": {
     getExternalApiDiagnosticHeaders: () => ({ "content-type": "application/json" }),
@@ -47,6 +48,16 @@ async function load(file, extraSource = "") {
 }
 const { getCadastruLookupTracking } = await load("src/lib/cadastru-lookup-tracking.js");
 const { groupExternalApiEvents } = await load("src/lib/admin-external-api-groups.js");
+
+const browserA = { device_id: "11111111-1111-4111-8111-111111111111", os: "Android" };
+const browserB = { device_id: "22222222-2222-4222-8222-222222222222", os: "iOS" };
+const separateBrowsers = groupExternalApiEvents([browserA, browserB].map((visitor, index) => ({
+  id: index + 1, service: "cadastru_number", status: "success", visitor,
+  response_headers: { "x-catdai-lookup-id": "shared-lookup" }, created_at: new Date().toISOString(),
+})));
+assert.equal(separateBrowsers.length, 2, "Copied URLs never merge different known browser identities");
+assert.deepEqual(new Set(separateBrowsers.map((group) => group.visitor.device_id)), new Set([browserA.device_id, browserB.device_id]));
+
 const worker = await load("src/lib/cadastru-external-api.js");
 const id = crypto.randomUUID();
 const query = "Chișinău, strada Decebal 63, ap. 1";
@@ -161,6 +172,7 @@ const jsx = (type, props) => ({ type, props });
 const uiContext = vm.createContext({ console, Date, URLSearchParams,
   window: { confirm: () => { confirmations++; return false; } } });
 const uiMocks = {
+  "@/components/admin/AdminUserCell": { default: ({ row, name }) => name || row.user_name || row.user_id || "Anonymous", VisitorTags: () => null },
   react: { Fragment: "Fragment", useCallback: (fn) => fn, useEffect: noop,
     useState: (initial) => {
       const index = cursor++;
@@ -172,7 +184,7 @@ const uiMocks = {
 };
 const uiModule = new vm.SourceTextModule(code, { context: uiContext });
 await uiModule.link((name) => {
-  const exports = uiMocks[name] || (name.startsWith("@/components/") ? { default: noop } : null);
+  const exports = uiMocks[name] || (name.startsWith("@/components/") ? { default: noop, VisitorTags: noop } : null);
   assert(exports, `Unexpected UI import: ${name}`);
   return new vm.SyntheticModule(Object.keys(exports), function () {
     for (const [key, value] of Object.entries(exports)) this.setExport(key, value);

@@ -158,7 +158,7 @@ await page.link((name) => {
       if (!(index in states)) states[index] = initial;
       return [states[index], (value) => { states[index] = typeof value === "function" ? value(states[index]) : value; }];
     }, useEffect: (callback) => effects.push(callback), useCallback: (fn) => fn, useRef: () => ({}) }
-    : name.startsWith("@/components/") ? { default: () => null }
+    : name.startsWith("@/components/") ? { default: () => null, VisitorTags: () => null }
     : { groupExternalApiEvents: () => [] };
   return new vm.SyntheticModule(Object.keys(exports), function () {
     for (const [key, value] of Object.entries(exports)) this.setExport(key, value);

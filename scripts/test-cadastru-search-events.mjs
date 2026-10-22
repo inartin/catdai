@@ -39,6 +39,7 @@ await db.exec(`create role anon; create role authenticated; create role service_
   create table external_api_usage_events(created_at timestamptz, service text, status text);`);
 await db.exec(await fs.readFile("supabase/migrations/20261020093634_cadastru_search_journeys.sql", "utf8"));
 
+await db.exec("alter table cadastru_search_events add column visitor jsonb;");
 const errors = [];
 let persist = true;
 const environment = { NODE_ENV: "production", ADMIN_TOKEN: "isolated-test-secret" };
@@ -76,7 +77,8 @@ const admin = {
 const context = vm.createContext({ crypto, Buffer, URL, console: { error: (...args) => errors.push(args) }, process: { env: environment } });
 const modules = new Map();
 const mocks = {
-  "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
+  "@/lib/visitor-browser": { getDeviceId: () => null },
+  "@/lib/statistics-context": { getStatisticsVisitor: () => null, shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
   "node:crypto": { default: crypto },
   "@/lib/access-tier": { resolveAccessTier: async (request) => ({ user_id: request.userId }) },
   "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => persist },

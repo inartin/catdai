@@ -152,7 +152,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
         setError2(null);
       }
 
-      const headers = { "Content-Type": "application/json" };
+      const headers = { "Content-Type": "application/json", "x-catdai-device-id": getDeviceId() || "" };
       if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
 
       const fetchJson = async (url, options) => {

@@ -1,5 +1,7 @@
 "use client";
 
+import AdminUserCell, { VisitorTags } from "@/components/admin/AdminUserCell";
+
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Tooltip from "@/components/Tooltip";
 import { groupExternalApiEvents } from "@/lib/admin-external-api-groups";
@@ -314,7 +316,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                   ) : <span className="text-gray-400">—</span>}
                 </td>
                 <td className="px-4 py-3 text-gray-600 break-all">
-                  {row.user_name || "Anonymous"}
+                  <AdminUserCell row={row} />
                 </td>
                 {canDelete && <td className="px-4 py-3 text-right">
                   <button
@@ -343,7 +345,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                         </div>
                         <div>
                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">User</p>
-                          <p className="mt-1 break-all text-sm text-gray-800">{row.user_name || "Anonymous"}</p>
+                          <div className="mt-1 break-all text-sm text-gray-800"><AdminUserCell row={row} /></div>
                         </div>
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                           <div>
@@ -641,7 +643,7 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
                   <td className="px-4 py-3 text-right text-gray-600">{fmtNum(row.share_count)}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{fmtNum(row.unique_viewers)}</td>
                   <td className="px-4 py-3 text-gray-600 break-all">
-                    {row.user_name || userName || "Anonymous"}
+                    <AdminUserCell row={row} name={row.user_name || userName} />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -1138,6 +1140,7 @@ function DashboardContent() {
             <div className="flex flex-col gap-4 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">{selectedUser.name || "\u2014"}</h2>
+                <VisitorTags visitor={selectedUser.visitor} />
                 {selectedUser.email && <p className="mt-0.5 text-sm text-gray-500">{selectedUser.email}</p>}
                 <button
                   type="button"
@@ -1454,7 +1457,7 @@ function DashboardContent() {
                   <tbody className="divide-y divide-gray-100">
                     {s.payments.orders.map((payment) => (
                       <tr key={`${payment.provider}:${payment.id}`} className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
-                        <td className="px-4 py-3 text-gray-900 font-medium">{payment.name || payment.user_id || "Deleted user"}</td>
+                        <td className="px-4 py-3 text-gray-900 font-medium"><div title="Last recorded browser for this account"><AdminUserCell row={payment} name={payment.name || payment.user_id || "Deleted user"} /></div></td>
                         <td className="px-4 py-3 text-gray-600">{payment.email || "\u2014"}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDateTime(payment.paid_at || payment.created_at)}</td>
                         <td className="px-4 py-3 text-gray-600">
@@ -1536,10 +1539,11 @@ function DashboardContent() {
                             <button
                               type="button"
                               onClick={() => setSelectedUser(u)}
-                              className="text-left font-medium text-primary hover:underline"
+                              className="cursor-pointer text-left font-medium text-primary hover:underline"
                             >
                               {u.name || "\u2014"}
                             </button>
+                            <VisitorTags visitor={u.visitor} />
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(u)}`}>
@@ -1665,7 +1669,7 @@ function DashboardContent() {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600">
-                          {row.isAnonymous ? "Anonymous" : row.userName || "\u2014"}
+                          <AdminUserCell row={row} />
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                           {fmtDateTime(row.createdAt)}
@@ -1717,7 +1721,7 @@ function DashboardContent() {
                           {fmtDateTime(row.created_at)}
                         </td>
                         <td className="px-4 py-3 text-gray-900 font-medium break-all">
-                          {row.user_id || "Anonymous"}
+                          <AdminUserCell row={row} name={row.user_id || undefined} />
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {fmtBool(row.included_cadastral)}
@@ -1818,7 +1822,7 @@ function DashboardContent() {
                           {fmtPrice(row.listing_price, row.listing_currency)}
                         </td>
                         <td className="px-4 py-3 text-gray-600 break-all">
-                          {row.user_id || "Anonymous"}
+                          <AdminUserCell row={row} name={row.user_id || undefined} />
                         </td>
                       </tr>
                     ))}
@@ -1970,7 +1974,7 @@ function DashboardContent() {
                                     {group.failure > group.mainFailure && ` · ${fmtNum(group.failure - group.mainFailure)} other errors`}
                                   </p>
                                 </td>
-                                <td className="break-all px-4 py-3 text-gray-600">{group.user_name || "Anonymous"}</td>
+                                <td className="break-all px-4 py-3 text-gray-600"><AdminUserCell row={group} /></td>
                               </tr>
                               {expanded && (
                                 <tr>
@@ -2055,7 +2059,7 @@ function DashboardContent() {
                           {fmtBool(row.include_rent_tax)}
                         </td>
                         <td className="px-4 py-3 text-gray-600 break-all">
-                          {row.user_id || "Anonymous"}
+                          <AdminUserCell row={row} name={row.user_id || undefined} />
                         </td>
                       </tr>
                     ))}
@@ -2093,7 +2097,7 @@ function DashboardContent() {
                         <td className="px-4 py-3 text-gray-900 font-medium min-w-48">
                           <div>{alert.label || "\u2014"}</div>
                           <div className="mt-0.5 text-xs font-normal text-gray-400">
-                            {alert.user_id || "\u2014"}
+                            <AdminUserCell row={alert} name={alert.user_id || "\u2014"} />
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">

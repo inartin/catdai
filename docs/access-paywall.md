@@ -43,7 +43,7 @@ Sale/buy estimate results return a preview for anonymous users:
 - blurred values invite users to unlock the evaluation, without promising access just for logging in
 
 Locked preview sections include fast/target prices, price per m2, range numbers, market stats, district comparison values, seller breakdown, and listing details.
-The sale/buy preview still shows the sector/city trend card title and period, but uses fake blurred `9.999`-style trend data and the shared auth tooltip instead of exposing the real trend payload.
+The sale/buy evaluation preview shows real, unblurred sector/city trend data when available, including its values, chart, and interactive points, regardless of login or remaining credits. Other detailed-value sections remain locked.
 
 ## Full Payload
 Authenticated users receive the full sale/buy estimate response while they have a retained free credit or a paid credit remaining. Once both are exhausted, `/api/estimate` returns the locked detailed-value preview; anonymous previews additionally remove the headline estimate. Users with previously granted but exhausted shared paid credits receive `access_limit.reason = paid_evaluation_limit_reached`; other users receive `free_monthly_limit_reached`.

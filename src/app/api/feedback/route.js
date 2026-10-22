@@ -1,3 +1,4 @@
+import { getRequestVisitor } from "@/lib/visitor";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { resolveAccessTier } from "@/lib/access-tier";
@@ -153,6 +154,7 @@ export async function POST(request) {
   }
 
   const insertPayload = {
+    visitor: getRequestVisitor(request),
     user_id: access.user_id || null,
     message,
     image_name: image?.name || null,

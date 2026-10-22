@@ -1,5 +1,7 @@
 "use client";
 
+import { getDeviceId } from "@/lib/visitor-browser";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@/context/LanguageContext";
@@ -101,6 +103,7 @@ export default function LinkAnalyzer({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "x-catdai-device-id": getDeviceId() || "",
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
         body: JSON.stringify({ url: trimmed }),

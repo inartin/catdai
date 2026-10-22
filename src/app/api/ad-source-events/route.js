@@ -1,4 +1,4 @@
-import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -79,6 +79,7 @@ async function handlePost(request) {
 
   const row = {
     source,
+    visitor: getStatisticsVisitor(),
     event_name: eventName,
     user_id: null,
     device_id: cleanText(body.device_id, 80),

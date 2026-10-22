@@ -9,7 +9,7 @@ import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 60 * 1000;
-const CACHE_VERSION = 14;
+const CACHE_VERSION = 15;
 const PACKAGE_PRODUCT_KEYS = new Set(["standard_pack", "pro_pack", "extra_pack"]);
 let cache = { data: null, ts: 0 };
 
@@ -68,7 +68,7 @@ async function fetchActivityRows() {
   while (true) {
     const { data, error } = await supabaseAdmin
       .from("user_activity")
-      .select("user_id, last_seen_at")
+      .select("user_id, last_seen_at, visitor")
       .not("user_id", "is", null)
       .range(from, from + PAGE - 1);
 
@@ -354,6 +354,7 @@ export async function GET(request) {
         return {
           id: user.id,
           name: userDisplayName(user),
+          visitor: activityRows.find((row) => row.user_id === user.id)?.visitor || null,
           email: user.email || null,
           isAdmin: user.app_metadata?.catdai_is_admin === true,
           authProvider: userAuthProvider(user),

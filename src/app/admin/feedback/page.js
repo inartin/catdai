@@ -1,5 +1,7 @@
 "use client";
 
+import AdminUserCell from "@/components/admin/AdminUserCell";
+
 import { useCallback, useEffect, useState } from "react";
 
 function fmtDateTime(value) {
@@ -111,7 +113,7 @@ export default function AdminFeedbackPage() {
                   <div className="min-w-0">
                     <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                       <span>{fmtDateTime(row.created_at)}</span>
-                      {row.user_id && <span className="break-all">{row.user_id}</span>}
+                      <AdminUserCell row={row} name={row.user_id || undefined} />
                       {row.contact_email && <span className="break-all">{row.contact_email}</span>}
                       {row.contact_phone && <span className="break-all">{row.contact_phone}</span>}
                       <span className="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600">

@@ -1,4 +1,4 @@
-import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { rateLimit } from "@/lib/rate-limit";
@@ -49,6 +49,7 @@ async function handlePost(request) {
 
   const row = {
     user_id: access.user_id,
+    visitor: getStatisticsVisitor(),
     device_id: cleanText(body.device_id, 80),
     session_id: cleanText(body.session_id, 80),
     estimate_log_id: cleanText(body.estimate_log_id, 80),

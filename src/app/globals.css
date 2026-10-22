@@ -123,6 +123,26 @@ body {
   color: var(--admin-accent);
 }
 
+.admin-dark .admin-visitor-tags .bg-slate-100 {
+  background: #334155;
+  color: #cbd5e1;
+}
+
+.admin-dark .admin-visitor-tags .bg-blue-50 {
+  background: #1e3a5f;
+  color: #93c5fd;
+}
+
+.admin-dark .admin-visitor-tags .bg-emerald-50 {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+.admin-dark .admin-visitor-tags .bg-violet-50 {
+  background: #3b2561;
+  color: #c4b5fd;
+}
+
 .admin-dark :is(.text-amber-800, .text-yellow-700) {
   color: var(--admin-warning);
 }

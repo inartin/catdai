@@ -1,5 +1,7 @@
 "use client";
 
+import { getDeviceId } from "@/lib/visitor-browser";
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
@@ -180,7 +182,7 @@ function pingUserActivity(accessToken) {
 
   fetch("/api/activity/ping", {
     method: "POST",
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: { Authorization: `Bearer ${accessToken}`, "x-catdai-device-id": getDeviceId() || "" },
     keepalive: true,
   }).catch(() => {
     // Activity ping is best-effort and should never block UI/auth flows.

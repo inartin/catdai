@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { captureAdSource, getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
+import { captureAdSource, getDeviceId, getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
 
 function getCurrentPath() {
   return window.location.pathname + window.location.search;
@@ -32,6 +32,7 @@ export default function AdSourceTracker() {
     if (window.location.pathname.startsWith("/admin")) return;
     if (process.env.NODE_ENV === "development" && /^\/(?:ro\/|ru\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
 
+    getDeviceId();
     const currentPath = getCurrentPath();
     const params = new URLSearchParams(window.location.search);
     const landingSource = window.location.pathname === "/" ? getLandingAdSource(params) : null;

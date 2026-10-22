@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 const PAGE = 1000;
 const LIST_LIMIT = 200;
 const CACHE_TTL_MS = 60 * 1000;
-const ESTIMATE_COLUMNS = "id, user_id, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at";
+const ESTIMATE_COLUMNS = "id, user_id, device_id, visitor, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at";
 const ESTIMATE_COLUMNS_WITH_TYPE = `${ESTIMATE_COLUMNS}, estimate_type`;
 const PERIODS = {
   day: 24 * 60 * 60 * 1000,
@@ -238,6 +238,8 @@ export async function GET(request) {
         userId: row.user_id || null,
         userName: row.user_id ? usersById.get(row.user_id) || row.user_id : null,
         isAnonymous: !row.user_id,
+        device_id: row.device_id || null,
+        visitor: row.visitor || null,
         city: row.city,
         district: row.district,
         roomsCount: row.rooms_count,

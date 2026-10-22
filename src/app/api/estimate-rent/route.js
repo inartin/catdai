@@ -1,4 +1,4 @@
-import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
@@ -73,6 +73,7 @@ function trackRentEstimate({
   logEstimate({
     id: body.log_id || undefined,
     estimate_type: "rent",
+    visitor: getStatisticsVisitor(),
     user_id: access.user_id || null,
     device_id: body.device_id,
     session_id: body.session_id || null,

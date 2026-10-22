@@ -1,5 +1,7 @@
 "use client";
 
+import AdminUserCell from "@/components/admin/AdminUserCell";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const JOURNEY_PAGE_SIZE = 50;
@@ -361,7 +363,7 @@ export default function AdTrackingPage() {
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-semibold text-gray-900">{fmtUser(journey)}</h3>
+                            <div className="font-semibold text-gray-900"><AdminUserCell row={journey} name={journey.userId ? fmtUser(journey) : undefined} /></div>
                             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${journey.userId
                               ? "bg-green-100 text-green-700"
                               : "bg-gray-100 text-gray-500"

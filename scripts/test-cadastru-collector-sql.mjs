@@ -13,6 +13,20 @@ const bundle={cadastral_number:number,building:{classifier:'Bloc cu apartamente'
  apartments:[{cadastral_number:unit,apartment:{address:'Chișinău, bd Decebal 63, ap 59',area_m2:41,floor:'4'},partial:true}]};
 const ingest=async(b,time='2026-10-13T12:00:00Z')=>(await db.query('select ingest_cadastru_collection($1,$2,$3,$4) as result',[b,input,'a'.repeat(64),time])).rows[0].result;
 assert.equal((await ingest(bundle)).usable,true);
+// Upgrade already-collected snapshots without changing their source timestamps.
+await db.exec("insert into cadastru_address_aliases(address_key,raw_payload,expires_at) values ('legacy','{}','2026-11-12T12:00:00Z');");
+await db.exec("insert into cadastru_nearby(origin_key,lookup_input,raw_payload,fetched_at,expires_at) values ('legacy','{}','{}','2026-10-13T12:00:00Z','2026-11-12T12:00:00Z');");
+await db.exec(await fs.readFile('supabase/migrations/20261023170225_cadastru_snapshot_freshness.sql','utf8'));
+let upgraded=(await db.query('select * from cadastru_records')).rows[0];
+assert.equal(upgraded.last_official_fetch_at.toISOString(),'2026-10-13T12:00:00.000Z');
+assert.equal(upgraded.next_refresh_after-upgraded.last_official_fetch_at,90*86400_000);
+const alias=(await db.query('select * from cadastru_address_aliases')).rows[0];
+assert.equal(alias.fetched_at.toISOString(),'2026-10-13T12:00:00.000Z');
+assert.equal(alias.expires_at-alias.fetched_at,90*86400_000);
+const nearby=(await db.query('select * from cadastru_nearby')).rows[0];
+assert.equal(nearby.expires_at-nearby.fetched_at,90*86400_000);
+const shared=(await db.query('select * from cadastru_buildings')).rows[0];
+assert.equal(shared.expires_at-shared.fetched_at,180*86400_000);
 let row=(await db.query('select * from cadastru_records')).rows[0];
 assert.equal(row.shared_building_number,number);
 assert.equal(row.apartment_number,'59');
@@ -41,5 +55,12 @@ for(const role of ['anon','authenticated']) {
  const grants=(await db.query(`select has_function_privilege('${role}','public.ingest_cadastru_collection(jsonb,jsonb,text,timestamptz)','execute') as allowed`)).rows[0];
  assert.equal(grants.allowed,false);
 }
+// Future collector writes and building registry merges follow independent deadlines.
+await ingest({...bundle,building:{...bundle.building,registry:{ownership_type:'Private'}}},'2026-10-15T12:00:00Z');
+const current=(await db.query('select * from cadastru_buildings')).rows[0];
+assert.equal(Date.parse(current.field_expires_at.registry)-Date.parse(current.field_fetched_at.registry),30*86400_000);
+assert.equal(Date.parse(current.field_expires_at.total_floors)-Date.parse(current.field_fetched_at.total_floors),180*86400_000);
+upgraded=(await db.query('select * from cadastru_records')).rows[0];
+assert.equal(upgraded.next_refresh_after-upgraded.last_official_fetch_at,90*86400_000);
 console.log('Collector SQL: atomic ingestion, preserved partial fields/age, idempotence, seeds and permissions passed.');
 await db.close();

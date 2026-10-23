@@ -1,3 +1,5 @@
+import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
+import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 import { withStatisticsContext } from "@/lib/statistics-context";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { NextResponse } from "next/server";
@@ -55,29 +57,34 @@ async function handlePost(request) {
   // Lazily move valid legacy snapshots to the shared building store without renewing them.
   if (!stored && validNearbyResult(entry?.payload.nearby) && Number.isFinite(Date.parse(entry.expiresAt))) {
     stored = await storeNearby(input, entry.payload.nearby, {
-      fetchedAt: new Date(Date.parse(entry.expiresAt) - CADASTRU_TTL_SECONDS * 1000).toISOString(),
+      fetchedAt: entry.fetchedAt || new Date(Date.parse(entry.expiresAt) - CADASTRU_TTL_SECONDS * 1000).toISOString(),
       expiresAt: entry.expiresAt,
     });
   }
-  if (stored && isFreshCadastru(stored.expiresAt)) {
+  const refresh = async () => {
+    try {
+      const nearby = await fetchExternalNearbyData(input, stored ? { trackUsage: false } : getCadastruLookupTracking(body));
+      if (!validNearbyResult(nearby)) throw new Error("Invalid nearby response");
+      if ((nearby.incomplete || nearby.cache?.stale) && stored) return NextResponse.json({ nearby: nearbyFromStorage(stored) });
+      const saved = await storeNearby(input, nearby);
+      return NextResponse.json({ nearby: saved ? nearbyFromStorage(saved) : nearby });
+    } catch (error) {
+      console.error("[cadastru/nearby] lookup failed:", {
+        code: error?.code || "unknown",
+        status: error?.status || null,
+        message: error?.message || String(error),
+      });
+      if (stored) return NextResponse.json({ nearby: nearbyFromStorage(stored) });
+      return NextResponse.json({ error: "nearby_unavailable" }, { status: 503 });
+    }
+  };
+  if (stored) {
+    if (!isFreshCadastru(stored.expiresAt)) {
+      scheduleCadastruRefresh(`nearby:${cadastruLocationOriginKey(input)}`, refresh);
+    }
     return NextResponse.json({ nearby: nearbyFromStorage(stored) });
   }
-
-  try {
-    const nearby = await fetchExternalNearbyData(input, getCadastruLookupTracking(body));
-    if (!validNearbyResult(nearby)) throw new Error("Invalid nearby response");
-    if (nearby.incomplete && stored) return NextResponse.json({ nearby: nearbyFromStorage(stored) });
-    const saved = await storeNearby(input, nearby);
-    return NextResponse.json({ nearby: saved ? nearbyFromStorage(saved) : nearby });
-  } catch (error) {
-    console.error("[cadastru/nearby] lookup failed:", {
-      code: error?.code || "unknown",
-      status: error?.status || null,
-      message: error?.message || String(error),
-    });
-    if (stored) return NextResponse.json({ nearby: nearbyFromStorage(stored) });
-    return NextResponse.json({ error: "nearby_unavailable" }, { status: 503 });
-  }
+  return refresh();
 }
 
 export const POST = withStatisticsContext(handlePost);

@@ -5,6 +5,7 @@ create table if not exists public.cadastru_address_aliases (
   cadastral_number text,
   raw_payload jsonb not null,
   lookup_source text check (lookup_source in ('api', 'local')),
+  fetched_at timestamptz,
   expires_at timestamptz not null,
   check (jsonb_typeof(raw_payload) = 'object')
 );
@@ -17,7 +18,7 @@ alter table public.cadastru_address_aliases enable row level security;
 
 alter table public.cadastru_records alter column full_address drop not null;
 
--- Existing data expires 30 days after its actual fetch/save, never after a read.
+-- Existing data expires 90 days after its actual fetch/save, never after a read.
 update public.cadastru_records
-set next_refresh_after = coalesce(last_official_fetch_at, data_updated_at, saved_at) + interval '30 days'
+set next_refresh_after = coalesce(last_official_fetch_at, data_updated_at, saved_at) + interval '90 days'
 where next_refresh_after is null;

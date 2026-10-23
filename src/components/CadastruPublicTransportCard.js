@@ -1,4 +1,5 @@
 "use client";
+import CadastruFreshnessNote from "@/components/CadastruFreshnessNote";
 
 import Image from "next/image";
 import { useTranslation } from "@/context/LanguageContext";
@@ -63,7 +64,7 @@ export default function CadastruPublicTransportCard({ transport, loading, unavai
       ) : null}
       {transport ? (
         <div className="mt-5 space-y-1 text-xs text-gray-500">
-          {transport.cache?.stale ? <p>{t("cadastru.transportStale")}</p> : null}
+          <CadastruFreshnessNote freshness={{ property: transport.cache }} />
           {transport.incomplete ? <p>{t("cadastru.transportIncomplete")}</p> : null}
           <p>{transport.attribution || "© OpenStreetMap contributors"}</p>
         </div>

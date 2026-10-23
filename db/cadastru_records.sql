@@ -100,6 +100,7 @@ create table if not exists public.cadastru_address_aliases (
   cadastral_number text,
   raw_payload jsonb not null,
   lookup_source text check (lookup_source in ('api', 'local')),
+  fetched_at timestamptz,
   expires_at timestamptz not null,
   check (jsonb_typeof(raw_payload) = 'object')
 );

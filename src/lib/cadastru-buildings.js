@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
-import { cadastruExpiresAt, isFreshCadastru, readCadastruCache, writeCadastruCache, invalidateCadastruCache } from "@/lib/cadastru-cache";
+import { CADASTRU_BUILDING_TTL_SECONDS, cadastruExpiresAt, isFreshCadastru, readCadastruCache, writeCadastruCache, invalidateCadastruCache } from "@/lib/cadastru-cache";
 import { nearbyAddressFromCadastru } from "@/lib/cadastru-nearby";
 import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 
@@ -21,7 +21,7 @@ function entryFromRow(row) {
 
 export async function getSharedBuilding(number) {
   if (!/^\d{7}\.\d{3}\.\d{2}$/.test(number || "")) return null;
-  const cached = await readCadastruCache("building", number);
+  const cached = await readCadastruCache("building", number, { allowExpired: true });
   if (cached) return cached;
   if (!shouldPersistRuntimeData()) return null;
   const { data, error } = await supabaseAdmin.from("cadastru_buildings").select("*")
@@ -53,7 +53,7 @@ export async function storeSharedBuilding(number, building, options = {}) {
   // The database merges fields atomically, preserving older fields and their actual dates.
   const { data: rows, error } = await supabaseAdmin.rpc("merge_cadastru_building", {
     p_number: number, p_data: data, p_fetched_at: fetchedAt,
-    p_expires_at: options.expiresAt || cadastruExpiresAt(fetchedAt), p_lookup_input: input,
+    p_expires_at: options.expiresAt || cadastruExpiresAt(fetchedAt, CADASTRU_BUILDING_TTL_SECONDS), p_lookup_input: input,
   });
   if (error || !rows?.[0]) {
     console.error("[cadastru-buildings] save failed:", error?.message || "missing saved row");

@@ -61,6 +61,8 @@ const apartment = { address: `${building.address}, ap 59`, area_m2: 41.9, floor:
 await records.persistCadastruRecord({ cadastral_number: number, building, apartment }, { officialFetch: true });
 let row = (await db.query("select * from cadastru_records where cadastral_number=$1", [number])).rows[0];
 assert.equal(row.shared_building_number, parent);
+const initialBuilding = (await db.query("select * from cadastru_buildings where cadastral_number=$1", [parent])).rows[0];
+assert.equal(initialBuilding.expires_at - initialBuilding.fetched_at, 180 * 86400_000, "interactive building writes use 180 days independently of the property clock");
 assert.deepEqual(row.building_data, {});
 assert.equal(row.raw_payload.building, undefined);
 assert.equal((await records.getCadastruRecordByNumber(number)).payload.building.construction_year, "1965");
@@ -119,10 +121,12 @@ await buildings.storeSharedBuilding(parent, { registry: { ...property, area_m2: 
 assert.equal((await records.getCadastruRecordByAddress(building.address)).payload.buildings[0].area_m2, "1100", "aggregate aliases follow the canonical building");
 
 await db.query("delete from cadastru_building_addresses where building_number=$1", [secondParent]);
+const refreshCallbacks = [];
 let allowed = true, credits = 0, upstream = 0;
 const offline = async () => { upstream++; throw Object.assign(new Error("offline"), { status: 503, code: "service_unavailable", fallbackEligible: true }); };
 const routeMocks = { ...mocks,
-  "next/server": { NextResponse: { json: (data, init) => Response.json(data, init) } },
+  "@/lib/cache": { ...mocks["@/lib/cache"], getSharedCacheClient: async () => null },
+  "next/server": { after: callback => refreshCallbacks.push(callback), NextResponse: { json: (data, init) => Response.json(data, init) } },
   "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true, remaining: 14 }) }) },
   "@/lib/access-tier": { resolveAccessTier: async () => ({ tier: "free", user_id: allowed ? "test-user" : null }) },
   "@/lib/paid-feature-usage": { checkFeatureAccess: async () => ({ allowed, reason: "no_credit" }),
@@ -158,7 +162,10 @@ const stale = await (await numberRoute.POST(request({ cadastral_number: number }
 assert.equal(stale.apartment.area_m2, 41.9);
 assert.equal(stale.data_freshness.apartment.stale, true);
 assert.equal(credits, 1);
-assert(upstream >= 5);
+assert.equal(refreshCallbacks.length, 1, "expired data refreshes after returning the saved result");
+const callsBeforeRefresh = upstream;
+await refreshCallbacks.shift()();
+assert.equal(upstream, callsBeforeRefresh + 1);
 const grants = await db.query("select has_table_privilege('anon','cadastru_buildings','SELECT') as exposed, has_function_privilege('anon','merge_cadastru_building(text,jsonb,timestamptz,timestamptz,jsonb)','EXECUTE') as callable");
 assert.equal(grants.rows[0].exposed, false); assert.equal(grants.rows[0].callable, false);
 await db.close();

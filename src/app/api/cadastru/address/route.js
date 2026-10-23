@@ -12,6 +12,9 @@ import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByAddress, persistCadastruAddressResult } from "@/lib/cadastru-records";
+import { scheduleCadastruNumberRefresh } from "@/lib/cadastru-record-refresh";
+import { cadastruNeedsRefresh, withCadastruFreshness } from "@/lib/cadastru-cache";
+import { scheduleCadastruRefresh, isUsableCadastruRefresh } from "@/lib/cadastru-refresh";
 import { resolveAccessTier } from "@/lib/access-tier";
 import {
   checkFeatureAccess,
@@ -329,11 +332,11 @@ async function handlePost(request) {
     return response;
   };
 
-  const stored = skipCache ? null : await getCadastruRecordByAddress(lookupAddress, { structuredAddress, requireUnitDetails: true });
+  const stored = skipCache ? null : await getCadastruRecordByAddress(lookupAddress, { structuredAddress, requireUnitDetails: true, allowExpired: true });
   const shouldRefreshStoredDistrict = Boolean(stored && city === "Chișinău" && apartmentNumber &&
     !stored.payload?.district && !stored.payload?.form_fields?.district && !stored.payload?.district_lookup_checked);
   const respondWithStored = async () => {
-    const payload = withResolution(stored.payload);
+    const payload = withResolution(withCadastruFreshness(stored));
     const payloadResultType = classifyAddressPayload(payload);
     const evaluationToken = await recordAddressSearch(payload, "cache",
       payloadResultType === "land_only" ? payloadResultType : stored.resultType || payloadResultType);
@@ -344,7 +347,23 @@ async function handlePost(request) {
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   };
-  if (stored && !shouldRefreshStoredDistrict) return respondWithStored();
+  if (stored) {
+    if (shouldRefreshStoredDistrict || cadastruNeedsRefresh(stored)) {
+      if (stored.payload.cadastral_number) scheduleCadastruNumberRefresh(stored);
+      else scheduleCadastruRefresh(`address:${lookupAddress}`, async () => {
+        const payload = await fetchExternalCadastruAddressData({ city, road_type: body.road_type,
+          street: resolution.street, house_number: houseNumber,
+          ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}),
+        }, { trackUsage: false });
+        if (!isUsableCadastruRefresh(stored.payload, payload)) return;
+        await persistCadastruAddressResult({ ...payload, district_lookup_checked: true }, {
+          requestAddress: rawAddress, resolvedAddress: lookupAddress, structuredAddress,
+          lookupSource: "api", officialFetch: true,
+        });
+      });
+    }
+    return respondWithStored();
+  }
 
   let externalUnavailable = false;
   try {

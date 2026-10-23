@@ -24,14 +24,13 @@ export function createCadastruLocationStore({ name, table, isValid, ttlSeconds =
   }
 
   async function cacheEntry(originKey, entry) {
-    const ttl = Math.min(ttlSeconds, Math.floor((Date.parse(entry.expiresAt) - Date.now()) / 1000));
-    if (ttl > 0) await setSharedCache(cacheKey(originKey), entry, ttl);
+    await setSharedCache(cacheKey(originKey), { ...entry, cachePolicy: 2 }, ttlSeconds);
   }
 
   async function get(input) {
     const originKey = cadastruLocationOriginKey(input);
     const cached = await getSharedCache(cacheKey(originKey));
-    if (validEntry(cached?.value) && isFreshCadastru(cached.value.expiresAt)) return cached.value;
+    if (cached?.value?.cachePolicy === 2 && validEntry(cached.value)) return cached.value;
     if (!shouldPersistRuntimeData()) return null;
     try {
       const { data, error } = await supabaseAdmin.from(table)
@@ -50,7 +49,7 @@ export function createCadastruLocationStore({ name, table, isValid, ttlSeconds =
   }
 
   async function store(input, payload, timestamps = {}) {
-    if (!isValid(payload) || payload.incomplete) return null;
+    if (!isValid(payload) || payload.incomplete || payload.cache?.stale) return null;
     const originKey = cadastruLocationOriginKey(input);
     const fetchedAt = timestamps.fetchedAt || new Date().toISOString();
     const entry = { payload, fetchedAt, expiresAt: timestamps.expiresAt || (ttlSeconds === CADASTRU_TTL_SECONDS

@@ -7,6 +7,8 @@ import crypto from "node:crypto";
 import path from "node:path";
 import * as validation from "../src/lib/validation.js";
 
+const deferredRefreshes = [];
+async function flushRefreshes() { while (deferredRefreshes.length) await deferredRefreshes.shift()(); }
 const cache = new Map();
 const tables = { cadastru_records: [], cadastru_address_aliases: [], external_api_usage_events: [], cadastru_public_transport: [], cadastru_nearby: [], cadastru_buildings: [], cadastru_building_addresses: [], cadastru_municipal_reports: [] };
 let persistEnabled = true;
@@ -46,21 +48,25 @@ const supabaseAdmin = {
   },
 };
 const baseMocks = {
-  "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
+  "@/lib/statistics-context": { getStatisticsVisitor: () => null, getStatisticsUserId: () => null, shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
   "node:crypto": { default: crypto },
   "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => persistEnabled },
   "@/lib/supabase-admin": { supabaseAdmin },
   "@/lib/validation": { ...validation, matchDistrict: () => null },
   "@/lib/cache": {
+    getSharedCacheClient: async () => null,
     getSharedCache: async (key) => cache.has(key) ? { value: clone(cache.get(key)) } : null,
     setSharedCache: async (key, value, ttl) => {
-      assert(ttl > 0 && ttl <= 30 * 86400); cache.set(key, clone(value)); return true;
+      assert(ttl > 0 && ttl <= 180 * 86400); cache.set(key, clone(value)); return true;
     },
   },
 };
 async function load(entry, extraMocks = {}, globals = {}) {
   const context = vm.createContext({ console, Date, URL, URLSearchParams, Request, Response, Headers, AbortSignal, Buffer, setTimeout, clearTimeout, process, ...globals });
   const modules = new Map(), mocks = { ...baseMocks, ...extraMocks };
+  if (mocks["@/lib/cadastru-records"]) mocks["@/lib/cadastru-records"] = { persistCadastruRecord: async () => { throw new Error("Unexpected number persistence"); }, ...mocks["@/lib/cadastru-records"] };
+  if (mocks["@/lib/cadastru-external-api"]) mocks["@/lib/cadastru-external-api"] = { fetchExternalCadastralData: async () => { throw new Error("Unexpected number refresh"); }, ...mocks["@/lib/cadastru-external-api"] };
+  if (mocks["next/server"]) mocks["next/server"] = { after: callback => deferredRefreshes.push(callback), ...mocks["next/server"] };
   async function moduleFor(id) {
     if (modules.has(id)) return modules.get(id);
     let loadedModule;
@@ -230,7 +236,7 @@ const routeMocks = {
       if (workerError) throw workerError;
       return { ...expected, ...(workerDistrict ? { district: workerDistrict } : {}), matched_address: address };
     },
-    fetchExternalCadastralData: async () => { numberFetches++; return expected; },
+    fetchExternalCadastralData: async () => { numberFetches++; if (workerError) throw workerError; return { ...expected, ...(workerDistrict ? { district: workerDistrict } : {}) }; },
   },
   "@/lib/cadastru-address-search": { getVerifiedAddressAlternative: () => null,
     findCadastralByAddress: async () => { throw Error("Unexpected local fallback"); },
@@ -246,8 +252,10 @@ await storage.persistCadastruAddressResult({ ...expected, method: "address", req
 });
 const preview = await (await addressRoute.POST(request(addressBody))).json();
 assert.equal(preview.full_access, false);
-assert.equal(preview.district, "bOTANICA", "address previews retain the worker district for valuation prefill");
-assert.equal(addressFetches, 1, "legacy cached apartment results without a district refresh once");
+assert.equal(preview.district, null, "saved previews return before the district refresh");
+assert.equal(numberFetches, 0);
+await flushRefreshes();
+assert.equal(numberFetches, 1, "legacy district refresh runs once after the response");
 assert.equal((await storage.getCadastruRecordByNumber(number)).payload.district_lookup_checked, true);
 assert.deepEqual(preview.map_location, expected.map_location, "address previews retain map coordinates");
 assert.notEqual(preview.apartment.area_m2, 64);
@@ -256,7 +264,8 @@ assert.equal(tables.cadastru_records[0].raw_payload.access_limit, undefined);
 const numberPreview = await (await numberRoute.POST(request({ cadastral_number: number }))).json();
 assert.equal(numberPreview.full_access, false);
 assert.deepEqual(numberPreview.map_location, expected.map_location, "number previews retain stored map coordinates");
-assert.equal(numberFetches, 0, "address-saved details satisfy number lookup");
+assert.equal(numberFetches, 1, "address-saved details satisfy number lookup");
+assert.equal(numberPreview.district, "bOTANICA", "the next result receives the refreshed district");
 assert.equal(enrichFetches, 0, "fresh snapshots must not call enrichment again");
 hasCredit = true;
 const full = await (await numberRoute.POST(request({ cadastral_number: number }))).json();
@@ -274,11 +283,11 @@ await numberRoute.POST(request({ cadastral_number: number, lookup_id: searchId }
 assert.equal(searchLogs.at(-1).lookupId, searchId, "number route forwards search identity");
 assert.equal(creditCalls.at(-1).idempotencyKey, addressCreditKey, "address-to-number credit key remains shared");
 await addressRoute.POST(request({ ...addressBody, street: "Stefan cel Mare" }));
-assert.equal(addressFetches, 1, "diacritic variants share a snapshot");
+assert.equal(addressFetches, 0, "diacritic variants share a snapshot");
 await addressRoute.POST(request({ ...addressBody, skip_cache: true }));
-assert.equal(addressFetches, 2, "address skipcache bypasses Redis and DB");
+assert.equal(addressFetches, 1, "address skipcache bypasses Redis and DB");
 await numberRoute.POST(request({ cadastral_number: number, skipcache: true }));
-assert.equal(numberFetches, 1, "number skipcache bypasses Redis and DB");
+assert.equal(numberFetches, 2, "number skipcache bypasses Redis and DB");
 assert.equal(enrichFetches, 0, "AWS detail enrichment is disabled even on fresh worker results");
 for (const code of ["external_cadastru_timeout", "external_cadastru_unreachable", "service_unavailable", "external_cadastru_not_configured"]) {
   let localFetches = 0;
@@ -295,9 +304,65 @@ for (const code of ["external_cadastru_timeout", "external_cadastru_unreachable"
 }
 hasCredit = false;
 await numberRoute.POST(request({ cadastral_number: number, skip_cache: true }));
-assert.equal(numberFetches, 2);
+assert.equal(numberFetches, 3);
 assert.equal(tables.cadastru_records[0].raw_payload.apartment.area_m2, 64);
 console.log("Route regressions passed: anonymous persistence, masked previews, cross-query hits, no live enrichment on hits, skipcache.");
+// Saved non-block properties and full address aggregates also return before refresh.
+{
+hasCredit = true;
+const oldFetch = new Date(Date.now() - 91 * 86400_000).toISOString();
+const expiredAt = new Date(Date.now() - 86400_000).toISOString();
+const parcel = { cadastral_number: "0100201.987", lands: [{ cadastral_number: "0100201.987", address: aggregateAddress, area_m2: 100 }] };
+await storage.persistCadastruRecord(parcel, { officialFetch: true });
+const parcelRow = tables.cadastru_records.find(row => row.cadastral_number === parcel.cadastral_number);
+parcelRow.last_official_fetch_at = oldFetch;
+parcelRow.next_refresh_after = expiredAt;
+cache.clear();
+let parcelCalls = 0;
+const parcelRoute = await load("src/app/api/cadastral/route.js", { ...routeMocks,
+  "@/lib/cadastru-external-api": { fetchExternalCadastralData: async (_number, options) => {
+    parcelCalls++;
+    assert.equal(options.trackUsage, false);
+    return { ...parcel, lands: [{ ...parcel.lands[0], area_m2: 101 }] };
+  } },
+});
+const parcelResponse = await (await parcelRoute.POST(request({ cadastral_number: parcel.cadastral_number }))).json();
+assert.equal(parcelResponse.lands[0].area_m2, 100);
+assert.equal(parcelResponse.data_freshness.property.stale, true);
+assert.equal(parcelResponse.data_freshness.property.fetched_at, oldFetch);
+assert.equal(parcelCalls, 0, "expired land data returns before any worker request");
+const parcelCredits = creditCalls.length, parcelEvents = searchLogs.length, parcelLookups = parcelRow.lookup_count;
+await flushRefreshes();
+assert.equal(parcelCalls, 1);
+assert.equal((await storage.getCadastruRecordByNumber(parcel.cadastral_number)).payload.lands[0].area_m2, 101);
+assert.equal(creditCalls.length, parcelCredits, "background refresh consumes no extra credit");
+assert.equal(searchLogs.length, parcelEvents, "background refresh is not a second user search");
+assert.equal(parcelRow.lookup_count, parcelLookups);
+await storage.persistCadastruAddressResult(aggregate, { requestAddress: aggregateAddress, officialFetch: true });
+const aggregateAlias = tables.cadastru_address_aliases.find(row => row.address_key === storage.normalizeCadastruAddressForDb(aggregateAddress));
+aggregateAlias.fetched_at = oldFetch;
+aggregateAlias.expires_at = expiredAt;
+cache.clear();
+let aggregateCalls = 0;
+const aggregateRoute = await load("src/app/api/cadastru/address/route.js", { ...routeMocks,
+  "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: async (_input, options) => {
+    aggregateCalls++;
+    assert.equal(options.trackUsage, false);
+    return aggregate;
+  } },
+});
+const aggregateBody = { city: "Chișinău", road_type: "bulevard", street: "Moscova", house_number: "9/5" };
+const aggregateResponse = await (await aggregateRoute.POST(request(aggregateBody))).json();
+assert.equal(aggregateResponse.data_freshness.property.stale, true);
+assert.equal(aggregateCalls, 0, "expired address aggregates return before the worker request");
+assert.equal(aggregateResponse.buildings.length, 2);
+await flushRefreshes();
+assert.equal(aggregateCalls, 1);
+assert(caching.isFreshCadastru(aggregateAlias.expires_at));
+hasCredit = false;
+console.log("Main refresh regressions passed: expired land and aggregates return immediately; refresh preserves access rules, dates and lookup counters.");
+}
+
 cache.clear(); tables.cadastru_records.length = 0; tables.cadastru_address_aliases.length = 0;
 await storage.persistCadastruAddressResult({ ...expected, method: "address", request_address: address }, {
   requestAddress: address, resolvedAddress: address, structuredAddress, lookupSource: "api", officialFetch: true,
@@ -961,7 +1026,7 @@ assert.equal(tables.external_api_usage_events.at(-1).status, "failure");
 assert.equal(tables.external_api_usage_events.at(-1).error_code, "routing_unavailable");
 let nearbyCalls = 0;
 let nearbyResult = nearbyData;
-const nearbyRoute = await load("src/app/api/cadastru/nearby/route.js", {
+const nearbyRouteMocks = {
   "next/server": { NextResponse: { json: (data, options = {}) => Response.json(data, options) } },
   "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true }) }) },
   "@/lib/cadastru-records": storage,
@@ -971,7 +1036,8 @@ const nearbyRoute = await load("src/app/api/cadastru/nearby/route.js", {
     if (nearbyResult instanceof Error) throw nearbyResult;
     return nearbyResult;
   } },
-});
+};
+let nearbyRoute = await load("src/app/api/cadastru/nearby/route.js", nearbyRouteMocks);
 const nearbyRequest = () => new Request("http://localhost/api/cadastru/nearby", {
   method: "POST", headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ cadastral_number: nearbyNumber }),
@@ -983,7 +1049,7 @@ assert.deepEqual(clone(nearbyRow.raw_payload.nearby), legacyNearbyData, "new nea
 assert.deepEqual(clone((await caching.readCadastruCache("number", nearbyNumber)).payload.nearby), legacyNearbyData);
 assert.deepEqual(tables.cadastru_nearby[0].raw_payload, nearbyData, "nearby is saved in the shared building table");
 const firstNearbyRow = clone(tables.cadastru_nearby[0]);
-assert.equal(Date.parse(firstNearbyRow.expires_at) - Date.parse(firstNearbyRow.fetched_at), 30 * 86400 * 1000);
+assert.equal(Date.parse(firstNearbyRow.expires_at) - Date.parse(firstNearbyRow.fetched_at), 90 * 86400 * 1000);
 nearbyResult = new Error("worker offline");
 assert.equal((await nearbyRoute.POST(nearbyRequest())).status, 200);
 cache.clear();
@@ -1027,11 +1093,16 @@ assert.equal(staleNearby.cache.stale, true);
 assert.deepEqual(staleNearby.categories, nearbyData.categories);
 assert.equal(staleNearby.cache.fetched_at, expiredNearby.fetched_at);
 assert.deepEqual(nearbySavedRow, expiredNearby, "outage preserves the last complete nearby snapshot");
-assert(![...cache.keys()].some((key) => key.includes(":nearby:v1:")), "stale nearby data is not cached as fresh");
+assert.equal([...cache.entries()].find(([key]) => key.includes(":nearby:v1:"))[1].expiresAt, expiredNearby.expires_at, "Redis retains the stale snapshot without renewing freshness");
+await flushRefreshes();
+nearbyRoute = await load("src/app/api/cadastru/nearby/route.js", nearbyRouteMocks);
 nearbyResult = { categories: {} };
 assert.equal((await nearbyRoute.POST(nearbyRequest())).status, 200, "malformed refresh falls back to saved nearby");
+await flushRefreshes();
+nearbyRoute = await load("src/app/api/cadastru/nearby/route.js", nearbyRouteMocks);
 nearbyResult = { ...nearbyData, incomplete: true };
 assert.equal((await (await nearbyRoute.POST(nearbyRequest())).json()).nearby.cache.stale, true);
+await flushRefreshes();
 assert.deepEqual(nearbySavedRow, expiredNearby, "incomplete refresh cannot overwrite saved nearby");
 nearbyRow.next_refresh_after = new Date(Date.now() - 86400 * 1000).toISOString();
 cache.clear();
@@ -1039,7 +1110,10 @@ nearbyResult = new Error("worker offline");
 assert.equal(await storage.getCadastruRecordByNumber(nearbyNumber), null);
 assert.equal((await nearbyRoute.POST(nearbyRequest())).status, 200, "expired property can resolve nearby fallback origin");
 nearbyRow.next_refresh_after = nearbyExpiry;
+nearbyRoute = await load("src/app/api/cadastru/nearby/route.js", nearbyRouteMocks);
 nearbyResult = { ...nearbyData, search_radius_m: 2000 };
+assert.equal((await (await nearbyRoute.POST(nearbyRequest())).json()).nearby.cache.stale, true, "the expired snapshot returns before a successful refresh");
+await flushRefreshes();
 const refreshedNearby = (await (await nearbyRoute.POST(nearbyRequest())).json()).nearby;
 assert.equal(refreshedNearby.cache.stale, false);
 assert.equal(refreshedNearby.search_radius_m, 2000);
@@ -1091,7 +1165,7 @@ assert.equal((await parcelNearbyRoute.POST(parcelRequest())).status, 200);
 assert.equal(coordinateNearbyCalls, 1);
 const parcelNearbyRow = tables.cadastru_nearby[0];
 assert.deepEqual(parcelNearbyRow.lookup_input, parcelLocation, "coordinate input is persisted with its own origin key");
-assert.equal(Date.parse(parcelNearbyRow.expires_at) - Date.parse(parcelNearbyRow.fetched_at), 30 * 86400 * 1000);
+assert.equal(Date.parse(parcelNearbyRow.expires_at) - Date.parse(parcelNearbyRow.fetched_at), 90 * 86400 * 1000);
 assert.equal((await parcelNearbyRoute.POST(parcelRequest())).status, 200);
 cache.clear();
 assert.equal((await parcelNearbyRoute.POST(parcelRequest())).status, 200);
@@ -1109,7 +1183,7 @@ assert.equal((await parcelNearbyRoute.POST(new Request("http://localhost/api/cad
 }))).status, 422, "a locality-only request without a property point remains unavailable");
 tables.cadastru_nearby.length = 0;
 cache.clear();
-console.log("Nearby regressions passed: shared building persistence, 30-day cache, legacy promotion, stale outage fallback, safe refreshes and unchanged property snapshots.");
+console.log("Nearby regressions passed: shared building persistence, 90-day freshness, legacy promotion, stale outage fallback, safe refreshes and unchanged property snapshots.");
 
 const transportParsing = await load("@/lib/cadastru-public-transport");
 assert.deepEqual(clone(transportParsing.publicTransportInputFromCadastru({
@@ -1160,7 +1234,7 @@ assert.deepEqual(clone(await signedTransport.fetchExternalPublicTransportData(tr
 let transportCalls = 0;
 let transportResult = transportData;
 const transportStorage = await load("@/lib/cadastru-public-transport-storage");
-const transportRoute = await load("src/app/api/cadastru/public-transport/route.js", {
+const transportRouteMocks = {
   "next/server": { NextResponse: { json: (data, options = {}) => Response.json(data, options) } },
   "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true }) }) },
   "@/lib/cadastru-records": storage,
@@ -1170,7 +1244,8 @@ const transportRoute = await load("src/app/api/cadastru/public-transport/route.j
     if (transportResult instanceof Error) throw transportResult;
     return transportResult;
   } },
-});
+};
+let transportRoute = await load("src/app/api/cadastru/public-transport/route.js", transportRouteMocks);
 const transportRequest = (number) => new Request("http://localhost/api/cadastru/public-transport", {
   method: "POST", headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ cadastral_number: number }),
@@ -1222,20 +1297,28 @@ assert.equal(staleTransport.cache.stale, true);
 assert.equal(staleTransport.cache.fetched_at, expiredTransport.fetched_at);
 assert.deepEqual(staleTransport.route_groups, transportData.route_groups);
 assert.deepEqual(transportRow, expiredTransport, "failed refresh preserves the complete DB snapshot and its deadline");
-assert(![...cache.keys()].some((key) => key.includes("public-transport")), "expired fallback is not cached as fresh");
+assert.equal([...cache.entries()].find(([key]) => key.includes("public-transport"))[1].expiresAt, expiredTransport.expires_at, "Redis retains the stale snapshot without renewing freshness");
+await flushRefreshes();
+transportRoute = await load("src/app/api/cadastru/public-transport/route.js", transportRouteMocks);
 transportResult = { scope: "broken" };
 assert.equal((await transportRoute.POST(transportRequest(transportNumber))).status, 200, "malformed upstream data falls back to stored data");
+await flushRefreshes();
+transportRoute = await load("src/app/api/cadastru/public-transport/route.js", transportRouteMocks);
 transportResult = { ...transportData, incomplete: true, route_groups: [] };
 assert.equal((await (await transportRoute.POST(transportRequest(transportNumber))).json()).public_transport.cache.stale, true);
+await flushRefreshes();
 assert.deepEqual(transportRow, expiredTransport, "incomplete upstream data cannot erase saved routes");
 const propertyRow = tables.cadastru_records.find((row) => row.cadastral_number === transportNumber);
 propertyRow.next_refresh_after = new Date(Date.now() - 86400 * 1000).toISOString();
 cache.clear();
-assert.equal(await storage.getCadastruRecordByNumber(transportNumber), null, "normal property routes still reject expired records");
+assert.equal(await storage.getCadastruRecordByNumber(transportNumber), null, "storage callers can still explicitly require fresh records");
 transportResult = new Error("worker offline");
 assert.equal((await transportRoute.POST(transportRequest(transportNumber))).status, 200, "expired property data can resolve the transport fallback origin");
 propertyRow.next_refresh_after = transportPropertyExpiry;
+transportRoute = await load("src/app/api/cadastru/public-transport/route.js", transportRouteMocks);
 transportResult = { ...transportData, route_groups: [{ mode: "bus", routes: [{ ref: "20" }] }] };
+assert.equal((await (await transportRoute.POST(transportRequest(transportNumber))).json()).public_transport.cache.stale, true);
+await flushRefreshes();
 const refreshedTransport = (await (await transportRoute.POST(transportRequest(transportNumber))).json()).public_transport;
 assert.equal(refreshedTransport.cache.stale, false);
 assert.deepEqual(refreshedTransport.route_groups, transportResult.route_groups);

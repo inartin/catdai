@@ -9,7 +9,8 @@ import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
 import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { resolveAccessTier } from "@/lib/access-tier";
-import { cadastruExpiresAt, writeCadastruCache, cleanCadastruPayload } from "@/lib/cadastru-cache";
+import { cadastruExpiresAt, writeCadastruCache, cleanCadastruPayload, cadastruNeedsRefresh, withCadastruFreshness } from "@/lib/cadastru-cache";
+import { scheduleCadastruNumberRefresh } from "@/lib/cadastru-record-refresh";
 import {
   checkFeatureAccess,
   consumeFeatureCredit,
@@ -507,10 +508,17 @@ async function handlePost(request) {
         countLookup: false,
         officialFetch: true,
       });
-      if (saved) payload = normalizeCadastralPayload(saved, trimmed, access.tier);
-      if (!saved) await writeCadastruCache("number", trimmed, {
-        payload: cleanCadastruPayload(payload), lookupSource, expiresAt: cadastruExpiresAt(),
-      });
+      if (saved) {
+        const entry = await getCadastruRecordByNumber(trimmed, { allowExpired: true });
+        payload = normalizeCadastralPayload(entry ? withCadastruFreshness(entry) : saved, trimmed, access.tier);
+      }
+      if (!saved) {
+        const fetchedAt = new Date().toISOString();
+        const entry = { payload: cleanCadastruPayload(payload), lookupSource, fetchedAt,
+          expiresAt: cadastruExpiresAt(fetchedAt) };
+        await writeCadastruCache("number", trimmed, entry);
+        payload = withCadastruFreshness(entry);
+      }
     }
     const evaluationToken = await recordCadastruSearch(payload, null, options.cached ? "cache" : null);
     if (!creditCheck.allowed) {
@@ -550,6 +558,7 @@ async function handlePost(request) {
       resultType: options.resultType || classifyCadastralResult(payload),
       countLookup: options.countLookup !== false && !(process.env.NODE_ENV === "development" && cadastruSearchType),
       officialFetch: false,
+      fetchedAt: payload.data_freshness?.property?.fetched_at,
       expiresAt: options.expiresAt,
     });
     const { district_lookup_checked, building_bundles, ...publicPayload } = payload;
@@ -565,11 +574,12 @@ async function handlePost(request) {
     );
   };
 
-  const stored = skipCache ? null : await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true });
+  const stored = skipCache ? null : await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true, allowExpired: true });
   if (stored) {
+    if (cadastruNeedsRefresh(stored)) scheduleCadastruNumberRefresh(stored);
     lookupSource = stored.lookupSource;
     return respondWithCadastralPayload(
-      normalizeCadastralPayload(stored.payload, trimmed, access.tier),
+      normalizeCadastralPayload(withCadastruFreshness(stored), trimmed, access.tier),
       { cached: true, countLookup: true, resultType: classifyCadastralResult(stored.payload), expiresAt: stored.expiresAt }
     );
   }

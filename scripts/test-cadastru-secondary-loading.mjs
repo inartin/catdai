@@ -4,9 +4,16 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import crypto from "node:crypto";
-import { ensureCadastruLookupId } from "../src/lib/cadastru-lookup-tracking.js";
 import * as validation from "../src/lib/validation.js";
 import { createRequire } from "node:module";
+
+const lookupContext = vm.createContext({ crypto, URL, get window() { return globalThis.window; } });
+const lookupModule = new vm.SourceTextModule(await fs.readFile("src/lib/cadastru-lookup-tracking.js", "utf8"), { context: lookupContext });
+await lookupModule.link(() => new vm.SyntheticModule(["getDeviceId"], function () {
+  this.setExport("getDeviceId", () => null);
+}, { context: lookupContext }));
+await lookupModule.evaluate();
+const { ensureCadastruLookupId } = lookupModule.namespace;
 
 const require = createRequire(import.meta.url);
 const { transform, loadBindings } = require("next/dist/build/swc");
@@ -31,7 +38,7 @@ async function loadJsx(file, mocks, globals = {}) {
     setTimeout: () => 1, clearTimeout: noop, navigator: { userAgent: "" }, ...globals });
   const jsxModule = new vm.SourceTextModule(code, { context });
   await jsxModule.link((name) => {
-    const exports = mocks[name] || (name.startsWith("@/components/") ? { default: noop } : null);
+    const exports = mocks[name] || (name === "@/lib/visitor-browser" ? { getDeviceId: () => null } : null) || (name === "@/components/CadastruFreshnessNote" ? { default: freshnessNote.default } : null) || (name.startsWith("@/components/") ? { default: noop } : null);
     assert(exports, `Unexpected import: ${name}`);
     return new vm.SyntheticModule(Object.keys(exports), function () {
       for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
@@ -40,6 +47,11 @@ async function loadJsx(file, mocks, globals = {}) {
   await jsxModule.evaluate();
   return jsxModule.namespace;
 }
+
+const freshnessNote = await loadJsx("src/components/CadastruFreshnessNote.js", {
+  "@/context/LanguageContext": translation,
+  "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
+});
 
 const slots = [];
 let cursor = 0;
@@ -70,7 +82,7 @@ const router = { push: noop, replace: (url) => {
 } };
 const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
   "./loading": { default: noop },
-  "@/lib/cadastru-lookup-tracking": { ensureCadastruLookupId },
+  "@/lib/cadastru-lookup-tracking": { ...lookupModule.namespace },
   "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: (slug) => trackedOpens.push(slug) },
   react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
   "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
@@ -284,8 +296,8 @@ const transportCard = await loadJsx("src/components/CadastruPublicTransportCard.
 for (const locale of ["ro", "ru"]) {
   lang = locale;
   const transport = { scope: "nearby", route_groups: [{ mode: "bus", routes: [{ ref: "19" }] }], cache: { stale: true } };
-  assert(textOf(transportCard.default({ transport })).includes(t("cadastru.transportStale")), "stored fallback is labeled in both locales");
-  assert(!textOf(transportCard.default({ transport: { ...transport, cache: { stale: false } } })).includes(t("cadastru.transportStale")), "fresh data has no stale warning");
+  assert(textOf(transportCard.default({ transport })).includes(t("cadastru.savedDataStale")), "stored fallback is labeled in both locales");
+  assert(!textOf(transportCard.default({ transport: { ...transport, cache: { stale: false } } })).includes(t("cadastru.savedDataStale")), "fresh data has no stale warning");
 }
 console.log("Transport card passed: stale fallback notice in RO/RU, without warnings on fresh responses.");
 
@@ -296,8 +308,8 @@ const nearbyCard = await loadJsx("src/components/CadastruNearbyCard.js", {
 for (const locale of ["ro", "ru"]) {
   lang = locale;
   const nearby = { categories: {}, cache: { stale: true } };
-  assert(textOf(nearbyCard.default({ nearby })).includes(t("cadastru.nearbyStale")));
-  assert(!textOf(nearbyCard.default({ nearby: { ...nearby, cache: { stale: false } } })).includes(t("cadastru.nearbyStale")));
+  assert(textOf(nearbyCard.default({ nearby })).includes(t("cadastru.savedDataStale")));
+  assert(!textOf(nearbyCard.default({ nearby: { ...nearby, cache: { stale: false } } })).includes(t("cadastru.savedDataStale")));
   const fallback = nearbyCard.default({ nearby: { ...nearby, source: "geoapify",
     attribution: "Powered by Geoapify | © OpenStreetMap contributors" } });
   const credit = findNode(fallback, (node) => node.type === "a" && node.props.href === "https://www.geoapify.com/");
@@ -509,3 +521,13 @@ for (const locale of ["ro", "ru"]) {
 }
 for (const slot of slots) slot?.cleanup?.();
 console.log("Shared report viewer passed: anonymous RO/RU report, map and concurrent secondary cards, tamper-proof criteria and no gated lookup.");
+
+for (lang of ["ro", "ru"]) {
+  const freshness = { property: { fetched_at: "2026-10-01T12:00:00Z", stale: true } };
+  const text = textOf(freshnessNote.default({ freshness }));
+  assert(text.includes("01.10.2026"));
+  assert(text.includes(t("cadastru.checkedAt")));
+  assert(text.includes(t("cadastru.savedDataStale")));
+  assert.equal(freshnessNote.default({ freshness: { property: { fetched_at: "invalid", stale: false } } }), null);
+}
+console.log("Snapshot notices passed: actual source dates and saved-data warnings in Romanian and Russian.");

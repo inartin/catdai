@@ -1,3 +1,5 @@
+import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
+import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 import { withStatisticsContext } from "@/lib/statistics-context";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { NextResponse } from "next/server";
@@ -52,27 +54,32 @@ async function handlePost(request) {
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
   const stored = await getStoredMunicipalReports(input);
-  if (stored && isFreshCadastru(stored.expiresAt)) {
+  const refresh = async () => {
+    try {
+      const reports = await fetchExternalMunicipalReportsData(input, stored ? { trackUsage: false } : getCadastruLookupTracking(body));
+      if (!validMunicipalReportsResult(reports)) throw new Error("Invalid municipal reports response");
+      if (stored && (reports.incomplete || reports.cache?.stale)) {
+        return NextResponse.json({ municipal_reports: municipalReportsFromStorage(stored) });
+      }
+      const saved = await storeMunicipalReports(input, reports);
+      return NextResponse.json({ municipal_reports: saved ? municipalReportsFromStorage(saved) : reports });
+    } catch (error) {
+      console.error("[cadastru/municipal-reports] lookup failed:", {
+        code: error?.code || "unknown",
+        status: error?.status || null,
+        message: error?.message || String(error),
+      });
+      if (stored) return NextResponse.json({ municipal_reports: municipalReportsFromStorage(stored) });
+      return NextResponse.json({ error: "municipal_reports_unavailable" }, { status: 503 });
+    }
+  };
+  if (stored) {
+    if (!isFreshCadastru(stored.expiresAt)) {
+      scheduleCadastruRefresh(`municipal-reports:${cadastruLocationOriginKey(input)}`, refresh);
+    }
     return NextResponse.json({ municipal_reports: municipalReportsFromStorage(stored) });
   }
-
-  try {
-    const reports = await fetchExternalMunicipalReportsData(input, getCadastruLookupTracking(body));
-    if (!validMunicipalReportsResult(reports)) throw new Error("Invalid municipal reports response");
-    if (stored && (reports.incomplete || reports.cache?.stale)) {
-      return NextResponse.json({ municipal_reports: municipalReportsFromStorage(stored) });
-    }
-    const saved = await storeMunicipalReports(input, reports);
-    return NextResponse.json({ municipal_reports: saved ? municipalReportsFromStorage(saved) : reports });
-  } catch (error) {
-    console.error("[cadastru/municipal-reports] lookup failed:", {
-      code: error?.code || "unknown",
-      status: error?.status || null,
-      message: error?.message || String(error),
-    });
-    if (stored) return NextResponse.json({ municipal_reports: municipalReportsFromStorage(stored) });
-    return NextResponse.json({ error: "municipal_reports_unavailable" }, { status: 503 });
-  }
+  return refresh();
 }
 
 export const POST = withStatisticsContext(handlePost);

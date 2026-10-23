@@ -2,6 +2,7 @@
 
 import { useTranslation } from "@/context/LanguageContext";
 import LockIcon from "@/components/icons/LockIcon";
+import CadastruFreshnessNote from "@/components/CadastruFreshnessNote";
 
 export default function CadastralDataCard({
   cadastral,
@@ -277,6 +278,7 @@ export default function CadastralDataCard({
             </svg>
             {t("result.cadastralDataSource")}
           </span>
+          <CadastruFreshnessNote freshness={cadastral.data_freshness} />
         </div>
 
         {hasLimitedCadastralData && (

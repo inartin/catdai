@@ -1,4 +1,5 @@
 "use client";
+import CadastruFreshnessNote from "@/components/CadastruFreshnessNote";
 
 import { useTranslation } from "@/context/LanguageContext";
 import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
@@ -74,7 +75,7 @@ export default function CadastruNearbyCard({ nearby, loading, unavailable }) {
           ))}
         </div>
       ) : null}
-      {nearby?.cache?.stale ? <p className="mt-5 text-xs text-gray-500">{t("cadastru.nearbyStale")}</p> : null}
+      <CadastruFreshnessNote freshness={{ property: nearby?.cache }} />
       {nearby?.incomplete ? <p className="mt-5 text-xs text-gray-500">{t("cadastru.nearbyIncomplete")}</p> : null}
       {nearby ? (
         <p className="mt-6 text-xs text-gray-400">

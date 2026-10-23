@@ -1,3 +1,5 @@
+import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
+import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 import { withStatisticsContext } from "@/lib/statistics-context";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { NextResponse } from "next/server";
@@ -54,28 +56,33 @@ async function handlePost(request) {
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
   const stored = await getStoredPublicTransport(input);
-  if (stored && isFreshCadastru(stored.expiresAt)) {
+  const refresh = async () => {
+    try {
+      const publicTransport = await fetchExternalPublicTransportData(input, stored ? { trackUsage: false } : getCadastruLookupTracking(body));
+      if (!validPublicTransportResult(publicTransport)) throw new Error("Invalid public transport response");
+      // A partial source outage must not replace the last complete saved response.
+      if ((publicTransport.incomplete || publicTransport.cache?.stale) && stored) {
+        return NextResponse.json({ public_transport: publicTransportFromStorage(stored) });
+      }
+      const saved = await storePublicTransport(input, publicTransport);
+      return NextResponse.json({ public_transport: saved ? publicTransportFromStorage(saved) : publicTransport });
+    } catch (error) {
+      console.error("[cadastru/public-transport] lookup failed:", {
+        code: error?.code || "unknown",
+        status: error?.status || null,
+        message: error?.message || String(error),
+      });
+      if (stored) return NextResponse.json({ public_transport: publicTransportFromStorage(stored) });
+      return NextResponse.json({ error: "public_transport_unavailable" }, { status: 503 });
+    }
+  };
+  if (stored) {
+    if (!isFreshCadastru(stored.expiresAt)) {
+      scheduleCadastruRefresh(`public-transport:${cadastruLocationOriginKey(input)}`, refresh);
+    }
     return NextResponse.json({ public_transport: publicTransportFromStorage(stored) });
   }
-
-  try {
-    const publicTransport = await fetchExternalPublicTransportData(input, getCadastruLookupTracking(body));
-    if (!validPublicTransportResult(publicTransport)) throw new Error("Invalid public transport response");
-    // A partial source outage must not replace the last complete saved response.
-    if (publicTransport.incomplete && stored) {
-      return NextResponse.json({ public_transport: publicTransportFromStorage(stored) });
-    }
-    const saved = await storePublicTransport(input, publicTransport);
-    return NextResponse.json({ public_transport: saved ? publicTransportFromStorage(saved) : publicTransport });
-  } catch (error) {
-    console.error("[cadastru/public-transport] lookup failed:", {
-      code: error?.code || "unknown",
-      status: error?.status || null,
-      message: error?.message || String(error),
-    });
-    if (stored) return NextResponse.json({ public_transport: publicTransportFromStorage(stored) });
-    return NextResponse.json({ error: "public_transport_unavailable" }, { status: 503 });
-  }
+  return refresh();
 }
 
 export const POST = withStatisticsContext(handlePost);

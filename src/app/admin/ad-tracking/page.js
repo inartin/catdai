@@ -146,18 +146,19 @@ function groupJourneyEvents(events = [], sourceConfig) {
 }
 
 export default function AdTrackingPage() {
-  const [selectedSource, setSelectedSource] = useState("zdg");
+  const [selectedSource, setSelectedSource] = useState(null);
   const [selectedPeriod, setSelectedPeriod] = useState("all");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState(null);
   const [openJourneys, setOpenJourneys] = useState({});
   const loadMoreRef = useRef(null);
-  const sourceConfig = AD_SOURCES.find((source) => source.key === selectedSource) || AD_SOURCES[0];
+  const sourceConfig = AD_SOURCES.find((source) => source.key === selectedSource);
 
   const loadAdTracking = useCallback((offset = 0, { fresh = false } = {}) => {
+    if (!selectedSource) return;
     if (offset === 0) {
       if (fresh) setRefreshing(true);
       else setLoading(true);
@@ -211,9 +212,10 @@ export default function AdTrackingPage() {
   }, [selectedPeriod, selectedSource]);
 
   useEffect(() => {
+    if (!selectedSource) return;
     const timer = window.setTimeout(() => loadAdTracking(0), 0);
     return () => window.clearTimeout(timer);
-  }, [loadAdTracking]);
+  }, [loadAdTracking, selectedSource]);
 
   const ad = stats?.ad || {};
   const loadedJourneyCount = Array.isArray(ad.journeys) ? ad.journeys.length : 0;
@@ -232,25 +234,6 @@ export default function AdTrackingPage() {
     return () => observer.disconnect();
   }, [ad.hasMoreJourneys, loadAdTracking, loadedJourneyCount, loading, loadingMore]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400">Loading ad tracking...</div>
-      </div>
-    );
-  }
-
-  if (error || !stats) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center space-y-2">
-          <p className="text-red-500 font-medium">Failed to load ad tracking</p>
-          <p className="text-sm text-gray-400">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
   const adCounts = ad.countsByEvent || {};
 
   const toggleJourney = (key) => {
@@ -266,8 +249,12 @@ export default function AdTrackingPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Ad tracking</h1>
           <p className="mt-1 text-sm text-gray-500">
-            {sourceConfig.label} visitors who entered through{" "}
-            <span className="font-medium text-gray-700">{sourceConfig.entryPath}</span>.
+            {sourceConfig ? (
+              <>
+                {sourceConfig.label} visitors who entered through{" "}
+                <span className="font-medium text-gray-700">{sourceConfig.entryPath}</span>.
+              </>
+            ) : "Select an ad source to load its tracking statistics."}
           </p>
           <div className="mt-4 inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
             {AD_SOURCES.map((source) => {
@@ -276,7 +263,13 @@ export default function AdTrackingPage() {
                 <button
                   key={source.key}
                   type="button"
+                  disabled={loading || loadingMore || refreshing}
+                  aria-pressed={isActive}
                   onClick={() => {
+                    if (isActive) return;
+                    setStats(null);
+                    setError(null);
+                    setLoading(true);
                     setOpenJourneys({});
                     setSelectedSource(source.key);
                   }}
@@ -291,7 +284,7 @@ export default function AdTrackingPage() {
             })}
           </div>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        {sourceConfig && <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <div className="inline-flex w-full rounded-lg border border-gray-200 bg-white p-1 shadow-sm sm:w-auto">
             {PERIOD_OPTIONS.map((period) => {
               const isActive = period.key === selectedPeriod;
@@ -299,7 +292,12 @@ export default function AdTrackingPage() {
                 <button
                   key={period.key}
                   type="button"
+                  disabled={loading || loadingMore || refreshing}
                   onClick={() => {
+                    if (isActive) return;
+                    setStats(null);
+                    setError(null);
+                    setLoading(true);
                     setOpenJourneys({});
                     setSelectedPeriod(period.key);
                   }}
@@ -324,10 +322,21 @@ export default function AdTrackingPage() {
           >
             {refreshing ? "Refreshing..." : "Hard refresh"}
           </button>
-        </div>
+        </div>}
       </div>
 
-      {!ad.available ? (
+      {!selectedSource ? null : loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-gray-400">Loading ad tracking...</div>
+        </div>
+      ) : error || !stats ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center space-y-2">
+            <p className="text-red-500 font-medium">Failed to load ad tracking</p>
+            <p className="text-sm text-gray-400">{error}</p>
+          </div>
+        </div>
+      ) : !ad.available ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
           {ad.error || "Ad tracking data is not available yet."}
         </div>

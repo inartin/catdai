@@ -90,4 +90,5 @@ Current State
 Implemented: Auth, valuation (sale/rent), PDF reports, pricing UI, SEO, analytics, market data integration, Paddle payment schema, and backend payment flow preparation
 SEO Status: Not blocked by technical issues, robots.txt allows crawling, sitemap available, Google has crawled homepage
 Deployment: PM2 production setup on port 3000
+Production host `aws2` has 2 GiB of swap at `/swapfile` (root-owned, mode `0600`), enabled persistently through `/etc/fstab`. This provides memory headroom when builds share the host with running services; heavy swap use can still slow builds.
 The project is production-ready with comprehensive documentation in docs/ covering auth, valuation, SEO, market data, and admin features.

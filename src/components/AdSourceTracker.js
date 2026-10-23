@@ -15,8 +15,9 @@ const LANDING_SOURCE_RULES = [
   { source: "999", param: "src", value: "999" },
 ];
 
-function getLandingAdSource(params) {
+function getLandingAdSource(params, pathname) {
   for (const rule of LANDING_SOURCE_RULES) {
+    if (pathname !== "/" && rule.source !== "999") continue;
     if ((params.get(rule.param) || "").toLowerCase() === rule.value) {
       return rule.source;
     }
@@ -36,7 +37,7 @@ export default function AdSourceTracker() {
     getDeviceId();
     const currentPath = getCurrentPath();
     const params = new URLSearchParams(window.location.search);
-    const landingSource = window.location.pathname === "/" ? getLandingAdSource(params) : null;
+    const landingSource = getLandingAdSource(params, window.location.pathname);
 
     if (landingSource) {
       captureAdSource(landingSource, {

@@ -366,7 +366,7 @@ for (const locale of ["ro", "ru"]) {
       nearby.resolve({ ok: true, json: async () => ({ nearby: { categories: {}, location: { latitude: 47.02, longitude: 28.83 } } }) });
       await flush();
       const updated = render();
-      assert(findNode(updated, (node) => node.type === "iframe" && node.props.src.includes("47.02")), "available nearby coordinates restore the map");
+      assert(findNode(updated, (node) => node.props?.location?.latitude === 47.02 && node.props?.fallbackUrl), "available nearby coordinates restore the map");
       assert(findNode(updated, (node) => node.props?.nearby?.location?.latitude === 47.02), "nearby displays while transport is still pending");
       assert(findNode(updated, (node) => "transport" in (node.props || {}) && node.props.loading), "transport remains independently loading");
     }
@@ -506,7 +506,7 @@ for (const locale of ["ro", "ru"]) {
   assert.deepEqual(trackedOpens, [slug], "Only a loaded shared report records an open");
   const sharedCard = findNode(tree, (node) => node.props?.cadastral === snapshot);
   assert(sharedCard, "anonymous viewers see the saved full report");
-  assert(findNode(sharedCard.props.children, (node) => node.type === "iframe"), "public reports retain their map");
+  assert(findNode(sharedCard.props.children, (node) => node.props?.location?.latitude === 47.02 && node.props?.fallbackUrl), "public reports retain their map");
   paint();
   paint();
   for (const endpoint of ["nearby", "public-transport", "municipal-reports"]) {

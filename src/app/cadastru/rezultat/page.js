@@ -11,6 +11,7 @@ import CadastruPublicTransportCard from "@/components/CadastruPublicTransportCar
 import CadastruMunicipalReportsCard from "@/components/CadastruMunicipalReportsCard";
 import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
 import CadastruShareButton from "@/components/CadastruShareButton";
+import CadastruParcelMap from "@/components/CadastruParcelMap";
 import CadastruLoadingPage from "@/components/CadastruLoadingPage";
 import CadastruRouteLoading from "./loading";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
@@ -615,15 +616,7 @@ function CadastruResultContent() {
           )}
         </a>
       </div>
-      <iframe
-        key={mapUrl}
-        src={mapUrl}
-        title={t("cadastru.mapTitle")}
-        className="block h-[360px] w-full border-0 sm:h-[440px]"
-        loading="lazy"
-        allowFullScreen
-        referrerPolicy="strict-origin-when-cross-origin"
-      />
+      <CadastruParcelMap location={mapLocation} cadastral={state.data} fallbackUrl={mapUrl} />
     </div>
   );
   const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);

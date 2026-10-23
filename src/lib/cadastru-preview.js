@@ -20,7 +20,7 @@ function maskObjectFields(source, visibleFields = []) {
 
 function maskPropertyCollection(items) {
   if (!Array.isArray(items)) return [];
-  return items.map((item) => maskObjectFields(item, ["address", "map_location"]));
+  return items.map((item) => maskObjectFields(item, ["address", "map_location", "map_geometry"]));
 }
 
 export function buildCadastruPreviewPayload(payload, reason = "no_credit", options = {}) {
@@ -52,8 +52,9 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     ...(payload?.data_freshness ? { data_freshness: payload.data_freshness } : {}),
     district: payload?.district || null,
     map_location: payload?.map_location || null,
+    map_geometry: payload?.map_geometry || null,
     apartment: maskObjectFields(apartment, ["address", "floor", "map_location"]),
-    building: maskObjectFields(building, ["address", "classifier", "construction_year", "map_location"]),
+    building: maskObjectFields(building, ["address", "classifier", "construction_year", "map_location", "map_geometry"]),
     lands: maskPropertyCollection(payload?.lands),
     buildings: maskPropertyCollection(payload?.buildings),
     location: maskObjectFields(payload?.location || {}, ["display_name", "road", "house_number", "suburb", "city", "postcode"]),

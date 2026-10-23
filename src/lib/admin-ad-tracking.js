@@ -19,6 +19,10 @@ export const AD_TRACKING_SOURCES = {
     label: "vtememd",
     entryPath: "/?utm_source=vtememd",
   },
+  "999": {
+    label: "999.md",
+    entryPath: "/?src=999",
+  },
 };
 
 async function fetchAllRows(buildQuery) {

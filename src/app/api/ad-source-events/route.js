@@ -7,7 +7,7 @@ import { resolveAccessTier } from "@/lib/access-tier";
 
 const limiter = rateLimit({ interval: 60_000, limit: 120 });
 const TRACKING_SALT = process.env.TRACKING_SALT || "catdai-default-salt";
-const ALLOWED_SOURCES = new Set(["zdg", "reddit", "vtememd"]);
+const ALLOWED_SOURCES = new Set(["zdg", "reddit", "vtememd", "999"]);
 const ALLOWED_EVENTS = new Set([
   "source_landing_visit",
   "page_view",

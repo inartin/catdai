@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { validateCadastralNumber } from "@/lib/validation";
 
 const ADMIN_SESSION_VERSION = "v1";
 
@@ -50,6 +51,19 @@ async function verifyAdminSessionToken(token) {
 
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
+
+  const numberSearch = pathname.match(/^\/(?:(ro|ru)\/)?(?:c|cadastru)\/([\d.]+)\/?$/);
+  const cadastralNumber = numberSearch && validateCadastralNumber(numberSearch[2]);
+  if (cadastralNumber?.valid) {
+    const lang = numberSearch[1] || (request.cookies.get("catdai-lang")?.value === "ru" ? "ru" : "ro");
+    const url = request.nextUrl.clone();
+    url.pathname = `/${lang}/cadastru/rezultat`;
+    url.searchParams.delete("share_slug");
+    url.searchParams.set("cadastral_number", cadastralNumber.value);
+    url.searchParams.set("source", "number");
+    url.searchParams.set("lookup_id", crypto.randomUUID());
+    return NextResponse.redirect(url);
+  }
 
   // Language prefix rewrite: /ru/... or /ro/... → serve the actual route
   const langMatch = pathname.match(/^\/(ro|ru)(\/.*)?$/);
@@ -120,5 +134,5 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*", "/ro/:path*", "/ru/:path*"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/ro/:path*", "/ru/:path*", "/c/:code", "/cadastru/:number"],
 };

@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
-import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
+import { featureCheckoutUrl } from "@/lib/payment-urls.mjs";
 import FeaturePurchaseBenefits from "@/components/FeaturePurchaseBenefits";
 import { FEATURE_PURCHASE_CONTENT } from "@/lib/feature-purchase-content";
 
@@ -16,20 +16,6 @@ function formatMdl(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return null;
   return `${Math.round(amount).toLocaleString("ro-MD")} lei`;
-}
-
-function getReturnPath() {
-  if (typeof window === "undefined") return null;
-  return `${window.location.pathname}${window.location.search}`;
-}
-
-function buildPendingCheckoutUrl(productKey, lang) {
-  const url = new URL("/payment/checkout", paymentSiteOrigin(window.location.origin));
-  url.searchParams.set("product_key", productKey);
-  url.searchParams.set("lang", lang);
-  const returnPath = getReturnPath();
-  if (returnPath) url.searchParams.set("return_to", returnPath);
-  return url.toString();
 }
 
 const subscribeToPortal = () => () => {};
@@ -142,7 +128,7 @@ export default function FeaturePricingAction({
   const startCheckout = () => {
     setStatus("redirecting");
     onCheckoutStart?.();
-    window.location.href = buildPendingCheckoutUrl(packageOffer.product_key, lang);
+    window.location.href = featureCheckoutUrl(packageOffer.product_key, lang, window.location.href);
   };
 
   const offerTitle = t(isCadastruProduct ? "cadastru.mobilePurchaseTitle" : isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl) });

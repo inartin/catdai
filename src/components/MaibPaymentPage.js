@@ -151,6 +151,9 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
         </> : <p>{t('maib.invalidProduct')}</p>}
         {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
       </section>
+      {!result && <Link href={paymentAppLink('/pricing')} className="mx-auto mt-5 block w-fit text-sm text-gray-500 underline underline-offset-4 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
+        {t('payment.showAllPackages')}
+      </Link>}
     </main>
     {!result && <Footer checkout />}
   </div>;

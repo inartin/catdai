@@ -31,6 +31,7 @@ import { getDeviceId } from "@/lib/visitor-browser";
 import { ensureCadastruLookupId, getCadastruSearchSessionId } from "@/lib/cadastru-lookup-tracking";
 import { recordCadastruShareOpen } from "@/lib/cadastru-share-tracking";
 import { cadastruMapLocation } from "@/lib/cadastru-map";
+import { featureCheckoutUrl } from "@/lib/payment-urls.mjs";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet", fullLabel: "cadastru.roadTypeStreetFull" },
@@ -501,7 +502,6 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const loadedMarketKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("cadastru.loginToUse");
-  const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
   const [state, setState] = useState({
     loading: true,
     error: "",
@@ -516,10 +516,12 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
   const purchaseOffer = state.data?.access_limit?.purchase || (isLockedPreview ? { product_key: "cadastru_lookup_single" } : null);
   const singlePurchaseProduct = purchaseOffer?.product_key?.endsWith("_single") ? maibProduct(purchaseOffer.product_key) : null;
+  const checkoutProductKey = paymentProvider === "maib" && singlePurchaseProduct ? singlePurchaseProduct.key : "extra_pack";
   const unlockPriceMdl = paymentProvider === "maib"
     ? (singlePurchaseProduct || maibProduct("extra_pack")).amount_mdl
     : Number(process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499);
   const unlockPriceLabel = `${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD").format(unlockPriceMdl)} MDL`;
+  const startCheckout = () => window.location.assign(featureCheckoutUrl(checkoutProductKey, lang, window.location.href));
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
   const [device, setDevice] = useState({ isMobile: false, isIOS: false });
@@ -594,7 +596,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       key={nearbyKey}
       address={nearbyAddress}
       cadastralNumber={validateCadastralNumber(nearbyNumber).valid ? nearbyNumber : ""}
-      onUnlock={isLockedPreview ? () => setIsPaywallModalOpen(true) : undefined}
+      onUnlock={isLockedPreview ? startCheckout : undefined}
     /> : null;
   const map = protectedMap || (mapUrl && (
     <div className="mt-6 w-full overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md">
@@ -1123,17 +1125,6 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
         copyKey={authModalCopyKey}
         onClose={() => setIsAuthModalOpen(false)}
       />
-      <AuthRequiredModal
-        open={isPaywallModalOpen}
-        variant="paywall"
-        copyKey="payment.buyAccess"
-        showAuthOptions={false}
-        onClose={() => setIsPaywallModalOpen(false)}
-      >
-        {purchaseOffer ? (
-          <FeaturePricingAction offer={purchaseOffer} variant="cadastru" trackPopupOpen />
-        ) : null}
-      </AuthRequiredModal>
       <Navbar />
       <main className="flex-1">
         <section className="mx-auto w-full max-w-5xl px-6 pb-12 pt-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12">
@@ -1271,7 +1262,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
                 revealButtonLabel={t("cadastru.payToUnlock")}
                 desktopRevealButtonLabel={t("cadastru.unlockCompleteCta", { price: unlockPriceLabel })}
                 desktopRevealDescription={t("cadastru.unlockCompleteDescription")}
-                onLockedClick={isLockedPreview ? () => setIsPaywallModalOpen(true) : undefined}
+                onLockedClick={isLockedPreview ? startCheckout : undefined}
               >
                 {map}
               </CadastralDataCard>

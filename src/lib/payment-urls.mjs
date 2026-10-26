@@ -8,3 +8,12 @@ export function paymentSiteOrigin(fallback = process.env.MAIB_PUBLIC_URL || getC
 export function paymentAppLink(path) {
   return process.env.NODE_ENV === 'development' ? new URL(path, paymentSiteOrigin()).toString() : path;
 }
+
+export function featureCheckoutUrl(productKey, lang, currentUrl) {
+  const current = new URL(currentUrl);
+  const url = new URL('/payment/checkout', paymentSiteOrigin(current.origin));
+  url.searchParams.set('product_key', productKey);
+  url.searchParams.set('lang', lang);
+  url.searchParams.set('return_to', `${current.pathname}${current.search}`);
+  return url.toString();
+}

@@ -525,6 +525,10 @@ export default function PaddleCheckoutPage() {
           </div>
         </section>
 
+        <Link href={paymentAppLink("/pricing")} className="mx-auto mt-5 block w-fit text-sm text-gray-500 underline underline-offset-4 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
+          {t("payment.showAllPackages")}
+        </Link>
+
         <div className="mt-3 mb-8 space-y-3">
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-start gap-4">

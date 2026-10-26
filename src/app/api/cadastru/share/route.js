@@ -74,23 +74,25 @@ async function handlePost(request) {
     let { data: existing, error } = await findExisting();
     if (error) throw error;
     let slug = existing?.slug;
-    if (!slug) {
-      slug = crypto.randomBytes(24).toString("hex");
+    for (let attempt = 0; !slug && attempt < 3; attempt++) {
+      const candidate = crypto.randomBytes(24).toString("hex");
       const result = await supabaseAdmin.from("cadastru_shared_reports").insert({
-        slug, sharer_user_id: access.user_id, report_hash: reportHash,
+        slug: candidate, sharer_user_id: access.user_id, report_hash: reportHash,
         payload: snapshot, collect_statistics: shouldCollectStatistics(), search_event_id: searchEventId,
       });
       if (result.error?.code === "23505") {
-        // Concurrent clicks for the same snapshot return the first saved link.
+        // Reuse concurrent shares; retry a random slug/code collision.
         ({ data: existing, error } = await findExisting());
-        if (error || !existing?.slug) throw error || result.error;
-        slug = existing.slug;
+        if (error) throw error;
+        slug = existing?.slug;
       } else if (result.error) throw result.error;
+      else slug = candidate;
     }
+    if (!slug) throw new Error("Could not allocate a unique report code");
 
     const lang = body.lang === "ru" ? "ru" : "ro";
     const origin = process.env.NODE_ENV === "production" ? "https://catdai.md" : new URL(request.url).origin;
-    return NextResponse.json({ slug, url: `${origin}${getCadastruSharePath(slug, lang)}` });
+    return NextResponse.json({ slug, url: `${origin}${await getCadastruSharePath(slug, lang)}` });
   } catch (error) {
     console.error("[cadastru/share] create failed:", error.message);
     return NextResponse.json({ error: "sharing_unavailable" }, { status: 503 });

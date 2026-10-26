@@ -9,23 +9,24 @@ import { PGlite } from "@electric-sql/pglite";
 import { validateCadastralNumber } from "../src/lib/validation.js";
 import { decodeCadastruShareCode, getCadastruSharePath } from "../src/lib/cadastru-share-url.js";
 
-// Every saved slug has a reversible, URL-safe short form, including leading zeros.
-for (const slug of ["0".repeat(48), "f".repeat(48), "fb".repeat(24),
-  "000102030405060708090a0b0c0d0e0f1011121314151617", ...Array.from({ length: 100 }, () => crypto.randomBytes(24).toString("hex"))]) {
+// Short codes match PostgreSQL's hash expression; the earlier format still decodes.
+const slugFixtures = ["0".repeat(48), "f".repeat(48), "fb".repeat(24),
+  "000102030405060708090a0b0c0d0e0f1011121314151617", ...Array.from({ length: 100 }, () => crypto.randomBytes(24).toString("hex"))];
+for (const slug of slugFixtures) {
   for (const lang of ["ro", "ru"]) {
-    const path = getCadastruSharePath(slug, lang);
+    const path = await getCadastruSharePath(slug, lang);
     const code = path.split("/").at(-1);
-    assert.match(path, new RegExp(`^/${lang}/c/[A-Za-z0-9_-]{32}$`));
-    assert.equal(code, Buffer.from(slug, "hex").toString("base64url"));
-    assert.equal(decodeCadastruShareCode(code), slug);
-    assert.equal(`https://catdai.md${path}`.length, 55);
+    assert.match(path, new RegExp(`^/${lang}/c/[A-Za-z0-9_-]{12}$`));
+    assert.equal(code, crypto.createHash("sha256").update(Buffer.from(slug, "hex")).digest().subarray(0, 9).toString("base64url"));
+    assert.equal(decodeCadastruShareCode(Buffer.from(slug, "hex").toString("base64url")), slug);
+    assert.equal(`https://catdai.md${path}`.length, 35);
   }
 }
 for (const code of [null, undefined, "", "a".repeat(31), "a".repeat(33), "/".repeat(32), "+".repeat(32), "a".repeat(31) + "=", "é".repeat(32)]) {
   assert.equal(decodeCadastruShareCode(code), null);
 }
-assert.throws(() => getCadastruSharePath("invalid"));
-assert(getCadastruSharePath("0".repeat(48), "invalid").startsWith("/ro/c/"));
+await assert.rejects(getCadastruSharePath("invalid"));
+assert((await getCadastruSharePath("0".repeat(48), "invalid")).startsWith("/ro/c/"));
 
 const number = "0100106.131.01.097";
 const address = "Chișinău, strada Test 1";
@@ -33,7 +34,7 @@ const official = { status: "success", cadastral_number: number, apartment: { are
   cadastru_evaluation_token: "private-search-token", access_limit: { purchase: {} }, access_tier: "free" };
 let payload = official;
 let userId = "user-1", persistent = true, collect = true, creditReason = "already_consumed";
-let storageError = false, lookupCalls = [], creditKeys = [], rows = [];
+let storageError = false, lookupCalls = [], creditKeys = [], rows = [], insertCollisions = 0;
 let allowed = true;
 const clone = (value) => structuredClone(value);
 const supabaseAdmin = { from(table) {
@@ -48,7 +49,11 @@ const supabaseAdmin = { from(table) {
     },
     async insert(row) {
       if (storageError) return { error: { message: "offline" } };
-      rows.push(clone(row));
+      if (insertCollisions > 0) {
+        insertCollisions--;
+        return { error: { code: "23505", message: "short code collision" } };
+      }
+      rows.push({ ...clone(row), short_code: (await getCadastruSharePath(row.slug)).split("/").at(-1) });
       return { error: null };
     },
   };
@@ -131,7 +136,7 @@ const created = await post({ cadastral_number: number, lang: "ru", payload: { ap
 assert.equal(created.status, 200);
 const shared = await created.json();
 assert.match(shared.slug, /^[a-f0-9]{48}$/);
-assert.equal(shared.url, `https://catdai.md${getCadastruSharePath(shared.slug, "ru")}`);
+assert.equal(shared.url, `https://catdai.md${await getCadastruSharePath(shared.slug, "ru")}`);
 assert.equal(rows.length, 1);
 assert.equal(rows[0].payload.apartment.area_m2, 52, "the server ignores injected client report data");
 assert(!("cadastru_evaluation_token" in rows[0].payload));
@@ -139,7 +144,7 @@ assert(!("access_limit" in rows[0].payload));
 assert.equal(rows[0].collect_statistics, true);
 const repeated = await (await post()).json();
 assert.equal(repeated.slug, shared.slug);
-assert.equal(repeated.url, `https://catdai.md${getCadastruSharePath(shared.slug, "ro")}`);
+assert.equal(repeated.url, `https://catdai.md${await getCadastruSharePath(shared.slug, "ro")}`);
 assert.equal(rows.length, 1, "unchanged reports reuse their link");
 const firstSearch = await (await post({ cadastral_number: number, search_token: "source-1" })).json();
 const sameSearch = await (await post({ cadastral_number: number, search_token: "source-1" })).json();
@@ -172,8 +177,15 @@ assert.equal(creditKeys.at(-1).idempotencyKey, keyFor("cadastru_lookup", { addre
 assert.equal(rows.at(-1).collect_statistics, false);
 assert.equal(lookupCalls.at(-1)[0], "address");
 payload = { ...official, cadastral_number: "1014203.418" };
+insertCollisions = 1;
 assert.equal((await post({ cadastral_number: "1014203418" })).status, 200);
+assert.equal(insertCollisions, 0, "a code collision is retried without overwriting another report");
 assert.equal(lookupCalls.at(-1)[1], "1014203.418");
+payload = { ...official, apartment: { area_m2: 99 } };
+insertCollisions = 3;
+const beforeCollisions = rows.length;
+assert.equal((await post()).status, 503, "collisions have a bounded retry limit");
+assert.equal(rows.length, beforeCollisions);
 storageError = true;
 assert.equal((await post()).status, 503);
 console.log("Sharing API passed: login/unlock checks, no new credit consumption, official snapshots, public reads, deduplication, address/number identities and storage failures.");
@@ -189,6 +201,16 @@ await db.query("insert into cadastru_shared_reports(slug,sharer_user_id,report_h
 assert.equal((await db.query("select count(*)::int as total from cadastru_shared_reports")).rows[0].total, 1);
 await assert.rejects(db.query("update cadastru_shared_reports set payload='{}'"), /permission denied/);
 await db.exec("reset role");
+// Apply the real migration after a legacy report exists, then verify future inserts.
+await db.exec(await fs.readFile("supabase/migrations/20261026103149_cadastru_report_short_codes.sql", "utf8"));
+const savedCode = (await db.query("select short_code from cadastru_shared_reports where slug=$1", [shared.slug])).rows[0].short_code;
+assert.equal(savedCode, new URL(shared.url).pathname.split("/").at(-1));
+for (const slug of slugFixtures) {
+  const result = await db.query("insert into cadastru_shared_reports(slug,report_hash,payload) values ($1,$2,'{}') returning short_code", [slug, slug]);
+  assert.equal(result.rows[0].short_code, (await getCadastruSharePath(slug)).split("/").at(-1));
+}
+await assert.rejects(db.query("insert into cadastru_shared_reports(slug,short_code,report_hash,payload) values ($1,'forged','x','{}')", [crypto.randomBytes(24).toString("hex")]), { code: "428C9" });
+assert.equal((await db.query("select relrowsecurity from pg_class where oid='cadastru_shared_reports'::regclass")).rows[0].relrowsecurity, true);
 for (const role of ["anon", "authenticated"]) {
   await db.exec(`set role ${role}`);
   for (const sql of ["select * from cadastru_shared_reports", "insert into cadastru_shared_reports(slug,report_hash,payload) values (repeat('a',48),'forged','{}')",
@@ -284,14 +306,21 @@ const routeMocks = {
   "next/navigation": { notFound() { throw new Error("404"); } },
   "@/app/cadastru/rezultat/page": { default: ResultPage },
   "@/lib/cadastru-share-url": { decodeCadastruShareCode },
+  "@/lib/supabase-admin": { supabaseAdmin },
   "react/jsx-runtime": { jsx },
 };
 await shortRoute.link((name) => new vm.SyntheticModule(Object.keys(routeMocks[name]), function () {
   for (const [key, value] of Object.entries(routeMocks[name])) this.setExport(key, value);
 }, { context }));
 await shortRoute.evaluate();
+storageError = false;
 const shortPage = await shortRoute.namespace.default({ params: Promise.resolve({ code: new URL(shared.url).pathname.split("/").at(-1) }) });
 assert.equal(shortPage.type, ResultPage);
 assert.equal(shortPage.props.shareSlug, shared.slug);
 await assert.rejects(shortRoute.namespace.default({ params: Promise.resolve({ code: "invalid" }) }), /404/);
-console.log("Compact sharing passed: reversible 55-character RO/RU URLs, existing report reuse and invalid-route rejection.");
+await assert.rejects(shortRoute.namespace.default({ params: Promise.resolve({ code: "0".repeat(12) }) }), /404/);
+const legacyPage = await shortRoute.namespace.default({ params: Promise.resolve({ code: Buffer.from(shared.slug, "hex").toString("base64url") }) });
+assert.equal(legacyPage.props.shareSlug, shared.slug, "32-character links still open the same report");
+storageError = true;
+await assert.rejects(shortRoute.namespace.default({ params: Promise.resolve({ code: savedCode }) }), /storage unavailable/);
+console.log("Compact sharing passed: 35-character RO/RU URLs, existing report reuse, old compact links, invalid codes and storage outages.");

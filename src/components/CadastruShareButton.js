@@ -30,7 +30,7 @@ export default function CadastruShareButton({ cadastralNumber, address, shareSlu
       let url;
       let slug = shareSlug;
       if (shareSlug) {
-        url = `${window.location.origin}${getCadastruSharePath(shareSlug, lang)}`;
+        url = `${window.location.origin}${await getCadastruSharePath(shareSlug, lang)}`;
       } else {
         const response = await fetch("/api/cadastru/share", {
           method: "POST",

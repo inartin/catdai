@@ -40,50 +40,52 @@ function MobilePurchaseDrawer({ title, children, onCheckout, disabled, pending }
 
   if (!portalTarget) return null;
 
-  return createPortal(
+  return (
     <>
       <div aria-hidden="true" className="h-[calc(6rem+env(safe-area-inset-bottom))] lg:hidden" />
-      <section
-        aria-label={title}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") setExpanded(false);
-        }}
-        className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-primary bg-white px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-4 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] ring-1 ring-primary/10 lg:hidden"
-      >
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => setExpanded((value) => !value)}
-            aria-expanded={expanded}
-            aria-controls={detailsId}
-            aria-label={`${title}. ${t(expanded ? "pricing.hideDetails" : "pricing.showDetails")}`}
-            className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg text-left text-sm font-bold text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <span aria-hidden="true" className="absolute inset-x-0 top-0 flex h-4 cursor-pointer items-center justify-center">
-              <span className="h-1 w-9 rounded-full bg-primary/30" />
-            </span>
-            <span>{title}</span>
-            <svg viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 text-primary transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="m6 15 6-6 6 6" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={onCheckout}
-            disabled={disabled}
-            aria-busy={pending}
-            className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300"
-          >
-            {t("payment.unlock")}
-            {pending && <span className="sr-only"> · {t("payment.checkoutLoading")}</span>}
-          </button>
-        </div>
-        <div id={detailsId} hidden={!expanded} className="max-h-[55dvh] overflow-y-auto overscroll-contain pb-2">
-          {children}
-        </div>
-      </section>
-    </>,
-    portalTarget
+      {createPortal(
+        <section
+          aria-label={title}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setExpanded(false);
+          }}
+          className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-primary bg-white px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-4 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] ring-1 ring-primary/10 lg:hidden"
+        >
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setExpanded((value) => !value)}
+              aria-expanded={expanded}
+              aria-controls={detailsId}
+              aria-label={`${title}. ${t(expanded ? "pricing.hideDetails" : "pricing.showDetails")}`}
+              className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg text-left text-sm font-bold text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              <span aria-hidden="true" className="absolute inset-x-0 top-0 flex h-4 cursor-pointer items-center justify-center">
+                <span className="h-1 w-9 rounded-full bg-primary/30" />
+              </span>
+              <span>{title}</span>
+              <svg viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 text-primary transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="m6 15 6-6 6 6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={onCheckout}
+              disabled={disabled}
+              aria-busy={pending}
+              className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {t("payment.unlock")}
+              {pending && <span className="sr-only"> · {t("payment.checkoutLoading")}</span>}
+            </button>
+          </div>
+          <div id={detailsId} hidden={!expanded} className="max-h-[55dvh] overflow-y-auto overscroll-contain pb-2">
+            {children}
+          </div>
+        </section>,
+        portalTarget
+      )}
+    </>
   );
 }
 
@@ -104,7 +106,8 @@ export default function FeaturePricingAction({
   const isSingleOffer = provider === "maib" && offer?.product_key?.endsWith("_single") && !!maibProduct(offer.product_key);
   const selectedProductKey = isSingleOffer ? offer.product_key : "extra_pack";
   const selectedMaibProduct = maibProduct(selectedProductKey);
-  const isCadastruOffer = variant === "cadastru" && isSingleOffer && selectedProductKey === "cadastru_lookup_single";
+  const isCadastruProduct = isSingleOffer && selectedProductKey === "cadastru_lookup_single";
+  const isCadastruOffer = variant === "cadastru" && isCadastruProduct;
 
   const packageOffer = {
     product_key: selectedProductKey,
@@ -139,8 +142,17 @@ export default function FeaturePricingAction({
     window.location.href = buildPendingCheckoutUrl(packageOffer.product_key, lang);
   };
 
-  const offerTitle = t(isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl) });
-  const packageDetails = (
+  const offerTitle = t(isCadastruProduct ? "cadastru.mobilePurchaseTitle" : isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl) });
+  const packageDetails = isCadastruProduct ? (
+    <ul className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+      {["cadastru.mobilePurchaseArea", "cadastru.purchaseBuilding", "cadastru.mobilePurchaseOfficial"].map((key) => (
+        <li key={key} className="flex items-start gap-2 text-sm leading-5 text-gray-700">
+          <span aria-hidden="true" className="shrink-0 font-semibold text-primary">✓</span>
+          <span>{t(key)}</span>
+        </li>
+      ))}
+    </ul>
+  ) : (
     <>
       <p className="mt-4 text-xs font-bold uppercase tracking-wide text-gray-400">
         {t("payment.packageIncludesLabel")}
@@ -158,7 +170,9 @@ export default function FeaturePricingAction({
   const packagesLink = (
     <Link
       href="/pricing"
-      className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-50"
+      className={isCadastruProduct
+        ? "mx-auto mt-4 block w-fit text-sm text-gray-500 underline underline-offset-4 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+        : "mt-3 inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-50"}
     >
       {t("payment.showAllPackages")}
     </Link>
@@ -181,7 +195,7 @@ export default function FeaturePricingAction({
             {t("cadastru.purchaseIncludes")}
           </p>
           <ul className="mb-7 mt-3 space-y-4">
-            {["Official", "Property", "Nearby", "Transport"].map((feature) => (
+            {["Area", "Value", "Building", "Rights"].map((feature) => (
               <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-gray-900 sm:text-base">
                 <span aria-hidden="true" className="shrink-0 font-semibold text-primary">✓</span>
                 <span>{t(`cadastru.purchase${feature}`)}</span>

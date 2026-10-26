@@ -17,6 +17,8 @@ import CadastruLoadingPage from "@/components/CadastruLoadingPage";
 import CadastruRouteLoading from "./loading";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import FeaturePricingAction from "@/components/FeaturePricingAction";
+import usePaymentProvider from "@/components/usePaymentProvider";
+import { maibProduct } from "@/lib/maib/products.mjs";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { matchCity, validateCadastralNumber } from "@/lib/validation";
@@ -467,6 +469,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const searchParams = useSearchParams();
   const { lang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
+  const paymentProvider = usePaymentProvider();
   const shareSlug = sharedReportSlug || searchParams.get("share_slug") || "";
   const rawCadastralNumber = shareSlug ? "" : searchParams.get("cadastral_number") || "";
   const cadastralNumber = validateCadastralNumber(rawCadastralNumber).value || rawCadastralNumber;
@@ -510,6 +513,11 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const resolvedStreet = resolvedStreetParam || String(state.data?.street_resolution?.resolved || "").slice(0, 80);
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
   const purchaseOffer = state.data?.access_limit?.purchase || (isLockedPreview ? { product_key: "cadastru_lookup_single" } : null);
+  const singlePurchaseProduct = purchaseOffer?.product_key?.endsWith("_single") ? maibProduct(purchaseOffer.product_key) : null;
+  const unlockPriceMdl = paymentProvider === "maib"
+    ? (singlePurchaseProduct || maibProduct("extra_pack")).amount_mdl
+    : Number(process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499);
+  const unlockPriceLabel = `${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD").format(unlockPriceMdl)} MDL`;
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
   const [device, setDevice] = useState({ isMobile: false, isIOS: false });
@@ -531,8 +539,9 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     addressRequest: (isAddressPreviewHandoff || isPendingAddressLookup) ? readAddressLookupRequest() : null,
   }) : null;
   const favoriteNumber = cadastralNumber || (!isLockedPreview ? state.data?.cadastral_number : "");
-  const favoriteAddress = state.data?.resolved_address || state.data?.request_address ||
-    state.data?.matched_address || state.data?.apartment?.address || state.data?.building?.address;
+  const favoriteAddress = state.data?.locked_sections?.address ? state.data?.address_locality
+    : state.data?.resolved_address || state.data?.request_address ||
+      state.data?.matched_address || state.data?.apartment?.address || state.data?.building?.address;
   const favoriteLabel = [t("nav.cadastru"), favoriteNumber, favoriteAddress].filter(Boolean).join(" · ");
   const nearbyAddress = state.fallbackAddress || (source === "address" || shareSlug
     ? state.data?.request_address || state.data?.resolved_address || (savedAddress
@@ -1039,7 +1048,8 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     };
   }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, reportsAvailable, secondaryAvailable, session?.access_token]);
 
-  const marketAddress = nearbyAddress || state.data?.resolved_address || state.data?.apartment?.address || state.data?.building?.address || state.data?.matched_address || "";
+  const marketAddress = state.data?.locked_sections?.address ? ""
+    : nearbyAddress || state.data?.resolved_address || state.data?.apartment?.address || state.data?.building?.address || state.data?.matched_address || "";
   const marketCity = resolveValuationCity(state.data);
   const marketDistrict = resolveValuationDistrict(state.data, marketCity, source === "address" ? searchParams.get("district") : null);
   const marketKey = `${nearbyKey}|${marketAddress}|${marketCity || ""}|${marketDistrict || ""}`;
@@ -1060,7 +1070,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       try {
         const response = await fetch("/api/cadastru/market", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
           body: JSON.stringify({ address: marketAddress, city: marketCity, district: marketDistrict,
             ...(validateCadastralNumber(nearbyNumber).valid ? { cadastral_number: nearbyNumber } : {}),
           }),
@@ -1088,7 +1098,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       if (window.requestIdleCallback) window.cancelIdleCallback(idle);
       else clearTimeout(idle);
     };
-  }, [marketReady, marketKey, marketAddress, marketCity, marketDistrict, nearbyNumber]);
+  }, [marketReady, marketKey, marketAddress, marketCity, marketDistrict, nearbyNumber, session?.access_token]);
 
   if (state.loading) return <CadastruLoadingPage
     cadastralNumber={cadastralNumber}
@@ -1250,6 +1260,8 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
                 locked={isLockedPreview}
                 showRevealButton={isLockedPreview}
                 revealButtonLabel={t("cadastru.payToUnlock")}
+                desktopRevealButtonLabel={t("cadastru.unlockCompleteCta", { price: unlockPriceLabel })}
+                desktopRevealDescription={t("cadastru.unlockCompleteDescription")}
                 onLockedClick={isLockedPreview ? () => setIsPaywallModalOpen(true) : undefined}
               >
                 {map}
@@ -1264,8 +1276,22 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
               unavailable={!nearbySearchAvailable || (nearbyState.key === nearbyKey && nearbyState.error)}
             />
           )}
-          {valuationPrefill && !shareSlug && (
-            <div className="mt-8 flex justify-center">
+          {secondaryAvailable && (
+            <CadastruPublicTransportCard
+              transport={transportState.key === nearbyKey ? transportState.data : null}
+              loading={nearbySearchAvailable && (transportState.key !== nearbyKey || transportState.loading)}
+              unavailable={!nearbySearchAvailable || (transportState.key === nearbyKey && transportState.error)}
+            />
+          )}
+          {secondaryAvailable && reportsAvailable && (
+            <CadastruMunicipalReportsCard
+              reports={reportsState.key === nearbyKey ? reportsState.data : null}
+              loading={nearbySearchAvailable && (reportsState.key !== nearbyKey || reportsState.loading)}
+              unavailable={!nearbySearchAvailable || (reportsState.key === nearbyKey && reportsState.error)}
+            />
+          )}
+          <CadastruListingsCard data={marketReady && marketState.key === marketKey ? marketState.data : null}>
+            {valuationPrefill && !shareSlug && (
               <button
                 type="button"
                 onClick={async () => {
@@ -1284,7 +1310,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
                   }
                   router.push(`/estimeaza?${params.toString()}`);
                 }}
-                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary/90 sm:w-auto"
+                className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-base font-semibold text-emerald-950 shadow-sm transition-colors hover:bg-emerald-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300 sm:w-auto"
               >
                 {t("cadastru.valuationCta")}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
@@ -1292,26 +1318,11 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
                   <path d="m13 6 6 6-6 6" />
                 </svg>
               </button>
-            </div>
-          )}
-          {secondaryAvailable && (
-            <CadastruPublicTransportCard
-              transport={transportState.key === nearbyKey ? transportState.data : null}
-              loading={nearbySearchAvailable && (transportState.key !== nearbyKey || transportState.loading)}
-              unavailable={!nearbySearchAvailable || (transportState.key === nearbyKey && transportState.error)}
-            />
-          )}
-          {secondaryAvailable && reportsAvailable && (
-            <CadastruMunicipalReportsCard
-              reports={reportsState.key === nearbyKey ? reportsState.data : null}
-              loading={nearbySearchAvailable && (reportsState.key !== nearbyKey || reportsState.loading)}
-              unavailable={!nearbySearchAvailable || (reportsState.key === nearbyKey && reportsState.error)}
-            />
-          )}
-          <CadastruListingsCard data={marketReady && marketState.key === marketKey ? marketState.data : null} />
+            )}
+          </CadastruListingsCard>
           {(state.data || secondaryAvailable) && (
             <p className="mt-6 text-center text-xs text-gray-500">
-              © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a> · © <a href="https://map.md/" className="underline">map.md</a>
+              <a href="https://ipcbi.gov.md" className="underline">ipcbi.gov.md</a> · © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a> · © <a href="https://map.md/" className="underline">map.md</a>
             </p>
           )}
           {state.data && (
@@ -1330,6 +1341,11 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
         </section>
       </main>
       <Footer />
+      {isLockedPreview && purchaseOffer ? (
+        <div className="lg:hidden">
+          <FeaturePricingAction offer={purchaseOffer} mobileDock />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -12,6 +12,8 @@ export default function CadastralDataCard({
   forceDesktopLayout = false,
   showRevealButton = false,
   revealButtonLabel,
+  desktopRevealButtonLabel,
+  desktopRevealDescription,
   children,
 }) {
   const { lang, t } = useTranslation();
@@ -28,7 +30,6 @@ export default function CadastralDataCard({
   const lands = Array.isArray(cadastral.lands) ? cadastral.lands : [];
   const addressBuildings = Array.isArray(cadastral.buildings) ? cadastral.buildings : [];
   const hasAddressProperties = lands.length > 0 || addressBuildings.length > 0;
-  const hasPartialAddressProperties = [...lands, ...addressBuildings].some((property) => property?.partial);
   const hasApartmentDetails = Boolean(
     cadastral.apartment?.area_m2 ||
       cadastral.apartment?.floor ||
@@ -58,21 +59,22 @@ export default function CadastralDataCard({
       cadastral.building?.electricity
   );
   const hasFullDetails = (hasApartmentDetails && hasBuildingDetails) || hasAddressProperties;
-  const hasLimitedCadastralData = Boolean(
-    cadastral.partial || hasPartialAddressProperties || (!hasAddressProperties && (!hasApartmentDetails || !hasBuildingDetails))
-  );
   const widthClass = hasFullDetails || forceDesktopLayout ? "w-full" : "mx-auto w-full max-w-xl";
   const detailsGridClass = hasFullDetails || forceDesktopLayout
     ? `grid gap-6 ${forceDesktopLayout ? "grid-cols-2 gap-8" : "lg:grid-cols-2 lg:gap-8"}`
     : "grid gap-6";
   const detailValueClass = "min-w-0 break-words text-right font-medium text-gray-900";
   const hasLockedDetails = locked || cadastral.locked_sections?.cadastru_details === true;
+  const isAddressLocked = hasLockedDetails && cadastral.locked_sections?.address === true;
+  const locality = cadastral.address_locality;
+  const addressDetail = locality && displayAddress?.startsWith(`${locality}, `)
+    ? displayAddress.slice(locality.length + 2) : displayAddress;
   const showLockedRevealButton = Boolean(showRevealButton && hasLockedDetails && onLockedClick);
   const revealButton = showLockedRevealButton ? (
     <button
       type="button"
       onClick={onLockedClick}
-      className={`inline-flex min-h-10 w-max cursor-pointer items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 sm:px-5 ${cadastral.cadastral_number ? "absolute inset-y-0 left-1/2 h-10 max-w-[calc(100%-1.5rem)] -translate-x-1/2 whitespace-nowrap" : "max-w-full"}`}
+      className={`inline-flex min-h-10 w-max cursor-pointer items-center justify-center gap-2 rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 sm:px-5 ${desktopRevealButtonLabel ? "lg:hidden" : ""} ${cadastral.cadastral_number ? "absolute inset-y-0 left-1/2 h-10 max-w-[calc(100%-1.5rem)] -translate-x-1/2 whitespace-nowrap" : "max-w-full"}`}
     >
       <LockIcon size={16} strokeWidth={2.2} />
       {revealButtonLabel || t("cadastru.unlockData")}
@@ -192,26 +194,31 @@ export default function CadastralDataCard({
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
               {t("cadastru.numberLabel")}
             </p>
-            <div className={showLockedRevealButton ? "relative mt-2 min-h-10" : "relative mt-1"}>
+            <div className={showLockedRevealButton && isCadastralNumberLocked ? "relative mt-2 min-h-10" : "relative mt-1"}>
               <p
                 className={`font-mono text-xl font-semibold tracking-wide text-emerald-950 ${isCadastralNumberLocked ? "select-none blur-sm cursor-pointer" : ""}`}
                 {...cadastralNumberProps}
               >
                 {cadastral.cadastral_number}
               </p>
-              {revealButton}
+              {isCadastralNumberLocked ? revealButton : null}
             </div>
           </div>
         )}
 
         {displayAddress && (
           <p className="text-base text-gray-600">
-            {displayAddress}
+            {isAddressLocked ? <>
+              {locality ? `${locality}, ` : null}
+              <span className="select-none blur-sm cursor-pointer" {...lockedValueProps("address", "address")} aria-label={t("cadastru.payToUnlock")}>
+                {addressDetail}
+              </span>
+            </> : displayAddress}
           </p>
         )}
 
         {!cadastral.cadastral_number && showLockedRevealButton && (
-          <div className="flex justify-center">
+          <div className={`flex justify-center ${desktopRevealButtonLabel ? "lg:hidden" : ""}`}>
             {revealButton}
           </div>
         )}
@@ -271,24 +278,22 @@ export default function CadastralDataCard({
           </div>
         )}
 
-        <div className="pt-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0">
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
-            {t("result.cadastralDataSource")}
-          </span>
-          <CadastruFreshnessNote freshness={cadastral.data_freshness} />
-        </div>
-
-        {hasLimitedCadastralData && (
-          <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-            <svg viewBox="0 0 20 20" fill="currentColor" className="mt-0.5 h-4 w-4 shrink-0 text-sky-500">
-              <path fillRule="evenodd" d="M18 10A8 8 0 1 1 2 10a8 8 0 0 1 16 0Zm-8-4a.875.875 0 1 0 0 1.75A.875.875 0 0 0 10 6Zm.75 4a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0v-4Z" clipRule="evenodd" />
-            </svg>
-            <p>{t("cadastru.limitedDataNote")}</p>
+        {showLockedRevealButton && desktopRevealButtonLabel ? (
+          <div className="hidden rounded-2xl border border-emerald-200 bg-emerald-50 p-6 lg:block">
+            {desktopRevealDescription ? (
+              <p className="mx-auto mb-4 max-w-3xl text-center text-base leading-relaxed text-gray-700">{desktopRevealDescription}</p>
+            ) : null}
+            <button
+              type="button"
+              onClick={onLockedClick}
+              className="inline-flex min-h-14 w-full cursor-pointer items-center justify-center gap-3 rounded-xl bg-emerald-700 px-6 py-4 text-lg font-semibold text-white shadow-sm transition-colors hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+            >
+              <LockIcon size={20} strokeWidth={2.2} />
+              {desktopRevealButtonLabel}
+            </button>
           </div>
-        )}
+        ) : null}
+        <CadastruFreshnessNote freshness={cadastral.data_freshness} />
       </div>
     </div>
   );

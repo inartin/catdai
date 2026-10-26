@@ -12,7 +12,7 @@ Implemented, depends on external parser and Supabase snapshots.
 
 ## Cadastru result card
 
-`/api/cadastru/market` supplies real building/same-street sale listings, retained price histories and optional sector trends after the other result cards finish loading. EUR prices are compared separately from the all-currency collected-ad count. Exact parsed addresses are required; unmatched addresses are not guessed. Missing listings fall back to sector trends, and no data hides the card. Successful payloads are cached for one hour. See [cadastral lookup](cadastral.md#building-listing-market-card).
+`/api/cadastru/market` supplies real building/same-street sale listings, retained price histories and optional sector trends after the other result cards finish loading. EUR prices are compared separately from the all-currency collected-ad count. Exact parsed addresses are required; unmatched addresses are not guessed. Missing listings fall back to sector trends, and no data hides the card. Locked number-search previews receive sector trends only until the property lookup is unlocked, keeping the exact address behind the paywall. Successful payloads are cached for one hour with separate restricted/full keys. See [cadastral lookup](cadastral.md#building-listing-market-card).
 
 ## Live Prices API
 - App route: `GET /api/prices`.

@@ -1,4 +1,5 @@
 import { buildFeatureCreditRequiredPayload } from "@/lib/paid-feature-usage";
+import { resolveCadastruCityFromAddress, resolveCadastruSupportedCity } from "@/lib/cadastru-supported-cities";
 
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 
@@ -23,6 +24,35 @@ function maskPropertyCollection(items) {
   return items.map((item) => maskObjectFields(item, ["address", "map_location", "map_geometry"]));
 }
 
+function addressLocality(payload) {
+  const addresses = [payload?.apartment?.address, payload?.building?.address,
+    payload?.matched_address, payload?.building_address, payload?.geocoded_address,
+    payload?.resolved_address, payload?.request_address, payload?.location?.display_name,
+    ...(Array.isArray(payload?.lands) ? payload.lands : []).map((item) => item?.address),
+    ...(Array.isArray(payload?.buildings) ? payload.buildings : []).map((item) => item?.address)];
+  return addresses.map(resolveCadastruCityFromAddress).find(Boolean)
+    || [payload?.location?.village, payload?.location?.town, payload?.location?.city,
+      payload?.form_fields?.city, payload?.parsed_input?.city].map(resolveCadastruSupportedCity).find(Boolean)
+    || null;
+}
+
+const ADDRESS_FIELDS = new Set(["address", "display_name", "matched_address", "building_address",
+  "geocoded_address", "request_address", "resolved_address", "full_address", "formatted_address"]);
+const ADDRESS_PARTS = new Set(["road", "street", "street_name", "house_number", "building_number",
+  "apartment_number", "postcode"]);
+
+function maskAddresses(value, placeholder) {
+  if (Array.isArray(value)) return value.map((item) => maskAddresses(item, placeholder));
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key,
+    ADDRESS_FIELDS.has(key) && typeof item === "string" && item
+      ? placeholder
+      : ADDRESS_PARTS.has(key) && (typeof item === "string" || typeof item === "number")
+        ? maskValue(item)
+        : maskAddresses(item, placeholder),
+  ]));
+}
+
 export function buildCadastruPreviewPayload(payload, reason = "no_credit", options = {}) {
   const maskCadastralNumber = options?.maskCadastralNumber === true;
   const apartment = {
@@ -38,7 +68,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
   };
   const hasAddressProperties = Boolean(payload?.lands?.length || payload?.buildings?.length);
 
-  return {
+  const preview = {
     cadastral_number: hasAddressProperties
       ? payload?.cadastral_number
       : maskCadastralNumber
@@ -71,5 +101,14 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
       ...(maskCadastralNumber && !hasAddressProperties ? { cadastral_number: true } : {}),
     },
     access_limit: buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
+  };
+  if (options?.maskAddress !== true) return preview;
+  const locality = addressLocality(payload);
+  const placeholder = [locality, "str. Exemplu 10, ap. 1"].filter(Boolean).join(", ");
+  return {
+    ...maskAddresses(preview, placeholder),
+    address_locality: locality,
+    street_resolution: null,
+    locked_sections: { ...preview.locked_sections, address: true },
   };
 }

@@ -524,6 +524,7 @@ async function handlePost(request) {
     if (!creditCheck.allowed) {
       const preview = buildCadastruPreviewPayload(payload, creditCheck.reason || "no_credit", {
         maskCadastralNumber: maskPreviewCadastralNumber,
+        maskAddress: !maskPreviewCadastralNumber,
       });
       const res = NextResponse.json({ ...preview, cadastru_evaluation_token: evaluationToken });
       res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -546,6 +547,7 @@ async function handlePost(request) {
     if (!creditUsage.allowed) {
       const preview = buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit", {
         maskCadastralNumber: maskPreviewCadastralNumber,
+        maskAddress: !maskPreviewCadastralNumber,
       });
       const res = NextResponse.json({ ...preview, cadastru_evaluation_token: evaluationToken });
       res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -612,7 +614,10 @@ async function handlePost(request) {
       if (partial) {
         // Building-only fallback never consumes a full apartment lookup credit.
         return NextResponse.json(creditCheck.allowed ? partial
-          : buildCadastruPreviewPayload(partial, creditCheck.reason || "no_credit", { maskCadastralNumber: maskPreviewCadastralNumber }));
+          : buildCadastruPreviewPayload(partial, creditCheck.reason || "no_credit", {
+            maskCadastralNumber: maskPreviewCadastralNumber,
+            maskAddress: !maskPreviewCadastralNumber,
+          }));
       }
     }
     const details = {

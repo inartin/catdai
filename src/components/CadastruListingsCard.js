@@ -61,7 +61,7 @@ function availableTrend(trend) {
   return series.length ? { ...trend, series } : null;
 }
 
-export default function CadastruListingsCard({ data = null }) {
+export default function CadastruListingsCard({ data = null, children }) {
   const { lang, t } = useTranslation();
   const [houseId, setHouseId] = useState("current");
   const [tab, setTab] = useState("active");
@@ -144,6 +144,7 @@ export default function CadastruListingsCard({ data = null }) {
             </div>
           )}
         </div>
+        {children ? <div className="relative mt-6">{children}</div> : null}
         {hasListings && <button type="button" aria-expanded={expanded} aria-controls={contentId}
           onClick={() => {
             if (expanded && cardRef.current.getBoundingClientRect().top < 0) {

@@ -10,6 +10,7 @@ import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics
 import { rateLimit } from "@/lib/rate-limit";
 import { validateCadastralNumber } from "@/lib/validation";
 import { resolveCadastruShareSearch } from "@/lib/cadastru-share-statistics";
+import { getCadastruSharePath } from "@/lib/cadastru-share-url";
 
 const limiter = rateLimit({ interval: 60_000, limit: 20, namespace: "cadastru-share" });
 
@@ -89,7 +90,7 @@ async function handlePost(request) {
 
     const lang = body.lang === "ru" ? "ru" : "ro";
     const origin = process.env.NODE_ENV === "production" ? "https://catdai.md" : new URL(request.url).origin;
-    return NextResponse.json({ slug, url: `${origin}/${lang}/cadastru/rezultat?share_slug=${slug}` });
+    return NextResponse.json({ slug, url: `${origin}${getCadastruSharePath(slug, lang)}` });
   } catch (error) {
     console.error("[cadastru/share] create failed:", error.message);
     return NextResponse.json({ error: "sharing_unavailable" }, { status: 503 });

@@ -23,6 +23,8 @@ assert.deepEqual(cadastruMapFeatures({ lands: [{ map_geometry: polygon, cadastra
     { type: "Feature", properties: { kind: "building" }, geometry: multipolygon },
   ] });
 assert.equal(cadastruMapFeatures({ map_geometry: polygon, lands: [{ map_geometry: polygon }] }).features.length, 1);
+assert.deepEqual(cadastruMapFeatures({ map_geometry: polygon, buildings: [{ map_geometry: polygon }] }).features[0].properties,
+  { kind: "building" }, "a repeated top-level building footprint keeps its building color");
 assert.equal(cadastruMapFeatures({ lands: [{ map_geometry: "||||" }] }).features.length, 0);
 assert.equal(cadastruMapFeatures({ lands: {}, buildings: "invalid" }).features.length, 0);
 

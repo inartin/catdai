@@ -99,6 +99,9 @@ const structuredAddress = { city: "Chișinău", street: "Strada Ștefan cel Mare
 const number = "0100201.999.01.012";
 const payload = { cadastral_number: number, apartment: { address, area_m2: 64, unknown_field: { nested: [0, false, null] } }, building: { address: "Chișinău, str Ștefan cel Mare 9", construction_year: 1981 }, novel: { records: [{ value: "unexpected" }] }, access_tier: "paid", access_limit: { reason: "private" }, locked_sections: {} };
 payload.map_location = { latitude: 47.14, longitude: 28.86 };
+const mapShape = { type: "Polygon", coordinates: [[[28.8, 47], [28.801, 47], [28.801, 47.001], [28.8, 47]]] };
+payload.map_geometry = mapShape;
+payload.building.map_geometry = mapShape;
 const expected = clone(payload);
 delete expected.access_tier; delete expected.access_limit; delete expected.locked_sections;
 await storage.persistCadastruRecord(payload, { officialFetch: true, structuredAddress });
@@ -173,10 +176,13 @@ await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, apartm
 const coordinateRow = tables.cadastru_records.find((row) => row.cadastral_number === coordinateNumber);
 const coordinateExpiry = coordinateRow.next_refresh_after;
 const originalHash = coordinateRow.payload_hash;
-await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address", district: "bOTANICA", map_location: coordinateLocation }, { officialFetch: true });
+await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address", district: "bOTANICA", map_location: coordinateLocation,
+  map_geometry: mapShape, building: { map_geometry: mapShape } }, { officialFetch: true });
 cache.clear();
 let coordinatePayload = (await storage.getCadastruRecordByNumber(coordinateNumber)).payload;
 assert.deepEqual(clone(coordinatePayload.map_location), coordinateLocation, "DB retains new coordinates alongside existing details");
+assert.deepEqual(clone(coordinatePayload.map_geometry), mapShape, "DB retains new parcel geometry alongside existing details");
+assert.deepEqual(clone(coordinatePayload.building.map_geometry), mapShape, "DB retains the separately identified building footprint");
 assert.equal(coordinatePayload.district, "bOTANICA", "DB retains the worker district alongside existing details");
 assert.equal(coordinateRow.district, "bOTANICA", "DB indexes the fresh worker district");
 assert.equal(coordinatePayload.apartment.area_m2, 40);
@@ -184,10 +190,13 @@ assert.equal(coordinateRow.next_refresh_after, coordinateExpiry, "location updat
 assert.notEqual(coordinateRow.payload_hash, originalHash);
 await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address" }, { officialFetch: true });
 assert.deepEqual(clone((await storage.getCadastruRecordByNumber(coordinateNumber)).payload.map_location), coordinateLocation, "omitted coordinates preserve saved location");
-await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address", map_location: null }, { officialFetch: true });
+await storage.persistCadastruRecord({ cadastral_number: coordinateNumber, method: "address", map_location: null,
+  map_geometry: null, building: { map_geometry: null } }, { officialFetch: true });
 cache.clear();
 coordinatePayload = (await storage.getCadastruRecordByNumber(coordinateNumber)).payload;
 assert.equal(coordinatePayload.map_location, null, "explicitly unavailable location survives DB reload");
+assert.deepEqual(clone(coordinatePayload.map_geometry), mapShape, "an optional geometry miss cannot erase a saved outline");
+assert.deepEqual(clone(coordinatePayload.building.map_geometry), mapShape);
 assert.equal(coordinatePayload.apartment.area_m2, 40);
 
 await storage.persistCadastruRecord({ cadastral_number: "0100201.111", mystery: { no_address: true } }, { officialFetch: true });
@@ -1632,3 +1641,31 @@ for (const mode of ['cached-address', 'fresh-address', 'number']) {
   assert.equal(failures.at(-1).lookupId,lookupId,mode);
 }
 console.log('Credit failure regressions passed: cached/fresh addresses and number results report internal errors and failed search outcomes.');
+
+// Previously guessed identities must miss both fresh and stale cache/DB reads.
+for (const source of ['geodata_wms_derived', 'geodata_wfs_building_derived', 'geodata_wfs_parcel_derived']) {
+  const unsafe = { ...expected, source };
+  const entry = { payload: unsafe, expiresAt: new Date(Date.now() + 86400000).toISOString() };
+  const savedTables = clone(tables);
+  cache.clear();
+  tables.cadastru_records.length = 0;
+  tables.cadastru_address_aliases.length = 0;
+  await caching.writeCadastruCache('number', number, entry);
+  await caching.writeCadastruCache('address', storage.normalizeCadastruAddressForDb(address), entry);
+  for (const allowExpired of [false, true]) {
+    assert.equal(await storage.getCadastruRecordByNumber(number, { allowExpired }), null);
+    assert.equal(await storage.getCadastruRecordByAddress(address, { allowExpired, structuredAddress }), null);
+  }
+  cache.clear();
+  tables.cadastru_records.push({ ...savedTables.cadastru_records[0], cadastral_number:number,
+    source, raw_payload:unsafe, next_refresh_after:entry.expiresAt });
+  tables.cadastru_address_aliases.push({address_key:storage.normalizeCadastruAddressForDb(address),raw_payload:unsafe,expires_at:entry.expiresAt});
+  assert.equal(await storage.getCadastruRecordByNumber(number,{allowExpired:true}),null);
+  assert.equal(await storage.getCadastruRecordByAddress(address,{allowExpired:true,structuredAddress}),null);
+  tables.cadastru_address_aliases.length=0; cache.clear();
+  assert.equal(await storage.getCadastruRecordByAddress(address,{allowExpired:true,structuredAddress}),null);
+  await assert.rejects(storage.persistCadastruAddressResult(unsafe,{requestAddress:address}),{code:'not_found'});
+  assert.equal(await storage.persistCadastruRecord(unsafe),null);
+  for(const key of Object.keys(tables)) tables[key].splice(0,Infinity,...savedTables[key]);
+}
+console.log('Derived apartment identity cache and storage regressions passed.');

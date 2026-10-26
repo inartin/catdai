@@ -178,7 +178,6 @@ export default function CadastruMunicipalReportsCard({ reports, loading, unavail
           <div className="mt-5 space-y-1 text-xs leading-relaxed text-gray-500">
             {reports.incomplete ? <p>{t("cadastru.reportsIncomplete")}</p> : null}
             {reports.cache.stale ? <p>{t("cadastru.reportsStale")}</p> : null}
-            <p>{t("cadastru.reportsNote")}</p>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm">
             <div className="text-gray-500">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-const STORAGE_KEY = "catdai_market_trends";
+const STORAGE_KEY = "catdai_market_trends_v5";
 
 function readCache() {
   try {

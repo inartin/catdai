@@ -12,6 +12,7 @@ import Tooltip from "@/components/Tooltip";
 import ValuationPdfDialog from "@/components/ValuationPdfDialog";
 import CadastralDataCard from "@/components/CadastralDataCard";
 import InfoCallout from "@/components/InfoCallout";
+import SharedMarketTrendMiniChart from "@/components/MarketTrendMiniChart";
 
 const PDF_LOGIN_RETURN_KEY = "catdai:open-pdf-after-login";
 const LISTING_FAIR_BAND_PCT = 3;
@@ -118,13 +119,6 @@ function formatYears(num, t) {
   return t("calculator.resultYearsValue", { years: value.toFixed(1) });
 }
 
-function formatTrendDate(date, lang) {
-  if (!date) return "";
-  return new Date(`${date}T00:00:00`).toLocaleDateString(
-    lang === "ru" ? "ru-RU" : "ro-RO",
-    { day: "2-digit", month: "short" }
-  );
-}
 
 function formatHistoryDate(date, lang) {
   if (!date) return "";
@@ -279,151 +273,14 @@ function buildEvaluationUrl(params) {
 }
 
 function MarketTrendMiniChart({ trend, compact = false, locked = false, onLockedClick }) {
-  const { t, lang } = useTranslation();
+  const { t } = useTranslation();
   const lockedTooltipKey = useContext(LockedTooltipContext);
-  const [activeIndex, setActiveIndex] = useState(null);
-  const points = Array.isArray(trend?.points)
-    ? trend.points
-      .map((point) => ({
-        date: point.date,
-        value: Number(point.value),
-      }))
-      .filter((point) => point.date && Number.isFinite(point.value) && point.value > 0)
-    : [];
-
-  if (points.length < 2) return null;
-
-  const values = points.map((point) => point.value);
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const width = 176;
-  const height = 48;
-  const padding = 4;
-  const span = maxValue - minValue;
-  const chartPoints = points.map((point, index) => {
-    const x = padding + (index / (points.length - 1)) * (width - padding * 2);
-    const y = span === 0
-      ? height / 2
-      : height - padding - ((point.value - minValue) / span) * (height - padding * 2);
-
-    return { ...point, x, y };
-  });
-  const coords = chartPoints.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
-  const activePoint = Number.isInteger(activeIndex) ? chartPoints[activeIndex] : null;
-  const firstPoint = chartPoints[0];
-  const lastPoint = chartPoints[chartPoints.length - 1];
-  const endValue = Number(trend.end_value);
-  const changePct = Number(trend.change_pct);
-  const isUp = changePct > 0;
-  const isDown = changePct < 0;
-  const toneClass = isUp
-    ? "text-emerald-600 bg-emerald-50"
-    : isDown
-      ? "text-red-600 bg-red-50"
-      : "text-gray-500 bg-gray-100";
-  const lockedTextClassName = locked ? "select-none blur-sm" : "";
-  const lockedChartClassName = locked ? "opacity-80" : "";
-  const metricLabel = trend.metric === "average_price_per_m2"
-    ? t("result.trendMetricAverage")
-    : t("result.trendMetricMedian");
-
-  const chartContent = (
-    <div
-      className={`${compact
-        ? "mt-5 border-t border-gray-100 pt-4"
-        : "mt-5 border-t border-gray-100 pt-4 lg:mt-0 lg:w-full lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0"
-        }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-            {trend.scope === "city" ? t("result.cityTrend") : t("result.districtTrend")}
-          </p>
-          <p className="mt-0.5 text-[11px] text-gray-400">
-            {t("result.trendPeriod", { days: trend.period_days || 30 })}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-2 flex items-center gap-2">
-        <p className={`text-lg font-bold leading-none text-gray-900 ${lockedTextClassName}`}>
-          {formatPrice(endValue)}/m²
-        </p>
-        <span className={`shrink-0 rounded-lg px-2 py-1 text-xs font-bold ${toneClass} ${lockedTextClassName}`}>
-          {formatTrendPercent(changePct)}
-        </span>
-      </div>
-      <p className={`mt-1 text-[11px] text-gray-400 ${lockedTextClassName}`}>{metricLabel}</p>
-
-      <div className="relative mt-3 h-14 w-full">
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="none"
-          className={`absolute inset-0 h-full w-full overflow-visible text-primary ${lockedChartClassName}`}
-          role="img"
-          aria-label={t("result.districtTrend")}
-        >
-          <line x1="0" y1={height - padding} x2={width} y2={height - padding} stroke="currentColor" strokeOpacity="0.08" strokeWidth="1" vectorEffect="non-scaling-stroke" />
-          <polyline
-            points={coords}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={locked ? "4" : "3"}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
-        {!locked && chartPoints.map((point, index) => (
-          <button
-            key={`${point.date}-${point.value}`}
-            type="button"
-            aria-label={`${formatTrendDate(point.date, lang)} ${formatPrice(point.value)}/m²`}
-            className="group absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full outline-none"
-            style={{
-              left: `${(point.x / width) * 100}%`,
-              top: `${(point.y / height) * 100}%`,
-            }}
-            onMouseEnter={() => setActiveIndex(index)}
-            onMouseLeave={() => setActiveIndex(null)}
-            onFocus={() => setActiveIndex(index)}
-            onBlur={() => setActiveIndex(null)}
-          >
-            <span className="block h-2.5 w-2.5 translate-x-[5px] translate-y-[5px] rounded-full border-2 border-primary bg-white opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100" />
-          </button>
-        ))}
-        {activePoint && (
-          <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 px-2.5 py-1.5 text-center text-[11px] font-medium leading-tight text-white shadow-lg"
-            style={{
-              left: `${(activePoint.x / width) * 100}%`,
-              top: `${(activePoint.y / height) * 100}%`,
-            }}
-          >
-            <span className="block whitespace-nowrap">{formatTrendDate(activePoint.date, lang)}</span>
-            <span className="block whitespace-nowrap">{formatPrice(activePoint.value)}/m²</span>
-          </div>
-        )}
-      </div>
-      <div className={`mt-1 flex items-center justify-between text-[11px] leading-none text-gray-400 ${lockedTextClassName}`}>
-        <span>{formatTrendDate(firstPoint.date, lang)}</span>
-        <span>{formatTrendDate(lastPoint.date, lang)}</span>
-      </div>
-    </div>
-  );
-
+  if (!Array.isArray(trend?.points) || trend.points.filter((point) => point.date && Number.isFinite(Number(point.value)) && Number(point.value) > 0).length < 2) return null;
+  const chartContent = <SharedMarketTrendMiniChart trend={trend} compact={compact} locked={locked} />
   if (!locked) return chartContent;
-
   return (
     <Tooltip text={t(lockedTooltipKey)} className="block w-full" wrapperClassName="block w-full">
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onLockedClick?.();
-        }}
-        className="relative block w-full cursor-pointer border-0 bg-transparent p-0 text-left"
-      >
+      <button type="button" onClick={(event) => { event.stopPropagation(); onLockedClick?.(); }} className="relative block w-full cursor-pointer border-0 bg-transparent p-0 text-left">
         {chartContent}
         <LockedOverlayIcon />
       </button>

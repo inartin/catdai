@@ -106,10 +106,11 @@ const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
     return new Promise((resolve, reject) => requests.set(url, { resolve, reject, options }));
   },
 });
-function render() {
+function render(props = {}) {
   cursor = 0;
   effects = [];
-  const tree = page.default().props.children.type();
+  const content = page.default(props).props.children;
+  const tree = content.type(content.props);
   effects.forEach((effect) => effect());
   return tree;
 }
@@ -481,8 +482,11 @@ for (const locale of ["ro", "ru"]) {
 for (const slot of slots) slot?.cleanup?.();
 console.log("Compact land input passed: RO/RU result-page validation and canonical main/secondary requests.");
 
-// Shared reports load a public saved result, ignoring ordinary query criteria.
-for (const locale of ["ro", "ru"]) {
+// Old query links and short-route props load the same saved report, ignoring other criteria.
+for (const { locale, compact } of [
+  { locale: "ro", compact: false }, { locale: "ru", compact: false },
+  { locale: "ro", compact: true }, { locale: "ru", compact: true },
+]) {
   lang = locale;
   for (const slot of slots) slot?.cleanup?.();
   slots.length = 0;
@@ -492,9 +496,10 @@ for (const locale of ["ro", "ru"]) {
   authSession = null;
   const slug = "a".repeat(48);
   trackedOpens.length = 0;
-  searchParams = new URLSearchParams({ share_slug: slug, cadastral_number: "1014203418",
+  const props = compact ? { shareSlug: slug } : {};
+  searchParams = new URLSearchParams({ share_slug: compact ? "b".repeat(48) : slug, cadastral_number: "1014203418",
     source: "address", city: "Orhei", street: "Injected", house_number: "999", skipcache: "true" });
-  render();
+  render(props);
   assert.equal(requests.size, 1);
   assert(requests.has(`/api/cadastru/share/${slug}`));
   assert.equal(trackedOpens.length, 0, "Loading requests do not count as opened reports");
@@ -502,7 +507,7 @@ for (const locale of ["ro", "ru"]) {
     form_fields: { city: "Chișinău" }, map_location: { latitude: 47.02, longitude: 28.83 } };
   requests.get(`/api/cadastru/share/${slug}`).resolve({ ok: true, json: async () => ({ cadastral: snapshot }) });
   await flush();
-  const tree = render();
+  const tree = render(props);
   assert.deepEqual(trackedOpens, [slug], "Only a loaded shared report records an open");
   const sharedCard = findNode(tree, (node) => node.props?.cadastral === snapshot);
   assert(sharedCard, "anonymous viewers see the saved full report");
@@ -520,7 +525,7 @@ for (const locale of ["ro", "ru"]) {
   assert(!requests.has("/api/cadastru/address"));
 }
 for (const slot of slots) slot?.cleanup?.();
-console.log("Shared report viewer passed: anonymous RO/RU report, map and concurrent secondary cards, tamper-proof criteria and no gated lookup.");
+console.log("Shared report viewer passed: old and compact RO/RU links, anonymous report, map and concurrent secondary cards, tamper-proof criteria and no gated lookup.");
 
 for (lang of ["ro", "ru"]) {
   const freshness = { property: { fetched_at: "2026-10-01T12:00:00Z", stale: true } };

@@ -6,6 +6,7 @@ import { matchDistrict } from "@/lib/validation";
 import { resolveCadastruSupportedCity, resolveCadastruCityFromAddress } from "@/lib/cadastru-supported-cities";
 import { cadastruExpiresAt, isFreshCadastru, cleanCadastruPayload, readCadastruCache, writeCadastruCache, withCadastruFreshness } from "@/lib/cadastru-cache";
 import { apartmentBuildingNumber, isApartmentBlock, storeSharedBuilding, getSharedBuilding, composeBuildingEntry } from "@/lib/cadastru-buildings";
+import { validMapGeometry } from "@/lib/cadastru-map";
 
 const RECORD_COLUMNS = [
   "id",
@@ -49,6 +50,11 @@ const RECORD_COLUMNS = [
 
 const RESULT_TYPES = new Set(["no_data", "address_only", "land_only", "apartment_only", "full_data"]);
 const LOOKUP_SOURCES = new Set(["api", "local"]);
+
+// These legacy resolver sources guessed an apartment's cadastral identity.
+function hasDerivedIdentity(payload) {
+  return ["geodata_wms_derived", "geodata_wfs_building_derived", "geodata_wfs_parcel_derived"].includes(payload?.source);
+}
 
 function isObject(value) {
   return value && typeof value === "object" && !Array.isArray(value);
@@ -491,7 +497,7 @@ async function persistBuildingBundles(payload, options) {
 }
 
 export async function persistCadastruRecord(payload, options = {}) {
-  if (!isCadastruDbEnabled()) return null;
+  if (!isCadastruDbEnabled() || hasDerivedIdentity(payload)) return null;
 
   try {
     if (!options.skipBuildingBundles) await persistBuildingBundles(payload, options);
@@ -510,11 +516,16 @@ export async function persistCadastruRecord(payload, options = {}) {
         });
       } else {
         sharedBuilding = await getSharedBuilding(parentNumber);
+        if (sharedBuilding && options.officialFetch && validMapGeometry(row.building_data.map_geometry)) {
+          sharedBuilding = await storeSharedBuilding(parentNumber, { map_geometry: row.building_data.map_geometry });
+        }
       }
     }
     if (blockProperty && await getSharedBuilding(row.cadastral_number)) {
       sharedBuilding = options.officialFetch
-        ? await storeSharedBuilding(row.cadastral_number, { registry: blockProperty }, {
+        ? await storeSharedBuilding(row.cadastral_number, { registry: blockProperty,
+          ...(validMapGeometry(blockProperty.map_geometry) ? { map_geometry: blockProperty.map_geometry } : {}),
+        }, {
           mapLocation: blockProperty.map_location,
         }) : await getSharedBuilding(row.cadastral_number);
       if (sharedBuilding) {
@@ -552,11 +563,14 @@ export async function persistCadastruRecord(payload, options = {}) {
 
     const now = new Date().toISOString();
     const countLookup = shouldCollectStatistics() && options.countLookup !== false;
-    const shouldKeepExistingDetail = !sharedBuilding && existing && isFreshCadastru(recordExpiry(existing)) && row.raw_payload.method === "address" && hasDetailedPayload(existing.raw_payload) && !hasDetailedPayload(row.raw_payload);
+    const shouldKeepExistingDetail = !sharedBuilding && existing && !hasDerivedIdentity(existing) && !hasDerivedIdentity(existing.raw_payload) && isFreshCadastru(recordExpiry(existing)) && row.raw_payload.method === "address" && hasDetailedPayload(existing.raw_payload) && !hasDetailedPayload(row.raw_payload);
     const retainedPayload = shouldKeepExistingDetail
       ? {
           ...existing.raw_payload,
           ...(Object.hasOwn(row.raw_payload, "map_location") ? { map_location: row.raw_payload.map_location } : {}),
+          ...(validMapGeometry(row.raw_payload.map_geometry) ? { map_geometry: row.raw_payload.map_geometry } : {}),
+          ...(validMapGeometry(row.raw_payload.building?.map_geometry)
+            ? { building: { ...existing.raw_payload.building, map_geometry: row.raw_payload.building.map_geometry } } : {}),
           ...(cleanText(row.raw_payload.district) ? { district: row.raw_payload.district } : {}),
           ...(row.raw_payload.district_lookup_checked === true ? { district_lookup_checked: true } : {}),
           ...(row.raw_payload.nearby ? { nearby: row.raw_payload.nearby } : {}),
@@ -668,11 +682,11 @@ async function saveAddressAlias(address, entry) {
 
 export async function getCadastruRecordByNumber(cadastralNumber, options = {}) {
   const cached = await readCadastruCache("number", cadastralNumber, options);
-  if (cached && (!options.requireDetailPayload || !isAddressResolverOnlyRecord({ raw_payload: cached.payload }))) return composeBuildingEntry(cached);
+  if (cached && !hasDerivedIdentity(cached.payload) && (!options.requireDetailPayload || !isAddressResolverOnlyRecord({ raw_payload: cached.payload }))) return composeBuildingEntry(cached);
   if (!isCadastruDbEnabled()) return null;
   try {
     const row = await findRecordByNumber(cadastralNumber);
-    if (!row || (!options.allowExpired && !isFreshCadastru(recordExpiry(row)))) return null;
+    if (!row || hasDerivedIdentity(row) || hasDerivedIdentity(row.raw_payload) || (!options.allowExpired && !isFreshCadastru(recordExpiry(row)))) return null;
     if (options.requireDetailPayload && isAddressResolverOnlyRecord(row)) return null;
     const entry = recordEntry(row);
     await writeCadastruCache("number", cadastralNumber, entry);
@@ -703,7 +717,7 @@ export async function persistCadastruNearby(entry, nearby, address = null) {
 }
 
 async function resolveAddressEntry(entry, options = {}) {
-  if (!entry || (!options.allowExpired && !isFreshCadastru(entry.expiresAt))) return null;
+  if (!entry || hasDerivedIdentity(entry.payload) || (!options.allowExpired && !isFreshCadastru(entry.expiresAt))) return null;
   // Resolve single-property aliases through the same canonical record as number searches.
   if (entry.payload.cadastral_number) {
     const canonical = await getCadastruRecordByNumber(entry.payload.cadastral_number, options);
@@ -756,7 +770,7 @@ export async function getCadastruRecordByAddress(rawAddress, options = {}) {
     query = structured.apartmentNumber ? query.eq("apartment_number", structured.apartmentNumber) : query.is("apartment_number", null);
     const { data, error } = await query.limit(100);
     logDbError("structured address lookup failed", error);
-    const matches = (data || []).filter((row) => (!options.requireUnitDetails || !row.raw_payload?.unit_list_entry)
+    const matches = (data || []).filter((row) => !hasDerivedIdentity(row) && !hasDerivedIdentity(row.raw_payload) && (!options.requireUnitDetails || !row.raw_payload?.unit_list_entry)
       && (options.allowExpired || isFreshCadastru(recordExpiry(row))) && recordMatchesStructuredAddress(row, normalized, structured));
     // An address without an apartment can describe several parcels/buildings. Only an exact saved aggregate is safe.
     if (!structured.apartmentNumber || matches.length !== 1) return null;
@@ -770,6 +784,7 @@ export async function getCadastruRecordByAddress(rawAddress, options = {}) {
 }
 
 export async function persistCadastruAddressResult(payload, options = {}) {
+  if (hasDerivedIdentity(payload)) throw Object.assign(new Error("Unverified apartment identity from address resolver"), { code: "not_found", status: 404 });
   await persistBuildingBundles(payload, options);
   const entry = {
     payload: cleanCadastruPayload(payload),

@@ -10,10 +10,11 @@ export function cadastruMapFeatures(cadastral) {
     // Do not copy registry fields into the public map layer or its tooltips.
     features.push({ type: "Feature", properties: { kind }, geometry });
   };
-  add(cadastral, "land");
   for (const property of Array.isArray(cadastral?.lands) ? cadastral.lands : []) add(property, "land");
   for (const property of Array.isArray(cadastral?.buildings) ? cadastral.buildings : []) add(property, "building");
   add(cadastral?.building, "building");
+  // Number records can repeat a building footprint at the top level.
+  add(cadastral, "land");
   return { type: "FeatureCollection", features };
 }
 

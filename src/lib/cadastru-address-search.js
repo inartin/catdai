@@ -553,19 +553,6 @@ function displayCadastralNumber(raw) {
   return formatCadastralNumber(value);
 }
 
-function normalizeBuildingCadastralNumber(raw) {
-  const value = String(raw || "").trim();
-  if (/^\d{7,12}\.\d{2}$/.test(value)) return value;
-  if (/^\d{7}\.\d{1,4}\.\d{2}$/.test(value)) return value;
-  return null;
-}
-
-function deriveApartmentCadastralNumber(buildingCadastralNumber, parsed) {
-  const buildingNumber = normalizeBuildingCadastralNumber(buildingCadastralNumber);
-  if (!buildingNumber || !/^\d+$/.test(parsed.apartmentKey)) return null;
-  return `${buildingNumber}.${parsed.apartmentKey.padStart(3, "0")}`;
-}
-
 function normalizeHouseNumber(value) {
   return normalizeSpaces(stripDiacritics(value || ""))
     .replace(/\s+/g, "")
@@ -950,16 +937,15 @@ function findApartmentInCadastruHtml(html, parsed) {
 
   for (const section of sections) {
     const address = extractCadastruSectionAddress(section);
-    if (address && !addressMatchesParsedBuilding(address, parsed)) continue;
+    if (!addressMatchesParsedBuilding(address, parsed)) continue;
 
     const matches = extractCadastruApartmentLinks(section)
       .map((link) => ({
         ...link,
         matched_address: address,
         labelKey: normalizeApartmentKey(link.label),
-        suffixKey: normalizeApartmentKey(link.cadastralNumber.split(".").at(-1)),
       }))
-      .filter((link) => link.labelKey === parsed.apartmentKey || link.suffixKey === parsed.apartmentKey);
+      .filter((link) => link.labelKey === parsed.apartmentKey);
 
     if (matches.length === 1) return matches[0];
     if (matches.length > 1) {
@@ -1163,17 +1149,14 @@ function findApartmentMatch(html, parsed) {
   const matches = apartments
     .map((apartment) => {
       const officialApartmentKey = extractOfficialApartmentFromAddress(apartment.address);
-      const suffixKey = normalizeApartmentKey(apartment.cadastralNumber.split(".").at(-1));
       let score = 0;
       if (officialApartmentKey && officialApartmentKey === parsed.apartmentKey) score += 100;
-      if (suffixKey === parsed.apartmentKey) score += 20;
       if (apartment.address && parsed.houseNumber && normalizeForMatch(apartment.address).includes(normalizeForMatch(parsed.houseNumber))) {
         score += 10;
       }
       return {
         ...apartment,
         officialApartmentKey,
-        suffixKey,
         score,
       };
     })
@@ -1191,28 +1174,6 @@ function findApartmentMatch(html, parsed) {
   }
 
   return { match: best, buildings, apartments };
-}
-
-function findDerivedApartmentMatch(buildings, parsed) {
-  const exactBuildings = buildings.filter((building) => addressMatchesParsedBuilding(building.address, parsed));
-  const derivedMatches = exactBuildings
-    .map((building) => ({
-      building,
-      cadastralNumber: deriveApartmentCadastralNumber(building.cadastralNumber, parsed),
-    }))
-    .filter((match) => match.cadastralNumber);
-
-  const uniqueMatches = new Map();
-  for (const match of derivedMatches) {
-    uniqueMatches.set(match.cadastralNumber, match);
-  }
-
-  const matches = [...uniqueMatches.values()];
-  if (matches.length === 1) return matches[0];
-  if (matches.length > 1) {
-    throw new Error(`Ambiguous exact building match for ${parsed.buildingAddressWithoutCity}: ${matches.map((item) => item.building.cadastralNumber).join(", ")}`);
-  }
-  return null;
 }
 
 function cadastralCodeIsUsable(value) {
@@ -1285,58 +1246,6 @@ async function findPropertiesFromExactGeocode(parsed) {
   return null;
 }
 
-async function findDerivedApartmentFromExactGeocode(parsed, geocoded) {
-  const exactCandidates = geocoded.filter((candidate) => geocodeMatchesParsedBuilding(candidate, parsed));
-
-  for (const candidate of exactCandidates) {
-    const buildingFeatures = containingFeatures(
-      await queryWfsByPoint("cad_cladiri", candidate.lon, candidate.lat),
-      candidate.lon,
-      candidate.lat
-    );
-    const buildingFeature = buildingFeatures.find((feature) =>
-      cadastralCodeIsUsable(feature.properties?.codcadastral_complet)
-    );
-    const buildingCadastralNumber = buildingFeature?.properties?.codcadastral_complet;
-    if (buildingCadastralNumber) {
-      const cadastralNumber = deriveApartmentCadastralNumber(buildingCadastralNumber, parsed);
-      if (cadastralNumber) {
-        return {
-          cadastralNumber,
-          buildingCadastralNumber,
-          candidate,
-          source: "geodata_wfs_building_derived",
-        };
-      }
-    }
-
-    const parcelFeatures = containingFeatures(
-      await queryWfsByPoint("cad_terenuri", candidate.lon, candidate.lat),
-      candidate.lon,
-      candidate.lat
-    );
-    const parcelFeature = parcelFeatures.find((feature) =>
-      cadastralCodeIsUsable(feature.properties?.codcadastral)
-    );
-    const parcelCadastralNumber = parcelFeature?.properties?.codcadastral;
-    if (parcelCadastralNumber) {
-      const buildingNumber = `${parcelCadastralNumber}.01`;
-      const cadastralNumber = deriveApartmentCadastralNumber(buildingNumber, parsed);
-      if (cadastralNumber) {
-        return {
-          cadastralNumber,
-          buildingCadastralNumber: buildingNumber,
-          parcelCadastralNumber,
-          candidate,
-          source: "geodata_wfs_parcel_derived",
-        };
-      }
-    }
-  }
-
-  return null;
-}
-
 export async function findCadastralByAddress(rawAddress) {
   const parsed = parseInputAddress(rawAddress);
   if (!parsed.apartment) {
@@ -1356,6 +1265,7 @@ export async function findCadastralByAddress(rawAddress) {
   if (cachedAlternative) return cachedAlternative;
 
   const failures = [];
+  const verifiedBuildings = new Map();
   let geocoded = [];
   try {
     geocoded = await geocodeBuilding(parsed);
@@ -1398,54 +1308,15 @@ export async function findCadastralByAddress(rawAddress) {
             };
           }
 
-          const derivedMatch = findDerivedApartmentMatch(buildings, parsed);
-          if (derivedMatch) {
-            return {
-              status: "success",
-              source: "geodata_wms_derived",
-              cadastral_number: derivedMatch.cadastralNumber,
-              raw_cadastral_number: derivedMatch.cadastralNumber,
-              matched_address: derivedMatch.building.address,
-              apartment: parsed.apartment,
-              building_cadastral_number: derivedMatch.building.cadastralNumber,
-              building_address: derivedMatch.building.address,
-              geocoded_address: candidate.display_name,
-              geocoded_lat: candidate.lat,
-              geocoded_lon: candidate.lon,
-              geocode_score: candidate.score,
-              wms_feature_id: feature.id,
-              wms_offset_m: offset,
-              parsed_input: parsed,
-              partial: true,
-            };
+          // A verified building is useful, but does not identify an apartment.
+          for (const building of buildings.filter(item => addressMatchesParsedBuilding(item.address, parsed))) {
+            verifiedBuildings.set(building.cadastralNumber, { building, candidate });
           }
 
-          console.error(
-            `No apartment match at ${candidate.display_name} offset=${offset}; found ${apartments.length} unit sections.`
-          );
         }
       }
     }
 
-    const exactGeocodeDerivedMatch = await findDerivedApartmentFromExactGeocode(parsed, geocoded);
-    if (exactGeocodeDerivedMatch) {
-      return {
-        status: "success",
-        source: exactGeocodeDerivedMatch.source,
-        cadastral_number: exactGeocodeDerivedMatch.cadastralNumber,
-        raw_cadastral_number: exactGeocodeDerivedMatch.cadastralNumber,
-        matched_address: exactGeocodeDerivedMatch.candidate.display_name,
-        apartment: parsed.apartment,
-        building_cadastral_number: exactGeocodeDerivedMatch.buildingCadastralNumber,
-        parcel_cadastral_number: exactGeocodeDerivedMatch.parcelCadastralNumber || null,
-        geocoded_address: exactGeocodeDerivedMatch.candidate.display_name,
-        geocoded_lat: exactGeocodeDerivedMatch.candidate.lat,
-        geocoded_lon: exactGeocodeDerivedMatch.candidate.lon,
-        geocode_score: exactGeocodeDerivedMatch.candidate.score,
-        parsed_input: parsed,
-        partial: true,
-      };
-    }
   } catch (error) {
     if (error?.code !== "service_unavailable") throw error;
     failures.push(error);
@@ -1461,6 +1332,18 @@ export async function findCadastralByAddress(rawAddress) {
     console.error(`cadastru.md fallback failed: ${error.message}`);
   }
 
+  if (verifiedBuildings.size === 1 && (!cadastruError || cadastruError.code === "service_unavailable")) {
+    const [number, { building, candidate }] = [...verifiedBuildings][0];
+    return {
+      status: "success", source: "geodata_wms_building", partial: true, apartment_unavailable: true,
+      building_cadastral_number: formatCadastralNumber(number),
+      building: { address: building.address }, apartment: {}, matched_address: building.address,
+      parsed_input: parsed,
+      ...(geocodeMatchesParsedBuilding(candidate, parsed) ? {
+        map_location: { latitude: Number(candidate.lat), longitude: Number(candidate.lon) },
+      } : {}),
+    };
+  }
   if (cadastruError) throw cadastruError;
   if (failures.length) throw failures[0];
   const suffix = cadastruError ? ` cadastru.md fallback error: ${cadastruError.message}` : "";

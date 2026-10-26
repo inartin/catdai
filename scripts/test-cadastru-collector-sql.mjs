@@ -62,5 +62,16 @@ assert.equal(Date.parse(current.field_expires_at.registry)-Date.parse(current.fi
 assert.equal(Date.parse(current.field_expires_at.total_floors)-Date.parse(current.field_fetched_at.total_floors),180*86400_000);
 upgraded=(await db.query('select * from cadastru_records')).rows[0];
 assert.equal(upgraded.next_refresh_after-upgraded.last_official_fetch_at,90*86400_000);
+const beforeMap = (await db.query('select * from cadastru_records where cadastral_number=$1',[unit])).rows[0];
+const shape={type:'Polygon',coordinates:[[[28.8,47],[28.801,47],[28.801,47.001],[28.8,47]]]};
+await db.query('select * from merge_cadastru_building($1,$2,$3,$4,$5)',[number,
+  {map_geometry:shape,lands:[{cadastral_number:'0100106.131',map_geometry:shape}],map_geometry_checked_at:'2026-10-23T12:00:00Z'},
+  '2026-10-23T12:00:00Z','2027-04-21T12:00:00Z',null]);
+const afterMap=(await db.query('select * from cadastru_records where cadastral_number=$1',[unit])).rows[0];
+assert.deepEqual(afterMap,beforeMap,'geometry-only backfill never changes apartment data or source dates');
+const mapped=(await db.query('select * from cadastru_buildings where cadastral_number=$1',[number])).rows[0];
+assert.deepEqual(mapped.raw_payload.map_geometry,shape);
+assert.deepEqual(mapped.raw_payload.lands[0].map_geometry,shape);
+assert.equal(mapped.field_fetched_at.total_floors,current.field_fetched_at.total_floors,'existing building fields retain their source dates');
 console.log('Collector SQL: atomic ingestion, preserved partial fields/age, idempotence, seeds and permissions passed.');
 await db.close();

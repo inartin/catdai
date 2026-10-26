@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useState } from "react";
 import AdminCadastruOfflineSearch from "@/components/admin/AdminCadastruOfflineSearch";
 import AdminCadastruAddressReuse from "@/components/admin/AdminCadastruAddressReuse";
+import AdminCollectorStatus from "@/components/admin/AdminCollectorStatus";
 
 const fmtNum = (value) => Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
 const percent = (value, total) => total ? Math.round(value / total * 100) : 0;
@@ -26,18 +27,32 @@ function StatCard({ label, value, detail, accent = false }) {
 export default function AdminCadastruPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [cityStats, setCityStats] = useState(null);
+  const [citiesLoading, setCitiesLoading] = useState(false);
   const [selectedCity, setSelectedCity] = useState(null);
   const [reuseRefresh, setReuseRefresh] = useState(0);
   const loadStats = useCallback(async (fresh = false) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/cadastru-storage${fresh ? "?fresh=1" : ""}`);
+      const response = await fetch(`/api/admin/cadastru-storage?view=overview${fresh ? "&fresh=1" : ""}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setStats(await response.json());
     } catch {
       setStats({ available: false });
     } finally {
       setLoading(false);
+    }
+  }, []);
+  const loadCities = useCallback(async (fresh = false) => {
+    setCitiesLoading(true);
+    try {
+      const response = await fetch(`/api/admin/cadastru-storage?view=cities${fresh ? "&fresh=1" : ""}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setCityStats(await response.json());
+    } catch {
+      setCityStats({ available: false });
+    } finally {
+      setCitiesLoading(false);
     }
   }, []);
   useEffect(() => { loadStats(); }, [loadStats]);
@@ -51,9 +66,13 @@ export default function AdminCadastruPage() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {stats?.available && <span className="text-xs text-gray-500">Updated {new Date(stats.updatedAt).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}</span>}
-          <button type="button" onClick={() => { setReuseRefresh((value) => value + 1); loadStats(true); }} disabled={loading}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary/40 hover:text-primary disabled:text-gray-400">
-            {loading ? "Refreshing…" : "Hard refresh"}
+          <button type="button" onClick={() => {
+            setReuseRefresh((value) => value + 1);
+            loadStats(true);
+            if (cityStats !== null) loadCities(true);
+          }} disabled={loading || citiesLoading}
+            className="cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-default disabled:text-gray-400">
+            {loading || citiesLoading ? "Refreshing…" : "Hard refresh"}
           </button>
         </div>
       </header>
@@ -110,58 +129,51 @@ export default function AdminCadastruPage() {
             <p className="border-t border-gray-100 px-5 py-3 text-xs leading-5 text-gray-500 sm:px-6">Expired snapshots remain stored</p>
           </section>
 
-          <section aria-labelledby="collection-heading" className="rounded-xl border border-gray-200 bg-white p-5 sm:p-6">
-            <div className="mb-5"><h2 id="collection-heading" className="text-lg font-semibold text-gray-900">Building collection</h2>
-              <p className="mt-1 text-sm text-gray-500">Saved results of whole-building cadastral collection.</p></div>
-            <dl className="grid gap-4 sm:grid-cols-3">
-              {[["harvested", "Harvested", "Building and observed unit details saved", "text-primary"],
-                ["partial", "Partial harvest", "Unit details still missing from the response", "text-amber-800"],
-                ["notHarvested", "Not harvested yet", "May already contain individual apartment lookups", "text-gray-900"]].map(([key, label, detail, color]) => (
-                <div key={key} className="rounded-lg bg-gray-50 p-4">
-                  <dt className="text-sm text-gray-600">{label}</dt><dd className={`mt-2 text-2xl font-semibold tabular-nums ${color}`}>{fmtNum(stats.collection[key])}</dd>
-                  <p className="mt-1 text-xs leading-5 text-gray-500">{detail}</p>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-4 text-xs text-gray-500">These are database results, not the collector’s live queue or running status.</p>
-          </section>
-
-          <section aria-labelledby="city-heading" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 p-5 sm:px-6">
-              <div><h2 id="city-heading" className="text-lg font-semibold text-gray-900">Stored data by city</h2>
-                <p className="mt-1 text-xs text-gray-500">Select a city to see stored properties and search counts.</p></div>
-              <p className="text-sm text-gray-500"><span className="font-semibold tabular-nums text-gray-900">{fmtNum(stats.total)}</span> unique cadastral numbers overall</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500"><tr>
-                  {[["City", "text-left"], ["Apartment buildings", "text-right"], ["Apartments / units", "text-right"], ["Other properties", "text-right"]].map(([label, align]) =>
-                    <th key={label} scope="col" className={`whitespace-nowrap px-5 py-3 font-medium ${align}`}>{label}</th>)}
-                </tr></thead>
-                <tbody className="divide-y divide-gray-100">
-                  {stats.byCity.map((row, index) => <Fragment key={row.city}>
-                    <tr onClick={() => setSelectedCity((current) => current === row.city ? null : row.city)}
-                      className={`cursor-pointer hover:bg-gray-50 ${selectedCity === row.city ? "bg-primary/5" : ""}`}>
-                      <th scope="row" className="px-5 py-3 text-left font-medium text-gray-700">
-                        <button type="button" aria-expanded={selectedCity === row.city} aria-controls={`city-reuse-${index}`}
-                          className="flex items-center gap-2 rounded text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
-                          <span aria-hidden="true" className={`text-xs transition-transform ${selectedCity === row.city ? "rotate-90" : ""}`}>▶</span>{row.city}
-                        </button>
-                      </th>
-                      {[row.buildings, row.apartments, row.other].map((value, index) => <td key={index} className="px-5 py-3 text-right tabular-nums text-gray-900">{fmtNum(value)}</td>)}
-                    </tr>
-                    {selectedCity === row.city && <tr id={`city-reuse-${index}`}><td colSpan={4} className="bg-gray-50">
-                      <AdminCadastruAddressReuse key={`${row.city}:${reuseRefresh}`} city={row.city} />
-                    </td></tr>}
-                  </Fragment>)}
-                  {!stats.byCity.length && <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-500">No cadastru data stored yet.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </section>
-          <p className="text-xs text-gray-500">All-time database inventory, including expired records. Buildings appearing in multiple tables are counted once.</p>
         </div>
       ) : <p role="alert" className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-500">Stored cadastru statistics are temporarily unavailable. Try Hard refresh.</p>}
+
+      <AdminCollectorStatus refreshKey={reuseRefresh} />
+
+      <section aria-labelledby="city-heading" aria-busy={citiesLoading} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 p-5 sm:px-6">
+          <div><h2 id="city-heading" className="text-lg font-semibold text-gray-900">Stored data by city</h2>
+            <p className="mt-1 text-xs text-gray-500">Select a city to see stored properties and search counts.</p></div>
+          {!cityStats?.available && <button type="button" onClick={() => loadCities(!!cityStats)} disabled={citiesLoading}
+            className="cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-default disabled:text-gray-400">
+            {citiesLoading ? "Loading cities…" : cityStats ? "Retry" : "Load cities"}
+          </button>}
+          {cityStats?.available && stats?.available && <p className="text-sm text-gray-500"><span className="font-semibold tabular-nums text-gray-900">{fmtNum(stats.total)}</span> unique cadastral numbers overall</p>}
+        </div>
+        {cityStats?.available ? <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500"><tr>
+              {[["City", "text-left"], ["Apartment buildings", "text-right"], ["Apartments / units", "text-right"], ["Other properties", "text-right"]].map(([label, align]) =>
+                <th key={label} scope="col" className={`whitespace-nowrap px-5 py-3 font-medium ${align}`}>{label}</th>)}
+            </tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {cityStats.byCity.map((row, index) => <Fragment key={row.city}>
+                <tr onClick={() => setSelectedCity((current) => current === row.city ? null : row.city)}
+                  className={`cursor-pointer hover:bg-gray-50 ${selectedCity === row.city ? "bg-primary/5" : ""}`}>
+                  <th scope="row" className="px-5 py-3 text-left font-medium text-gray-700">
+                    <button type="button" aria-expanded={selectedCity === row.city} aria-controls={`city-reuse-${index}`}
+                      className="flex cursor-pointer items-center gap-2 rounded text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
+                      <span aria-hidden="true" className={`text-xs transition-transform ${selectedCity === row.city ? "rotate-90" : ""}`}>▶</span>{row.city}
+                    </button>
+                  </th>
+                  {[row.buildings, row.apartments, row.other].map((value, index) => <td key={index} className="px-5 py-3 text-right tabular-nums text-gray-900">{fmtNum(value)}</td>)}
+                </tr>
+                {selectedCity === row.city && <tr id={`city-reuse-${index}`}><td colSpan={4} className="bg-gray-50">
+                  <AdminCadastruAddressReuse key={`${row.city}:${reuseRefresh}`} city={row.city} />
+                </td></tr>}
+              </Fragment>)}
+              {!cityStats.byCity.length && <tr><td colSpan={4} className="px-5 py-8 text-center text-gray-500">No cadastru data stored yet.</td></tr>}
+            </tbody>
+          </table>
+        </div> : <p role={cityStats && !citiesLoading ? "alert" : "status"} className="px-5 py-4 text-sm text-gray-500 sm:px-6">
+          {citiesLoading ? "Loading stored data by city…" : cityStats ? "City statistics are temporarily unavailable. Try again." : "Load the city breakdown when needed."}
+        </p>}
+      </section>
+      <p className="text-xs text-gray-500">All-time database inventory, including expired records. Buildings appearing in multiple tables are counted once.</p>
 
       <AdminCadastruOfflineSearch />
     </div>

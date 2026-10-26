@@ -3,6 +3,7 @@ import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { CADASTRU_BUILDING_TTL_SECONDS, cadastruExpiresAt, isFreshCadastru, readCadastruCache, writeCadastruCache, invalidateCadastruCache } from "@/lib/cadastru-cache";
 import { nearbyAddressFromCadastru } from "@/lib/cadastru-nearby";
 import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
+import { validMapGeometry } from "@/lib/cadastru-map";
 
 export function apartmentBuildingNumber(number) {
   return String(number || "").match(/^(\d{7}\.\d{3}\.\d{2})\.\d{3,4}$/)?.[1] || null;
@@ -77,26 +78,53 @@ export function sharedBuildingMetadata(entry) {
     stale: !isFreshCadastru(entry.expiresAt), field_fetched_at: entry.fieldFetchedAt };
 }
 
+function sharedMapData(payload) {
+  const { map_location: location, registry, lands, ...details } = payload;
+  delete details.map_geometry_checked_at;
+  const geometry = validMapGeometry(details.map_geometry) ? details.map_geometry : registry?.map_geometry;
+  return { location, registry, details: { ...details,
+    ...(validMapGeometry(geometry) ? { map_geometry: geometry } : {}),
+  }, lands: Array.isArray(lands) ? lands.filter(land => validMapGeometry(land?.map_geometry)) : [] };
+}
+
+function sharedProperty(building) {
+  const { location, registry, details } = sharedMapData(building.payload);
+  return { ...registry, cadastral_number: building.number,
+    ...(location ? { map_location: location } : {}),
+    ...(validMapGeometry(details.map_geometry) ? { map_geometry: details.map_geometry } : {}),
+  };
+}
+
 export async function composeBuildingEntry(entry) {
   if (entry?.payload?.buildings?.some((property) => property.shared_building_reference)) {
+    const lands = new Map((entry.payload.lands || []).map(land => [land.cadastral_number, land]));
     const properties = await Promise.all(entry.payload.buildings.map(async (property) => {
       if (!property.shared_building_reference) return property;
       const shared = await getSharedBuilding(property.cadastral_number);
-      return shared?.payload.registry || { cadastral_number: property.cadastral_number, partial: true };
+      for (const land of shared ? sharedMapData(shared.payload).lands : []) {
+        const saved = lands.get(land.cadastral_number);
+        if (!validMapGeometry(saved?.map_geometry)) lands.set(land.cadastral_number, { ...saved, ...land });
+      }
+      return shared ? sharedProperty(shared) : { cadastral_number: property.cadastral_number, partial: true };
     }));
-    entry = { ...entry, payload: { ...entry.payload, buildings: properties } };
+    entry = { ...entry, payload: { ...entry.payload, buildings: properties,
+      ...(lands.size ? { lands: [...lands.values()] } : {}),
+    } };
   }
   if (!entry?.buildingNumber) return entry;
   const building = await getSharedBuilding(entry.buildingNumber);
   if (!building) return entry;
-  const { map_location: location, registry, ...details } = building.payload;
+  const { location, details, lands } = sharedMapData(building.payload);
   if (entry.payload.cadastral_number === building.number) {
-    const property = { ...registry, cadastral_number: building.number,
-      ...(location ? { map_location: location } : {}) };
-    return { ...entry, payload: { ...entry.payload, ...property, buildings: [property], building: details,
+    const property = sharedProperty(building);
+    return { ...entry, payload: { ...entry.payload, ...property, ...(lands.length ? { lands } : {}), buildings: [property], building: details,
       data_freshness: { building: sharedBuildingMetadata(building) } } };
   }
-  return { ...entry, payload: { ...entry.payload, building: details,
+  // Apartment parcel geometry already has a top-level field. A lands collection
+  // would incorrectly turn its data card into a land/building address result.
+  const parcelMap = !validMapGeometry(entry.payload.map_geometry) && lands.length
+    ? { map_geometry: lands[0].map_geometry } : {};
+  return { ...entry, payload: { ...entry.payload, ...parcelMap, building: details,
     building_cadastral_number: building.number,
     ...(location ? { map_location: location } : {}),
     form_fields: { ...entry.payload.form_fields,
@@ -112,8 +140,8 @@ export async function getBuildingFallback({ number, address }) {
   const building = number ? await getSharedBuilding(apartmentBuildingNumber(number))
     : await getSharedBuildingByAddress(address);
   if (!building) return null;
-  const { map_location: location, registry, ...details } = building.payload;
-  return { building: details, apartment: {}, partial: true, apartment_unavailable: true,
+  const { location, details, lands } = sharedMapData(building.payload);
+  return { building: details, ...(lands.length ? { map_geometry: lands[0].map_geometry } : {}), apartment: {}, partial: true, apartment_unavailable: true,
     building_cadastral_number: building.number, matched_address: details.address,
     ...(location ? { map_location: location } : {}),
     ...(address ? { request_address: address } : {}),

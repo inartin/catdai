@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { recordCadastruShareClick } from "@/lib/cadastru-share-tracking";
+import { getCadastruSharePath } from "@/lib/cadastru-share-url";
 
 export default function CadastruShareButton({ cadastralNumber, address, shareSlug, searchToken }) {
   const { session } = useAuth();
@@ -29,7 +30,7 @@ export default function CadastruShareButton({ cadastralNumber, address, shareSlu
       let url;
       let slug = shareSlug;
       if (shareSlug) {
-        url = `${window.location.origin}/${lang}/cadastru/rezultat?${new URLSearchParams({ share_slug: shareSlug })}`;
+        url = `${window.location.origin}${getCadastruSharePath(shareSlug, lang)}`;
       } else {
         const response = await fetch("/api/cadastru/share", {
           method: "POST",

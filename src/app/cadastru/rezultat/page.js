@@ -6,6 +6,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BackButton from "@/components/BackButton";
 import CadastralDataCard from "@/components/CadastralDataCard";
+import CadastruListingsCard from "@/components/CadastruListingsCard";
 import CadastruNearbyCard from "@/components/CadastruNearbyCard";
 import CadastruPublicTransportCard from "@/components/CadastruPublicTransportCard";
 import CadastruMunicipalReportsCard from "@/components/CadastruMunicipalReportsCard";
@@ -461,12 +462,12 @@ function readAddressLookupRequest() {
   }
 }
 
-function CadastruResultContent() {
+function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { lang, t } = useTranslation();
   const { session, isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
-  const shareSlug = searchParams.get("share_slug") || "";
+  const shareSlug = sharedReportSlug || searchParams.get("share_slug") || "";
   const rawCadastralNumber = shareSlug ? "" : searchParams.get("cadastral_number") || "";
   const cadastralNumber = validateCadastralNumber(rawCadastralNumber).value || rawCadastralNumber;
   const source = shareSlug ? "" : searchParams.get("source") || "";
@@ -492,6 +493,7 @@ function CadastruResultContent() {
   const loadedNearbyKey = useRef("");
   const loadedTransportKey = useRef("");
   const loadedReportsKey = useRef("");
+  const loadedMarketKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("cadastru.loginToUse");
   const [isPaywallModalOpen, setIsPaywallModalOpen] = useState(false);
@@ -502,6 +504,7 @@ function CadastruResultContent() {
   });
   const [nearbyState, setNearbyState] = useState({ key: "", data: null, loading: false, error: false });
   const [transportState, setTransportState] = useState({ key: "", data: null, loading: false, error: false });
+  const [marketState, setMarketState] = useState({ key: "", data: null });
   const [reportsState, setReportsState] = useState({ key: "", data: null, loading: false, error: false });
   const originalStreet = originalStreetParam || String(state.data?.street_resolution?.original || "").slice(0, 80);
   const resolvedStreet = resolvedStreetParam || String(state.data?.street_resolution?.resolved || "").slice(0, 80);
@@ -849,8 +852,8 @@ function CadastruResultContent() {
     async function loadCadastralData() {
       // Keep the successful address result visible while number details load.
       setState((current) => attempt > 0
-        ? { ...current, retry: null, retrying: true }
-        : { loading: !addressData, error: "", data: addressData });
+        ? { ...current, retry: null, retrying: true, detailsLoading: true }
+        : { loading: !addressData, error: "", data: addressData, detailsLoading: true });
 
       try {
         const body = {
@@ -1035,6 +1038,57 @@ function CadastruResultContent() {
       if (frame) cancelAnimationFrame(frame);
     };
   }, [nearbyAddress, nearbyKey, nearbyNumber, nearbySearchAvailable, reportsAvailable, secondaryAvailable, session?.access_token]);
+
+  const marketAddress = nearbyAddress || state.data?.resolved_address || state.data?.apartment?.address || state.data?.building?.address || state.data?.matched_address || "";
+  const marketCity = resolveValuationCity(state.data);
+  const marketDistrict = resolveValuationDistrict(state.data, marketCity, source === "address" ? searchParams.get("district") : null);
+  const marketKey = `${nearbyKey}|${marketAddress}|${marketCity || ""}|${marketDistrict || ""}`;
+  const secondarySettled = !nearbySearchAvailable || (
+    nearbyState.key === nearbyKey && !nearbyState.loading &&
+    transportState.key === nearbyKey && !transportState.loading &&
+    (!reportsAvailable || (reportsState.key === nearbyKey && !reportsState.loading))
+  );
+  const marketReady = Boolean(state.data && !state.loading && !state.detailsLoading && !state.retrying && secondarySettled);
+
+  useEffect(() => {
+    if (!marketReady || loadedMarketKey.current === marketKey) return;
+    let active = true;
+    const controller = new AbortController();
+    let timeout;
+    const load = async () => {
+      timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch("/api/cadastru/market", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ address: marketAddress, city: marketCity, district: marketDistrict,
+            ...(validateCadastralNumber(nearbyNumber).valid ? { cadastral_number: nearbyNumber } : {}),
+          }),
+          signal: controller.signal,
+          priority: "low",
+        });
+        const result = response.ok ? await response.json() : null;
+        if (active) {
+          loadedMarketKey.current = marketKey;
+          setMarketState({ key: marketKey, data: result?.market || null });
+        }
+      } catch {
+        if (active) {
+          loadedMarketKey.current = marketKey;
+          setMarketState({ key: marketKey, data: null });
+        }
+      } finally { clearTimeout(timeout); }
+    };
+    // All existing secondary cards have settled; give their paint priority too.
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(load, { timeout: 1000 }) : setTimeout(load, 0);
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(timeout);
+      if (window.requestIdleCallback) window.cancelIdleCallback(idle);
+      else clearTimeout(idle);
+    };
+  }, [marketReady, marketKey, marketAddress, marketCity, marketDistrict, nearbyNumber]);
 
   if (state.loading) return <CadastruLoadingPage
     cadastralNumber={cadastralNumber}
@@ -1254,6 +1308,7 @@ function CadastruResultContent() {
               unavailable={!nearbySearchAvailable || (reportsState.key === nearbyKey && reportsState.error)}
             />
           )}
+          <CadastruListingsCard data={marketReady && marketState.key === marketKey ? marketState.data : null} />
           {(state.data || secondaryAvailable) && (
             <p className="mt-6 text-center text-xs text-gray-500">
               © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a> · © <a href="https://map.md/" className="underline">map.md</a>
@@ -1279,10 +1334,10 @@ function CadastruResultContent() {
   );
 }
 
-export default function CadastruResultPage() {
+export default function CadastruResultPage({ shareSlug = "" } = {}) {
   return (
     <Suspense fallback={<CadastruRouteLoading />}>
-      <CadastruResultContent />
+      <CadastruResultContent sharedReportSlug={shareSlug} />
     </Suspense>
   );
 }

@@ -6,9 +6,13 @@ Implemented, depends on external parser and Supabase snapshots.
 ## Listings Data
 - Main DB tables are `listing`, `owner`, and `listing_price_history`.
 - Data is consumed by estimates, relevant listings, admin views, market stats, and duplicate-candidate detection.
-- Current imported sale/rent listing rows have empty exact-address fields (`address_text`, `sector`, `latitude`, `longitude`), so address-aware duplicate checks depend on parsed/cached 999.md page data. The parser reads embedded street and house fields when available until the importer starts storing address data.
+- Exact-address coverage is partial. A read-only sale-listing check on 2026-10-24 found `address_text` and `attributes.sourceStreet` on 19,595 of 78,441 rows; imported structured street/house values live in `attributes.sourceStreet` and `attributes.sourceBuildingNumber`. Older/unmatched rows still require parsed/cached 999.md addresses. Listing coordinates may be absent, so nearby distances cannot be inferred from house numbers.
 - `/anunt` reads `listing_price_history` through `/api/listing-price-history` to show analyzed-listing total-price changes when available.
-- Parser/importer code is outside this app repo.
+- Parser/importer code is outside this app repo. Its daily cleanup deletes price-history rows for deleted sale/rent listings; inactive listing rows can retain a last asking price without a retained change history.
+
+## Cadastru result card
+
+`/api/cadastru/market` supplies real building/same-street sale listings, retained price histories and optional sector trends after the other result cards finish loading. EUR prices are compared separately from the all-currency collected-ad count. Exact parsed addresses are required; unmatched addresses are not guessed. Missing listings fall back to sector trends, and no data hides the card. Successful payloads are cached for one hour. See [cadastral lookup](cadastral.md#building-listing-market-card).
 
 ## Live Prices API
 - App route: `GET /api/prices`.
@@ -19,7 +23,7 @@ Implemented, depends on external parser and Supabase snapshots.
 ## Market Trends
 - App route: `GET /api/market-trends`.
 - Reads `daily_price_snapshot`.
-- Returns three-month city trends for new builds and secondary market.
+- Returns up to four months (120 days) of city trends for new builds and secondary market, starting no earlier than 1 July 2026 to exclude the earlier city-classification discontinuity. District trends use the same cutoff.
 - Accepts an optional validated `district` query parameter, for example `GET /api/market-trends?district=Botanica`, and returns district-scoped trends for both building types without city fallback when district data is insufficient.
 - Unsupported district values return HTTP 400 with `{"error":"invalid_district"}`; accepted aliases and diacritic variants are normalized to the canonical Chișinău district name.
 - Estimate API also returns a 30-day district trend when enough points exist, with city fallback.

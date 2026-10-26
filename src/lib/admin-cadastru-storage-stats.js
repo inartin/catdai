@@ -10,9 +10,8 @@ function originKey(input) {
   return crypto.createHash("sha256").update(JSON.stringify(normalized)).digest("hex");
 }
 
-export function summarizeCadastruStorage({ records, buildings, addresses, nearby, transport, reports }, now = Date.now()) {
+export function summarizeCadastruCities({ records, buildings }, now = Date.now()) {
   const buildingIds = new Set(buildings.map((row) => digits(row.cadastral_number)));
-  const allIds = new Set([...buildingIds, ...records.map((row) => digits(row.cadastral_number))]);
   const cities = new Map();
   const cityRow = (city) => {
     const name = city?.trim() || "Unknown city";
@@ -21,22 +20,38 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
   };
   const linkedCities = new Map(records.filter((row) => row.shared_building_number && row.city)
     .map((row) => [row.shared_building_number, row.city]));
+  for (const row of records) {
+    const number = digits(row.cadastral_number);
+    if (buildingIds.has(number)) continue;
+    cityRow(row.city)[/^\d{15,16}$/.test(number) ? "apartments" : "other"]++;
+  }
+  for (const building of buildings) {
+    cityRow(building.lookup_input?.city || linkedCities.get(building.cadastral_number)).buildings++;
+  }
+  return { available: true, updatedAt: new Date(now).toISOString(),
+    byCity: [...cities.values()].sort((a, b) => (b.buildings + b.apartments + b.other) - (a.buildings + a.apartments + a.other) || a.city.localeCompare(b.city, "ro")),
+  };
+}
+
+export function summarizeCadastruStorage({ records, buildings, addresses, nearby, transport, reports }, now = Date.now(), { includeCities = true } = {}) {
+  const buildingIds = new Set(buildings.map((row) => digits(row.cadastral_number)));
+  const allIds = new Set([...buildingIds, ...records.map((row) => digits(row.cadastral_number))]);
+  const linkedCities = new Map(records.filter((row) => row.shared_building_number && row.city)
+    .map((row) => [row.shared_building_number, row.city]));
   const apartments = { total: 0, linked: 0, details: 0, references: 0, fresh: 0 };
   let other = 0;
   for (const row of records) {
     const number = digits(row.cadastral_number);
     if (buildingIds.has(number)) continue; // The same building can also have a registry record.
-    const city = cityRow(row.city);
     if (/^\d{15,16}$/.test(number)) {
       apartments.total++;
-      city.apartments++;
       if (buildingIds.has(digits(row.shared_building_number))) apartments.linked++;
       const details = !row.unit_list_entry && (["full_data", "apartment_only"].includes(row.result_type)
         || row.apartment_area_m2 != null || row.apartment_floor != null);
       if (details) apartments.details++;
       else apartments.references++;
       if (fresh(row.next_refresh_after, now)) apartments.fresh++;
-    } else { other++; city.other++; }
+    } else { other++; }
   }
   const aliases = new Map();
   for (const row of addresses) {
@@ -51,7 +66,6 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
   for (const building of buildings) {
     const relatedCity = linkedCities.get(building.cadastral_number);
     const buildingCity = building.lookup_input?.city || relatedCity;
-    cityRow(buildingCity).buildings++;
     const keys = new Set(aliases.get(building.cadastral_number) || []);
     if (building.lookup_input) keys.add(originKey(building.lookup_input));
     coverage.cadastru.total++;
@@ -73,6 +87,6 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
   }
   return { available: true, updatedAt: new Date(now).toISOString(), total: allIds.size,
     buildings: buildings.length, apartments, other, coverage, allCategories, collection,
-    byCity: [...cities.values()].sort((a, b) => (b.buildings + b.apartments + b.other) - (a.buildings + a.apartments + a.other) || a.city.localeCompare(b.city, "ro")),
+    ...(includeCities ? { byCity: summarizeCadastruCities({ records, buildings }, now).byCity } : {}),
   };
 }

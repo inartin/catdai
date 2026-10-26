@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
-import { summarizeCadastruStorage } from "@/lib/admin-cadastru-storage-stats";
+import { summarizeCadastruCities, summarizeCadastruStorage } from "@/lib/admin-cadastru-storage-stats";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
-let cache = { data: null, ts: 0 };
+const caches = new Map();
 
 async function readRows(table, columns, order) {
   const rows = [];
@@ -19,7 +19,14 @@ async function readRows(table, columns, order) {
   }
 }
 
-async function fetchCadastruStorageStats() {
+async function fetchCadastruStorageStats(view) {
+  if (view === "cities") {
+    const [records, buildings] = await Promise.all([
+      readRows("cadastru_records", "cadastral_number,city,shared_building_number", "id"),
+      readRows("cadastru_buildings", "cadastral_number,lookup_input", "cadastral_number"),
+    ]);
+    return summarizeCadastruCities({ records, buildings });
+  }
   // Read only counting/coverage metadata, never entire property or nearby payloads.
   const [records, buildings, addresses, nearby, transport, reports] = await Promise.all([
     readRows("cadastru_records", "cadastral_number,city,shared_building_number,result_type,apartment_area_m2,apartment_floor,next_refresh_after,unit_list_entry:raw_payload->unit_list_entry", "id"),
@@ -28,7 +35,7 @@ async function fetchCadastruStorageStats() {
     ...["cadastru_nearby", "cadastru_public_transport", "cadastru_municipal_reports"].map((table) =>
       readRows(table, "origin_key,expires_at,incomplete:raw_payload->incomplete,stale:raw_payload->cache->stale", "origin_key")),
   ]);
-  return summarizeCadastruStorage({ records, buildings, addresses, nearby, transport, reports });
+  return summarizeCadastruStorage({ records, buildings, addresses, nearby, transport, reports }, Date.now(), { includeCities: view === "all" });
 }
 
 export async function GET(request) {
@@ -36,13 +43,16 @@ export async function GET(request) {
   if (unauthorized) return unauthorized;
 
   const fresh = request.nextUrl.searchParams.get("fresh") === "1";
-  if (!fresh && cache.data && Date.now() - cache.ts < CACHE_TTL_MS) {
+  const requestedView = request.nextUrl.searchParams.get("view");
+  const view = ["overview", "cities"].includes(requestedView) ? requestedView : "all";
+  const cache = caches.get(view);
+  if (!fresh && cache?.data && Date.now() - cache.ts < CACHE_TTL_MS) {
     return NextResponse.json(cache.data);
   }
 
   try {
-    const data = await fetchCadastruStorageStats();
-    cache = { data, ts: Date.now() };
+    const data = await fetchCadastruStorageStats(view);
+    caches.set(view, { data, ts: Date.now() });
     return NextResponse.json(data);
   } catch (error) {
     console.error("Failed to load cadastru storage stats:", error.message);

@@ -11,7 +11,7 @@ Backend prepared and active when Redis is reachable.
 
 ## Cached Routes
 - `GET /api/prices`: key `catdai:prices:latest:v1`, 24h TTL.
-- `GET /api/market-trends`: key `catdai:market-trends:v1`, 12h TTL.
+- `GET /api/market-trends`: key prefix `catdai:market-trends:v5:`, 12h TTL; separate city and district entries for 120-day trends clipped at 1 July 2026. Browser trend storage uses `catdai_market_trends_v5` to discard earlier cached chart data.
 - `POST /api/estimate`: key prefix `catdai:estimate:v1:`, 30m TTL for repeated validated estimate inputs.
 - `POST /api/estimate-rent`: key prefix `catdai:estimate-rent:v7:`, 12h TTL for repeated validated rent estimate inputs.
 - `POST /api/listing-preview-images`: key prefix `catdai:listing-preview-image:v1:`, 24h TTL per listing/language. The route accepts up to 6 unique 5-12 digit numeric ids, applies a 30/min per-IP limit, and refuses upstream HTML above 512 KB before caching.
@@ -36,6 +36,7 @@ Backend prepared and active when Redis is reachable.
 - Address keys normalize diacritics, case, whitespace, punctuation and RO/RU street/apartment abbreviations. Source-verified address aliases handle alternate street spellings; no fuzzy property matching is used. Address aliases resolve current canonical number data, while land/building aggregates remain address-scoped. For single-property hits, an alias or saved record district fills missing district data in older canonical Redis JSON and updates the number cache.
 
 - Shared apartment-block details use `catdai:cadastru:building:v3:` and `cadastru_buildings`. Unit entries and applicable address aliases hold references, so a building update does not require refreshing every apartment. Building writes invalidate the shared cache; per-field source dates survive partial/failed refreshes. Technical fields use 180 days and registry fields 30 days.
+- Geometry-only collector repairs merge building footprints and exact parent-parcel outlines into the shared JSON, invalidating building/number/linked address caches when Redis is configured. App reads compose these fields from shared storage; apartment and registry dates stay unchanged. Valid empty source checks wait 180 days before retrying; failed checks do not gain a success timestamp.
 - Municipal reports use `catdai:cadastru:municipal-reports:v1:` and `cadastru_municipal_reports`, with 72-hour freshness measured from the worker snapshot, independent of property freshness. Complete saved results are served immediately and survive failed, malformed, stale or incomplete background refreshes.
 - See [Building and apartment storage](cadastral.md#building-and-apartment-storage) for schema, backfill and deployment order.
 
@@ -85,3 +86,5 @@ pm2 start ecosystem.config.cjs
 The manual `catdai-api` collector writes these same stores and invalidates affected app Redis keys after durable writes. `--partial` fills missing categories without renewing existing complete snapshot dates; known RO/RU address aliases share a collection job. See the worker documentation for its persistent checkpoint and configuration.
 
 Migration `supabase/migrations/20261023170225_cadastru_snapshot_freshness.sql` was applied on 2026-10-23; deploy the app and collector changes to activate background refresh and the new write policy. It derives new deadlines from existing source dates, adds address-alias fetch dates, and aligns collector ingestion with the 90/180/30-day property/building/registry policy. It preserves transport and municipal deadlines.
+
+- Legacy apartment results with `geodata_wms_derived`, `geodata_wfs_building_derived`, or `geodata_wfs_parcel_derived` sources are ineligible for number/address reuse, including expired fallback. A fresh address lookup must verify the unit; derived responses are rejected before persistence. This is a read-time quarantine, not deletion of historical database rows.

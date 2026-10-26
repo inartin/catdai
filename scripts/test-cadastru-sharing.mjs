@@ -7,6 +7,25 @@ import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import { PGlite } from "@electric-sql/pglite";
 import { validateCadastralNumber } from "../src/lib/validation.js";
+import { decodeCadastruShareCode, getCadastruSharePath } from "../src/lib/cadastru-share-url.js";
+
+// Every saved slug has a reversible, URL-safe short form, including leading zeros.
+for (const slug of ["0".repeat(48), "f".repeat(48), "fb".repeat(24),
+  "000102030405060708090a0b0c0d0e0f1011121314151617", ...Array.from({ length: 100 }, () => crypto.randomBytes(24).toString("hex"))]) {
+  for (const lang of ["ro", "ru"]) {
+    const path = getCadastruSharePath(slug, lang);
+    const code = path.split("/").at(-1);
+    assert.match(path, new RegExp(`^/${lang}/c/[A-Za-z0-9_-]{32}$`));
+    assert.equal(code, Buffer.from(slug, "hex").toString("base64url"));
+    assert.equal(decodeCadastruShareCode(code), slug);
+    assert.equal(`https://catdai.md${path}`.length, 55);
+  }
+}
+for (const code of [null, undefined, "", "a".repeat(31), "a".repeat(33), "/".repeat(32), "+".repeat(32), "a".repeat(31) + "=", "é".repeat(32)]) {
+  assert.equal(decodeCadastruShareCode(code), null);
+}
+assert.throws(() => getCadastruSharePath("invalid"));
+assert(getCadastruSharePath("0".repeat(48), "invalid").startsWith("/ro/c/"));
 
 const number = "0100106.131.01.097";
 const address = "Chișinău, strada Test 1";
@@ -64,6 +83,7 @@ const mocks = {
   "@/lib/statistics-context": { shouldCollectStatistics: () => collect, withStatisticsContext: (handler) => handler },
   "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed, retryAfter: 60 }) }) },
   "@/lib/validation": { validateCadastralNumber },
+  "@/lib/cadastru-share-url": { getCadastruSharePath },
 };
 async function load(file) {
   const context = vm.createContext({ console: { error() {} }, URL, process: { env: { NODE_ENV: "production" } } });
@@ -111,7 +131,7 @@ const created = await post({ cadastral_number: number, lang: "ru", payload: { ap
 assert.equal(created.status, 200);
 const shared = await created.json();
 assert.match(shared.slug, /^[a-f0-9]{48}$/);
-assert.equal(shared.url, `https://catdai.md/ru/cadastru/rezultat?share_slug=${shared.slug}`);
+assert.equal(shared.url, `https://catdai.md${getCadastruSharePath(shared.slug, "ru")}`);
 assert.equal(rows.length, 1);
 assert.equal(rows[0].payload.apartment.area_m2, 52, "the server ignores injected client report data");
 assert(!("cadastru_evaluation_token" in rows[0].payload));
@@ -119,6 +139,7 @@ assert(!("access_limit" in rows[0].payload));
 assert.equal(rows[0].collect_statistics, true);
 const repeated = await (await post()).json();
 assert.equal(repeated.slug, shared.slug);
+assert.equal(repeated.url, `https://catdai.md${getCadastruSharePath(shared.slug, "ro")}`);
 assert.equal(rows.length, 1, "unchanged reports reuse their link");
 const firstSearch = await (await post({ cadastral_number: number, search_token: "source-1" })).json();
 const sameSearch = await (await post({ cadastral_number: number, search_token: "source-1" })).json();
@@ -213,6 +234,7 @@ const jsxMocks = {
   "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
   "@/context/AuthContext": { useAuth: () => ({ session: { access_token: "token" } }) },
   "@/lib/cadastru-share-tracking": { recordCadastruShareClick: (slug) => recordedClicks.push(slug) },
+  "@/lib/cadastru-share-url": { getCadastruSharePath },
   "@/context/LanguageContext": { useTranslation: () => ({ lang: "ru", t: (key) => key }) },
 };
 await component.link((name) => new vm.SyntheticModule(Object.keys(jsxMocks[name]), function () {
@@ -249,3 +271,27 @@ assert.equal(shareCalls, beforeShareCalls, "public viewers can re-share without 
 assert.equal(recordedClicks.length, 3, "Both manual-copy shares and public re-shares are counted");
 assert.equal(copied, shared.url);
 console.log("Share button passed: generated link copying, explicit errors, clipboard fallback and public re-sharing.");
+
+// The short route decodes into the existing viewer and rejects malformed codes.
+const { code: routeCode } = await transform(await fs.readFile("src/app/c/[code]/page.js", "utf8"), {
+  filename: "src/app/c/[code]/page.js",
+  jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } } },
+  module: { type: "es6" },
+});
+const shortRoute = new vm.SourceTextModule(routeCode, { context });
+const ResultPage = () => null;
+const routeMocks = {
+  "next/navigation": { notFound() { throw new Error("404"); } },
+  "@/app/cadastru/rezultat/page": { default: ResultPage },
+  "@/lib/cadastru-share-url": { decodeCadastruShareCode },
+  "react/jsx-runtime": { jsx },
+};
+await shortRoute.link((name) => new vm.SyntheticModule(Object.keys(routeMocks[name]), function () {
+  for (const [key, value] of Object.entries(routeMocks[name])) this.setExport(key, value);
+}, { context }));
+await shortRoute.evaluate();
+const shortPage = await shortRoute.namespace.default({ params: Promise.resolve({ code: new URL(shared.url).pathname.split("/").at(-1) }) });
+assert.equal(shortPage.type, ResultPage);
+assert.equal(shortPage.props.shareSlug, shared.slug);
+await assert.rejects(shortRoute.namespace.default({ params: Promise.resolve({ code: "invalid" }) }), /404/);
+console.log("Compact sharing passed: reversible 55-character RO/RU URLs, existing report reuse and invalid-route rejection.");

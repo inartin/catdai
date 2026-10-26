@@ -5,11 +5,12 @@ import { matchDistrict, normalizeDiacritics } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
-const MARKET_TREND_DAYS = 90;
+const MARKET_TREND_DAYS = 120;
+const MARKET_TREND_EARLIEST_DATE = "2026-07-01";
 const MIN_MARKET_TREND_POINTS = 2;
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const CACHE_TTL_SECONDS = 12 * 60 * 60;
-const CACHE_NAMESPACE = "catdai:market-trends:v3";
+const CACHE_NAMESPACE = "catdai:market-trends:v5";
 const CACHE_HEADERS = {
   "Cache-Control": "public, max-age=0, s-maxage=43200, stale-while-revalidate=86400",
 };
@@ -25,9 +26,12 @@ function isCacheFresh(cachedAt) {
 }
 
 function getSinceDate() {
-  return new Date(Date.now() - MARKET_TREND_DAYS * 24 * 60 * 60 * 1000)
+  const rollingStart = new Date(Date.now() - MARKET_TREND_DAYS * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
+  return rollingStart < MARKET_TREND_EARLIEST_DATE
+    ? MARKET_TREND_EARLIEST_DATE
+    : rollingStart;
 }
 
 function getCacheKey(district) {

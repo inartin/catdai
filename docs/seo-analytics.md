@@ -14,6 +14,7 @@ Implemented.
 - Landing hero body copy intentionally echoes the homepage H1 wording so heading keywords also appear in visible page text.
 - Landing page includes a localized FAQ preview with visible paragraph answers and result-page terminology so homepage body copy is less thin for basic SEO analyzers.
 - Shared result pages at `/imobil/[slug]` generate OG/Twitter metadata and JSON-LD before redirecting.
+- Shared Cadastru reports use server-rendered RO/RU Open Graph/Twitter metadata containing only the saved address and generic cadastral-report copy. Compact and legacy links use the same localized compact report URL; other query criteria cannot alter previews. See [Cadastru sharing](favorites-sharing.md#cadastru-reports).
 - Admin, profile, and API routes are marked `noindex` in `next.config.mjs`.
 - `/ro/estimeaza`, `/ru/estimeaza`, `/ro/evaluare`, `/ru/evaluare`, `/ro/alerts`, `/ru/alerts`, `/ro/cadastru`, and `/ru/cadastru` are indexable localized entry points with alternate metadata.
 - `/verifica-anunt` is an indexable Romanian entry point for 999.md listing-link analysis, with canonical, description, Open Graph, and Twitter metadata; `/999` is only a redirect shortcut.

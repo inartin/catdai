@@ -46,6 +46,7 @@ async function harness(file, path, stored = {}, lang = 'ro') {
     effects.push(() => { slots[index].cleanup = effect(); });
   };
   const mocks = {
+    '@/lib/visitor-browser': { getDeviceId: () => null },
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },
   "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
@@ -104,7 +105,7 @@ async function harness(file, path, stored = {}, lang = 'ro') {
   };
 }
 
-const pageFile = 'src/app/cadastru/rezultat/page.js';
+const pageFile = 'src/app/cadastru/rezultat/CadastruResultPage.js';
 // Building confirmations keep the input unchanged until an explicit suffix choice.
 const kievInput = { city: 'Chișinău', road_type: 'strada', street: 'Киев', house_number: '6', skip_cache: true };
 const buildingPage = await harness(pageFile, '/ro/cadastru/rezultat?source=address&lookup=1&skipcache=true', { [addressKey]: JSON.stringify(kievInput) });

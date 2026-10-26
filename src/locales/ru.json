@@ -405,6 +405,8 @@
   "cadastru.reportsStatus.SOLVED": "Решено",
   "cadastru.reportsStatus.REJECTED": "Отклонено",
   "cadastru.resultMetaDescription": "Результат кадастрового поиска Catdai. Страница создается для введенного запроса и не используется как публичная индексируемая страница.",
+  "cadastru.sharedMetaTitle": "Кадастровые данные",
+  "cadastru.sharedMetaDescription": "Отчёт с кадастровыми данными по этому адресу",
   "cadastru.backToSearch": "Назад к поиску",
   "cadastru.saveImage": "Сохранить",
   "cadastru.savingImage": "Сохранение...",

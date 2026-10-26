@@ -80,7 +80,7 @@ let authSession = null;
 const router = { push: noop, replace: (url) => {
   searchParams = new URLSearchParams(url.split("?")[1]);
 } };
-const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
+const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
   "./loading": { default: noop },
   "@/lib/cadastru-lookup-tracking": { ...lookupModule.namespace },
   "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: (slug) => trackedOpens.push(slug) },

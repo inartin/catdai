@@ -405,6 +405,8 @@
   "cadastru.reportsStatus.SOLVED": "Soluționată",
   "cadastru.reportsStatus.REJECTED": "Respinsă",
   "cadastru.resultMetaDescription": "Rezultatul unei căutări cadastrale Catdai. Pagina este generată pentru interogarea introdusă și nu este folosită ca pagină publică indexabilă.",
+  "cadastru.sharedMetaTitle": "Date cadastrale",
+  "cadastru.sharedMetaDescription": "Raport cu date cadastrale pentru această adresă",
   "cadastru.backToSearch": "Înapoi la căutare",
   "cadastru.saveImage": "Salvează",
   "cadastru.savingImage": "Se salvează...",

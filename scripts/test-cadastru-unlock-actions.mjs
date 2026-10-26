@@ -4,8 +4,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import crypto from "node:crypto";
-import { ensureCadastruLookupId } from "../src/lib/cadastru-lookup-tracking.js";
 import { createRequire } from "node:module";
+
+const trackingContext = vm.createContext({ crypto, URL });
+const trackingModule = new vm.SourceTextModule(await fs.readFile("src/lib/cadastru-lookup-tracking.js", "utf8"), { context: trackingContext });
+await trackingModule.link(() => new vm.SyntheticModule(["getDeviceId"], function () {
+  this.setExport("getDeviceId", () => null);
+}, { context: trackingContext }));
+await trackingModule.evaluate();
 
 const require = createRequire(import.meta.url);
 const { transform, loadBindings } = require("next/dist/build/swc");
@@ -90,9 +96,10 @@ async function checkPageAction(isAuthenticated) {
     ["catdai:cadastru-address-result-preview:v1", JSON.stringify(multiPropertyPreview)],
     ["catdai:cadastru-address-lookup-request:v1", JSON.stringify(request)],
   ]);
-  const page = await loadJsx("src/app/cadastru/rezultat/page.js", {
+  const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
     "./loading": { default: noop },
-    "@/lib/cadastru-lookup-tracking": { ensureCadastruLookupId },
+    "@/lib/cadastru-lookup-tracking": { ...trackingModule.namespace },
+    "@/lib/visitor-browser": { getDeviceId: () => null },
     "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: () => {} },
     "@/lib/cadastru-supported-cities": { CADASTRU_SUPPORTED_CITIES: ["Chișinău", "Durlești"] },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0],
@@ -132,12 +139,12 @@ async function checkPageAction(isAuthenticated) {
   assert(card, "multi-property result renders its cadastral card");
   const buttons = findNodes(CadastralDataCard(card.props), (node) => node.type === "button");
   assert.equal(buttons.length, 1, `${lang}: multi-property result offers one shared unlock action`);
-  assert.equal(textOf(buttons[0]), t(isAuthenticated ? "cadastru.payToUnlock" : "cadastru.unlockData"));
+  assert.equal(textOf(buttons[0]), t("cadastru.payToUnlock"));
   buttons[0].props.onClick();
   tree = render();
   const openModals = findNodes(tree, (node) => node.type === AuthRequiredModal && node.props.open);
   assert.equal(openModals.length, 1, "unlock action opens one modal");
-  assert.equal(openModals[0].props.copyKey, isAuthenticated ? "payment.buyAccess" : "cadastru.loginToUse");
+  assert.equal(openModals[0].props.copyKey, "payment.buyAccess");
   if (isAuthenticated) {
     const offer = findNodes(openModals[0], (node) => node.type === FeaturePricingAction)[0];
     assert.equal(offer.props.offer.product_key, purchase.product_key);

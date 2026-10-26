@@ -46,6 +46,7 @@ async function harness(file, path, stored = {}) {
     effects.push(() => { slots[index].cleanup = effect(); });
   };
   const mocks = {
+    '@/lib/visitor-browser': { getDeviceId: () => null },
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
@@ -115,7 +116,7 @@ async function harness(file, path, stored = {}) {
   };
 }
 
-const pageFile = 'src/app/cadastru/rezultat/page.js';
+const pageFile = 'src/app/cadastru/rezultat/CadastruResultPage.js';
 const page = await harness(pageFile, '/ro/cadastru/rezultat?source=address&lookup=1', { [addressKey]: JSON.stringify(address) });
 page.render();
 const id = page.requests[0].body.lookup_id;

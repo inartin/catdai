@@ -680,9 +680,50 @@ async function saveAddressAlias(address, entry) {
   logDbError("address alias save failed", error);
 }
 
+function isParcelBuilding(parcelNumber, buildingNumber) {
+  const parts = String(buildingNumber || "").split(".");
+  return parts.length === 3 && /^\d{2}$/.test(parts[2])
+    && `${parts[0]}.${parts[1]}` === parcelNumber;
+}
+
+async function composeParcelEntry(entry, options) {
+  const number = entry.payload.cadastral_number;
+  if (!/^\d{7}\.\d{1,4}$/.test(number || "") || !isCadastruDbEnabled()) return entry;
+  try {
+    // Recover buildings saved separately by older address lookups and the collector.
+    // The range uses the existing number index; the pattern excludes apartments.
+    const { data, error } = await supabaseAdmin.from("cadastru_records").select(RECORD_COLUMNS)
+      .gte("cadastral_number", `${number}.`).lt("cadastral_number", `${number}/`)
+      .like("cadastral_number", `${number}.__`).limit(100);
+    if (error) { logDbError("parcel buildings lookup failed", error); return entry; }
+    const buildings = new Map((entry.payload.buildings || [])
+      .filter(property => isParcelBuilding(number, property.cadastral_number))
+      .map(property => [property.cadastral_number, property]));
+    const parcelFetchedAt = entry.fetchedAt;
+    for (const row of data || []) {
+      if (!isParcelBuilding(number, row.cadastral_number) || hasDerivedIdentity(row) || hasDerivedIdentity(row.raw_payload)
+        || (!options.allowExpired && !isFreshCadastru(recordExpiry(row)))) continue;
+      const child = await composeBuildingEntry(recordEntry(row));
+      const property = child.payload.buildings?.find(property => property.cadastral_number === row.cadastral_number);
+      if (!property) continue;
+      if (buildings.has(row.cadastral_number) && Date.parse(child.fetchedAt) < Date.parse(parcelFetchedAt)) continue;
+      buildings.set(row.cadastral_number, { ...buildings.get(row.cadastral_number), ...property });
+      if (Date.parse(child.expiresAt) < Date.parse(entry.expiresAt)) {
+        entry = { ...entry, fetchedAt: child.fetchedAt, expiresAt: child.expiresAt };
+      }
+    }
+    return { ...entry, payload: { ...entry.payload, ...(buildings.size ? { buildings: [...buildings.values()] } : {}) } };
+  } catch (error) {
+    logDbError("parcel buildings lookup failed", error);
+    return entry;
+  }
+}
+
 export async function getCadastruRecordByNumber(cadastralNumber, options = {}) {
   const cached = await readCadastruCache("number", cadastralNumber, options);
-  if (cached && !hasDerivedIdentity(cached.payload) && (!options.requireDetailPayload || !isAddressResolverOnlyRecord({ raw_payload: cached.payload }))) return composeBuildingEntry(cached);
+  if (cached && !hasDerivedIdentity(cached.payload) && (!options.requireDetailPayload || !isAddressResolverOnlyRecord({ raw_payload: cached.payload }))) {
+    return composeParcelEntry(await composeBuildingEntry(cached), options);
+  }
   if (!isCadastruDbEnabled()) return null;
   try {
     const row = await findRecordByNumber(cadastralNumber);
@@ -690,7 +731,7 @@ export async function getCadastruRecordByNumber(cadastralNumber, options = {}) {
     if (options.requireDetailPayload && isAddressResolverOnlyRecord(row)) return null;
     const entry = recordEntry(row);
     await writeCadastruCache("number", cadastralNumber, entry);
-    return composeBuildingEntry(entry);
+    return composeParcelEntry(await composeBuildingEntry(entry), options);
   } catch (error) {
     logDbError("number lookup failed", error);
     return null;
@@ -800,7 +841,7 @@ export async function persistCadastruAddressResult(payload, options = {}) {
     }
     else await writeCadastruCache("number", payload.cadastral_number, entry);
   }
-  // Keep the complete aggregate under its address; individual numbers return only their own property.
+  // A parcel includes its verified constructions; a building keeps its own result.
   for (const [kind, properties] of [["lands", payload.lands], ["buildings", payload.buildings]]) {
     for (const property of properties || []) {
       if (!property.cadastral_number) continue;
@@ -809,6 +850,8 @@ export async function persistCadastruAddressResult(payload, options = {}) {
         source: payload.source,
         matched_address: property.address || payload.matched_address,
         [kind]: [property],
+        ...(kind === "lands" ? { buildings: (payload.buildings || [])
+          .filter(building => isParcelBuilding(property.cadastral_number, building.cadastral_number)) } : {}),
       };
       const saved = await persistCadastruRecord(individual, { ...options, skipAddressAlias: true, countLookup: false });
       if (!saved) await writeCadastruCache("number", property.cadastral_number, { ...entry, payload: individual });

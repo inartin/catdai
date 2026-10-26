@@ -21,6 +21,12 @@ const supabaseAdmin = {
     const query = {
       select() { return query; },
       eq(key, value) { filters.push((row) => row[key] === value); return query; },
+      gte(key, value) { filters.push((row) => row[key] >= value); return query; },
+      lt(key, value) { filters.push((row) => row[key] < value); return query; },
+      like(key, value) {
+        const pattern = new RegExp(`^${value.replace(/\./g, "\\.").replace(/_/g, ".").replace(/%/g, ".*")}$`);
+        filters.push((row) => pattern.test(row[key])); return query;
+      },
       is(key, value) { filters.push((row) => (row[key] ?? null) === value); return query; },
       limit(value) { limit = value; return query; },
       insert(value) { operation = "insert"; values = value; return query; },
@@ -154,7 +160,8 @@ await storage.persistCadastruAddressResult(aggregate, { requestAddress: aggregat
 cache.clear();
 assert.deepEqual(clone((await storage.getCadastruRecordByAddress(aggregateAddress)).payload), aggregate);
 assert.deepEqual(clone((await storage.getCadastruRecordByNumber(aggregate.lands[0].cadastral_number)).payload.map_location), aggregate.lands[0].map_location, "land coordinates belong to their own number record");
-assert.equal((await storage.getCadastruRecordByNumber(aggregate.lands[0].cadastral_number)).resultType, "land_only");
+assert.deepEqual(clone((await storage.getCadastruRecordByNumber(aggregate.lands[0].cadastral_number)).payload.buildings), aggregate.buildings,
+  "a parcel-number result includes the constructions verified by address lookup");
 assert.deepEqual(clone((await storage.getCadastruRecordByNumber(aggregate.buildings[0].cadastral_number)).payload.map_location), aggregate.buildings[0].map_location, "building coordinates belong to their own number record");
 const single = (await storage.getCadastruRecordByNumber("0100201.555.02")).payload;
 assert.equal(single.buildings.length, 1); assert.equal(single.buildings[0].restrictions, "test");
@@ -162,6 +169,28 @@ assert.equal(single.lands, undefined, "individual numbers cannot return neighbor
 await storage.persistCadastruRecord(single, { officialFetch: false });
 cache.clear();
 assert.deepEqual(clone((await storage.getCadastruRecordByAddress(aggregateAddress)).payload), aggregate, "a number read must not replace its building-wide address snapshot");
+
+// Older saved parcels and collector records keep constructions as separate number records.
+{
+  const parcelNumber = aggregate.lands[0].cadastral_number;
+  const parcelRow = tables.cadastru_records.find(row => row.cadastral_number === parcelNumber);
+  delete parcelRow.raw_payload.buildings;
+  await storage.persistCadastruRecord({ cadastral_number: `${parcelNumber}.01.001`, apartment: { area_m2: 42 } }, { officialFetch: true });
+  await storage.persistCadastruRecord({ cadastral_number: `${parcelNumber}1.01`, buildings: [{ cadastral_number: `${parcelNumber}1.01` }] }, { officialFetch: true });
+  cache.clear();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    assert.deepEqual(clone((await storage.getCadastruRecordByNumber(parcelNumber)).payload.buildings), aggregate.buildings,
+      "DB and Redis parcel reads recover only exact child constructions, excluding apartments and neighbouring parcels");
+  }
+  const childRow = tables.cadastru_records.find(row => row.cadastral_number === `${parcelNumber}.02`);
+  childRow.next_refresh_after = "2020-01-01T00:00:00Z";
+  cache.clear();
+  assert.equal((await storage.getCadastruRecordByNumber(parcelNumber)).payload.buildings.length, 1, "fresh-only reads exclude expired child records");
+  const staleParcel = await storage.getCadastruRecordByNumber(parcelNumber, { allowExpired: true });
+  assert.equal(staleParcel.payload.buildings.length, 2, "normal saved-data lookups retain expired child snapshots");
+  assert.equal(staleParcel.expiresAt, childRow.next_refresh_after, "expired child data keeps the parcel result eligible for refresh");
+  childRow.next_refresh_after = caching.cadastruExpiresAt();
+}
 const numericStreet = "Chișinău, str. 31 August 1989 14, ap. 7";
 await storage.persistCadastruRecord({ cadastral_number: "0100201.888.01.007", apartment: { address: numericStreet, area_m2: 40 } }, { officialFetch: true });
 const numericRow = tables.cadastru_records.find((row) => row.cadastral_number === "0100201.888.01.007");
@@ -1669,3 +1698,39 @@ for (const source of ['geodata_wms_derived', 'geodata_wfs_building_derived', 'ge
   for(const key of Object.keys(tables)) tables[key].splice(0,Infinity,...savedTables[key]);
 }
 console.log('Derived apartment identity cache and storage regressions passed.');
+
+
+// The reported Stăuceni case works through the public number route and its paywall.
+{
+  const propertyAddress = "Stăuceni, str. Luceafărul 22";
+  const parcel = { cadastral_number: "3153208.081", address: propertyAddress, object_type: "Teren", area_m2: "607", district_lookup_checked: true };
+  const construction = { cadastral_number: "3153208.081.01", address: propertyAddress, object_type: "Construcție", area_m2: "120" };
+  const result = { lands: [parcel], buildings: [construction], matched_address: propertyAddress };
+  await storage.persistCadastruAddressResult(result, { requestAddress: propertyAddress, officialFetch: true, lookupSource: "api" });
+  const before = numberFetches;
+  hasCredit = true;
+  const response = await numberRoute.POST(request({ cadastral_number: parcel.cadastral_number }));
+  assert.equal(response.status, 200);
+  const full = await response.json();
+  assert.deepEqual(full.lands.map(property => property.cadastral_number), [parcel.cadastral_number]);
+  assert.deepEqual(full.buildings.map(property => property.cadastral_number), [construction.cadastral_number]);
+  assert.equal(full.buildings[0].area_m2, "120");
+  hasCredit = false;
+  const preview = await (await numberRoute.POST(request({ cadastral_number: parcel.cadastral_number }))).json();
+  assert.equal(preview.full_access, false);
+  assert.equal(preview.buildings.length, 1);
+  assert.notEqual(preview.buildings[0].area_m2, "120", "child construction registry details remain masked");
+  assert.equal(numberFetches, before, "saved address data satisfies the parcel-number search without another provider call");
+  const freshRoute = await load("src/app/api/cadastral/route.js", {
+    ...routeMocks,
+    "@/lib/cadastru-external-api": { fetchExternalCadastralData: async () => ({ ...result, cadastral_number: parcel.cadastral_number }) },
+  });
+  const oldConstruction = tables.cadastru_records.find(row => row.cadastral_number === construction.cadastral_number);
+  oldConstruction.last_official_fetch_at = new Date(Date.now() - 86400_000).toISOString();
+  oldConstruction.raw_payload.buildings[0].area_m2 = "80";
+  hasCredit = true;
+  const fresh = await (await freshRoute.POST(request({ cadastral_number: parcel.cadastral_number, skipcache: true }))).json();
+  assert.deepEqual(fresh.buildings.map(property => property.cadastral_number), [construction.cadastral_number], "fresh worker results retain the parcel and its buildings through persistence");
+  assert.equal(fresh.buildings[0].area_m2, "120", "older separate construction records cannot overwrite freshly fetched details");
+  console.log("Parcel-number regressions passed: Stăuceni address parity, saved/fresh results and preview masking.");
+}

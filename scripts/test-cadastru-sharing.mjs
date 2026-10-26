@@ -36,6 +36,9 @@ let payload = official;
 let userId = "user-1", persistent = true, collect = true, creditReason = "already_consumed";
 let storageError = false, lookupCalls = [], creditKeys = [], rows = [], insertCollisions = 0;
 let allowed = true;
+let metadataUrlLang = "ro", metadataCookieLang = "ru";
+const ro = JSON.parse(await fs.readFile("src/locales/ro.json", "utf8"));
+const ru = JSON.parse(await fs.readFile("src/locales/ru.json", "utf8"));
 const clone = (value) => structuredClone(value);
 const supabaseAdmin = { from(table) {
   assert.equal(table, "cadastru_shared_reports");
@@ -64,6 +67,11 @@ const stable = (value) => value && typeof value === "object"
 const keyFor = (feature, value) => `${feature}:${JSON.stringify(stable(value))}`;
 const mocks = {
   "node:crypto": { default: crypto },
+  react: { cache: (fn) => fn },
+  "next/headers": {
+    headers: async () => new Headers(metadataUrlLang ? { "x-catdai-lang": metadataUrlLang } : {}),
+    cookies: async () => ({ get: () => metadataCookieLang ? { value: metadataCookieLang } : undefined }),
+  },
   "next/server": { NextResponse: { json: (body, init) => Response.json(body, init) } },
   "@/lib/supabase-admin": { supabaseAdmin },
   "@/lib/access-tier": { resolveAccessTier: async () => ({ user_id: userId }) },
@@ -88,7 +96,10 @@ const mocks = {
   "@/lib/statistics-context": { shouldCollectStatistics: () => collect, withStatisticsContext: (handler) => handler },
   "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed, retryAfter: 60 }) }) },
   "@/lib/validation": { validateCadastralNumber },
-  "@/lib/cadastru-share-url": { getCadastruSharePath },
+  "@/lib/cadastru-share-url": { getCadastruSharePath, decodeCadastruShareCode },
+  "@/lib/seo": { toAbsoluteUrl: (path) => `https://catdai.md${path}` },
+  "@/locales/ro.json": { default: ro },
+  "@/locales/ru.json": { default: ru },
 };
 async function load(file) {
   const context = vm.createContext({ console: { error() {} }, URL, process: { env: { NODE_ENV: "production" } } });
@@ -302,11 +313,11 @@ const { code: routeCode } = await transform(await fs.readFile("src/app/c/[code]/
 });
 const shortRoute = new vm.SourceTextModule(routeCode, { context });
 const ResultPage = () => null;
+const shareMetadata = await load("src/lib/cadastru-share-metadata.js");
 const routeMocks = {
   "next/navigation": { notFound() { throw new Error("404"); } },
-  "@/app/cadastru/rezultat/page": { default: ResultPage },
-  "@/lib/cadastru-share-url": { decodeCadastruShareCode },
-  "@/lib/supabase-admin": { supabaseAdmin },
+  "@/app/cadastru/rezultat/CadastruResultPage": { default: ResultPage },
+  "@/lib/cadastru-share-metadata": { ...shareMetadata },
   "react/jsx-runtime": { jsx },
 };
 await shortRoute.link((name) => new vm.SyntheticModule(Object.keys(routeMocks[name]), function () {
@@ -324,3 +335,67 @@ assert.equal(legacyPage.props.shareSlug, shared.slug, "32-character links still 
 storageError = true;
 await assert.rejects(shortRoute.namespace.default({ params: Promise.resolve({ code: savedCode }) }), /storage unavailable/);
 console.log("Compact sharing passed: 35-character RO/RU URLs, existing report reuse, old compact links, invalid codes and storage outages.");
+
+storageError = false;
+const privateReport = { slug: shared.slug, payload: {
+  request_address: "  Chișinău,\n bd. Test 1, ap. 7  ",
+  resolved_address: "Different official address 99",
+  cadastral_number: "0100999.888.77.666",
+  apartment: { area_m2: 123.456, estimated_value: "PRIVATE_VALUE", ownership: "PRIVATE_OWNER", restrictions: "PRIVATE_RESTRICTION" },
+} };
+for (const lang of ["ro", "ru"]) {
+  metadataUrlLang = lang;
+  metadataCookieLang = lang === "ro" ? "ru" : "ro";
+  const metadata = await shareMetadata.getCadastruShareMetadata(privateReport);
+  const path = await getCadastruSharePath(shared.slug, lang);
+  assert.equal(metadata.title, `${(lang === "ro" ? ro : ru)["cadastru.sharedMetaTitle"]} — Chișinău, bd. Test 1, ap. 7 | Catdai`);
+  assert.equal(metadata.openGraph.title, metadata.title);
+  assert.equal(metadata.twitter.title, metadata.title);
+  assert.equal(metadata.openGraph.description, metadata.description);
+  assert.equal(metadata.twitter.description, metadata.description);
+  assert.equal(metadata.openGraph.url, `https://catdai.md${path}`);
+  assert.equal(metadata.alternates.canonical, path);
+  assert.equal(metadata.openGraph.locale, lang === "ru" ? "ru_MD" : "ro_MD");
+  assert.equal(metadata.robots.index, false);
+  for (const value of ["0100999.888.77.666", "123.456", "PRIVATE_VALUE", "PRIVATE_OWNER", "PRIVATE_RESTRICTION", "Different official"]) {
+    assert(!JSON.stringify(metadata).includes(value), `Preview must exclude ${value}`);
+  }
+  for (const payload of [null, {}, { request_address: "0100999.888.77.666" }, { request_address: { owner: "PRIVATE_OWNER" } }]) {
+    const generic = await shareMetadata.getCadastruShareMetadata({ slug: shared.slug, payload });
+    assert.equal(generic.title, `${(lang === "ro" ? ro : ru)["cadastru.sharedMetaTitle"]} | Catdai`);
+  }
+  for (const payload of [{ resolved_address: address }, { apartment: { address } }, { building: { address } },
+    { lands: [{ address }] }, { buildings: [{ address }] }]) {
+    assert((await shareMetadata.getCadastruShareMetadata({ slug: shared.slug, payload })).title.includes(address));
+  }
+  const codeMetadata = await shortRoute.namespace.generateMetadata({ params: Promise.resolve({ code: savedCode }) });
+  const oldCodeMetadata = await shortRoute.namespace.generateMetadata({ params: Promise.resolve({ code: Buffer.from(shared.slug, "hex").toString("base64url") }) });
+  assert.deepEqual(codeMetadata, oldCodeMetadata);
+}
+metadataUrlLang = "";
+metadataCookieLang = "ru";
+assert((await shareMetadata.getCadastruShareMetadata(privateReport)).title.startsWith(ru["cadastru.sharedMetaTitle"]));
+metadataCookieLang = "";
+assert((await shareMetadata.getCadastruShareMetadata(privateReport)).title.startsWith(ro["cadastru.sharedMetaTitle"]));
+
+const { code: resultRouteCode } = await transform(await fs.readFile("src/app/cadastru/rezultat/page.js", "utf8"), {
+  filename: "src/app/cadastru/rezultat/page.js",
+  jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } } },
+  module: { type: "es6" },
+});
+const resultRoute = new vm.SourceTextModule(resultRouteCode, { context });
+const resultMocks = { "./CadastruResultPage": { default: ResultPage },
+  "@/lib/cadastru-share-metadata": { ...shareMetadata }, "react/jsx-runtime": { jsx } };
+await resultRoute.link((name) => new vm.SyntheticModule(Object.keys(resultMocks[name]), function () {
+  for (const [key, value] of Object.entries(resultMocks[name])) this.setExport(key, value);
+}, { context }));
+await resultRoute.evaluate();
+assert.equal(Object.keys(await resultRoute.namespace.generateMetadata({ searchParams: Promise.resolve({ cadastral_number: number }) })).length, 0,
+  "ordinary results keep their existing metadata");
+for (const lang of ["ro", "ru"]) {
+  metadataUrlLang = lang;
+  const legacy = await resultRoute.namespace.generateMetadata({ searchParams: Promise.resolve({ share_slug: shared.slug, street: "INJECTED", owner: "PRIVATE_OWNER" }) });
+  const compact = await shortRoute.namespace.generateMetadata({ params: Promise.resolve({ code: savedCode }) });
+  assert.deepEqual(legacy, compact, "legacy and compact links have identical metadata, ignoring unrelated query criteria");
+}
+console.log("Shared metadata passed: all formats, URL-language precedence, address-only previews, generic/fallback addresses and unchanged ordinary results.");

@@ -8,6 +8,7 @@ import { groupExternalApiEvents } from "@/lib/admin-external-api-groups";
 import AdminUserCredits from "@/components/AdminUserCredits";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 import AdminWorkerStatus from "@/components/admin/AdminWorkerStatus";
+import AdminOnlineUsers from "@/components/admin/AdminOnlineUsers";
 
 function fmtNum(n) {
   if (n == null) return "\u2014";
@@ -1297,6 +1298,7 @@ function DashboardContent() {
       )}
       <div className="flex flex-col items-start gap-3 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <AdminOnlineUsers />
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
           <div className="inline-flex w-full rounded-lg border border-gray-200 bg-white p-1 sm:w-auto">
             {DASHBOARD_PERIOD_OPTIONS.map((option) => (

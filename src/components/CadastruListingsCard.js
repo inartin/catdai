@@ -97,55 +97,53 @@ export default function CadastruListingsCard({ data = null }) {
     <section ref={cardRef} className="mx-1 mt-6 overflow-hidden rounded-3xl border border-stone-200 bg-white shadow-sm" aria-labelledby="cadastru-listings-title">
       <header className="relative bg-emerald-950 px-5 py-7 text-white sm:p-8">
         <BuildingIcon className="pointer-events-none absolute bottom-3 left-3 h-24 w-24 text-emerald-900/30" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm font-medium tracking-wide text-emerald-200">{label("eyebrow")}</p>
-            <h2 id="cadastru-listings-title" className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-              {hasListings ? data.address : `${label("priceTrend")} · ${trend.name}`}
-            </h2>
-          </div>
-          {collectedCount > 0 && (
-            <div className="shrink-0 text-right">
-              <p className="text-4xl font-semibold tabular-nums tracking-tight">{number.format(collectedCount)}</p>
-              <p className="mt-1 text-base text-emerald-100">{label("collectedListings")}</p>
+        <div className={`relative grid items-start gap-x-8 gap-y-7 ${trend ? "md:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)] md:grid-rows-[auto_1fr]" : ""}`}>
+          <div className={`flex flex-wrap items-start justify-between gap-4 ${trend && collectedCount > 0 ? "md:col-span-2" : ""}`}>
+            <div className="min-w-0">
+              <p className="text-sm font-medium tracking-wide text-emerald-200">{label("eyebrow")}</p>
+              <h2 id="cadastru-listings-title" className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                {hasListings ? data.address : `${label("priceTrend")} · ${trend.name}`}
+              </h2>
             </div>
-          )}
-        </div>
-
-        {((currentMedian != null || nearbyMedian != null) || trend) && (
-          <div className={`relative mt-7 grid items-start gap-8 ${trend ? "md:grid-cols-[minmax(0,1fr)_minmax(280px,0.85fr)]" : ""}`}>
-            {(currentMedian != null || nearbyMedian != null) ? (
-              <div className="flex flex-wrap items-end gap-x-10 gap-y-5">
-                {currentMedian != null && (
-                  <div>
-                    <p className="mb-2 text-base text-emerald-100">{tab === "active" ? label("currentMedian") : label("archiveMedian")}</p>
-                    <p className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
-                      {currentMedian ? number.format(currentMedian) : "—"}
-                      <span className="ml-2 text-xl font-normal text-emerald-200">€/m²</span>
-                    </p>
-                  </div>
-                )}
-                {nearbyMedian != null && (
-                  <div className="pb-1 text-base leading-relaxed text-emerald-100">
-                    <p>{label("sameStreetMedian")} <strong className="font-semibold text-white">{nearbyMedian ? money(nearbyMedian) : "—"} / m²</strong></p>
-                    {difference !== null && (
-                      <p className="mt-1">{difference === 0 ? label("similar") : t(`cadastru.market.${difference < 0 ? "below" : "above"}`, { percent: Math.abs(difference) })}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : <div />}
-            {trend && (
-              <div className="md:pl-6">
-                <MarketTrendOverlayChart
-                  series={trend.series.map((series) => ({ ...series, label: label(series.key) }))}
-                  title={`${trend.scope === "building" ? label("building") : t("result.districtTrend")} · ${trend.name}`}
-                  metricLabel={t("result.trendMetricMedian")}
-                />
+            {collectedCount > 0 && (
+              <div className="shrink-0 text-right">
+                <p className="text-4xl font-semibold tabular-nums tracking-tight">{number.format(collectedCount)}</p>
+                <p className="mt-1 text-base text-emerald-100">{label("collectedListings")}</p>
               </div>
             )}
           </div>
-        )}
+
+          {(currentMedian != null || nearbyMedian != null) && (
+            <div className="flex flex-wrap items-end gap-x-10 gap-y-5 md:col-start-1 md:row-start-2">
+              {currentMedian != null && (
+                <div>
+                  <p className="mb-2 text-base text-emerald-100">{tab === "active" ? label("currentMedian") : label("archiveMedian")}</p>
+                  <p className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
+                    {currentMedian ? number.format(currentMedian) : "—"}
+                    <span className="ml-2 text-xl font-normal text-emerald-200">€/m²</span>
+                  </p>
+                </div>
+              )}
+              {nearbyMedian != null && (
+                <div className="pb-1 text-base leading-relaxed text-emerald-100">
+                  <p>{label("sameStreetMedian")} <strong className="font-semibold text-white">{nearbyMedian ? money(nearbyMedian) : "—"} / m²</strong></p>
+                  {difference !== null && (
+                    <p className="mt-1">{difference === 0 ? label("similar") : t(`cadastru.market.${difference < 0 ? "below" : "above"}`, { percent: Math.abs(difference) })}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {trend && (
+            <div className={`md:col-start-2 md:pl-6 ${collectedCount > 0 ? "md:row-start-2" : "md:row-span-2 md:row-start-1"}`}>
+              <MarketTrendOverlayChart
+                series={trend.series.map((series) => ({ ...series, label: label(series.key) }))}
+                title={`${trend.scope === "building" ? label("building") : t("result.districtTrend")} · ${trend.name}`}
+                metricLabel={t("result.trendMetricMedian")}
+              />
+            </div>
+          )}
+        </div>
         {hasListings && <button type="button" aria-expanded={expanded} aria-controls={contentId}
           onClick={() => {
             if (expanded && cardRef.current.getBoundingClientRect().top < 0) {

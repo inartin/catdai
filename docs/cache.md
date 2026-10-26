@@ -22,6 +22,11 @@ Backend prepared and active when Redis is reachable.
 - `GET /api/admin/ad-tracking`: key prefix `catdai:admin-ad-tracking:v1`, 10m TTL per source, journey limit, and offset; `fresh=1` bypasses the cache.
 - `POST /api/admin/auth`: key prefix `catdai:admin-login:v1:`, 15m TTL per client IP for failed-login throttling. Production admin login requires Redis and fails closed if it is unavailable.
 
+## Live Presence
+- `catdai:online-users:v1` is a Redis sorted set of browser IDs scored by the server heartbeat timestamp. `POST /api/online-users` atomically removes entries at least 90 seconds old, updates one browser and returns the current count. Each heartbeat renews a 180-second TTL on the set; reads do not extend it.
+- `GET /api/online-users` counts only timestamps newer than the 90-second cutoff and returns uncached plain text. Redis is required: failures return `503`, without a process-local fallback or a misleading zero. No schema or extra service is needed.
+- Check with `pnpm exec node --experimental-vm-modules scripts/test-online-users.mjs` (requires `redis-server`; starts and stops an isolated, non-persistent instance).
+
 ## Cadastru Cache
 - Only successful `200` cadastru payloads are cached; unauthorized, invalid, rate-limited, not-found, and upstream-error responses are not cached.
 - Cadastru routes use Redis first; if Redis is unavailable or misses, they check `cadastru_records` before calling official sources.

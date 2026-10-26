@@ -32,6 +32,8 @@ Implemented as admin dashboard with direct registered-user package adjustment.
 
 ## Dashboard
 
+- A centered `Online now` line between the Dashboard heading and period filter shows unique browsers across CatDai seen within 90 seconds. It reads plain-text `GET /api/online-users` on load, every 30 seconds while visible and immediately on returning to the tab, independently of the selected period and cached stats. Loading shows `—`; Redis/request failures show `Unavailable`. Admin pages do not send heartbeats, and authenticated marked admins are excluded on the server.
+
 - The API worker status bar checks `pi`, `mac` and `curiosity` independently on load, every minute while the tab is visible, and with Check now. Each host shows Online/Offline/Not configured, response time, application Git revision, Node.js version and a short failure reason. During refresh, the last checked time and worker details stay visible; Checking replaces the status and response time. The admin-only `/api/admin/worker-status` route probes all configured `/health` URLs concurrently with a five-second timeout and no cache; it forwards no credentials and creates no usage events. Older workers without identity metadata remain compatible and show unknown versions. This checks process reachability, not upstream provider health. Configuration and failover rules are in [Cadastral Lookup](cadastral.md#worker-host-failover).
 
 Shows:

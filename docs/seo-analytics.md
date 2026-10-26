@@ -30,6 +30,8 @@ Implemented.
 - About page includes `AboutPage`.
 
 ## Analytics And Consent
+
+- Live presence uses the existing browser ID: `OnlineUsersTracker` sends `POST /api/online-users` on entry, every 30 seconds while visible and immediately when returning to the tab. A browser counts once across tabs and public pages for 90 seconds after its last heartbeat; another browser/device counts separately, and blocked persistent storage cannot supply an ID. Admin routes and development Cadastru pages skip heartbeats. The existing authenticated statistics guard excludes marked admins and failed auth checks; recognized bots are excluded. Presence stores only transient browser IDs/timestamps in Redis, with no database writes. Public `GET /api/online-users` returns only the integer in plain text with `no-store`, never registers its caller, and returns `503 Unavailable` if Redis fails. The POST returns the same count after an accepted heartbeat and rejects invalid browser IDs and cross-origin requests.
 - Google tag loads once and configures `NEXT_PUBLIC_GA_ID` plus Google Ads-provided tag `AW-18184166002`. Loading is independent of auth/admin status; Google traffic exclusion is managed in Google, without an app policy request or session check.
 - The shared Google tag script loads with the Ads ID first so Ads diagnostics see the expected source ID.
 - CSP allows Google Ads collection endpoints used by remarketing, consent mode, and view-through conversion checks.

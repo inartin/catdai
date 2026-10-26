@@ -1613,6 +1613,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
       : "rent_estimate_single",
   } : null;
   const authModalPurchaseOffer = purchaseOffer;
+  const isPurchaseModal = Boolean(authModalPurchaseOffer && (authModalCopyKey === "result.freeMonthlyLimitReached" || authModalCopyKey === "payment.buyAccess"));
   const paidFeatureCreditRequired = !!purchaseOffer && !freeMonthlyLimitReached && !paidEvaluationLimitReached;
   const lockedSections = data.locked_sections || {};
   const hideRentLevels = !isPaid && lockedSections.rent_levels !== false;
@@ -1714,16 +1715,12 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
       <AuthRequiredModal
         open={isAuthModalOpen}
         copyKey={authModalCopyKey}
-        showAuthOptions={authModalShowAuthOptions}
+        showAuthOptions={isPurchaseModal ? false : authModalShowAuthOptions}
+        variant={isPurchaseModal ? "paywall" : "default"}
         onClose={closeAuthModal}
       >
-        {authModalPurchaseOffer && (authModalCopyKey === "result.freeMonthlyLimitReached" || authModalCopyKey === "payment.buyAccess") ? (
-          <>
-            <p className="mb-4 text-center text-sm font-medium text-gray-500">
-              {t("payment.limitPackageSubtitle")}
-            </p>
-            <FeaturePricingAction offer={authModalPurchaseOffer} trackPopupOpen />
-          </>
+        {isPurchaseModal ? (
+          <FeaturePricingAction offer={authModalPurchaseOffer} variant="paywall" trackPopupOpen />
         ) : null}
       </AuthRequiredModal>
       <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
@@ -1943,6 +1940,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const [showLoginTooltip, setShowLoginTooltip] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("result.comingSoon");
+  const [authModalOfferOverride, setAuthModalOfferOverride] = useState(null);
   const [authModalShowAuthOptions, setAuthModalShowAuthOptions] = useState(true);
   const [showListingsView, setShowListingsView] = useState(false);
   const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false);
@@ -1964,9 +1962,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   } : null;
   const cadastralLockedPreview = cadastral?.locked_sections?.cadastru_details === true;
   const cadastralPurchaseOffer = cadastral?.access_limit?.purchase || null;
-  const authModalPurchaseOffer = authModalCopyKey === "payment.buyAccess" && cadastralPurchaseOffer
-    ? cadastralPurchaseOffer
-    : purchaseOffer;
+  const authModalPurchaseOffer = authModalOfferOverride || purchaseOffer;
+  const isPurchaseModal = Boolean(authModalPurchaseOffer && (authModalCopyKey === "result.freeMonthlyLimitReached" || authModalCopyKey === "payment.buyAccess"));
   const lockedSections = data.locked_sections || {};
   const hideMarketEstimate = !isPaid && lockedSections.market_estimate === true;
   const hidePriceTiers = !isPaid && lockedSections.price_tiers !== false;
@@ -2002,6 +1999,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const openAuthModal = useCallback((copyKey = "result.comingSoon", options = {}) => {
     if (isAuthenticated && !options.force) return;
     setAuthModalCopyKey(typeof copyKey === "string" ? copyKey : "result.comingSoon");
+    setAuthModalOfferOverride(options.purchaseOffer || null);
     setAuthModalShowAuthOptions(options.showAuthOptions !== false);
     clearAuthError();
     setIsAuthModalOpen(true);
@@ -2039,8 +2037,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     openAuthModal("payment.buyAccess", {
       force: true,
       showAuthOptions: false,
+      purchaseOffer: cadastralPurchaseOffer || { product_key: "cadastru_lookup_single" },
     });
-  }, [openAuthModal]);
+  }, [openAuthModal, cadastralPurchaseOffer]);
 
   useEffect(() => {
     if (!isAuthenticated || typeof window === "undefined") return;
@@ -2389,16 +2388,12 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
       <AuthRequiredModal
         open={isAuthModalOpen}
         copyKey={authModalCopyKey}
-        showAuthOptions={authModalShowAuthOptions}
+        showAuthOptions={isPurchaseModal ? false : authModalShowAuthOptions}
+        variant={isPurchaseModal ? "paywall" : "default"}
         onClose={closeAuthModal}
       >
-        {authModalPurchaseOffer && (authModalCopyKey === "result.freeMonthlyLimitReached" || authModalCopyKey === "payment.buyAccess") ? (
-          <>
-            <p className="mb-4 text-center text-sm font-medium text-gray-500">
-              {t("payment.limitPackageSubtitle")}
-            </p>
-            <FeaturePricingAction offer={authModalPurchaseOffer} trackPopupOpen />
-          </>
+        {isPurchaseModal ? (
+          <FeaturePricingAction offer={authModalPurchaseOffer} variant="paywall" trackPopupOpen />
         ) : null}
       </AuthRequiredModal>
       <ValuationPdfDialog

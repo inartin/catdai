@@ -31,3 +31,40 @@ export function validMapGeometry(geometry) {
     return ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1];
   }));
 }
+
+export function cadastruMapLocation(cadastral) {
+  const location = [cadastral?.map_location, cadastral?.building?.map_location, cadastral?.apartment?.map_location,
+    ...(Array.isArray(cadastral?.buildings) ? cadastral.buildings : []).map((item) => item?.map_location),
+    ...(Array.isArray(cadastral?.lands) ? cadastral.lands : []).map((item) => item?.map_location),
+  ].find((point) => Number.isFinite(point?.latitude) && Math.abs(point.latitude) <= 90
+    && Number.isFinite(point?.longitude) && Math.abs(point.longitude) <= 180);
+  if (location) return location;
+  let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+  for (const feature of cadastruMapFeatures(cadastral).features) {
+    const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+    for (const polygon of polygons) for (const ring of polygon) for (const [lon, lat] of ring) {
+      minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
+      minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat);
+    }
+  }
+  return Number.isFinite(minLon) ? { longitude: (minLon + maxLon) / 2, latitude: (minLat + maxLat) / 2 } : null;
+}
+
+const MAP_DATA_FIELDS = new Set(["maplocation", "mapgeometry", "latitude", "longitude", "lat", "lon", "lng",
+  "x", "y", "coordinates", "geometry", "geojson", "bbox", "bounds", "boundingbox", "center", "centroid", "point", "wkt",
+  "tiles", "tileurl", "tilejson", "mapurl", "maplink", "externalmapurl", "styleurl"]);
+
+// Apply at the response boundary, including cache hits. Saved data stays complete.
+export function redactCadastruMapData(value) {
+  if (Array.isArray(value)) return value.map(redactCadastruMapData);
+  if (!value || typeof value !== "object") {
+    if (typeof value === "string" && /^(?:https?:\/\/|geo:)/i.test(value)) {
+      if (/^geo:/i.test(value) || /(?:[?&](?:lat|lon|lng|ll|center|bbox|coordinates|x|y)=|[?&]q=-?\d|\/@-?\d|\/api\/tiles\/|\/vt\/|\/\d+\/\d+\/\d+\.(?:pbf|png|jpe?g|webp))/i.test(value)) return null;
+    }
+    return value;
+  }
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key, item]) => !MAP_DATA_FIELDS.has(key.replace(/[_-]/g, "").toLowerCase())
+      && !(key === "location" && Array.isArray(item)))
+    .map(([key, item]) => [key, redactCadastruMapData(item)]));
+}

@@ -1,5 +1,6 @@
 import { buildFeatureCreditRequiredPayload } from "@/lib/paid-feature-usage";
 import { resolveCadastruCityFromAddress, resolveCadastruSupportedCity } from "@/lib/cadastru-supported-cities";
+import { cadastruMapLocation, redactCadastruMapData } from "@/lib/cadastru-map";
 
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 
@@ -68,7 +69,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
   };
   const hasAddressProperties = Boolean(payload?.lands?.length || payload?.buildings?.length);
 
-  const preview = {
+  const preview = redactCadastruMapData({
     cadastral_number: hasAddressProperties
       ? payload?.cadastral_number
       : maskCadastralNumber
@@ -84,7 +85,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     map_location: payload?.map_location || null,
     map_geometry: payload?.map_geometry || null,
     apartment: maskObjectFields(apartment, ["address", "floor", "map_location"]),
-    building: maskObjectFields(building, ["address", "classifier", "construction_year", "map_location", "map_geometry"]),
+    building: maskObjectFields(building, ["address", "classifier", "map_location", "map_geometry"]),
     lands: maskPropertyCollection(payload?.lands),
     buildings: maskPropertyCollection(payload?.buildings),
     location: maskObjectFields(payload?.location || {}, ["display_name", "road", "house_number", "suburb", "city", "postcode"]),
@@ -98,10 +99,12 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     locked_sections: {
       ...(payload?.locked_sections || {}),
       cadastru_details: true,
+      map: true,
       ...(maskCadastralNumber && !hasAddressProperties ? { cadastral_number: true } : {}),
     },
     access_limit: buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
-  };
+  });
+  preview.map_preview = { available: Boolean(cadastruMapLocation(payload)) };
   if (options?.maskAddress !== true) return preview;
   const locality = addressLocality(payload);
   const placeholder = [locality, "str. Exemplu 10, ap. 1"].filter(Boolean).join(", ");

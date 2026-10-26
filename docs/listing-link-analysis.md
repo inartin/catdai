@@ -11,7 +11,7 @@ Paste a 999.md listing link, auto-extract its parameters, run the standard valua
 3. The route extracts the listing id, checks the parsed-listing cache, then tries the signed external 999 worker when configured; if the worker is unavailable or fails, it falls back to the local 999 fetch/parser.
 4. The app validates Chișinău sale apartments and maps the parsed seller-selected fields to estimate params.
 5. The client redirects to `/anunt?...` with the mapped params plus `listing_price`, `listing_currency`, `listing_id`.
-6. `/anunt` runs the usual sale estimate and renders the listing-vs-market comparison through the shared result component. Users without a `listing_analysis` credit receive the same blurred preview pattern used by `/evaluare` and rent results.
+6. `/anunt` runs the usual sale estimate and renders the listing-vs-market comparison through the shared result component. Users without a `listing_analysis` credit receive the same blurred preview pattern used by `/evaluare` and rent results. The unlock popup uses the shared Cadastru layout with listing-specific comparison/price benefits, available price history, similar ads and potential duplicates only when found.
 7. At the bottom of the `/anunt` result, the page embeds `LinkAnalyzer` directly so users can start another 999.md listing check without returning to `/verifica-anunt`.
 
 ## Search landing page (`/verifica-anunt`)

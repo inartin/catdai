@@ -27,6 +27,7 @@ Implemented for rent-yield calculations.
 ## Result
 - Reuses the rent result layout from `EstimateResult`.
 - Without a `yield_calculator` credit, the calculator keeps the result page visible but locks and blurs the rent-yield, tax, market-stat, district, and listing details.
+- Its unlock popup reuses the shared Cadastru layout with the calculator price and benefits for estimated rental income, annual yield/payback, selected tax calculations and the income/tax chart.
 - The calculator result top card removes the lowest/highest rent listing columns.
 - `Preț Chirie Recomandată` is shown on the left only for the calculator result.
 - On mobile calculator results, the top rent-analysis card hides the renovation/building/floor/bathroom badges to keep the header compact.

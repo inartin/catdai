@@ -1,3 +1,5 @@
+import { redactCadastruMapData } from "@/lib/cadastru-map";
+import { canReadCadastruMapData } from "@/lib/cadastru-map-access";
 import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
 import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 import { withStatisticsContext } from "@/lib/statistics-context";
@@ -53,6 +55,14 @@ async function handlePost(request) {
   const input = nearbyInputFromCadastru(entry?.payload || { request_address: address });
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
+  const mapAccess = await canReadCadastruMapData(request, { payload: entry?.payload, number, address });
+  const respond = (nearby) => NextResponse.json({ nearby: mapAccess ? nearby : {
+    ...redactCadastruMapData(nearby),
+    map_preview: { available: Number.isFinite(nearby?.location?.latitude) && Number.isFinite(nearby?.location?.longitude) },
+  } }, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
+
   let stored = await getStoredNearby(input);
   // Lazily move valid legacy snapshots to the shared building store without renewing them.
   if (!stored && validNearbyResult(entry?.payload.nearby) && Number.isFinite(Date.parse(entry.expiresAt))) {
@@ -65,16 +75,16 @@ async function handlePost(request) {
     try {
       const nearby = await fetchExternalNearbyData(input, stored ? { trackUsage: false } : getCadastruLookupTracking(body));
       if (!validNearbyResult(nearby)) throw new Error("Invalid nearby response");
-      if ((nearby.incomplete || nearby.cache?.stale) && stored) return NextResponse.json({ nearby: nearbyFromStorage(stored) });
+      if ((nearby.incomplete || nearby.cache?.stale) && stored) return respond(nearbyFromStorage(stored));
       const saved = await storeNearby(input, nearby);
-      return NextResponse.json({ nearby: saved ? nearbyFromStorage(saved) : nearby });
+      return respond(saved ? nearbyFromStorage(saved) : nearby);
     } catch (error) {
       console.error("[cadastru/nearby] lookup failed:", {
         code: error?.code || "unknown",
         status: error?.status || null,
         message: error?.message || String(error),
       });
-      if (stored) return NextResponse.json({ nearby: nearbyFromStorage(stored) });
+      if (stored) return respond(nearbyFromStorage(stored));
       return NextResponse.json({ error: "nearby_unavailable" }, { status: 503 });
     }
   };
@@ -82,7 +92,7 @@ async function handlePost(request) {
     if (!isFreshCadastru(stored.expiresAt)) {
       scheduleCadastruRefresh(`nearby:${cadastruLocationOriginKey(input)}`, refresh);
     }
-    return NextResponse.json({ nearby: nearbyFromStorage(stored) });
+    return respond(nearbyFromStorage(stored));
   }
   return refresh();
 }

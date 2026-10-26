@@ -1,3 +1,5 @@
+import { redactCadastruMapData } from "@/lib/cadastru-map";
+import { canReadCadastruMapData } from "@/lib/cadastru-map-access";
 import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
 import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 import { withStatisticsContext } from "@/lib/statistics-context";
@@ -55,6 +57,11 @@ async function handlePost(request) {
     : nearbyAddressFromCadastru({ request_address: address });
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
+  const mapAccess = await canReadCadastruMapData(request, { payload: entry?.payload, number, address });
+  const respond = (publicTransport) => NextResponse.json({ public_transport: mapAccess ? publicTransport : redactCadastruMapData(publicTransport) }, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
+
   const stored = await getStoredPublicTransport(input);
   const refresh = async () => {
     try {
@@ -62,17 +69,17 @@ async function handlePost(request) {
       if (!validPublicTransportResult(publicTransport)) throw new Error("Invalid public transport response");
       // A partial source outage must not replace the last complete saved response.
       if ((publicTransport.incomplete || publicTransport.cache?.stale) && stored) {
-        return NextResponse.json({ public_transport: publicTransportFromStorage(stored) });
+        return respond(publicTransportFromStorage(stored));
       }
       const saved = await storePublicTransport(input, publicTransport);
-      return NextResponse.json({ public_transport: saved ? publicTransportFromStorage(saved) : publicTransport });
+      return respond(saved ? publicTransportFromStorage(saved) : publicTransport);
     } catch (error) {
       console.error("[cadastru/public-transport] lookup failed:", {
         code: error?.code || "unknown",
         status: error?.status || null,
         message: error?.message || String(error),
       });
-      if (stored) return NextResponse.json({ public_transport: publicTransportFromStorage(stored) });
+      if (stored) return respond(publicTransportFromStorage(stored));
       return NextResponse.json({ error: "public_transport_unavailable" }, { status: 503 });
     }
   };
@@ -80,7 +87,7 @@ async function handlePost(request) {
     if (!isFreshCadastru(stored.expiresAt)) {
       scheduleCadastruRefresh(`public-transport:${cadastruLocationOriginKey(input)}`, refresh);
     }
-    return NextResponse.json({ public_transport: publicTransportFromStorage(stored) });
+    return respond(publicTransportFromStorage(stored));
   }
   return refresh();
 }

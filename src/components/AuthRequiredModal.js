@@ -11,11 +11,16 @@ export default function AuthRequiredModal({
   copyKey = "result.comingSoon",
   showAuthOptions = true,
   showCopy = true,
-  dialogClassName = "max-w-md",
+  dialogClassName,
+  variant = "default",
   children = null,
   onClose,
 }) {
   const { t } = useTranslation();
+  const paywall = variant === "paywall";
+  const dialogStyle = dialogClassName || (paywall
+    ? "max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto border border-gray-200"
+    : "max-w-md");
 
   useEffect(() => {
     if (!open) return;
@@ -45,7 +50,7 @@ export default function AuthRequiredModal({
       <div
         role="dialog"
         aria-modal="true"
-        className={`relative w-full rounded-2xl overflow-hidden shadow-2xl bg-white p-6 sm:p-7 cursor-auto ${dialogClassName}`}
+        className={`relative w-full rounded-2xl overflow-hidden shadow-2xl bg-white p-6 sm:p-7 cursor-auto ${dialogStyle}`}
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -57,7 +62,7 @@ export default function AuthRequiredModal({
           <CloseIcon size={18} />
         </button>
 
-        {showCopy && (
+        {showCopy && !paywall && (
           <p className={`text-center text-base font-medium text-gray-800 px-8 ${showAuthOptions || children ? "mb-4" : "mb-0"}`}>
             {t(copyKey)}
           </p>

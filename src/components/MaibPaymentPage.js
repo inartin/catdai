@@ -9,6 +9,18 @@ import { maibProduct } from '@/lib/maib/products.mjs';
 import { MAIB_TERMS_VERSION, MAIB_FEATURE_LABELS, receiptEmail, maibProductTitle } from '@/lib/maib/purchase.mjs';
 import { trackPaymentCheckoutEvent } from '@/lib/tracking';
 import { paymentAppLink } from '@/lib/payment-urls.mjs';
+import LockIcon from '@/components/icons/LockIcon';
+import FeaturePurchaseBenefits from '@/components/FeaturePurchaseBenefits';
+import { FEATURE_PURCHASE_CONTENT } from '@/lib/feature-purchase-content';
+
+function featureResultPath(value) {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || /[\\\x00-\x1f]/.test(value)) return null;
+  try {
+    const url = new URL(value, 'https://catdai.local');
+    return url.origin === 'https://catdai.local' && /^\/(?:ro\/|ru\/)?(?:cadastru\/rezultat|evaluare|anunt|calculator)\/?$/.test(url.pathname)
+      ? `${url.pathname}${url.search}${url.hash}` : null;
+  } catch { return null; }
+}
 
 export default function MaibPaymentPage({ result = false, sandbox = false }) {
   const { session, user, loading } = useAuth();
@@ -81,18 +93,48 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
   const useCount = Object.values(grants).reduce((total, count) => total + count, 0);
   const usePlural = new Intl.PluralRules(lang).select(useCount);
   const hasUseCountTitle = params?.get('checkout_source') === 'pricing' || product?.key.startsWith('all_features_');
-  return <div className="flex min-h-screen flex-col bg-[#f7f8f5] text-gray-950">
-    <header className="border-b border-gray-100 bg-white"><div className="mx-auto flex h-16 max-w-3xl items-center px-6"><Link href={paymentAppLink('/')} className="text-lg font-semibold">Cât Dai?</Link></div></header>
+  const isFeatureCheckout = !result && params?.get('checkout_source') !== 'pricing' && product?.key.endsWith('_single');
+  const featureContent = isFeatureCheckout ? FEATURE_PURCHASE_CONTENT[product.key] : null;
+  const isContextualCheckout = Boolean(featureContent);
+  const backToResultPath = isContextualCheckout ? featureResultPath(params?.get('return_to')) : null;
+  return <div className={`flex min-h-screen flex-col text-gray-950 ${isContextualCheckout ? 'bg-gray-50' : 'bg-[#f7f8f5]'}`}>
+    <header className="border-b border-gray-100 bg-white">
+      <div className="mx-auto flex h-16 max-w-3xl items-center px-6">
+        <Link href={paymentAppLink('/')} aria-label={t('nav.homeAriaLabel')} className="flex items-center gap-3 whitespace-nowrap">
+          <img src="/icon0.svg" alt="" className="h-11 w-auto object-contain" />
+          <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
+        </Link>
+      </div>
+    </header>
     <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
-      <h1 className="text-3xl font-bold">{t(result ? 'maib.resultTitle' : 'payment.checkoutTitle')}</h1>
+      {backToResultPath && <Link href={paymentAppLink(backToResultPath)} className="mb-5 inline-flex items-center gap-2 rounded text-sm font-medium text-emerald-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="m12 19-7-7 7-7M5 12h14" /></svg>
+        {t('payment.checkoutBackToResult')}
+      </Link>}
+      <div className="flex items-center gap-3">
+        {isContextualCheckout && <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700"><LockIcon size={20} /></span>}
+        <h1 className="text-3xl font-bold">{t(result ? 'maib.resultTitle' : 'payment.checkoutTitle')}</h1>
+      </div>
       {result && sandbox && <p className="mt-3 text-sm font-semibold text-amber-800">{t("maib.sandbox")}</p>}
-      <section className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <section className={`mt-6 bg-white p-6 shadow-sm ${isContextualCheckout ? 'rounded-2xl border-2 border-emerald-200' : 'rounded-xl border border-gray-200'}`}>
         {product && <>
-          <div className="mb-4 flex justify-between gap-4"><div><h2 className="text-xl font-bold">{order?.product_title || maibProductTitle(product.key, lang, product.quantity, result ? undefined : params?.get('checkout_source'))}</h2>{result ? <><p className="mt-2 text-sm text-gray-600">{t('maib.oneTime')}</p><p className="mt-1 text-sm text-gray-600">{t('maib.quantity')}: {order?.quantity || product.quantity}</p></> : <p className="mt-2 text-sm text-gray-600">{hasUseCountTitle ? t('maib.extraBadge') : t(`maib.checkoutUses.${usePlural}`, { count: useCount })}</p>}</div><strong className="shrink-0 text-xl">{amount}</strong></div>
+          <div className="mb-4 flex justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-xl font-bold">{isContextualCheckout ? t(featureContent.checkoutTitle) : order?.product_title || maibProductTitle(product.key, lang, product.quantity, result ? undefined : params?.get('checkout_source'))}</h2>
+              {result ? <><p className="mt-2 text-sm text-gray-600">{t('maib.oneTime')}</p><p className="mt-1 text-sm text-gray-600">{t('maib.quantity')}: {order?.quantity || product.quantity}</p></> : <p className="mt-2 text-sm text-gray-600">
+                {isContextualCheckout ? t(`payment.checkoutUnlocks.${usePlural}`, { count: useCount }) : hasUseCountTitle ? t('maib.extraBadge') : t(`maib.checkoutUses.${usePlural}`, { count: useCount })}
+              </p>}
+            </div>
+            <strong className={`shrink-0 text-xl ${isContextualCheckout ? 'text-emerald-800' : ''}`}>{amount}</strong>
+          </div>
+          {isContextualCheckout && <>
+            <p className="border-t border-emerald-100 pt-4 text-sm font-semibold text-gray-950">{t('payment.featureIncludes')}</p>
+            <FeaturePurchaseBenefits productKey={product.key} className="mb-6 mt-3" />
+          </>}
           {result && <ul className="mb-5 space-y-3 text-sm">
             {Object.entries(grants).filter(([feature]) => MAIB_FEATURE_LABELS[feature]).map(([feature, count]) => <li key={feature}><p className="font-semibold">{t(MAIB_FEATURE_LABELS[feature])} · {t('maib.uses', { count })}</p>{result && <p className="mt-1 text-gray-600">{t(`maib.service.${feature}`)}</p>}</li>)}
           </ul>}
-          {!result && <p className="mb-5 text-sm text-gray-600">{t('maib.checkoutCreditNote')}</p>}
+          {!result && !isFeatureCheckout && <p className="mb-5 text-sm text-gray-600">{t('maib.checkoutCreditNote')}</p>}
         </>}
         {loading ? <p>{t('payment.checkoutLoading')}</p> : !session ? <><p className="mb-5">{t('payment.loginRequiredForCheckout')}</p><AuthOptions /></> : result ? <>
           <p role="status" className="text-lg font-semibold">{t(`maib.status.${order?.status || 'pending'}`)}</p>
@@ -103,13 +145,13 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
             <label htmlFor="receipt-email" className="block text-sm font-semibold">{t('maib.receiptEmail')}</label>
             <input id="receipt-email" type="email" autoComplete="email" placeholder={t('maib.receiptEmailPlaceholder')} required maxLength={254} value={email} onChange={event => setEmailInput(event.target.value)} disabled={busy} className="mt-2 mb-5 w-full rounded-lg border border-gray-300 px-3 py-3" />
             <label className="mb-4 flex items-start gap-3 text-sm"><input type="checkbox" required checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={busy} className="mt-1 h-4 w-4 shrink-0 accent-emerald-700" /><span>{t('maib.acceptTerms')} <Link href={paymentAppLink('/terms')} target="_blank" rel="noopener noreferrer" className="underline">{t('footer.terms')}</Link></span></label>
-            <button type="submit" disabled={busy || !accepted || !receiptEmail(email)} className="w-full rounded-lg bg-primary px-5 py-3 font-semibold text-white disabled:opacity-50">{busy ? t('payment.checkoutLoading') : t('maib.pay', { amount })}</button>
+            <button type="submit" disabled={busy || !accepted || !receiptEmail(email)} className={`w-full rounded-lg px-5 py-3 font-semibold text-white disabled:opacity-50 ${isContextualCheckout ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-primary'}`}>{busy ? t('payment.checkoutLoading') : t('maib.pay', { amount })}</button>
             <p className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500"><svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3" /></svg>{t('maib.securePayment')}</p>
           </form>
         </> : <p>{t('maib.invalidProduct')}</p>}
         {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
       </section>
     </main>
-    {!result && <Footer />}
+    {!result && <Footer checkout />}
   </div>;
 }

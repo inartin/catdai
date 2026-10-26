@@ -72,10 +72,47 @@ const paymentLogos = [
   },
 ];
 
-export default function Footer() {
+export default function Footer({ checkout = false }) {
   const { lang, t } = useTranslation();
   const provider = usePaymentProvider();
   const faqHref = lang === "ru" ? "/ru/faq" : "/ro/faq";
+
+  const paymentSystems = (
+    <div className={`${checkout ? "" : "mt-4"} flex items-center justify-center gap-4`} aria-label="Payment systems">
+      {paymentLogos.filter(logo => provider === "paddle" || logo.alt !== "Paddle").map((logo) => (
+        <Image
+          key={logo.alt}
+          src={logo.src}
+          alt={logo.alt}
+          width={logo.width}
+          height={logo.height}
+          className={`${logo.className} w-auto object-contain opacity-90`}
+          loading="lazy"
+          unoptimized
+        />
+      ))}
+      {provider === "maib" && (
+        <>
+          <Image src="/brands/maib.png" alt="maib" width={156} height={44} className="mr-2 h-4 w-auto object-contain sm:h-5" unoptimized />
+          <Image src="/brands/mia_clean.svg" alt="MIA" width={245} height={59} className="h-3.5 w-auto object-contain sm:h-4" unoptimized />
+        </>
+      )}
+    </div>
+  );
+
+  if (checkout) return (
+    <footer className="mt-8 border-t border-gray-100 bg-section-bg">
+      <div className="mx-auto max-w-3xl px-6 py-6">
+        {paymentSystems}
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-gray-500">
+          <Link href="/terms" className="transition-colors hover:text-foreground">{t("footer.terms")}</Link>
+          <Link href="/privacy" className="transition-colors hover:text-foreground">{t("footer.privacy")}</Link>
+          <Link href="/refund" className="transition-colors hover:text-foreground">{t("footer.refund")}</Link>
+        </div>
+        <p className="mt-4 text-center text-xs text-gray-400">{t("footer.copyright")}</p>
+      </div>
+    </footer>
+  );
 
   return (
     <footer className="bg-section-bg border-t border-gray-100 mt-8">
@@ -121,26 +158,7 @@ export default function Footer() {
           {t("footer.copyright")}
         </p>
 
-        <div className="mt-4 flex items-center justify-center gap-4" aria-label="Payment systems">
-          {paymentLogos.filter(logo => provider === "paddle" || logo.alt !== "Paddle").map((logo) => (
-            <Image
-              key={logo.alt}
-              src={logo.src}
-              alt={logo.alt}
-              width={logo.width}
-              height={logo.height}
-              className={`${logo.className} w-auto object-contain opacity-90`}
-              loading="lazy"
-              unoptimized
-            />
-          ))}
-          {provider === "maib" && (
-            <>
-              <Image src="/brands/maib.png" alt="maib" width={156} height={44} className="mr-2 h-4 w-auto object-contain sm:h-5" unoptimized />
-              <Image src="/brands/mia_clean.svg" alt="MIA" width={245} height={59} className="h-3.5 w-auto object-contain sm:h-4" unoptimized />
-            </>
-          )}
-        </div>
+        {paymentSystems}
       </div>
     </footer>
   );

@@ -13,6 +13,7 @@ import CadastruMunicipalReportsCard from "@/components/CadastruMunicipalReportsC
 import CadastruFavoriteButton from "@/components/CadastruFavoriteButton";
 import CadastruShareButton from "@/components/CadastruShareButton";
 import CadastruParcelMap from "@/components/CadastruParcelMap";
+import CadastruMapPreview from "@/components/CadastruMapPreview";
 import CadastruLoadingPage from "@/components/CadastruLoadingPage";
 import CadastruRouteLoading from "./loading";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
@@ -29,6 +30,7 @@ import { municipalReportsAvailableForCadastru, validMunicipalReportsResult } fro
 import { getDeviceId } from "@/lib/visitor-browser";
 import { ensureCadastruLookupId, getCadastruSearchSessionId } from "@/lib/cadastru-lookup-tracking";
 import { recordCadastruShareOpen } from "@/lib/cadastru-share-tracking";
+import { cadastruMapLocation } from "@/lib/cadastru-map";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet", fullLabel: "cadastru.roadTypeStreetFull" },
@@ -559,8 +561,9 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     ...(Array.isArray(state.data?.buildings) ? state.data.buildings.map((property) => property?.map_location) : []),
     ...(Array.isArray(state.data?.lands) ? state.data.lands.map((property) => property?.map_location) : []),
   ].find((location) => Number.isFinite(location?.latitude) && Math.abs(location.latitude) <= 90 &&
-    Number.isFinite(location?.longitude) && Math.abs(location.longitude) <= 180);
-  const hasMapLocation = Boolean(mapLocation);
+    Number.isFinite(location?.longitude) && Math.abs(location.longitude) <= 180)
+    || (!isLockedPreview ? cadastruMapLocation(state.data) : null);
+  const hasMapLocation = !isLockedPreview && Boolean(mapLocation);
   const latitude = mapLocation?.latitude;
   const longitude = mapLocation?.longitude;
   const mapUrl = hasMapLocation
@@ -586,7 +589,14 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     }
   };
 
-  const map = mapUrl && (
+  const protectedMap = (isLockedPreview || Boolean(state.fallbackAddress && !hasMapLocation)) && (state.data?.map_preview?.available || nearbyData?.map_preview?.available || Boolean(mapLocation))
+    ? <CadastruMapPreview
+      key={nearbyKey}
+      address={nearbyAddress}
+      cadastralNumber={validateCadastralNumber(nearbyNumber).valid ? nearbyNumber : ""}
+      onUnlock={isLockedPreview ? () => setIsPaywallModalOpen(true) : undefined}
+    /> : null;
+  const map = protectedMap || (mapUrl && (
     <div className="mt-6 w-full overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-2.5">
@@ -630,7 +640,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       </div>
       <CadastruParcelMap location={mapLocation} cadastral={state.data} fallbackUrl={mapUrl} />
     </div>
-  );
+  ));
   const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);
   const secondaryAvailable = Boolean(state.data || state.fallbackAddress);
   const reportsAvailable = municipalReportsAvailableForCadastru(state.data || { request_address: state.fallbackAddress });
@@ -1115,10 +1125,9 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       />
       <AuthRequiredModal
         open={isPaywallModalOpen}
+        variant="paywall"
         copyKey="payment.buyAccess"
         showAuthOptions={false}
-        showCopy={false}
-        dialogClassName="max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto border border-gray-200"
         onClose={() => setIsPaywallModalOpen(false)}
       >
         {purchaseOffer ? (
@@ -1322,7 +1331,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
           </CadastruListingsCard>
           {(state.data || secondaryAvailable) && (
             <p className="mt-6 text-center text-xs text-gray-500">
-              <a href="https://ipcbi.gov.md" className="underline">ipcbi.gov.md</a> · © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a> · © <a href="https://map.md/" className="underline">map.md</a>
+              <a href="https://ipcbi.gov.md" className="underline">ipcbi.gov.md</a> · © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a> · © <a href="https://map.md/" className="underline">map.md</a>{protectedMap ? " · © Google" : null}
             </p>
           )}
           {state.data && (

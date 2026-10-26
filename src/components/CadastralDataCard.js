@@ -83,7 +83,7 @@ export default function CadastralDataCard({
   const isCadastralNumberLocked = hasLockedDetails && cadastral.locked_sections?.cadastral_number === true;
   const isVisibleLockedField = (section, field) => (
     (section === "apartment" && field === "floor") ||
-    (section === "building" && (field === "classifier" || field === "construction_year"))
+    (section === "building" && field === "classifier")
   );
   const isFieldLocked = (section, field) => hasLockedDetails && !isVisibleLockedField(section, field);
   const lockedValueProps = (section, field) => {

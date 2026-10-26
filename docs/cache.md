@@ -28,6 +28,7 @@ Backend prepared and active when Redis is reachable.
 - Check with `pnpm exec node --experimental-vm-modules scripts/test-online-users.mjs` (requires `redis-server`; starts and stops an isolated, non-persistent instance).
 
 ## Cadastru Cache
+- Blurred map thumbnails use `catdai:cadastru-map-preview:v1:` with a SHA-256 fingerprint of the saved map data and a one-hour TTL. The cache stores only the flattened, downsized, blurred WebP, never an unblurred alternative. Image responses use `private, no-store`; thumbnail rendering does not renew cadastral/nearby snapshot freshness. Map redaction for JSON responses runs after cache/storage reads and cannot be bypassed by a stale snapshot.
 - Only successful `200` cadastru payloads are cached; unauthorized, invalid, rate-limited, not-found, and upstream-error responses are not cached.
 - Cadastru routes use Redis first; if Redis is unavailable or misses, they check `cadastru_records` before calling official sources.
 - `/api/cadastral` caches the cadastral payload without per-request access fields and restores access fields for the current authenticated request.

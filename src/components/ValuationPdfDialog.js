@@ -878,14 +878,14 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 p-4"
       onClick={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="valuation-pdf-title"
-        className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-2xl sm:p-6"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl sm:p-7"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
@@ -916,7 +916,7 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
         </div>
 
         <div className="mb-5">
-          <FeaturePricingAction offer={purchaseOffer} trackPopupOpen />
+          <FeaturePricingAction offer={purchaseOffer} variant="paywall" trackPopupOpen />
           <p className="mt-3 text-sm leading-5 text-gray-500">
             {t("result.pdfAccessNote")}
           </p>

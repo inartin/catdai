@@ -9,6 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
+import FeaturePurchaseBenefits from "@/components/FeaturePurchaseBenefits";
+import { FEATURE_PURCHASE_CONTENT } from "@/lib/feature-purchase-content";
 
 function formatMdl(value) {
   const amount = Number(value);
@@ -107,7 +109,8 @@ export default function FeaturePricingAction({
   const selectedProductKey = isSingleOffer ? offer.product_key : "extra_pack";
   const selectedMaibProduct = maibProduct(selectedProductKey);
   const isCadastruProduct = isSingleOffer && selectedProductKey === "cadastru_lookup_single";
-  const isCadastruOffer = variant === "cadastru" && isCadastruProduct;
+  const featureContent = isSingleOffer ? FEATURE_PURCHASE_CONTENT[selectedProductKey] : null;
+  const isPaywallOffer = Boolean(featureContent && (variant === "paywall" || variant === "cadastru"));
 
   const packageOffer = {
     product_key: selectedProductKey,
@@ -170,38 +173,31 @@ export default function FeaturePricingAction({
   const packagesLink = (
     <Link
       href="/pricing"
-      className={isCadastruProduct
+      className={isCadastruProduct || isPaywallOffer
         ? "mx-auto mt-4 block w-fit text-sm text-gray-500 underline underline-offset-4 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
         : "mt-3 inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-50"}
     >
       {t("payment.showAllPackages")}
     </Link>
   );
-  const useMobileDock = mobileDock && !isCadastruOffer;
+  const useMobileDock = mobileDock && !isPaywallOffer;
   const checkoutPending = status === "loading" || status === "redirecting";
 
   return (
     <>
-    <div className={`${useMobileDock ? "hidden lg:block" : ""} ${isCadastruOffer ? "" : "rounded-2xl border border-primary bg-white p-4 shadow-sm ring-1 ring-primary/10"} ${className}`}>
-      {isCadastruOffer ? (
+    <div className={`${useMobileDock ? "hidden lg:block" : ""} ${isPaywallOffer ? "" : "rounded-2xl border border-primary bg-white p-4 shadow-sm ring-1 ring-primary/10"} ${className}`}>
+      {isPaywallOffer ? (
         <>
           <h2 className="px-4 text-center text-2xl font-bold tracking-tight text-gray-950">
-            {t("cadastru.purchaseTitle")}
+            {t(featureContent.title)}
           </h2>
           <p className="mt-6 border-b border-gray-200 pb-5 text-lg font-semibold text-gray-950">
-            {t("cadastru.purchasePackage", { price: formatMdl(packageOffer.price_mdl) })}
+            {t(featureContent.summary, { price: formatMdl(packageOffer.price_mdl) })}
           </p>
           <p className="mt-5 text-base font-medium text-gray-950">
-            {t("cadastru.purchaseIncludes")}
+            {t("payment.featureIncludes")}
           </p>
-          <ul className="mb-7 mt-3 space-y-4">
-            {["Area", "Value", "Building", "Rights"].map((feature) => (
-              <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-gray-900 sm:text-base">
-                <span aria-hidden="true" className="shrink-0 font-semibold text-primary">✓</span>
-                <span>{t(`cadastru.purchase${feature}`)}</span>
-              </li>
-            ))}
-          </ul>
+          <FeaturePurchaseBenefits productKey={selectedProductKey} className="mb-7 mt-3" />
         </>
       ) : (
         <div className="mb-4 rounded-xl border border-gray-100 bg-gray-50 px-4 py-4 text-left">
@@ -217,7 +213,7 @@ export default function FeaturePricingAction({
         disabled={authLoading || status === "loading" || status === "redirecting"}
         className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       >
-        {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : isCadastruOffer ? t("cadastru.purchaseCta", { price: formatMdl(packageOffer.price_mdl) }) : t(isSingleOffer ? "maib.continueSingleFeature" : "payment.continueWithExtra")}
+        {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : isPaywallOffer ? t("payment.featureUnlockCta", { price: formatMdl(packageOffer.price_mdl) }) : t(isSingleOffer ? "maib.continueSingleFeature" : "payment.continueWithExtra")}
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M5 12h14" />
           <path d="m13 6 6 6-6 6" />

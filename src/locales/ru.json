@@ -7,6 +7,8 @@
   "cadastru.buildingAlternativeFound": "Найден дом {house} на улице {street}. Это нужный вам адрес?",
   "cadastru.addressAlternativeIntro": "Не удалось подтвердить квартиру {apartment} по адресу {street}, дом {house}.",
   "cadastru.addressAlternativeFound": "Найдена квартира {apartment} по адресу {street}, дом {house}. Это нужный вам адрес?",
+  "cadastru.withoutApartmentAlternativeFound": "По этому адресу найдены кадастровые данные. Посмотреть дом и участок без квартиры?",
+  "cadastru.searchWithoutApartment": "Посмотреть дом и участок",
   "cadastru.searchSuggestedHouse": "Найти в доме {house}",
   "cadastru.notFoundWithSuggestion": "Не нашли результатов для «{road} {street}».",
   "cadastru.roadTypeStreetFull": "Улица",

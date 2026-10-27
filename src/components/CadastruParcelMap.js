@@ -70,7 +70,7 @@ export default function CadastruParcelMap({ location, cadastral, fallbackUrl }) 
         // retain the usable map rather than hide it during a transient outage.
         if (!disposed && (!map.style || event.error?.url?.includes("/style.json"))) setFailed(true);
       });
-    }).catch(() => { if (!disposed) setFailed(true); });
+    }).catch((error) => { if (!disposed) { console.warn("Map initialization diagnostic:", error.message); setFailed(true); } });
     return () => { disposed = true; mapRef.current = null; map?.remove(); };
   }, [latitude, longitude, geometry, lang]);
 

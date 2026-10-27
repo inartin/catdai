@@ -284,6 +284,97 @@ const routeMocks = {
 const addressRoute = await load("src/app/api/cadastru/address/route.js", routeMocks);
 const numberRoute = await load("src/app/api/cadastral/route.js", routeMocks);
 const request = (body) => new Request("http://localhost/api/cadastral", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ search_context: "cadastru", ...body }) });
+// An unconfirmed unit can offer only its exact verified parent address without a unit.
+const withoutApartmentFields = { city: 'Chișinău', road_type: 'strada', street: 'Maria Tănase', house_number: '15', apartment_number: '2', skip_cache: true };
+const withoutApartmentChoice = { city: 'Chișinău', road_type: 'strada', street: 'Maria Tănase', house_number: '15' };
+let withoutApartmentSelected = false, withoutApartmentWrites = 0, withoutApartmentCredits = 0;
+const withoutApartmentRoute = await load('src/app/api/cadastru/address/route.js', {
+  ...routeMocks,
+  '@/lib/cadastru-records': { getCadastruRecordByAddress: async () => null,
+    persistCadastruAddressResult: async (payload, options) => {
+      withoutApartmentWrites++;
+      assert.equal(options.requestAddress, 'Chișinău, str Maria Tănase 15');
+      return payload;
+    } },
+  '@/lib/paid-feature-usage': { ...routeMocks['@/lib/paid-feature-usage'],
+    checkFeatureAccess: async () => { withoutApartmentCredits++; return { allowed: true }; },
+    consumeFeatureCredit: async () => { withoutApartmentCredits++; return { allowed: true }; } },
+  '@/lib/cadastru-external-api': { fetchExternalCadastruAddressData: async (fields) => {
+    if (withoutApartmentSelected) {
+      assert.equal(fields.apartment_number, undefined);
+      assert.equal(fields.house_number, '15');
+      return { lands: [{ cadastral_number: '0100517.170', address: 'Chișinău, str Maria Tănase 15' }],
+        buildings: [{ cadastral_number: '0100517.170.01', address: 'Chișinău, str Maria Tănase 15' }] };
+    }
+    assert.equal(fields.apartment_number, '2');
+    throw Object.assign(new Error('confirm without unit'), { code: 'address_confirmation_required', status: 422,
+      addressSuggestions: [withoutApartmentChoice, { ...withoutApartmentChoice, city: 'Bălți' },
+        { ...withoutApartmentChoice, street: 'Maria Tănase Nouă' }, { ...withoutApartmentChoice, house_number: '15/1' },
+        { ...withoutApartmentChoice, road_type: 'bulevard' }, { ...withoutApartmentChoice, apartment_number: '3' }] });
+  } },
+});
+const withoutApartmentResponse = await withoutApartmentRoute.POST(request(withoutApartmentFields));
+assert.equal(withoutApartmentResponse.status, 422);
+const withoutApartmentPayload = await withoutApartmentResponse.json();
+assert.deepEqual(clone(withoutApartmentPayload.address_suggestions), [withoutApartmentChoice]);
+assert.equal(withoutApartmentPayload.data, undefined);
+assert.equal(withoutApartmentWrites, 0); assert.equal(withoutApartmentCredits, 0);
+withoutApartmentSelected = true;
+const withoutApartmentConfirmed = await withoutApartmentRoute.POST(request({ ...withoutApartmentFields, apartment_number: undefined }));
+assert.equal(withoutApartmentConfirmed.status, 200);
+const withoutApartmentResult = await withoutApartmentConfirmed.json();
+assert.equal(withoutApartmentResult.buildings.length, 1);
+assert.equal(withoutApartmentResult.cadastral_number, undefined);
+assert.equal(withoutApartmentResult.request_address, 'Chișinău, str Maria Tănase 15');
+assert.equal(withoutApartmentWrites, 1); assert.equal(withoutApartmentCredits, 1);
+console.log('Unconfirmed-unit route passed: only exact parent address accepted, no persistence or credits before selection and ordinary house/land result afterward.');
+
+// The new choice uses actual signed recovery tokens and the existing telemetry writer.
+{
+  const trackingMocks = { ...routeMocks,
+    '@/lib/cadastru-records': { getCadastruRecordByAddress: async () => null,
+      persistCadastruAddressResult: async payload => payload },
+  };
+  delete trackingMocks['@/lib/cadastru-external-api'];
+  const trackingEnv = { NODE_ENV: 'production', CADASTRU_EXTERNAL_API_BASE_URL: 'https://worker.test/',
+    CADASTRU_EXTERNAL_API_SECRET: 'without-apartment-tracking-test' };
+  let retrySucceeds = false;
+  const trackedRoute = await load('src/app/api/cadastru/address/route.js', trackingMocks, {
+    process: { env: trackingEnv },
+    fetch: async (_url, options) => {
+      const fields = JSON.parse(options.body);
+      assert.equal(fields.suggestion_recovery_token, undefined, 'recovery token never reaches the worker');
+      if (fields.apartment_number) return Response.json({ ok: false, error: 'address_confirmation_required',
+        address_suggestions: [withoutApartmentChoice] }, { status: 422 });
+      if (!retrySucceeds) return Response.json({ ok: false, error: 'service_unavailable' }, { status: 503 });
+      return Response.json({ ok: true, data: { lands: [{ cadastral_number: '0100517.170' }],
+        buildings: [{ cadastral_number: '0100517.170.01' }] } });
+    },
+  });
+  const failedResponse = await trackedRoute.POST(request(withoutApartmentFields));
+  assert.equal(failedResponse.status, 422);
+  const failedPayload = await failedResponse.json();
+  assert(failedPayload.suggestion_recovery_token, 'the failed worker row is recorded before returning the choice');
+  const event = tables.external_api_usage_events.at(-1);
+  assert.equal(event.service, 'cadastru_address');
+  assert.equal(event.status, 'failure');
+  assert.equal(event.http_status, 422);
+  assert.equal(event.request_payload.apartment_number, '2');
+  assert.equal(event.suggestion_recovery, undefined);
+  const selected = { ...withoutApartmentFields, apartment_number: undefined,
+    suggestion_recovery_token: failedPayload.suggestion_recovery_token };
+  assert.equal((await trackedRoute.POST(request(selected))).status, 503);
+  assert.equal(event.suggestion_recovery, undefined, 'a click whose lookup fails is not recovered');
+  retrySucceeds = true;
+  assert.equal((await trackedRoute.POST(request(selected))).status, 200);
+  assert.equal(event.status, 'failure', 'the original failure remains in the admin Failed filter');
+  assert.equal(event.suggestion_recovery.suggested_street, 'Maria Tănase');
+  assert.equal(event.suggestion_recovery.resolved_address, 'Chișinău, str Maria Tănase 15');
+  assert.equal(event.suggestion_recovery.lookup_source, 'api');
+  assert(event.suggestion_recovery.recovered_at);
+  console.log('Without-apartment admin recovery passed: actual worker telemetry, signed click correlation, failed-click suppression and successful house/land recovery on the original failed row.');
+}
+
 const addressBody = { city: "Chisinau", road_type: "strada", street: "Ștefan cel Mare", house_number: "9", apartment_number: "012" };
 await storage.persistCadastruAddressResult({ ...expected, method: "address", request_address: address }, {
   requestAddress: address, resolvedAddress: address, structuredAddress, lookupSource: "api", officialFetch: true,

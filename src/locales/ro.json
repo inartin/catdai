@@ -7,6 +7,8 @@
   "cadastru.buildingAlternativeFound": "Am găsit imobilul de pe {street}, nr. {house}. Este adresa dorită?",
   "cadastru.addressAlternativeIntro": "Nu am putut confirma apartamentul {apartment} la {street}, nr. {house}.",
   "cadastru.addressAlternativeFound": "Am găsit apartamentul {apartment} la {street}, nr. {house}. Este adresa dorită?",
+  "cadastru.withoutApartmentAlternativeFound": "Am găsit date cadastrale pentru această adresă. Dorești să vezi imobilul și terenul, fără apartament?",
+  "cadastru.searchWithoutApartment": "Vezi imobilul și terenul",
   "cadastru.searchSuggestedHouse": "Caută la nr. {house}",
   "cadastru.notFoundWithSuggestion": "Nu am găsit rezultate pentru „{road} {street}”.",
   "cadastru.roadTypeStreetFull": "Strada",

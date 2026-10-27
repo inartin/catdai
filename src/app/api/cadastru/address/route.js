@@ -244,15 +244,20 @@ async function handlePost(request) {
     if (error?.code !== "address_confirmation_required") return null;
     const expectedRoadType = roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : "strada";
     const offered = error.addressSuggestions || error.address_suggestions;
-    const suggestions = (Array.isArray(offered) ? offered : []).filter((value) =>
-      value && value.road_type === expectedRoadType && value.street === resolution.street &&
-      typeof value.house_number === "string" && value.house_number.length <= HOUSE_NUMBER_MAX_LENGTH &&
-      HOUSE_NUMBER_PATTERN.test(value.house_number) &&
-      ((value.city === city && value.house_number.startsWith(`${houseNumber}/`)) ||
-        (city === "Chișinău" && value.city !== city && CADASTRU_SUPPORTED_CITIES.includes(value.city) && value.house_number === houseNumber)) &&
-      (apartmentNumber ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number) &&
-        Number(value.apartment_number) === Number(apartmentNumber) : !value.apartment_number)
-    ).slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) =>
+    const suggestions = (Array.isArray(offered) ? offered : []).filter((value) => {
+      if (!value || value.road_type !== expectedRoadType || value.street !== resolution.street ||
+        typeof value.house_number !== "string" || value.house_number.length > HOUSE_NUMBER_MAX_LENGTH ||
+        !HOUSE_NUMBER_PATTERN.test(value.house_number)) return false;
+      const withoutApartment = apartmentNumber && value.city === city && value.house_number === houseNumber
+        && value.apartment_number === undefined;
+      const alternativeAddress = (value.city === city && value.house_number.startsWith(`${houseNumber}/`)) ||
+        (city === "Chișinău" && value.city !== city && CADASTRU_SUPPORTED_CITIES.includes(value.city) && value.house_number === houseNumber);
+      const sameApartment = apartmentNumber
+        ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
+          && Number(value.apartment_number) === Number(apartmentNumber)
+        : !value.apartment_number;
+      return withoutApartment || (alternativeAddress && sameApartment);
+    }).slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) =>
       ({ city, road_type, street, house_number, ...(apartment_number ? { apartment_number } : {}) }));
     if (!suggestions.length) return null;
     const token = shouldTrackCadastruSearch && process.env.NODE_ENV !== "development"

@@ -190,6 +190,40 @@ for (const lang of ['ro', 'ru']) {
 console.log('RO/RU locality confirmation passed: full addresses, distinct city choices, exact house, explicit city retry, skip-cache, recovery and stale-choice cleanup.');
 
 
+// An unconfirmed unit can offer the same verified address without changing it before selection.
+for (const lang of ['ro', 'ru']) {
+  const input = { city: 'Chișinău', road_type: 'strada', street: 'Maria Tănase', house_number: '15', apartment_number: '2', skip_cache: true };
+  const choice = { city: input.city, road_type: input.road_type, street: input.street, house_number: input.house_number };
+  const page = await harness(pageFile, `/${lang}/cadastru/rezultat?source=address&lookup=1&city=Chișinău&road_type=strada&street=Maria+Tănase&house_number=15&apartment_number=2&skipcache=true`,
+    { [addressKey]: JSON.stringify(input) }, lang);
+  page.render();
+  await page.finish({ error: 'address_confirmation_required', suggestion_recovery_token: 'without-unit-recovery', address_suggestions: [
+    choice, { ...choice, city: 'Bălți' }, { ...choice, road_type: 'bulevard' },
+    { ...choice, house_number: '15/1' }, { ...choice, apartment_number: '3' },
+  ] }, 422);
+  const tree = page.render();
+  const buttons = walk(tree).filter(node => node.type === 'button' && node.props.className?.includes('border-sky-200'));
+  assert.equal(buttons.length, 1, 'removing a unit cannot also change city, road type or house');
+  assert(textOf(tree).includes(lang === 'ro' ? 'Nu am putut confirma apartamentul 2' : 'Не удалось подтвердить квартиру 2'));
+  assert(textOf(tree).includes(translations[lang]['cadastru.withoutApartmentAlternativeFound']));
+  assert.equal(textOf(buttons[0]), translations[lang]['cadastru.searchWithoutApartment']);
+  assert.equal(page.requests.length, 1, 'no retry or secondary request before choosing');
+  assert.equal(JSON.parse(page.storage.get(addressKey)).apartment_number, '2');
+  assert.equal(new URL(page.browser.location.href).searchParams.get('apartment_number'), '2');
+  buttons[0].props.onClick(); page.render();
+  const retry = page.requests.at(-1).body;
+  for (const key of ['city', 'road_type', 'street', 'house_number']) assert.equal(retry[key], input[key]);
+  assert.equal(retry.apartment_number, undefined);
+  assert.equal(retry.skip_cache, true);
+  assert.equal(retry.suggestion_recovery_token, 'without-unit-recovery');
+  assert.equal(JSON.parse(page.storage.get(addressKey)).apartment_number, undefined);
+  assert.equal(new URL(page.browser.location.href).searchParams.has('apartment_number'), false);
+  await page.finish({ lands: [{ cadastral_number: '0100517.170' }], buildings: [{ cadastral_number: '0100517.170.01' }],
+    request_address: 'Chișinău, str Maria Tănase 15' });
+  assert(!walk(page.render()).some(node => node.type === 'button' && node.props.className?.includes('border-sky-200')));
+}
+console.log('RO/RU unconfirmed-unit confirmation passed: exact address, explicit apartment removal, request/storage/URL consistency, skip-cache, recovery and successful house/land result.');
+
 // Public and admin inputs retain Latin letters; public navigation retains the exact house.
 for (const file of ['src/components/CadastruSearchForm.js', 'src/components/admin/AdminCadastruOfflineSearch.js']) {
   const form = await harness(file, '/ro/cadastru');

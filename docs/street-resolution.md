@@ -45,6 +45,12 @@ Durlești is included in the app city allowlist, matching the worker, so confirm
 
 If a Chișinău lookup cannot find an exact property, the worker can offer the same street, road type, house (including suffix) and optional apartment in a settlement explicitly identified inside Chișinău municipality. Autocomplete must be confirmed by a matching registry section and a land/building link, or the exact apartment link for unit searches. The app preserves these 422 `address_confirmation_required` choices. Only locality corrections say that the same address was found in the named alternative locality; house-suffix confirmations keep their existing copy. It displays the proposed locality and full street/house in a localized button; only clicking it changes the city and retries. Original matches take precedence. Suggestions do not save property data or consume credits; normal access, persistence and recovery tracking apply after confirmation. No cross-city inference from street names or map pins is used.
 
+## Verified address without an apartment
+
+When an apartment cannot be confirmed but the registry explicitly verifies the same city, road type, complete street and house with land/building links in that address section, the worker can return `422 address_confirmation_required` with the same address and no `apartment_number`. For example, `Maria Tănase 15`, apartment `2`, can offer `Maria Tănase 15` without a unit. Autocomplete or a map pin alone cannot establish this alternative; the worker reuses the registry response from the unit search. Exact units and verified unit alternatives take precedence. Existing single-building partial results remain supported.
+
+The API accepts apartment removal only for the exact resolved address. The RO/RU result screen explains that the apartment was not confirmed and offers the house/land result. Clicking removes the apartment from the next request, saved handoff and URL while preserving skip-cache and suggestion recovery. No retry, property persistence or credit consumption occurs before that choice. The confirmed search uses the ordinary building/land result and access rules. Deploy the app and worker together; the retained, disabled local backup is unchanged.
+
 ## Verified house-number alternatives
 
 With multiple verified addresses, the result screen shows the shared explanation and one button per house number without repeating the confirmation sentence for each option. A single alternative retains its address confirmation sentence.

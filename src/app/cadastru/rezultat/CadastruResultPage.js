@@ -666,6 +666,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     const address = { ...original };
     delete address.suggestion_recovery_token;
     const correction = typeof suggestion === "object" ? suggestion : null;
+    if (correction && state.confirmationRequired && !correction.apartment_number) delete address.apartment_number;
     const body = {
       ...address,
       lookup_id: crypto.randomUUID(),
@@ -785,14 +786,21 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
             const failure = response.data;
             const confirmationRequired = response.status === 422 && failure?.error === "address_confirmation_required";
             const addressCorrections = confirmationRequired && Array.isArray(failure.address_suggestions)
-              ? failure.address_suggestions.filter((value) => value && value.road_type === body.road_type
-                && typeof value.street === "string" && value.street.length <= STREET_MAX_LENGTH
-                && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)
-                && ((value.city === body.city && value.house_number.startsWith(`${body.house_number}/`))
+              ? failure.address_suggestions.filter((value) => {
+                if (!value || value.road_type !== body.road_type || typeof value.street !== "string"
+                  || value.street.length > STREET_MAX_LENGTH || typeof value.house_number !== "string"
+                  || !HOUSE_NUMBER_PATTERN.test(value.house_number)) return false;
+                const withoutApartment = body.apartment_number && value.city === body.city
+                  && value.house_number === body.house_number && value.apartment_number === undefined;
+                const alternativeAddress = (value.city === body.city && value.house_number.startsWith(`${body.house_number}/`))
                   || (body.city === "Chișinău" && value.city !== body.city && CADASTRU_SUPPORTED_CITIES.includes(value.city)
-                    && value.house_number === body.house_number))
-                && (body.apartment_number ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
-                  && Number(value.apartment_number) === Number(body.apartment_number) : !value.apartment_number)).slice(0, 3)
+                    && value.house_number === body.house_number);
+                const sameApartment = body.apartment_number
+                  ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
+                    && Number(value.apartment_number) === Number(body.apartment_number)
+                  : !value.apartment_number;
+                return withoutApartment || (alternativeAddress && sameApartment);
+              }).slice(0, 3)
               : failure?.error === "address_fields_conflict" && Array.isArray(failure.corrections)
               ? failure.corrections.filter((value) => typeof value?.street === "string" && value.street.length <= STREET_MAX_LENGTH
                 && typeof value.house_number === "string" && HOUSE_NUMBER_PATTERN.test(value.house_number)) : [];
@@ -816,6 +824,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
               fallbackAddress: isLookupUnavailable(response) ? formatLookupAddress(body) : "",
               didYouMean: response.status === 404 && failure?.error === "not_found",
               requestedCity: body.city,
+              requestedApartmentNumber: body.apartment_number || "",
               requestedStreet: body.street,
               requestedRoad: t(roadTypes.find(({ value }) => value === body.road_type)?.fullLabel),
               suggestionRecoveryToken: failure?.suggestion_recovery_token || null,
@@ -1219,6 +1228,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
                     <div key={`${correction.city}:${correction.street}:${correction.house_number}`}>
                       {state.confirmationRequired && state.addressCorrections.length === 1 && <p className="mb-2 text-sm">
                         {correction.city !== state.requestedCity ? t("cadastru.localityAlternativeConfirm")
+                          : state.requestedApartmentNumber && !correction.apartment_number ? t("cadastru.withoutApartmentAlternativeFound")
                           : t(correction.apartment_number ? "cadastru.addressAlternativeFound" : "cadastru.buildingAlternativeFound",
                             { street: correction.street, house: correction.house_number,
                             apartment: correction.apartment_number })}
@@ -1229,6 +1239,8 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
                         onClick={() => retryAddressSearch(correction)}>
                         {state.confirmationRequired && correction.city !== state.requestedCity
                           ? t("cadastru.searchSuggestedLocality", { city: correction.city, street: correction.street, house: correction.house_number })
+                          : state.confirmationRequired && state.requestedApartmentNumber && !correction.apartment_number
+                          ? t("cadastru.searchWithoutApartment")
                           : state.confirmationRequired ? t("cadastru.searchSuggestedHouse", { house: correction.house_number })
                           : t("cadastru.useAddressCorrection", { street: correction.street, house: correction.house_number })}
                       </button>

@@ -306,6 +306,8 @@
   "cadastru.numberLabel": "Кадастровый номер",
   "cadastru.numberSearchButton": "Проверить кадастровый номер",
   "cadastru.searching": "Поиск...",
+  "cadastru.searchProgress": "Ищем объект в официальных источниках.",
+  "cadastru.detailsProgress": "Объект найден. Загружаем кадастровые данные.",
   "cadastru.lookupError": "Не удалось найти кадастровые данные. Проверьте введенные данные.",
   "cadastru.internalError": "Не удалось завершить запрос из-за внутренней ошибки. Попробуйте позже.",
   "cadastru.serviceUnavailable": "Кадастровый сервис временно недоступен. Попробуйте позже.",

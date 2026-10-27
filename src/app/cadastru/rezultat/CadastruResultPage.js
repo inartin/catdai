@@ -1134,6 +1134,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     cadastralNumber={cadastralNumber}
     address={savedAddress}
     useStoredAddress={source === "address" && !savedAddress}
+    detailsLoading={Boolean(state.detailsLoading && state.data)}
   />;
 
   return (

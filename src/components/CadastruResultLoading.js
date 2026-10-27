@@ -21,7 +21,7 @@ function emptySnapshot() {
   return null;
 }
 
-export default function CadastruResultLoading({ cadastralNumber = "", address = null, useStoredAddress = false }) {
+export default function CadastruResultLoading({ cadastralNumber = "", address = null, useStoredAddress = false, detailsLoading = false }) {
   const { t } = useTranslation();
   const storedAddress = useSyncExternalStore(subscribeToStorage, useStoredAddress ? readStoredAddress : emptySnapshot, emptySnapshot);
   let searchAddress = address;
@@ -53,6 +53,9 @@ export default function CadastruResultLoading({ cadastralNumber = "", address = 
       <CadastruLoadingIcon className="mb-6 h-40 w-auto text-primary sm:h-48" ariaLabel={t("cadastru.searching")} />
       <p className="text-base font-semibold text-gray-900">{t("cadastru.searching")}</p>
       <p className="mt-2 min-h-6 max-w-xl break-words text-base text-gray-600">{query}</p>
+      <p role="status" className="mt-3 max-w-md text-sm leading-relaxed text-gray-500">
+        {t(detailsLoading ? "cadastru.detailsProgress" : "cadastru.searchProgress")}
+      </p>
     </div>
   );
 }

@@ -141,6 +141,7 @@ for (const lang of ['ro', 'ru']) {
           { [addressKey]: JSON.stringify(address) }, lang);
         pending.login();
         pending.render();
+        assert.equal(pending.render().props.detailsLoading, false, 'the initial lookup shows the search progress message');
         const lookupId = pending.requests[0].body.lookup_id;
         const addressData = { cadastral_number: number, request_address: 'Chișinău, strada Valea Trandafirilor 11',
           matched_address: 'Chișinău, str. Valea Trandafirilor 11',
@@ -152,6 +153,7 @@ for (const lang of ['ro', 'ru']) {
         assert.equal(Boolean(pending.requests.at(-1).body.skip_cache), skipCache);
         const intermediate = pending.render();
         assert.equal(intermediate.type, resultLoading, 'the loader continues until number details settle');
+        assert.equal(intermediate.props.detailsLoading, true, 'a resolved address shows the detail progress message');
         assert(!walk(intermediate).some((node) => node.props?.cadastral), 'no intermediate data card or map is mounted');
         const finalData = { ...addressData, apartment: { area_m2: 34, floor: 5 }, building: { total_floors: 9 },
           map_location: { latitude: 47.02, longitude: 28.83 },
@@ -160,6 +162,7 @@ for (const lang of ['ro', 'ru']) {
           const oldRequest = pending.requests.at(-1);
           pending.logout(); pending.render();
           assert.equal(pending.render().type, resultLoading, 'auth changes cannot reveal the previous viewer result');
+          assert.equal(pending.render().props.detailsLoading, false, 'the previous viewer result cannot set the new progress message');
           oldRequest.resolve({ ok: true, status: 200, json: async () => finalData });
           const masked = { cadastral_number: number, locked_sections: { cadastru_details: true } };
           await pending.finish(masked);

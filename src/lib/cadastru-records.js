@@ -103,6 +103,7 @@ function stripDiacritics(value) {
 export function normalizeCadastruAddressForDb(value) {
   return stripDiacritics(value)
     .toLowerCase()
+    .replace(/\s*\/\s*/g, "/")
     .replace(/[.,;:()]/g, " ")
     .replace(/(^|\s)(?:улица|ул)(?=\s|$)/g, "$1str")
     .replace(/(^|\s)(?:бульвар|бул|проспект|пр)(?=\s|$)/g, "$1bd")
@@ -224,14 +225,14 @@ function parseAddressParts(address) {
   if (!value) return {};
 
   const streetMatch = value.match(
-    /(?:^|[\s,])((?:str(?:ada)?|bd|bulevard(?:ul)?|sos|șos|al|ул|улица|пр|проспект)\.?\s+[^,]+?)[,\s]+(\d+[a-zA-Z]?(?:\/\d+[a-zA-Z]?)?)(?:[\s,]*(?:ap\.?|apartament(?:ul)?|apt|кв\.?|квартира)\s*([0-9a-zA-Z/-]+))?(?=\s*(?:,|$))/i
+    /(?:^|[\s,])((?:str(?:ada)?|bd|bulevard(?:ul)?|sos|șos|al|ул|улица|пр|проспект)\.?\s+[^,]+?)[,\s]+(\d+[a-zA-Z]?(?:\s*\/\s*(?:\d+[a-zA-Z]?|[a-zA-Z]))?)(?:[\s,]*(?:ap\.?|apartament(?:ul)?|apt|кв\.?|квартира)\s*([0-9a-zA-Z/-]+))?(?=\s*(?:,|$))/i
   );
 
   if (!streetMatch) return {};
 
   return {
     street: cleanText(streetMatch[1], 200),
-    houseNumber: cleanText(streetMatch[2], 40),
+    houseNumber: cleanText(streetMatch[2], 40).replace(/\s*\/\s*/g, "/").toUpperCase(),
     apartmentNumber: cleanText(streetMatch[3], 40),
   };
 }
@@ -247,7 +248,7 @@ export function recordMatchesStructuredAddress(row, normalizedAddress, structure
   const parsed = parseAddressParts(row.full_address);
   const house = cleanText(row.house_number || parsed.houseNumber, 40);
   const apartment = cleanText(row.apartment_number || parsed.apartmentNumber, 40);
-  if (house !== cleanText(structuredAddress.houseNumber, 40)) return false;
+  if (house.replace(/\s*\/\s*/g, "/").toUpperCase() !== cleanText(structuredAddress.houseNumber, 40).replace(/\s*\/\s*/g, "/").toUpperCase()) return false;
   if (apartment !== cleanText(structuredAddress.apartmentNumber, 40)) return false;
   const street = normalizeStreetPart(structuredAddress.street);
   const streets = [row.street, parsed.street, parseAddressParts(row.address_ro).street, parseAddressParts(row.address_ru).street];

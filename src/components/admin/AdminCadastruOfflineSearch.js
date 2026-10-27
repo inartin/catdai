@@ -55,7 +55,7 @@ const SAMPLE_RECORDS = [
 ];
 
 function onlyHouseNumberChars(value) {
-  return value.replace(/[^\d/]/g, "").slice(0, HOUSE_NUMBER_MAX_LENGTH);
+  return value.replace(/[^\da-z/]/gi, "").toUpperCase().slice(0, HOUSE_NUMBER_MAX_LENGTH);
 }
 
 function onlyDigits(value, maxLength) {
@@ -371,11 +371,12 @@ export default function AdminCadastruOfflineSearch() {
                     </span>
                     <input
                       type="text"
-                      inputMode="numeric"
+                      inputMode="text"
+                      pattern="\d{1,4}(?:/(?:\d{1,4}|[A-Za-z]))?"
                       maxLength={HOUSE_NUMBER_MAX_LENGTH}
                       value={addressForm.houseNumber}
                       onChange={(event) => setAddressField("houseNumber", onlyHouseNumberChars(event.target.value))}
-                      placeholder="ex. 18/2"
+                      placeholder="ex. 18/2, 22/D"
                       className="mt-1.5 h-11 w-full rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light"
                     />
                   </label>

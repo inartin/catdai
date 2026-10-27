@@ -24,7 +24,8 @@ export function nearbyAddressFromCadastru(payload) {
     payload?.buildings?.[0]?.address,
   ].filter((value) => typeof value === "string");
 
-  for (const address of addresses) {
+  for (const inputAddress of addresses) {
+    const address = inputAddress.replace(/\s*\/\s*/g, "/");
     const city = resolveCadastruCityFromAddress(address)
       || resolveCadastruSupportedCity(payload?.form_fields?.city || payload?.location?.city);
     const road = address.match(/(?:^|[,;]\s*|\s)(str-la|strădela|stradela|strada|str\.?|bd\.?|bul\.?|bulevard(?:ul)?|ул\.?|улица)\s+([^,;]+)/i);
@@ -33,11 +34,11 @@ export function nearbyAddressFromCadastru(payload) {
       || (/^(ул|улица)/i.test(road[1]) ? "strada" : null);
     if (!roadType) continue;
     let street = road[2].replace(/\s+(?:ap\.?|apartament(?:ul)?|apt|кв\.?)\s*\d{1,4}\s*$/i, "").trim();
-    let houseNumber = street.match(/\s+(\d{1,4}(?:\/\d{1,4})?)\s*$/)?.[1];
+    let houseNumber = street.match(/\s+(\d{1,4}(?:\/(?:\d{1,4}|[a-z]))?)\s*$/i)?.[1];
     if (houseNumber) street = street.slice(0, -houseNumber.length).trim();
-    else houseNumber = address.slice(road.index + road[0].length).match(/^\s*[,;]\s*(?:nr\.?\s*)?(\d{1,4}(?:\/\d{1,4})?)(?=\s*(?:[,;]|$))/i)?.[1];
+    else houseNumber = address.slice(road.index + road[0].length).match(/^\s*[,;]\s*(?:nr\.?\s*)?(\d{1,4}(?:\/(?:\d{1,4}|[a-z]))?)(?=\s*(?:[,;]|$))/i)?.[1];
     if (!street || street.length > 80 || !houseNumber) continue;
-    return { city, road_type: roadType, street, house_number: houseNumber };
+    return { city, road_type: roadType, street, house_number: houseNumber.toUpperCase() };
   }
   return null;
 }

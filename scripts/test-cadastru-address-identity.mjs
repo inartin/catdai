@@ -77,3 +77,26 @@ test('WMS apartment address can verify a unit whose suffix differs',async t=>{
   const result=await findCadastralByAddress(requested);
   assert.equal(result.cadastral_number,'0100106.123.02.987');
 });
+
+
+for (const house of ['22/D', '22/d', '22 / d', '22']) {
+  test(`local backup preserves the complete house suffix: ${house}`, async t => {
+    t.mock.method(globalThis, 'fetch', async (url, options = {}) => {
+      const host = new URL(url).hostname;
+      if (host === 'nominatim.openstreetmap.org') return Response.json([]);
+      if (host === 'geodata.gov.md') return Response.json({ features: [] });
+      assert.equal(host, 'www.cadastru.md');
+      if (options.method !== 'POST') return new Response('<input name="p_instance" value="12345">');
+      const body = new URLSearchParams(options.body);
+      if (body.get('p_request') === 'APPLICATION_PROCESS=jQuery_Auto') return new Response(
+        '0100118131: mun. Chișinău, str. Nuferilor 22\n0100118111: mun. Chișinău, str. Nuferilor 22/d');
+      assert.equal(body.get('p_request'), 'APPLICATION_PROCESS=GET_INFO_RBI');
+      const suffix = body.get('x01') === '01001180111' ? '/d' : '';
+      const parcel = suffix ? '111' : '131';
+      return new Response(`<div class="infoConstr">Adresa: mun. Chișinău, str. Nuferilor 22${suffix}<br><a onclick="getDetailedInfo('0100118.${parcel}.01.009',3)"><i>9</i></a></div>`);
+    });
+    const result = await findCadastralByAddress(`Chișinău, str Nuferilor ${house} ap 9`);
+    assert.equal(result.cadastral_number, `0100118.${house.includes('/') ? '111' : '131'}.01.009`);
+    assert.equal(result.parsed_input.houseNumber, house.includes('/') ? '22/D' : '22');
+  });
+}

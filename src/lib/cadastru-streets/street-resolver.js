@@ -123,7 +123,8 @@ export function inspectStreetAddress({ city, roadType, street, houseNumber }) {
   // Check complete names first: dates and numbered streets must retain their digits.
   if (resolveStreet({ city, roadType, street, exactOnly: true }).status !== "unresolved") return unchanged;
   let candidate = String(street || "").trim().replace(/[.,;]+$/, "").trim();
-  const house = candidate.match(/(?:^|[\s,;])(?:nr\.?\s*)?(\d{1,4}(?:\/\d{1,4})?)$/i);
+  const house = candidate.match(/(?:^|[\s,;])(?:nr\.?\s*)?(\d{1,4}(?:\s*\/\s*(?:\d{1,4}|[a-z]))?)$/i);
+  const embeddedHouseNumber = house?.[1].replace(/\s+/g, "").toUpperCase();
   if (house) candidate = candidate.slice(0, house.index).trim();
   const markers = { str: "strada|str|улица|ул", bd: "bulevardul|bulevard|bd|bul|бульвар|бул|проспект|пр",
     "str-la": "stradela|strădela|str-la" }[roadKey(roadType)];
@@ -135,9 +136,10 @@ export function inspectStreetAddress({ city, roadType, street, houseNumber }) {
   // A marker for another road type must not disappear through name normalization.
   if (/^(?:stradela|strădela|str-la|strada|str|bulevardul|bulevard|bd|bul|улица|ул|бульвар|бул|проспект|пр|soseaua|șoseaua|sos|шоссе|aleea|al|аллея)(?:[.,]|\s)/iu.test(candidate)) return unchanged;
   if (resolved.status !== "exact") return unchanged;
-  if (house && house[1] !== houseNumber) {
-    return { status: "conflict", street: resolved.street, embeddedHouseNumber: house[1],
-      corrections: [house[1], houseNumber].map((number) => ({ street: resolved.street, house_number: number })) };
+  const requestedHouseNumber = String(houseNumber || "").replace(/\s*\/\s*/g, "/").toUpperCase();
+  if (house && embeddedHouseNumber !== requestedHouseNumber) {
+    return { status: "conflict", street: resolved.street, embeddedHouseNumber,
+      corrections: [embeddedHouseNumber, requestedHouseNumber].map((number) => ({ street: resolved.street, house_number: number })) };
   }
   return { status: "cleaned", street: resolved.street };
 }

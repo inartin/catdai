@@ -313,7 +313,7 @@
   "cadastru.retrySearch": "Încearcă din nou",
   "cadastru.otherDataAvailable": "Între timp, afișăm celelalte informații disponibile pentru această adresă.",
   "cadastru.missingAddressFields": "Completează strada și numărul imobilului.",
-  "cadastru.invalidAddressFields": "Nr. imobil trebuie să conțină doar cifre și opțional /",
+  "cadastru.invalidAddressFields": "Introdu un număr de imobil valid, de exemplu 22, 22/1 sau 22/D.",
   "cadastru.rateLimitError": "Prea multe căutări. Încearcă din nou peste puțin timp.",
   "cadastru.loginToUse": "Autentifică-te ca să cauți date cadastrale",
   "cadastru.unlockData": "Autentifică-te pentru a debloca",

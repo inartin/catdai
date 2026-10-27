@@ -46,6 +46,10 @@ async function harness(file, path, stored = {}, lang = 'ro') {
     effects.push(() => { slots[index].cleanup = effect(); });
   };
   const mocks = {
+    '@/components/usePaymentProvider': { default: () => 'maib' },
+    '@/lib/maib/products.mjs': { maibProduct: key => ({ key, amount_mdl: 15 }) },
+    '@/lib/payment-urls.mjs': { featureCheckoutUrl: () => '/payment/checkout' },
+    '@/lib/cadastru-map': { cadastruMapLocation: () => null },
     '@/lib/visitor-browser': { getDeviceId: () => null },
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },
   "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
@@ -184,3 +188,51 @@ for (const lang of ['ro', 'ru']) {
   assert(!walk(localityPage.render()).some((node) => node.type === 'button' && node.props.className?.includes('border-sky-200')));
 }
 console.log('RO/RU locality confirmation passed: full addresses, distinct city choices, exact house, explicit city retry, skip-cache, recovery and stale-choice cleanup.');
+
+
+// Public and admin inputs retain Latin letters; public navigation retains the exact house.
+for (const file of ['src/components/CadastruSearchForm.js', 'src/components/admin/AdminCadastruOfflineSearch.js']) {
+  const form = await harness(file, '/ro/cadastru');
+  let tree = form.render();
+  if (file.includes('/admin/')) {
+    walk(tree).find(node => node.type === 'button' && node.props['aria-expanded'] === false).props.onClick();
+  }
+  const field = length => walk(form.render()).find(node => node.type === 'input' && node.props.maxLength === length);
+  assert.equal(field(10).props.inputMode, 'text', 'letter suffixes need the text keyboard');
+  for (const [input, expected] of [['22 /d', '22/D'], ['22/1', '22/1'], ['22', '22']]) {
+    field(10).props.onChange({ target: { value: input } });
+    assert.equal(field(10).props.value, expected);
+    assert(new RegExp(`^(?:${field(10).props.pattern})$`).test(expected));
+  }
+  assert(!new RegExp(`^(?:${field(10).props.pattern})$`).test('22/DD'));
+  field(80).props.onChange({ target: { value: 'Nuferilor' } });
+  field(10).props.onChange({ target: { value: '22/d' } });
+  tree = form.render();
+  const button = walk(tree).find(node => node.type === 'button' && node.props.children ===
+    (file.includes('/admin/') ? 'Caută adresă (offline)' : translations.ro['cadastru.searchButton']));
+  button.props.onClick();
+  if (file.includes('/admin/')) {
+    assert.equal(form.requests.at(-1).body.house_number, '22/D');
+    await form.finish({ error: 'not_found' }, 404);
+  } else {
+    const url = new URL(form.navigations.at(-1), 'https://catdai.md');
+    assert.equal(url.searchParams.get('house_number'), '22/D');
+    assert.equal(JSON.parse(form.storage.get(addressKey)).house_number, '22/D');
+  }
+}
+for (const lang of ['ro', 'ru']) {
+  const input = { city: 'Chișinău', road_type: 'strada', street: 'Nuferilor 22 /D', house_number: '22' };
+  const page = await harness(pageFile, `/${lang}/cadastru/rezultat?source=address&lookup=1`, { [addressKey]: JSON.stringify(input) }, lang);
+  page.render();
+  await page.finish({ error: 'address_fields_conflict', embedded_house_number: '22/D', house_number: '22', corrections: [
+    { street: 'Nuferilor', house_number: '22/D' }, { street: 'Nuferilor', house_number: '22' },
+  ] }, 422);
+  const buttons = walk(page.render()).filter(node => node.type === 'button' && node.props.className?.includes('border-sky-200'));
+  assert.equal(buttons.length, 2);
+  assert(textOf(buttons[0]).includes('22/D'));
+  buttons[0].props.onClick(); page.render();
+  assert.equal(page.requests.at(-1).body.house_number, '22/D');
+  assert.equal(page.requests.at(-1).body.street, 'Nuferilor');
+  await page.finish({ error: 'not_found' }, 404);
+}
+console.log('Letter suffix UI checks passed: public/admin typing, keyboard, navigation and RO/RU correction retry.');

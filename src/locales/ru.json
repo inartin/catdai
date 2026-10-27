@@ -313,7 +313,7 @@
   "cadastru.retrySearch": "Попробовать снова",
   "cadastru.otherDataAvailable": "Тем временем показываем другую доступную информацию по этому адресу.",
   "cadastru.missingAddressFields": "Укажите улицу и номер дома.",
-  "cadastru.invalidAddressFields": "Номер дома должен содержать только цифры и при необходимости /",
+  "cadastru.invalidAddressFields": "Введите допустимый номер дома, например 22, 22/1 или 22/D.",
   "cadastru.rateLimitError": "Слишком много запросов. Попробуйте еще раз немного позже.",
   "cadastru.loginToUse": "Войдите, чтобы искать кадастровые данные",
   "cadastru.unlockData": "Войдите, чтобы разблокировать",

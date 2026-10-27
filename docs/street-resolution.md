@@ -6,7 +6,7 @@ Initials such as `G. Coșbuc`, `M Eminescu`, and `I.L. Caragiale` expand before 
 
 ## Pasted addresses in the street field
 
-Before cache access or provider calls, the shared resolver checks for pasted road markers and a trailing house number. Cleanup requires an exact, unique dictionary street in the selected city/type; complete numbered names such as `31 August 1989` are checked first. Matching house numbers are redundant and are removed with `street_resolution.status: "cleaned"`. Unknown names retain the original lookup.
+Before cache access or provider calls, the shared resolver checks for pasted road markers and a trailing house number. Cleanup requires an exact, unique dictionary street in the selected city/type; complete numbered names such as `31 August 1989` are checked first. Matching house numbers are redundant and are removed with `street_resolution.status: "cleaned"`. Numeric and single Latin-letter slash suffixes are supported; `Nuferilor 22 /d` with house `22/D` is redundant, while house `22` returns an explicit conflict with `22/D` and `22` as choices. Unknown names retain the original lookup.
 
 Conflicting numbers return 422 `address_fields_conflict` with two corrected street/house choices. The result screen asks which house to use and retries only after a choice, preserving city, road type, apartment and skip-cache. Each retry clears stale choices; effect cleanup discards outdated responses. These choices are input validation, separate from no-result street suggestions and recovery telemetry. The dictionary remains server-side. Both the app API and signed worker enforce the check.
 
@@ -33,6 +33,8 @@ The sync script adapts only the loader and records worker source hashes in `sour
 
 ## Validation
 
+`pnpm exec node --experimental-vm-modules scripts/test-cadastru-house-suffix.mjs` checks letter-suffix validation, exact stored matching, worker forwarding and nearby origins with mocked providers/storage. `scripts/test-cadastru-address-identity.mjs` covers exact suffix matching in the local backup.
+
 `pnpm exec node --experimental-vm-modules scripts/test-cadastru-building-confirmation.mjs` checks RO/RU building-location messages, validated suffix choices, explicit retries, skip-cache preservation and stale-choice cleanup.
 
 The isolated storage/route regression suite covers original/resolved aliases, shared cache reuse, current-request metadata, masked previews, ambiguous suggestions, worker 422 propagation and canonical local fallback. It also checks pasted-address conflicts before cache/provider calls and redundant-input cleanup. These mocks do not establish live cadastral availability or browser interaction.
@@ -47,7 +49,7 @@ If a Chișinău lookup cannot find an exact property, the worker can offer the s
 
 With multiple verified addresses, the result screen shows the shared explanation and one button per house number without repeating the confirmation sentence for each option. A single alternative retains its address confirmation sentence.
 
-Building/land searches without an apartment also offer up to three verified numeric house suffixes when the exact house is absent. Autocomplete candidates must be confirmed by an explicit matching address and a land/building link in the same registry section. Exact original results take precedence, including Geodata recovery; verified choices can still be shown if geocoding fails. Confirmation never consumes credits or saves a property; clicking a choice starts the usual exact lookup. The result page explains in RO/RU that an exact building location is needed for nearby places, transport and reports, and does not start those requests while a choice is pending.
+Building/land searches without an apartment also offer up to three verified numeric or single Latin-letter house suffixes when the exact house is absent. Autocomplete candidates must be confirmed by an explicit matching address and a land/building link in the same registry section. Exact original results take precedence, including Geodata recovery; verified choices can still be shown if geocoding fails. Confirmation never consumes credits or saves a property; clicking a choice starts the usual exact lookup. The result page explains in RO/RU that an exact building location is needed for nearby places, transport and reports, and does not start those requests while a choice is pending.
 
 The synced resolver recognizes Chișinău strada `Киев` as `Kiev`. Russian street aliases ending in `улица` also accept the bare name or a leading `улица`/`ул.` marker (for example `Киевская`, `Киевская улица`, `ул. Киевская`). Matching remains scoped to city and road type; alias collisions remain ambiguous.
 

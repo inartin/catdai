@@ -51,6 +51,7 @@ function normalizeSpaces(value) {
 
 function normalizeForMatch(value) {
   return normalizeSpaces(stripDiacritics(value).toLowerCase())
+    .replace(/\s*\/\s*/g, "/")
     .replace(/[.,;:()]/g, " ")
     .replace(/\bmunicipiul\b/g, "mun")
     .replace(/\bsectorul\b/g, "sect")
@@ -116,7 +117,7 @@ function normalizeApartmentKey(value) {
 }
 
 function parseInputAddress(rawAddress) {
-  const raw = normalizeSpaces(rawAddress || DEFAULT_ADDRESS);
+  const raw = normalizeSpaces(rawAddress || DEFAULT_ADDRESS).replace(/\s*\/\s*/g, "/");
   const apartmentMatch = raw.match(
     /(?:^|[\s,;])(?:ap(?:artament(?:ul)?)?|apt|apart\.?|кв(?:артира)?|квартира)\.?\s*(?:nr\.?\s*)?([0-9a-zA-Z/-]+)/i
   );
@@ -136,9 +137,9 @@ function parseInputAddress(rawAddress) {
   const buildingAddress = normalizeRoadForQuery(withoutApartment);
   const buildingAddressWithoutCity = normalizeRoadForQuery(removeCityFromAddress(withoutApartment, city));
 
-  const houseMatches = [...buildingAddressWithoutCity.matchAll(/\b(\d+[a-zA-Z]?(?:[/-]\d+[a-zA-Z]?)?)\b/g)];
+  const houseMatches = [...buildingAddressWithoutCity.matchAll(/\b(\d+[a-zA-Z]?(?:[/-](?:\d+[a-zA-Z]?|[a-zA-Z]))?)\b/g)];
   const houseMatch = houseMatches.at(-1) || null;
-  const houseNumber = houseMatch ? houseMatch[1] : null;
+  const houseNumber = houseMatch ? houseMatch[1].toUpperCase() : null;
   const roadType = canonicalRoadType(withoutApartment);
   let streetName = null;
 
@@ -585,7 +586,7 @@ function extractHouseNumberFromAddress(address, parsed) {
     const index = normalizedAddress.indexOf(pattern);
     if (index === -1) continue;
     const afterStreet = normalizedAddress.slice(index + pattern.length);
-    const match = afterStreet.match(/\b(\d+[a-z]?(?:[/-]\d+[a-z]?)?)\b/i);
+    const match = afterStreet.match(/\b(\d+[a-z]?(?:[/-](?:\d+[a-z]?|[a-z]))?)(?=\s|$)/i);
     if (match) return match[1];
   }
 
@@ -804,8 +805,8 @@ function suggestedHouseNumber(address, parsed) {
   const names = resolution.aliases || parsed.streetNameVariants || [parsed.streetName];
   for (const name of names) {
     const escaped = normalizeForMatch(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
-    const match = normalizeForMatch(address).match(new RegExp(`(?:^|\\s)(?:${markers})\\s+${escaped}\\s+(?:nr\\s+)?(\\d{1,4}/\\d{1,4})(?=\\s|$)`, "i"));
-    if (match && match[1].split("/")[0] === parsed.houseNumber) return match[1];
+    const match = normalizeForMatch(address).match(new RegExp(`(?:^|\\s)(?:${markers})\\s+${escaped}\\s+(?:nr\\s+)?(\\d{1,4}/(?:\\d{1,4}|[a-z]))(?=\\s|$)`, "i"));
+    if (match && match[1].split("/")[0] === parsed.houseNumber) return match[1].toUpperCase();
   }
   return null;
 }

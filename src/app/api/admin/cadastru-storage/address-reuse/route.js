@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { cadastruReuseCityKey, summarizeCadastruAddressReuse } from "@/lib/admin-cadastru-address-reuse";
+import { cadastruReuseCityKey, searchCadastruAddressReuse, summarizeCadastruAddressReuse } from "@/lib/admin-cadastru-address-reuse";
 
 const PAGE = 1000;
 const PAGE_SIZE = 50;
@@ -34,20 +34,23 @@ export async function GET(request) {
   if (unauthorized) return unauthorized;
 
   const city = request.nextUrl.searchParams.get("city")?.trim();
+  const query = request.nextUrl.searchParams.get("q")?.trim() || "";
   const rawOffset = request.nextUrl.searchParams.get("offset") ?? "0";
   const offset = Number(rawOffset);
-  if (!city || city.length > 100 || !/^\d+$/.test(rawOffset) || !Number.isSafeInteger(offset) || offset > Number.MAX_SAFE_INTEGER - PAGE_SIZE) {
-    return NextResponse.json({ error: "Invalid city or offset." }, { status: 400 });
+  if ((!city && !query) || (city && city.length > 100) || (query && (query.length < 2 || query.length > 200))
+    || !/^\d+$/.test(rawOffset) || !Number.isSafeInteger(offset) || offset > Number.MAX_SAFE_INTEGER - PAGE_SIZE) {
+    return NextResponse.json({ error: "Invalid city, search or offset." }, { status: 400 });
   }
   try {
     if (request.nextUrl.searchParams.get("fresh") === "1" || !cache.data || Date.now() - cache.ts >= CACHE_TTL_MS) {
       const data = await readInventory();
       cache = { data, ts: Date.now() };
     }
-    const summary = cache.data.get(cadastruReuseCityKey(city)) || { rows: [], excluded: 0 };
+    const summary = city ? cache.data.get(cadastruReuseCityKey(city)) || { rows: [], excluded: 0 } : null;
+    const rows = query ? searchCadastruAddressReuse(summary ? new Map([[city, summary]]) : cache.data, query) : summary.rows;
     return NextResponse.json({
-      rows: summary.rows.slice(offset, offset + PAGE_SIZE), total: summary.rows.length,
-      excluded: summary.excluded, hasMore: summary.rows.length > offset + PAGE_SIZE, updatedAt: new Date(cache.ts).toISOString(),
+      rows: rows.slice(offset, offset + PAGE_SIZE), total: rows.length,
+      excluded: summary?.excluded || 0, hasMore: rows.length > offset + PAGE_SIZE, updatedAt: new Date(cache.ts).toISOString(),
     });
   } catch (error) {
     console.error("Failed to load cadastru address reuse:", error.message);

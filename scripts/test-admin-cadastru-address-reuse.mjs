@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { loadAppModule } from "./lib/load-app-module.mjs";
 
-const { summarizeCadastruAddressReuse, cadastruReuseCityKey } = await loadAppModule("src/lib/admin-cadastru-address-reuse.js");
+const { summarizeCadastruAddressReuse, searchCadastruAddressReuse, cadastruReuseCityKey } = await loadAppModule("src/lib/admin-cadastru-address-reuse.js");
 const request = { city: "Chișinău", road_type: "strada", street: "Kiev", house_number: "10", apartment_number: "2" };
 const event = (overrides = {}) => ({ search_type: "address", city: "Chișinău", search_request: request, user_id: "one", created_at: "2026-10-19T10:00:00Z", ...overrides });
 const cityKey = cadastruReuseCityKey("Кишинев");
@@ -68,7 +68,7 @@ const route = await loadAppModule("src/app/api/admin/cadastru-storage/address-re
 const req = (query = "city=Chișinău", authorized = true) => ({ authorized, nextUrl: new URL(`http://local/?${query}`) });
 assert.equal((await route.GET(req(undefined, false))).status, 401);
 assert.equal(reads, 0, "auth runs before database/cache reads");
-for (const query of ["", "city=Chișinău&offset=-1", "city=Chișinău&offset=1.5", "city=Chișinău&offset=9007199254740991"]) {
+for (const query of ["", "q=", "q=a", `q=${"a".repeat(201)}`, "q=Kiev&offset=-1", "city=Chișinău&offset=-1", "city=Chișinău&offset=1.5", "city=Chișinău&offset=9007199254740991"]) {
   assert.equal((await route.GET(req(query))).status, 400);
 }
 assert.equal(reads, 0);
@@ -82,6 +82,14 @@ const second = await (await route.GET(req("city=Chisinau&offset=50"))).json();
 assert.equal(second.rows.length, 50);
 assert(!second.rows.some((row) => first.rows.some((prior) => prior.key === row.key)), "pagination does not repeat buildings");
 assert.equal(reads, 4, "city aliases and load-more share the five-minute cache");
+const searched = await (await route.GET(req("q=Kiev"))).json();
+assert.equal(searched.total, 1001, "global search filters the complete snapshot before pagination");
+assert.equal(searched.rows.length, 50); assert.equal(searched.hasMore, true);
+assert.equal(searched.rows[0].city, "Chișinău", "cross-city results include their locality");
+const searchedNext = await (await route.GET(req("q=Kiev&offset=50"))).json();
+assert(!searchedNext.rows.some((row) => searched.rows.some((prior) => prior.key === row.key)));
+assert.equal(reads, 4, "search pagination reuses the inventory snapshot");
+assert.equal((await route.GET(req("q=Kiev", false))).status, 401, "global searches require admin authentication even on cache hits");
 assert.equal((await route.GET(req(undefined, false))).status, 401, "auth still runs on cached results");
 const last = await (await route.GET(req("city=Chișinău&offset=1000"))).json();
 assert.equal(last.rows.length, 1); assert.equal(last.hasMore, false);
@@ -138,6 +146,16 @@ assert.equal(main.properties.find((row) => row.apartmentNumber === "777").stored
 assert.equal(main.properties.find((row) => row.cadastralNumber === `${buildingNumber}.004`).searches, 1, "known cadastral number links searches even without a saved apartment number");
 assert.equal(main.properties.filter((row) => row.stored && row.apartmentNumber === "6").reduce((sum, row) => sum + row.searches, 0), 0, "ambiguous stored apartment labels never receive guessed search counts");
 assert.equal(main.properties.reduce((sum, row) => sum + row.searches, 0), main.searches);
+for (const query of ["Kiev 10", "Chisinau, str. Kiev 10", "Кишинев Kiev 10", "Kiev 10 ap. 59", `${buildingNumber}.003`, `${buildingNumber}.003`.replace(/\./g, "")]) {
+  const found = await (await route.GET(req(`q=${encodeURIComponent(query)}`))).json();
+  assert.equal(found.total, 1, `search matches the stored address or number: ${query}`);
+  assert.equal(found.rows[0].apartmentCount, main.apartmentCount, "unit searches retain the entire address inventory");
+  assert.equal(found.rows[0].searches, main.searches, "search preserves the address counters");
+  assert.deepEqual(found.rows[0].properties, main.properties, "search returns the same complete property rows as the city list");
+}
+assert.equal((await (await route.GET(req(`q=${buildingNumber}&city=Balti`))).json()).total, 0, "optional city filtering remains strict");
+assert.equal((await (await route.GET(req("q=Kiev%2010%20ap%205"))).json()).total, 0, "apartment numbers match exactly");
+assert.equal((await (await route.GET(req("q=unknown%20address"))).json()).total, 0);
 assert.equal(inventory.rows.find((row) => row.address === "Strada Kiev 12").searches, 0);
 const conflictingCity = summarizeCadastruAddressReuse([], { buildings: sharedBuildings, records: [
   storedUnit("001", "2", { city: "Bălți" }), storedUnit("002", "3", { city: null }),
@@ -163,6 +181,24 @@ assert.equal(orhei.rows[0].landCount, 1);
 assert.equal(orhei.rows[0].properties.length, 2, "land and its stored building are visible under the address");
 assert.deepEqual(orhei.rows[0].properties.map((property) => property.propertyType).sort(), ["building", "land"]);
 assert.equal(orhei.rows[0].searches, 0, "storage is independent of search analytics collection");
+const allCities = summarizeCadastruAddressReuse([], { records: [
+  ...storedRecords,
+  { cadastral_number: "0100101.005.01", city: "Chișinău", street: "Strada Bulgară", house_number: "20/1" },
+  { cadastral_number: "0100101.006.01", city: "Chișinău", street: "Stradela Bulgară", house_number: "20" },
+] });
+assert.equal(searchCadastruAddressReuse(allCities, "Bulgara").length, 3, "address text searches across cities and ignores diacritics");
+const exactHouse = searchCadastruAddressReuse(allCities, "str. Bulgara 20");
+assert.equal(exactHouse.length, 1, "explicit road types and complete house suffixes remain distinct");
+assert.equal(exactHouse[0].city, "Orhei");
+assert.equal(exactHouse[0].landCount, 1, "land and building records share the same search result");
+assert.equal(searchCadastruAddressReuse(allCities, "6401411.479")[0].properties.length, 2, "parcel-number searches retain the address's saved buildings");
+assert.equal(searchCadastruAddressReuse(allCities, "%_").length, 0, "punctuation never becomes a wildcard");
+const separateHouseAndUnit = summarizeCadastruAddressReuse([], { records: [
+  { cadastral_number: "0100101.007.01.001", city: "Chișinău", street: "Strada Kiev", house_number: "11", apartment_number: "10" },
+] });
+assert.equal(searchCadastruAddressReuse(separateHouseAndUnit, "Kiev 10").length, 0, "a stored apartment number cannot satisfy a searched house number");
+assert.equal(searchCadastruAddressReuse(separateHouseAndUnit, "Kiev 11 ap 10").length, 1);
+assert.equal(searchCadastruAddressReuse(separateHouseAndUnit, "Kiev 11 ap 11").length, 0, "a stored house number cannot satisfy a searched apartment number");
 events = [event({ city: "Orhei", cadastral_number: "6401411.479", search_request: { city: "Orhei", road_type: "strada", street: "Bulgară", house_number: "20" } })];
 orhei = await (await route.GET(req("city=Orhei&fresh=1"))).json();
 assert.equal(orhei.rows[0].searches, 1);
@@ -171,4 +207,5 @@ assert.equal(orhei.rows[0].properties.find((property) => property.propertyType =
 storedRecords = Array.from({ length: 1001 }, (_, index) => storedUnit(String(index + 1).padStart(4, "0"), String(index + 1)));
 failedTable = "cadastru_records"; failedPage = 1000;
 assert.equal((await route.GET(req("city=Chișinău&fresh=1"))).status, 503, "failed inventory reads never show partial or search-only totals");
-console.log("Cadastru address reuse: aliases, exact identity, counts, users, legacy data, all pages, auth, pagination, cache and failures passed.");
+assert.equal((await route.GET(req("q=Kiev&fresh=1"))).status, 503, "failed global searches never return partial inventory");
+console.log("Cadastru address reuse: inventory search, aliases, exact identity, counts, users, legacy data, all pages, auth, pagination, cache and failures passed.");

@@ -31,6 +31,9 @@ export default function AdminCadastruPage() {
   const [citiesLoading, setCitiesLoading] = useState(false);
   const [selectedCity, setSelectedCity] = useState(null);
   const [reuseRefresh, setReuseRefresh] = useState(0);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchRevision, setSearchRevision] = useState(0);
   const loadStats = useCallback(async (fresh = false) => {
     setLoading(true);
     try {
@@ -133,6 +136,29 @@ export default function AdminCadastruPage() {
       ) : <p role="alert" className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-500">Stored cadastru statistics are temporarily unavailable. Try Hard refresh.</p>}
 
       <AdminCollectorStatus refreshKey={reuseRefresh} />
+
+      <section aria-labelledby="property-search-heading" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="border-b border-gray-100 p-5 sm:p-6">
+          <h2 id="property-search-heading" className="text-lg font-semibold text-gray-900">Search stored properties</h2>
+          <p id="property-search-help" className="mt-1 text-xs text-gray-500">Search all cities by address or cadastral number to see the same stored properties and search counts as the city list.</p>
+          <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={(event) => {
+            event.preventDefault();
+            setSearchQuery(searchInput.trim());
+            setSearchRevision((value) => value + 1);
+          }}>
+            <div className="min-w-48 flex-1">
+              <label htmlFor="property-search" className="mb-1.5 block text-sm font-medium text-gray-700">Address or cadastral number</label>
+              <input id="property-search" type="search" value={searchInput} onChange={(event) => setSearchInput(event.target.value)}
+                required minLength={2} maxLength={200} aria-describedby="property-search-help" placeholder="Decebal 63 or 0100106.131.01.051"
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div>
+            <button type="submit" disabled={searchInput.trim().length < 2} className="cursor-pointer rounded-lg bg-primary px-5 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:cursor-default disabled:opacity-50">Search</button>
+            {searchQuery && <button type="button" onClick={() => { setSearchInput(""); setSearchQuery(""); }}
+              className="cursor-pointer rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 hover:text-primary">Clear</button>}
+          </form>
+        </div>
+        {searchQuery && <AdminCadastruAddressReuse key={`search:${searchQuery}:${searchRevision}:${reuseRefresh}`} query={searchQuery} />}
+      </section>
 
       <section aria-labelledby="city-heading" aria-busy={citiesLoading} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 p-5 sm:px-6">

@@ -59,6 +59,38 @@ function storedAddress(row) {
 
 const digits = (value) => String(value || "").replace(/\D/g, "");
 
+function searchTokens(value) {
+  const roadNames = { strada: "str", stradela: "str-la", bulevard: "bd", bulevardul: "bd", bul: "bd",
+    улица: "str", ул: "str", переулок: "str-la", пер: "str-la", бульвар: "bd", бул: "bd", проспект: "bd", пр: "bd",
+    apartament: "ap", apt: "ap", кв: "ap" };
+  return (normalize(value).match(/[\p{L}\d/-]+/gu) || [])
+    .filter((token) => !["mun", "municipiul", "or", "oras"].includes(token))
+    .map((token) => roadNames[token] || normalize(resolveCadastruSupportedCity(token) || token));
+}
+
+export function searchCadastruAddressReuse(cities, query) {
+  const number = /^[\d.\s]+$/.test(query) && digits(query).length >= 7 ? digits(query) : null;
+  const tokens = searchTokens(query);
+  const apartmentIndex = tokens.indexOf("ap");
+  const addressTokens = apartmentIndex < 0 ? tokens : tokens.slice(0, apartmentIndex);
+  const apartmentTokens = apartmentIndex < 0 ? null : tokens.slice(apartmentIndex + 1);
+  const rows = [];
+  for (const summary of cities.values()) {
+    for (const row of summary.rows) {
+      const tokenMatches = (token, parts) => parts.some((part) => /\d/.test(token) || ["str", "str-la", "bd", "ap"].includes(token)
+        ? part === token : part.includes(token));
+      const address = number ? [] : searchTokens(`${summary.city} ${row.address}`);
+      const matches = number ? row.properties.some((property) => digits(property.cadastralNumber).startsWith(number))
+        : tokens.length > 0 && addressTokens.every((token) => tokenMatches(token, address))
+          && (apartmentTokens === null || (apartmentTokens.length > 0 && row.properties.some((property) => property.apartmentNumber
+            && apartmentTokens.every((token) => tokenMatches(token, searchTokens(property.apartmentNumber))))));
+      if (matches) rows.push({ ...row, city: summary.city });
+    }
+  }
+  return rows.sort((a, b) => b.searches - a.searches || (Date.parse(b.lastSearched) || 0) - (Date.parse(a.lastSearched) || 0)
+    || a.city.localeCompare(b.city, "ro") || a.address.localeCompare(b.address, "ro"));
+}
+
 export function summarizeCadastruAddressReuse(events, { records = [], buildings = [] } = {}) {
   const cities = new Map();
   const citySummary = (city) => {

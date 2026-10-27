@@ -15,7 +15,7 @@ Conflicting numbers return 422 `address_fields_conflict` with two corrected stre
 - `src/lib/cadastru-streets/` is a generated copy of the worker resolver, supported-city definitions and data. JSON imports replace the worker filesystem loader for Next.js bundling; matching logic is unchanged. Do not hand-edit these copies.
 - `/api/cadastru/address` uses the canonical address for cache lookup, external requests, local fallback and address-based credit idempotency. Successful fresh lookups save both submitted and resolved aliases before access masking. Cache hits retain their original expiry and receive fresh per-request resolution metadata.
 - Responses preserve `request_address` and expose `resolved_address` and `street_resolution: { status, original, resolved }`, including masked previews. No extra cadastral details are exposed.
-- `cadastru-external-api.js` preserves worker ambiguity suggestions. The result screen displays localized suggestion buttons in its error area. Selecting a name immediately retries the lookup there, retaining the other address fields.
+- `cadastru-external-api.js` preserves worker ambiguity suggestions. The result screen displays a localized suggestion card. Selecting a name immediately retries the lookup there, retaining the other address fields.
 - Successful full-access address navigation carries the original/resolved street in URL parameters; address previews and multi-property results use response metadata for a localized result-page notice. These strings are display-only, capped at 80 characters, rendered as text, and never used to identify a property. This works for full number results, masked previews and building/land results.
 
 ## Data updates
@@ -53,7 +53,7 @@ The API accepts apartment removal only for the exact resolved address. The RO/RU
 
 ## Verified house-number alternatives
 
-With multiple verified addresses, the result screen shows the shared explanation and one button per house number without repeating the confirmation sentence for each option. A single alternative retains its address confirmation sentence.
+With multiple verified addresses, the result screen shows the shared explanation and one button per house number without repeating the confirmation sentence for each option. A single alternative displays its complete address separately and asks for confirmation.
 
 Building/land searches without an apartment also offer up to three verified numeric or single Latin-letter house suffixes when the exact house is absent. Autocomplete candidates must be confirmed by an explicit matching address and a land/building link in the same registry section. Exact original results take precedence, including Geodata recovery; verified choices can still be shown if geocoding fails. Confirmation never consumes credits or saves a property; clicking a choice starts the usual exact lookup. The result page explains in RO/RU that an exact building location is needed for nearby places, transport and reports, and does not start those requests while a choice is pending.
 
@@ -64,6 +64,8 @@ If an apartment lookup cannot confirm the submitted house without a suffix (for 
 The result screen keeps the original requested house and asks whether the verified address is intended, in Romanian or Russian. Only clicking the suggested-house button changes the request and retries; users can return to the filled form to edit it. Retries and late-response checks clear stale suggestions. The API returns confirmation before property persistence or credit consumption, and does not expose the alternative's cadastral number. Verified matches are cached for five minutes under the alternative's complete address and normalized apartment, with at most 500 entries per server process. Confirming reuses the already parsed match without repeating geocoding or registry calls. Local backup matches are checked before retrying the worker, including when `skip_cache` bypasses stored property records. Authentication, access checks, persistence and credit consumption still follow the normal confirmed-request path. The original house and other apartments cannot reuse the alternative. Reads do not extend expiry; expiration, eviction, restart or another process resumes a normal lookup. Address worker calls default to 45 seconds so a registry fallback can finish after a slow Geodata request; explicit timeout configuration still takes precedence.
 
 ## Suggestions after no result
+
+All result-page suggestions use a white bordered card with an information icon, a contextual heading and explanation, full-width green choice buttons with arrows, and an underlined “Modify address” action. A single verified alternative displays its complete address separately. Apartment-to-building suggestions explicitly state that the unit is unconfirmed. Multiple alternatives share the explanation and retain separate buttons. Copy is localized in Romanian and Russian. “Modify address” restores the current search fields in the form, including the apartment and skip-cache option; only a choice button starts a corrected lookup.
 
 When a completed lookup has no result but offers a street-name or road-type alternative, the localized message names the submitted road and street, explains that a similar name was found, and offers `Caută „{road} {street}”` buttons (with equivalent Russian copy).
 

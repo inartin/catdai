@@ -222,7 +222,7 @@ assert(page.storage.has(addressKey), 'address survives OAuth handoff');
 // An explicit correction gets a new identity and its own durable result URL.
 page.remount(); page.render();
 await page.finish({ error: 'not_found', suggestions: ['Decebal'] }, 404);
-const suggestion = walk(page.render()).find((node) => node.type === 'button' && node.props.className?.includes('border-sky-200'));
+const suggestion = walk(page.render()).find((node) => node.type === 'button' && 'data-cadastru-suggestion' in node.props);
 assert(suggestion, 'suggestion retry is available');
 suggestion.props.onClick(); page.render();
 const correctedId = page.requests.at(-1).body.lookup_id;

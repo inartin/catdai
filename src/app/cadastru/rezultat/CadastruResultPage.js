@@ -1139,6 +1139,69 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     };
   }, [marketReady, marketKey, marketAddress, marketCity, marketDistrict, nearbyNumber, session?.access_token]);
 
+  const suggestionChoices = [
+    ...(state.addressCorrections || []).map((correction) => ({
+      key: `address:${correction.city}:${correction.street}:${correction.house_number}`,
+      value: correction,
+      label: state.confirmationRequired && correction.city !== state.requestedCity
+        ? t("cadastru.searchSuggestedLocality", { city: correction.city, street: correction.street, house: correction.house_number })
+        : state.confirmationRequired && state.requestedApartmentNumber && !correction.apartment_number
+        ? t("cadastru.searchWithoutApartment")
+        : state.confirmationRequired ? t("cadastru.searchSuggestedHouse", { house: correction.house_number })
+        : t("cadastru.useAddressCorrection", { street: correction.street, house: correction.house_number }),
+    })),
+    ...(state.suggestions || []).map((street) => ({
+      key: `street:${street}`,
+      value: street,
+      label: t("cadastru.useRoadTypeSuggestion", { road: state.requestedRoad, street }),
+    })),
+    ...(state.roadTypeSuggestions || []).map((suggestion) => ({
+      key: `road:${suggestion.road_type}:${suggestion.street}`,
+      value: suggestion,
+      label: t("cadastru.useRoadTypeSuggestion", {
+        road: t(roadTypes.find(({ value }) => value === suggestion.road_type).fullLabel), street: suggestion.street,
+      }),
+    })),
+  ];
+  const hasSuggestions = suggestionChoices.length > 0;
+  const singleVerifiedAddress = state.confirmationRequired && state.addressCorrections?.length === 1
+    ? state.addressCorrections[0] : null;
+  const withoutApartment = singleVerifiedAddress && state.requestedApartmentNumber && !singleVerifiedAddress.apartment_number;
+  const suggestedAddress = singleVerifiedAddress ? [
+    `${t(roadTypes.find(({ value }) => value === singleVerifiedAddress.road_type).label)} ${singleVerifiedAddress.street} ${singleVerifiedAddress.house_number}`,
+    singleVerifiedAddress.city,
+    singleVerifiedAddress.apartment_number ? `${t("form.cadastralApartment")} ${singleVerifiedAddress.apartment_number}` : "",
+  ].filter(Boolean).join(", ") : "";
+  const suggestionTitle = state.confirmationRequired && state.requestedApartmentNumber
+    ? t("cadastru.apartmentNotIdentified", { apartment: state.requestedApartmentNumber })
+    : state.addressCorrections?.length && !state.confirmationRequired ? t("cadastru.confirmHouseNumber")
+    : state.confirmationRequired || state.didYouMean ? t("cadastru.addressNotIdentified")
+    : t("cadastru.confirmStreet");
+  const suggestionDescription = withoutApartment ? t("cadastru.withoutApartmentAlternativeFound")
+    : state.didYouMean && (state.suggestions?.length || state.roadTypeSuggestions?.length)
+    ? t("cadastru.notFoundWithSuggestion", { road: state.requestedRoad, street: state.requestedStreet })
+    : state.error;
+  const suggestionNote = withoutApartment ? t("cadastru.apartmentNotConfirmedNote")
+    : state.confirmationRequired ? t("cadastru.localityAlternativeConfirm")
+    : state.roadTypeSuggestions?.length ? t("cadastru.didYouMeanRoadType")
+    : state.didYouMean ? t("cadastru.didYouMean") : "";
+  const editAddress = () => {
+    const address = pendingAddressRequest || savedAddress;
+    if (address) {
+      try {
+        const draft = JSON.parse(localStorage.getItem(CADASTRU_DRAFT_STORAGE_KEY) || "null");
+        localStorage.setItem(CADASTRU_DRAFT_STORAGE_KEY, JSON.stringify({
+          ...draft,
+          addressForm: { city: address.city, roadType: address.road_type, street: address.street,
+            houseNumber: address.house_number, apartmentNumber: address.apartment_number || "" },
+        }));
+      } catch {
+        // Returning to the form still works when draft storage is unavailable.
+      }
+    }
+    router.push(`/${lang}/cadastru${skipCache ? "?skipcache=true" : ""}`);
+  };
+
   if (state.loading) return <CadastruLoadingPage
     cadastralNumber={cadastralNumber}
     address={savedAddress}
@@ -1198,18 +1261,56 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
             </p>
           )}
 
-          {(state.error || (!cadastralNumber && !state.loading && !state.data)) && (
-            <div role="status" aria-busy={state.retrying || undefined} className={`rounded-2xl border p-6 text-sm font-medium shadow-sm sm:p-8 ${state.retrying || state.suggestions?.length || state.roadTypeSuggestions?.length || state.addressCorrections?.length ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
-              <p className="flex items-start gap-2">{state.didYouMean && (state.suggestions?.length > 0 || state.roadTypeSuggestions?.length > 0)
-                ? <>
-                  <svg aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 16v-4" />
-                    <path d="M12 8h.01" />
-                  </svg>
-                  <span>{t("cadastru.notFoundWithSuggestion", { road: state.requestedRoad, street: state.requestedStreet })}</span>
-                </>
-                : state.retrying ? t("cadastru.retrying") : state.error || t("cadastru.lookupError")}</p>
+          {hasSuggestions && (
+            <div role="status" aria-busy={state.retrying || undefined} className="rounded-2xl border border-gray-200 bg-white p-5 text-gray-950 sm:p-6">
+              <div className="flex items-start gap-3">
+                <svg aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 sm:h-6 sm:w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4" />
+                  <path d="M12 8h.01" />
+                </svg>
+                <div className="min-w-0 space-y-4 text-base leading-relaxed sm:text-lg">
+                  <h2 className="text-lg font-semibold leading-snug sm:text-xl">{suggestionTitle}</h2>
+                  <p>{state.retrying ? t("cadastru.retrying") : suggestionDescription}</p>
+                  {suggestedAddress && <p className="break-words font-semibold">{suggestedAddress}</p>}
+                  {suggestionNote && <p className="text-gray-600">{suggestionNote}</p>}
+                  {state.fallbackAddress && <p className="text-gray-600">{t("cadastru.otherDataAvailable")}</p>}
+                </div>
+              </div>
+              <div className="mt-5 space-y-3 sm:mt-6">
+                {suggestionChoices.map((choice) => (
+                  <button key={choice.key} type="button" data-cadastru-suggestion
+                    className="flex min-h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-full bg-primary px-5 py-3 text-center text-base font-semibold text-white transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={state.loading || authLoading}
+                    onClick={() => retryAddressSearch(choice.value)}>
+                    <span>{choice.label}</span>
+                    <svg aria-hidden="true" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M5 12h14m-6-6 6 6-6 6" />
+                    </svg>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 text-center">
+                {state.retry && !state.retrying && <button type="button"
+                  className="mr-4 min-h-11 cursor-pointer rounded px-2 text-base font-medium underline decoration-1 underline-offset-4 hover:text-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed"
+                  disabled={authLoading}
+                  onClick={() => {
+                    setLookupRetry({ key: state.retry.key, attempt: state.retry.attempt + 1 });
+                    setState((current) => ({ ...current, retrying: true }));
+                  }}>
+                  {t("cadastru.retrySearch")}
+                </button>}
+                <button type="button" onClick={editAddress}
+                  className="min-h-11 cursor-pointer rounded px-2 text-base font-medium underline decoration-1 underline-offset-4 hover:text-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                  {t("cadastru.modifyAddress")}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!hasSuggestions && (state.error || (!cadastralNumber && !state.loading && !state.data)) && (
+            <div role="status" aria-busy={state.retrying || undefined} className={`rounded-2xl border p-6 text-sm font-medium shadow-sm sm:p-8 ${state.retrying ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
+              <p>{state.retrying ? t("cadastru.retrying") : state.error || t("cadastru.lookupError")}</p>
               {state.retry && !state.retrying && <button type="button"
                 className="mt-3 cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-2 text-sm hover:bg-red-50 disabled:cursor-not-allowed"
                 disabled={authLoading}
@@ -1222,65 +1323,6 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
               {state.fallbackAddress && <p className="mt-2 font-normal text-gray-700">
                 {t("cadastru.otherDataAvailable")}
               </p>}
-              {state.addressCorrections?.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {state.addressCorrections.map((correction) => (
-                    <div key={`${correction.city}:${correction.street}:${correction.house_number}`}>
-                      {state.confirmationRequired && state.addressCorrections.length === 1 && <p className="mb-2 text-sm">
-                        {correction.city !== state.requestedCity ? t("cadastru.localityAlternativeConfirm")
-                          : state.requestedApartmentNumber && !correction.apartment_number ? t("cadastru.withoutApartmentAlternativeFound")
-                          : t(correction.apartment_number ? "cadastru.addressAlternativeFound" : "cadastru.buildingAlternativeFound",
-                            { street: correction.street, house: correction.house_number,
-                            apartment: correction.apartment_number })}
-                      </p>}
-                      <button type="button"
-                        className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
-                        disabled={state.loading || authLoading}
-                        onClick={() => retryAddressSearch(correction)}>
-                        {state.confirmationRequired && correction.city !== state.requestedCity
-                          ? t("cadastru.searchSuggestedLocality", { city: correction.city, street: correction.street, house: correction.house_number })
-                          : state.confirmationRequired && state.requestedApartmentNumber && !correction.apartment_number
-                          ? t("cadastru.searchWithoutApartment")
-                          : state.confirmationRequired ? t("cadastru.searchSuggestedHouse", { house: correction.house_number })
-                          : t("cadastru.useAddressCorrection", { street: correction.street, house: correction.house_number })}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {state.suggestions?.length > 0 && (
-                <div className="mt-3">
-                  {state.didYouMean && <p className="mb-2 text-sm font-normal">{t("cadastru.didYouMean")}</p>}
-                  <div className="flex flex-wrap gap-2">
-                  {state.suggestions.map((street) => (
-                    <button key={street} type="button" className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
-                      disabled={state.loading || authLoading}
-                      onClick={() => retryAddressSearch(street)}>
-                      {state.didYouMean ? <>{t("cadastru.useRoadTypeSuggestion", { road: state.requestedRoad, street })}
-                        <span aria-hidden="true" className="ml-3">→</span></> : street}
-                    </button>
-                  ))}
-                  </div>
-                </div>
-              )}
-              {state.roadTypeSuggestions?.length > 0 && (
-                <div className="mt-3">
-                  <p className="mb-2 text-sm font-normal">{t("cadastru.didYouMeanRoadType")}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {state.roadTypeSuggestions.map((suggestion) => (
-                      <button key={`${suggestion.road_type}:${suggestion.street}`} type="button"
-                        className="cursor-pointer rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm hover:bg-sky-100 disabled:cursor-not-allowed"
-                        disabled={state.loading || authLoading}
-                        onClick={() => retryAddressSearch(suggestion)}>
-                        {t("cadastru.useRoadTypeSuggestion", {
-                          road: t(roadTypes.find(({ value }) => value === suggestion.road_type).fullLabel), street: suggestion.street,
-                        })}
-                        <span aria-hidden="true" className="ml-3">→</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 

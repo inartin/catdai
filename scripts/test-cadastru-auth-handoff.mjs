@@ -13,6 +13,7 @@ const { transform, loadBindings } = require('next/dist/build/swc');
 await loadBindings();
 const jsx = (type, props) => ({ type, props });
 const noop = () => null;
+const resultLoading = () => null;
 const t = (key) => key;
 const walk = (node) => Array.isArray(node) ? node.flatMap(walk)
   : node && typeof node === 'object' ? [node, ...walk(node.props?.children)] : [];
@@ -22,7 +23,7 @@ const address = { city: 'Chișinău', road_type: 'strada', street: 'Valea Tranda
 const number = '0100104.003.01';
 const result = { lands: [{ cadastral_number: '0100104.003' }], request_address: 'Chișinău, str Valea Trandafirilor 11' };
 
-async function harness(file, path, stored = {}) {
+async function harness(file, path, stored = {}, lang = 'ro') {
   let slots = [], cursor = 0, effects = [], authSession = null, clearAuthError = noop;
   const storage = new Map(Object.entries(stored));
   const requests = [], navigations = [];
@@ -50,6 +51,7 @@ async function harness(file, path, stored = {}) {
     effects.push(() => { slots[index].cleanup = effect(); });
   };
   const mocks = {
+    '@/components/CadastruLoadingPage': { default: resultLoading },
     '@/lib/maib/products.mjs': { maibProduct },
     '@/lib/payment-urls.mjs': { featureCheckoutUrl },
     '@/lib/cadastru-map': { cadastruMapLocation: () => null },
@@ -59,13 +61,14 @@ async function harness(file, path, stored = {}) {
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'next/navigation': { useRouter: () => router, useSearchParams: () => new URL(browser.location.href).searchParams },
-    '@/context/LanguageContext': { useTranslation: () => ({ lang: 'ro', t }) },
+    '@/context/LanguageContext': { useTranslation: () => ({ lang, t }) },
     '@/context/AuthContext': { useAuth: () => ({ isAuthenticated: Boolean(authSession) && !authSession?.user?.is_anonymous, loading: false,
       session: authSession, clearAuthError }) },
     '@/lib/validation': { matchCity: () => null, validateCadastralNumber: (value) => ({ valid: value === number }) },
     '@/lib/cadastru-favorites': cadastruFavorites,
     '@/lib/cadastru-valuation-handoff': { resolveValuationDistrict: () => null,
-      buildFullAccessAddressResultParams: (data) => new URLSearchParams({ source: 'address', cadastral_number: data.cadastral_number }) },
+      buildFullAccessAddressResultParams: (data, { skipCache }) => new URLSearchParams({ source: 'address', cadastral_number: data.cadastral_number,
+        ...(skipCache ? { skipcache: 'true' } : {}) }) },
     '@/lib/cadastru-municipal-reports': { municipalReportsAvailableForCadastru: () => false, validMunicipalReportsResult: () => false },
     '@/lib/cadastru-supported-cities': { CADASTRU_SUPPORTED_CITIES: ['Chișinău'] },
     './loading': { default: noop },
@@ -106,6 +109,7 @@ async function harness(file, path, stored = {}) {
     },
     unmount() { slots.forEach((slot) => slot?.cleanup?.()); },
     login(token = 'signed-in', userId = 'user-1', isGuest = false) { authSession = { access_token: token, user: { id: userId, is_anonymous: isGuest } }; },
+    logout() { authSession = null; },
     notifyAuth() { authSession = authSession && { ...authSession }; clearAuthError = () => null; },
     remount() { slots.forEach((slot) => slot?.cleanup?.()); slots = []; },
     restartEffects() { slots.filter((slot) => slot?.effect).forEach((slot) => { slot.cleanup?.(); slot.cleanup = slot.effect(); }); },
@@ -125,6 +129,66 @@ async function harness(file, path, stored = {}) {
 }
 
 const pageFile = 'src/app/cadastru/rezultat/CadastruResultPage.js';
+
+// The address response can contain only an identity, or a map pin without its shape.
+// Keep the loader through the number lookup so the first visible card/map is final.
+for (const lang of ['ro', 'ru']) {
+  for (const skipCache of [false, true]) {
+    for (const hasEarlyDetails of [false, true]) {
+      for (const outcome of ['success', 'unavailable', 'network', 'unauthorized', 'auth-change']) {
+        const pending = await harness(pageFile,
+          `/${lang}/cadastru/rezultat?source=address&lookup=1${skipCache ? '&skipcache=true' : ''}`,
+          { [addressKey]: JSON.stringify(address) }, lang);
+        pending.login();
+        pending.render();
+        const lookupId = pending.requests[0].body.lookup_id;
+        const addressData = { cadastral_number: number, request_address: 'Chișinău, strada Valea Trandafirilor 11',
+          matched_address: 'Chișinău, str. Valea Trandafirilor 11',
+          ...(hasEarlyDetails ? { apartment: { area_m2: 33.9 }, map_location: { latitude: 47.02, longitude: 28.83 } } : {}) };
+        await pending.finish(addressData);
+        assert.equal(pending.render().type, resultLoading, 'address resolution keeps the loader across navigation');
+        assert.equal(pending.requests.at(-1).url, '/api/cadastral');
+        assert.equal(pending.requests.at(-1).body.lookup_id, lookupId);
+        assert.equal(Boolean(pending.requests.at(-1).body.skip_cache), skipCache);
+        const intermediate = pending.render();
+        assert.equal(intermediate.type, resultLoading, 'the loader continues until number details settle');
+        assert(!walk(intermediate).some((node) => node.props?.cadastral), 'no intermediate data card or map is mounted');
+        const finalData = { ...addressData, apartment: { area_m2: 34, floor: 5 }, building: { total_floors: 9 },
+          map_location: { latitude: 47.02, longitude: 28.83 },
+          map_geometry: { type: 'Polygon', coordinates: [[[28.83, 47.02], [28.831, 47.02], [28.831, 47.021], [28.83, 47.02]]] } };
+        if (outcome === 'auth-change') {
+          const oldRequest = pending.requests.at(-1);
+          pending.logout(); pending.render();
+          assert.equal(pending.render().type, resultLoading, 'auth changes cannot reveal the previous viewer result');
+          oldRequest.resolve({ ok: true, status: 200, json: async () => finalData });
+          const masked = { cadastral_number: number, locked_sections: { cadastru_details: true } };
+          await pending.finish(masked);
+          assert(walk(pending.render()).some((node) => node.props?.cadastral === masked), 'only the new viewer result becomes visible');
+        } else {
+          if (outcome === 'network') await pending.failNetwork();
+          else await pending.finish(outcome === 'success' ? finalData
+            : { error: outcome === 'unauthorized' ? 'unauthorized' : 'service_unavailable' },
+          outcome === 'success' ? 200 : outcome === 'unauthorized' ? 401 : 503);
+          const finished = pending.render();
+          assert.notEqual(finished.type, resultLoading, 'completed detail requests leave the loader');
+          const card = walk(finished).find((node) => node.props?.cadastral && !node.props?.fallbackUrl);
+          if (outcome === 'success') {
+            assert.equal(card?.props.cadastral.apartment.area_m2, 34, 'the first visible card has the number details');
+            assert(walk(finished).some((node) => node.props?.fallbackUrl && node.props?.cadastral?.map_geometry === finalData.map_geometry),
+              'the map mounts with its shape in the same render as the cadastral fields');
+          } else if (outcome === 'unauthorized') assert(!card, 'unauthorized details do not expose the address result');
+          else {
+            assert.equal(card?.props.cadastral, addressData, 'detail failures retain the available address result');
+            assert(walk(finished).some((node) => node.props?.children === 'cadastru.retrying'), 'detail failures retain bounded recovery');
+          }
+        }
+        pending.unmount();
+      }
+    }
+  }
+}
+console.log('Address loading passed: RO/RU cached and skip-cache handoffs, fields and geometry appear together, failure fallback and auth isolation.');
+
 const page = await harness(pageFile, '/ro/cadastru/rezultat?source=address&lookup=1', { [addressKey]: JSON.stringify(address) });
 const guestResult = await harness(pageFile, '/ro/cadastru/rezultat?source=address&preview=1', { [addressKey]: JSON.stringify(address) });
 guestResult.login('guest-token', 'guest-user', true); guestResult.render();

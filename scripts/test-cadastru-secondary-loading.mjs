@@ -394,14 +394,14 @@ for (const locale of ["ro", "ru"]) {
     addressLookup.resolve({ ok: true, json: async () => addressData });
     await flush();
     const firstResult = render();
-    assert(findNode(firstResult, (node) => node.props?.cadastral === addressData),
-      "the address result replaces the loading screen while number details are still pending");
+    assert(!findNode(firstResult, (node) => node.props?.cadastral),
+      "the loading screen stays visible while number details are still pending");
     const numberLookup = requests.get("/api/cadastral");
     assert(numberLookup, "address results still request number details");
     assert.equal(JSON.parse(numberLookup.options.body).lookup_id, addressTracking.lookup_id);
     assert.equal(JSON.parse(numberLookup.options.body).skip_cache, true);
-    assert(findNode(render(), (node) => node.props?.cadastral === addressData),
-      "the follow-up request does not reset the card to the loading screen");
+    assert(!findNode(render(), (node) => node.props?.cadastral),
+      "the follow-up request does not expose the intermediate address card or map");
     assert.equal(requests.size, 2, "secondary requests wait for the result to paint");
     paint();
     paint();
@@ -450,7 +450,7 @@ for (const locale of ["ro", "ru"]) {
   }
 }
 for (const slot of slots) slot?.cleanup?.();
-console.log("Address handoff passed: RO/RU immediate card, background details and concurrent cards, stable lookup grouping, skip-cache, retained results on failure and auth isolation.");
+console.log("Address handoff passed: RO/RU loading through number details, concurrent secondary cards, stable lookup grouping, skip-cache, retained results on failure and auth isolation.");
 
 // Compact parcel URLs use the same dotted identity for all result-page requests.
 for (const locale of ["ro", "ru"]) {

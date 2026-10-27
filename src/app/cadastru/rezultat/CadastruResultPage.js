@@ -836,7 +836,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
             if (isPendingAddressLookup && data?.cadastral_number && !data?.locked_sections?.cadastru_details) {
               addressResultHandoff.current = { data, accessToken: session?.access_token, skipCache };
               loadedRequestKey.current = attemptKey;
-              setState({ loading: false, error: "", data });
+              setState({ loading: true, error: "", data, detailsLoading: true });
               const resolution = data.street_resolution;
               const params = buildFullAccessAddressResultParams(data, {
                 city: body.city,
@@ -889,10 +889,10 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       && handoff.accessToken === session?.access_token && handoff.skipCache === skipCache ? handoff.data : null;
 
     async function loadCadastralData() {
-      // Keep the successful address result visible while number details load.
+      // Address resolution can contain only the identity; reveal the card and map after details settle.
       setState((current) => attempt > 0
         ? { ...current, retry: null, retrying: true, detailsLoading: true }
-        : { loading: !addressData, error: "", data: addressData, detailsLoading: true });
+        : { loading: true, error: "", data: addressData, detailsLoading: true });
 
       try {
         const body = {
@@ -967,7 +967,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
 
     let active = true;
     let frame;
-    // Start after the cadastral result or outage notice has painted.
+    // Start after the current loading page, result, or outage notice has painted.
     const firstFrame = requestAnimationFrame(() => {
       if (!active) return;
       setNearbyState({ key: nearbyKey, data: null, loading: true, error: false });
@@ -1041,7 +1041,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     let active = true;
     let frame;
     const controller = new AbortController();
-    // Run independently of nearby places and transport once the main result has painted.
+    // Run independently of nearby places and transport after the current page has painted.
     const firstFrame = requestAnimationFrame(() => {
       if (!active) return;
       setReportsState({ key: nearbyKey, data: null, loading: true, error: false });

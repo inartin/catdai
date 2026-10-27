@@ -633,9 +633,9 @@ export default function ProfilePage() {
                                   }
                                 } : undefined}
                               >
-                                <td className={`whitespace-nowrap border-l-4 px-4 py-3 text-gray-600 ${row.isSnapshot ? "border-emerald-500 bg-emerald-50/40" : "border-transparent"}`}>
-                                  {row.isSnapshot ? (
-                                    <Tooltip text={t("profile.paidSnapshotTooltip")}>
+                                <td className={`whitespace-nowrap border-l-4 px-4 py-3 text-gray-600 ${row.isSnapshot || row.isPaidResult ? "border-emerald-500 bg-emerald-50/40" : "border-transparent"}`}>
+                                  {row.isSnapshot || row.isPaidResult ? (
+                                    <Tooltip text={t(row.isPaidResult ? 'profile.paidResultTooltip' : "profile.paidSnapshotTooltip")}>
                                       <span className="font-medium text-emerald-700">
                                         {formatHistoryDate(row.createdAt, lang)}
                                       </span>

@@ -456,11 +456,12 @@ function readAddressResultPreview() {
   }
 }
 
-function readAddressLookupRequest() {
+function readAddressLookupRequest(lookupId) {
   if (typeof window === "undefined") return null;
   try {
     const parsed = JSON.parse(sessionStorage.getItem(ADDRESS_LOOKUP_REQUEST_STORAGE_KEY) || "null");
     if (!parsed || typeof parsed !== "object") return null;
+    if (lookupId && parsed.lookup_id && parsed.lookup_id !== lookupId) return null;
     return parsed;
   } catch {
     return null;
@@ -488,10 +489,13 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const isPendingAddressLookup = source === "address" && searchParams.get("lookup") === "1";
   const [retryRequest, setRetryRequest] = useState(null);
   const [lookupRetry, setLookupRetry] = useState(null);
-  const pendingAddressRequest = (!cadastralNumber ? retryRequest : null) || (isPendingAddressLookup ? readAddressLookupRequest() : null);
-  const addressRequestKey = pendingAddressRequest ? JSON.stringify(pendingAddressRequest) : "";
-  const savedAddress = shareSlug ? null : (!cadastralNumber ? retryRequest : null) || getSavedCadastruAddress(searchParams);
   const isHistoryAddress = searchParams.get("history") === "1";
+  const urlAddress = shareSlug ? null : getSavedCadastruAddress(searchParams);
+  const pendingAddressRequest = (!cadastralNumber ? retryRequest : null) || (isPendingAddressLookup
+    ? urlAddress ? { ...urlAddress, lookup_id: searchLookupId, ...(isHistoryAddress ? {} : { search_context: 'cadastru' }) }
+      : readAddressLookupRequest(searchLookupId) : null);
+  const addressRequestKey = pendingAddressRequest ? JSON.stringify(pendingAddressRequest) : "";
+  const savedAddress = shareSlug ? null : (!cadastralNumber ? retryRequest : null) || urlAddress;
   const savedAddressKey = savedAddress ? new URLSearchParams({ source: "address", ...savedAddress }).toString() : "";
   const lookupTracking = useRef(null);
   const addressResultHandoff = useRef(null);
@@ -521,7 +525,16 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     ? (singlePurchaseProduct || maibProduct("extra_pack")).amount_mdl
     : Number(process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499);
   const unlockPriceLabel = `${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD").format(unlockPriceMdl)} MDL`;
-  const startCheckout = () => window.location.assign(featureCheckoutUrl(checkoutProductKey, lang, window.location.href));
+  const startCheckout = () => {
+    const current = new URL(window.location.href);
+    const path = getCadastruFavoritePath({ lang, cadastralNumber, cadastral: state.data,
+      addressRequest: pendingAddressRequest, savedAddress });
+    const destination = new URL(path || current.href, current.origin);
+    for (const key of ['lookup_id', 'source', 'skipcache']) {
+      if (!destination.searchParams.has(key) && current.searchParams.has(key)) destination.searchParams.set(key, current.searchParams.get(key));
+    }
+    window.location.assign(featureCheckoutUrl(checkoutProductKey, lang, destination.href));
+  };
   const cadastralCardRef = useRef(null);
   const exportCardRef = useRef(null);
   const [device, setDevice] = useState({ isMobile: false, isIOS: false });
@@ -674,6 +687,11 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     loadedRequestKey.current = "";
     setState({ loading: true, error: "", data: null });
     setRetryRequest(body);
+    const params = new URLSearchParams({ source: 'address', lookup: '1', lookup_id: body.lookup_id,
+      city: body.city, road_type: body.road_type, street: body.street, house_number: body.house_number,
+      ...(body.apartment_number ? { apartment_number: body.apartment_number } : {}),
+      ...(skipCache ? { skipcache: 'true' } : {}) });
+    router.replace(`/${lang}/cadastru/rezultat?${params}`);
   };
 
   useEffect(() => {
@@ -722,7 +740,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
         setState({ loading: false, error: "", data: preview });
         return;
       }
-      if (!isAuthenticated && !savedAddressKey && !isPendingAddressLookup) {
+      if (!session?.access_token && !isAuthenticated && !savedAddressKey && !isPendingAddressLookup) {
         loadedRequestKey.current = attemptKey;
         setState({
           loading: false,

@@ -46,11 +46,6 @@ function applySince(query, column, since) {
   return since ? query.gte(column, since) : query;
 }
 
-function filterRowsSince(rows, column, since) {
-  if (!since) return rows;
-  return rows.filter((row) => row[column] && row[column] >= since);
-}
-
 function getChisinauMidnight(now = new Date()) {
   const formatter = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Chisinau",
@@ -108,14 +103,16 @@ async function listAllUsers() {
   return users;
 }
 
-async function fetchActiveUserCount(since) {
-  const { count, error } = await applySince(
-    supabaseAdmin.from("user_activity").select("*", { count: "exact", head: true }),
-    "last_seen_at",
-    since
-  );
-  if (error) throw new Error(`user_activity query failed: ${error.message}`);
-  return count;
+async function fetchActiveUserStats(since) {
+  const { data, error } = await supabaseAdmin.rpc("admin_active_user_stats", { p_since: since });
+  if (error) throw new Error(`Active users query failed: ${error.message}`);
+  const row = data?.[0];
+  if (!row) throw new Error("Missing active user statistics");
+  return {
+    activeUsers: Number(row.active_users),
+    newUsers: Number(row.new_registered_users),
+    oldUsers: Number(row.old_registered_users),
+  };
 }
 
 function userDisplayName(user) {
@@ -748,9 +745,9 @@ export async function GET(request) {
         console.error("Failed to load payment stats:", error.message);
         return { available: false, total: null, orders: [] };
       }),
-      fetchActiveUserCount(periodSince).catch((error) => {
+      fetchActiveUserStats(periodSince).catch((error) => {
         console.error("Failed to load active users:", error.message);
-        return null;
+        return { activeUsers: null, newUsers: null, oldUsers: null };
       }),
     ]);
   } catch (err) {
@@ -773,11 +770,10 @@ export async function GET(request) {
     paymentCheckoutEvents,
     marketTrendsPopup,
     paymentSummary,
-    activeUsers,
+    activeUserStats,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
-  const filteredUsers = filterRowsSince(users, "created_at", periodSince);
   let cadastruSearches;
   try {
     const searchesWithFavorites = await loadCadastruShareStatistics(await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50)));
@@ -818,8 +814,7 @@ export async function GET(request) {
     period,
     periodLabel: periodConfig.label,
     periodSince,
-    activeUsers,
-    newUsers: filteredUsers.length,
+    ...activeUserStats,
     totalUsers: users.length,
     totalEstimations: estimationCounts.sale || 0,
     totalSaleEstimations: estimationCounts.sale || 0,

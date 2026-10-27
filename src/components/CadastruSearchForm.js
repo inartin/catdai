@@ -161,6 +161,11 @@ export default function CadastruSearchForm({
       source: "address",
       lookup: "1",
       lookup_id: requestBody.lookup_id,
+      city: requestBody.city,
+      road_type: requestBody.road_type,
+      street: requestBody.street,
+      house_number: requestBody.house_number,
+      ...(requestBody.apartment_number ? { apartment_number: requestBody.apartment_number } : {}),
       ...(skipCache ? { skipcache: "true" } : {}),
     });
     router.push(`/${lang}/cadastru/rezultat?${params.toString()}`);

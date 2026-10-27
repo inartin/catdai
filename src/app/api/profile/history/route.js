@@ -1,12 +1,13 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { normalizePaidEvaluationSnapshot, PAID_EVALUATION_FEATURE_KEYS } from "@/lib/evaluation-snapshots";
+import { normalizePaidCadastruHistoryRow } from "@/lib/cadastru-paid-history";
 import { NextResponse } from "next/server";
 
 const DEFAULT_HISTORY_LIMIT = 10;
 const MAX_HISTORY_LIMIT = 30;
 const ESTIMATE_COLUMNS = "id, estimate_type, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at";
-const CADASTRU_COLUMNS = "id, search_type, city, district, cadastral_number, search_address, search_request, result_value, result_type, lookup_source, created_at";
+const CADASTRU_COLUMNS = "id, search_type, city, district, cadastral_number, search_address, search_request, result_value, result_type, lookup_source, lookup_id, created_at";
 const PAID_USAGE_COLUMNS = "id, feature_key, metadata, created_at";
 
 function isMissingEstimateTypeError(error) {
@@ -167,7 +168,7 @@ async function fetchCadastruHistory(userId, cursor, pageSize) {
     );
 
     if (!res.error) return res;
-    const missingColumn = ["search_request", "result_value", "search_address", "city"].find((column) =>
+    const missingColumn = ["search_request", "result_value", "search_address", "city", "lookup_id"].find((column) =>
       columns.includes(column) && isMissingSchemaError(res.error) && String(res.error.message || "").includes(column)
     );
     if (missingColumn) {
@@ -187,7 +188,7 @@ async function fetchPaidEvaluationSnapshots(userId, cursor, pageSize) {
       .select(PAID_USAGE_COLUMNS)
       .eq("user_id", userId)
       .eq("source", "paid_credit")
-      .in("feature_key", PAID_EVALUATION_FEATURE_KEYS)
+      .in("feature_key", [...PAID_EVALUATION_FEATURE_KEYS, 'cadastru_lookup'])
       .order("created_at", { ascending: false })
       .limit(pageSize + 1),
     cursor
@@ -200,7 +201,7 @@ async function fetchPaidEvaluationSnapshots(userId, cursor, pageSize) {
   if (res.error) return res;
 
   return {
-    data: (res.data || []).map(normalizePaidSnapshotRow).filter(Boolean),
+    data: (res.data || []).map(row => normalizePaidCadastruHistoryRow(row) || normalizePaidSnapshotRow(row)).filter(Boolean),
     error: null,
   };
 }
@@ -234,6 +235,7 @@ export async function GET(request) {
   }
 
   const paidSnapshotRows = paidSnapshotRes.data || [];
+  const paidLookupIds = new Set(paidSnapshotRows.map(row => row.sourceLookupId).filter(Boolean));
   const paidSnapshotLogIds = new Set(
     paidSnapshotRows
       .map((paidRow) => paidRow.sourceLogId)
@@ -245,8 +247,8 @@ export async function GET(request) {
     ...(estimateRes.data || [])
       .filter((row) => !paidSnapshotLogIds.has(String(row.id || "")))
       .map(normalizeEstimateRow),
-    ...(cadastruRes.data || []).map(normalizeCadastruRow),
-    ...paidSnapshotRows.map(({ sourceLogId, ...row }) => row),
+    ...(cadastruRes.data || []).filter(row => !paidLookupIds.has(row.lookup_id)).map(normalizeCadastruRow),
+    ...paidSnapshotRows.map(({ sourceLogId, sourceLookupId, ...row }) => row),
   ].sort((a, b) => {
     const dateDiff = Date.parse(b.createdAt || "") - Date.parse(a.createdAt || "");
     if (dateDiff) return dateDiff;

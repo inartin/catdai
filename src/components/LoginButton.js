@@ -7,7 +7,7 @@ import AuthOptions from "@/components/AuthOptions";
 import CloseIcon from "@/components/icons/CloseIcon";
 import { useRouter } from "next/navigation";
 
-export default function LoginButton({ className = "", menuAlign = "right", onPress }) {
+export default function LoginButton({ className = "", menuAlign = "right", onPress, loginLabel }) {
   const { t } = useTranslation();
   const router = useRouter();
   const {
@@ -61,7 +61,7 @@ export default function LoginButton({ className = "", menuAlign = "right", onPre
         disabled={loading}
         className={`text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors cursor-pointer ${className}`}
       >
-        {isLoggedIn ? t("nav.profile") : t("nav.login")}
+        {isLoggedIn ? t("nav.profile") : loginLabel || t("nav.login")}
       </button>
 
       {!isLoggedIn && open && (

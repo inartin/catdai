@@ -5,6 +5,7 @@ import CookieBanner from "@/components/CookieBanner";
 import AdSourceTracker from "@/components/AdSourceTracker";
 import OnlineUsersTracker from "@/components/OnlineUsersTracker";
 import FeedbackWidget from "@/components/FeedbackWidget";
+import GuestAccountPrompt from "@/components/GuestAccountPrompt";
 import { getCanonicalSiteUrl, serializeJsonLd } from "@/lib/seo";
 import "./globals.css";
 
@@ -127,6 +128,7 @@ export default function RootLayout({ children }) {
           <AuthProvider>
             <AdSourceTracker />
             <OnlineUsersTracker />
+            <GuestAccountPrompt />
             {children}
             <FeedbackWidget />
           </AuthProvider>

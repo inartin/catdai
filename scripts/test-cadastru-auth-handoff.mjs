@@ -5,6 +5,9 @@ import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
+import { maibProduct } from '../src/lib/maib/products.mjs';
+import { featureCheckoutUrl } from '../src/lib/payment-urls.mjs';
+import * as cadastruFavorites from '../src/lib/cadastru-favorites.js';
 const require = createRequire(import.meta.url);
 const { transform, loadBindings } = require('next/dist/build/swc');
 await loadBindings();
@@ -31,6 +34,7 @@ async function harness(file, path, stored = {}) {
     browser.location.href = new URL(url, browser.location.href).href;
   };
   const navigate = (url) => { navigations.push(url); browser.location.href = new URL(url, browser.location.href).href; };
+  browser.location.assign = navigate;
   const router = { push: navigate, replace: navigate };
   const useState = (initial) => {
     const index = cursor++;
@@ -46,16 +50,20 @@ async function harness(file, path, stored = {}) {
     effects.push(() => { slots[index].cleanup = effect(); });
   };
   const mocks = {
+    '@/lib/maib/products.mjs': { maibProduct },
+    '@/lib/payment-urls.mjs': { featureCheckoutUrl },
+    '@/lib/cadastru-map': { cadastruMapLocation: () => null },
+    '@/components/usePaymentProvider': { default: () => 'maib' },
     '@/lib/visitor-browser': { getDeviceId: () => null },
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     'next/navigation': { useRouter: () => router, useSearchParams: () => new URL(browser.location.href).searchParams },
     '@/context/LanguageContext': { useTranslation: () => ({ lang: 'ro', t }) },
-    '@/context/AuthContext': { useAuth: () => ({ isAuthenticated: Boolean(authSession), loading: false,
+    '@/context/AuthContext': { useAuth: () => ({ isAuthenticated: Boolean(authSession) && !authSession?.user?.is_anonymous, loading: false,
       session: authSession, clearAuthError }) },
     '@/lib/validation': { matchCity: () => null, validateCadastralNumber: (value) => ({ valid: value === number }) },
-    '@/lib/cadastru-favorites': { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
+    '@/lib/cadastru-favorites': cadastruFavorites,
     '@/lib/cadastru-valuation-handoff': { resolveValuationDistrict: () => null,
       buildFullAccessAddressResultParams: (data) => new URLSearchParams({ source: 'address', cadastral_number: data.cadastral_number }) },
     '@/lib/cadastru-municipal-reports': { municipalReportsAvailableForCadastru: () => false, validMunicipalReportsResult: () => false },
@@ -97,7 +105,7 @@ async function harness(file, path, stored = {}) {
       timers.delete(id); timer.callback();
     },
     unmount() { slots.forEach((slot) => slot?.cleanup?.()); },
-    login(token = 'signed-in', userId = 'user-1') { authSession = { access_token: token, user: { id: userId } }; },
+    login(token = 'signed-in', userId = 'user-1', isGuest = false) { authSession = { access_token: token, user: { id: userId, is_anonymous: isGuest } }; },
     notifyAuth() { authSession = authSession && { ...authSession }; clearAuthError = () => null; },
     remount() { slots.forEach((slot) => slot?.cleanup?.()); slots = []; },
     restartEffects() { slots.filter((slot) => slot?.effect).forEach((slot) => { slot.cleanup?.(); slot.cleanup = slot.effect(); }); },
@@ -118,6 +126,11 @@ async function harness(file, path, stored = {}) {
 
 const pageFile = 'src/app/cadastru/rezultat/CadastruResultPage.js';
 const page = await harness(pageFile, '/ro/cadastru/rezultat?source=address&lookup=1', { [addressKey]: JSON.stringify(address) });
+const guestResult = await harness(pageFile, '/ro/cadastru/rezultat?source=address&preview=1', { [addressKey]: JSON.stringify(address) });
+guestResult.login('guest-token', 'guest-user', true); guestResult.render();
+assert.equal(guestResult.requests.length,1,'paid guest address previews request their authorized result without registered login');
+assert.equal(guestResult.requests[0].options.headers.Authorization,'Bearer guest-token');
+await guestResult.finish(); guestResult.unmount();
 page.render();
 const id = page.requests[0].body.lookup_id;
 assert.match(id, /^[0-9a-f-]{36}$/);
@@ -293,3 +306,34 @@ for (const type of ['address', 'number']) {
   assert(!content.includes('cadastru.serviceUnavailable'),type);
 }
 console.log('Internal application errors use distinct copy after the bounded retry.');
+
+// Address URLs, including a payment return, work in a fresh tab without sessionStorage.
+const durableId = crypto.randomUUID();
+const durableParams = new URLSearchParams({ source: 'address', lookup: '1', lookup_id: durableId, ...address });
+durableParams.delete('search_context');
+const durablePath = `/ro/cadastru/rezultat?${durableParams}`;
+for (const staleStorage of [{}, { [addressKey]: JSON.stringify({ ...address, street: 'Wrong street', lookup_id: crypto.randomUUID() }) }]) {
+  const freshTab = await harness(pageFile, durablePath, staleStorage);
+  freshTab.login('guest-token', 'paid-guest', true); freshTab.render();
+  assert.equal(freshTab.requests.length, 1, 'a fresh tab restores the submitted address from the URL');
+  assert.equal(freshTab.requests[0].body.street, address.street, 'another tab cannot substitute its stored address');
+  assert.equal(freshTab.requests[0].body.lookup_id, durableId);
+  await freshTab.finish(result); freshTab.unmount();
+}
+const legacyPreview = await harness(pageFile, `/ro/cadastru/rezultat?source=address&lookup=1&lookup_id=${durableId}`,
+  { [addressKey]: JSON.stringify({ ...address, lookup_id: durableId }) });
+legacyPreview.render();
+await legacyPreview.finish({ ...result, locked_sections: { cadastru_details: true } });
+const previewTree = legacyPreview.render();
+const lockedCard = walk(previewTree).find(node => typeof node.props?.onLockedClick === 'function');
+assert(lockedCard, 'locked result has an unlock action');
+lockedCard.props.onLockedClick();
+const checkoutUrl = new URL(legacyPreview.browser.location.href);
+const propertyUrl = new URL(checkoutUrl.searchParams.get('return_to'), 'https://catdai.md');
+assert.equal(propertyUrl.searchParams.get('street'), address.street, 'even legacy previews save a durable property URL during checkout');
+assert.equal(propertyUrl.searchParams.get('lookup_id'), durableId);
+const paidTab = await harness(pageFile, propertyUrl.pathname + propertyUrl.search);
+paidTab.login('guest-token', 'paid-guest', true); paidTab.render();
+assert.equal(paidTab.requests[0].body.house_number, address.house_number);
+await paidTab.finish(result); paidTab.unmount();
+console.log('Paid address returns: new tabs, stale tab storage, legacy checkout links and property identity passed.');

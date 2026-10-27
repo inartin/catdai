@@ -44,6 +44,14 @@ Reason: the app redirects users back to the current page after OAuth. The client
 
 ## Provider Config
 
+Guest feature checkout:
+
+- Apply `supabase/migrations/20261026194452_guest_feature_checkout.sql` before deploying the guest flow, and enable **Anonymous Sign-Ins** in Supabase Auth. No manual identity-linking setting is needed: Google/Telegram keep their existing sign-in flows and the server transfers guest ownership afterward.
+- Guest sessions use the existing persisted/automatically refreshed Supabase session. They have a real `auth.users` ID, receive no free allowance, and remain guests in the account UI. Anonymous RLS policies must enforce row ownership because these sessions use the `authenticated` database role. See [Supabase anonymous sign-ins](https://supabase.com/docs/guides/auth/auth-anonymous).
+- Feature checkouts initialize the guest session automatically. Concurrent startup requests share one sign-in and return its session; existing guest or registered sessions are reused.
+- Before Google/Telegram login, `/api/auth/guest-upgrade` verifies the guest bearer token and sets a signed, HttpOnly, same-site browser proof for 30 days. After login it checks the registered bearer token and atomically claims the guest's payment ledger, paid unlocks and histories. A guest can be claimed by one account only; retries preserve existing account balances and snapshot IDs. Failed transfers keep the guest identity active in the UI until retried, preventing an accidental second charge from account credits.
+- Clearing browser site data, signing out of the guest session, or moving to another browser loses guest access. Creating/signing into an account preserves the purchases across devices. Do not delete anonymous users with purchases as part of routine cleanup.
+
 Google:
 - Authorized JavaScript origin: `https://catdai.md`
 - Local origin: `http://localhost:3000`
@@ -76,6 +84,7 @@ Open: `http://localhost:3000`
 
 - `redirect_url_not_allowed`: add the current origin to Supabase Redirect URLs.
 - `provider is not enabled`: enable/configure the Google provider in Supabase.
+- `anonymous_provider_disabled`: enable **Anonymous Sign-Ins** in Supabase Auth. Guest checkout also requires `supabase/migrations/20261026194452_guest_feature_checkout.sql`; application code alone does not activate it. On 27 October 2026 the migration was applied to the shared CatDai project, anonymous sign-ins were verified enabled, and the guest table returned HTTP 200 through the service API. RLS and service-only table/function permissions were verified.
 - `redirect_uri_mismatch`: provider callback must be Supabase `/auth/v1/callback`.
 - Telegram `Bad ID token`: the frontend is passing Telegram's popup ID token directly to Supabase; send it to `/api/auth/telegram` instead.
 - Telegram `Error getting user profile from external provider`: Supabase hosted OIDC callback is still being used; the app should call `/api/auth/telegram` instead.

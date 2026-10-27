@@ -840,9 +840,10 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
     setError("");
 
     try {
+      const reportKey = buildPdfReportKey({ data: reportData, options, addedCadastralNumber });
       const authorization = await authorizePdfGeneration(
         accessToken,
-        buildPdfReportKey({ data: reportData, options, addedCadastralNumber })
+        reportKey
       );
       if (!authorization.authorized && authorization.reason === "auth") {
         setError(t("result.loginToGeneratePdf"));
@@ -854,8 +855,19 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
         return;
       }
 
+      let generationData = reportData;
+      if (reportData.full_access === false) {
+        const response = await fetch(reportKey.estimate_type === 'rent' ? '/api/estimate-rent' : '/api/estimate', {
+          method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...reportKey.input, pdf_report_key: reportKey, language: lang }),
+        });
+        const fullReport = await response.json();
+        if (!response.ok || fullReport.full_access !== true) throw new Error('Paid PDF data unavailable.');
+        generationData = { ...reportData, ...fullReport, cadastral: reportData.cadastral };
+      }
+
       const canvases = await buildReportCanvases({
-        data: reportData,
+        data: generationData,
         options,
         t,
         lang,
@@ -916,7 +928,9 @@ export default function ValuationPdfDialog({ open, data, accessToken = null, onA
         </div>
 
         <div className="mb-5">
-          <FeaturePricingAction offer={purchaseOffer} variant="paywall" trackPopupOpen />
+          <FeaturePricingAction offer={purchaseOffer} variant="paywall" trackPopupOpen onCheckoutStart={() => {
+            try { localStorage.setItem('catdai:open-pdf-after-login', '1'); } catch { /* Optional dialog restore. */ }
+          }} />
           <p className="mt-3 text-sm leading-5 text-gray-500">
             {t("result.pdfAccessNote")}
           </p>

@@ -6,8 +6,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import AuthOptions from "@/components/AuthOptions";
+import CheckoutAccountPrompt from "@/components/CheckoutAccountPrompt";
 import LockIcon from "@/components/icons/LockIcon";
 import { paymentSiteOrigin, paymentAppLink } from "@/lib/payment-urls.mjs";
+import { allowsGuestCheckout } from '@/lib/guest-checkout.mjs';
 
 const PADDLE_SCRIPT_SRC = "https://cdn.paddle.com/paddle/v2/paddle.js";
 const PADDLE_INLINE_FRAME_TARGET = "paddle-inline-checkout";
@@ -161,7 +163,7 @@ function getProductSummary(product, t) {
 
 export default function PaddleCheckoutPage() {
   const { lang, setLang, t } = useTranslation();
-  const { session, user, loading: authLoading } = useAuth();
+  const { session, user, loading: authLoading, isGuest, continueAsGuest, activeProvider } = useAuth();
   const [status, setStatus] = useState("loading");
   const [messageKey, setMessageKey] = useState("payment.checkoutOpening");
   const [errorMessage, setErrorMessage] = useState("");
@@ -177,9 +179,21 @@ export default function PaddleCheckoutPage() {
       orderId: searchParams.get("order_id") || "",
       productKey: searchParams.get("product_key") || "",
       returnTo: searchParams.get("return_to") || "",
+      checkoutSource: searchParams.get('checkout_source') || '',
       lang: searchParams.get("lang") || "",
     };
   }, []);
+  const pricingCheckout = params.checkoutSource === 'pricing';
+  const guestAllowed = allowsGuestCheckout({ checkout_source: params.checkoutSource, return_to: params.returnTo });
+  const requiresLogin = !session?.access_token || (isGuest && !guestAllowed);
+  const authMessageKey = pricingCheckout ? 'payment.loginRequiredForCheckout' : guestAllowed ? 'payment.checkoutLoading' : 'payment.checkoutContextRequired';
+
+  useEffect(() => {
+    if (authLoading || !guestAllowed || !params.productKey || session?.access_token) return;
+    let active = true;
+    continueAsGuest().then(outcome => { if (active && outcome.error) setErrorMessage(t('payment.guestUnavailable')); });
+    return () => { active = false; };
+  }, [authLoading, guestAllowed, params.productKey, session?.access_token, continueAsGuest, t]);
 
   useEffect(() => {
     setProduct(readStoredProduct(params.orderId) || (params.productKey ? { key: params.productKey } : null));
@@ -227,7 +241,7 @@ export default function PaddleCheckoutPage() {
   }, [authLoading, params.orderId, product?.key, session?.access_token]);
 
   useEffect(() => {
-    if (authLoading || params.transactionId || !params.productKey || !session?.access_token) return undefined;
+    if (authLoading || params.transactionId || !params.productKey || requiresLogin) return undefined;
     if ((params.lang === "ro" || params.lang === "ru") && params.lang !== lang) return undefined;
 
     let active = true;
@@ -248,6 +262,7 @@ export default function PaddleCheckoutPage() {
             product_key: params.productKey,
             lang,
             return_to: params.returnTo,
+            checkout_source: params.checkoutSource,
           }),
         });
 
@@ -276,7 +291,7 @@ export default function PaddleCheckoutPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, lang, params.lang, params.productKey, params.returnTo, params.transactionId, session?.access_token, t]);
+  }, [authLoading, lang, params.lang, params.productKey, params.returnTo, params.checkoutSource, params.transactionId, requiresLogin, session?.access_token, t]);
 
   useEffect(() => {
     if ((params.lang === "ro" || params.lang === "ru") && params.lang !== lang) {
@@ -305,7 +320,7 @@ export default function PaddleCheckoutPage() {
 
       const canResumeAfterLogin = !!(params.productKey || params.transactionId || params.orderId);
 
-      if (!session?.access_token && canResumeAfterLogin) {
+      if (requiresLogin && canResumeAfterLogin) {
         setStatus("auth_required");
         setMessageKey("payment.loginRequiredForCheckout");
         setErrorMessage("");
@@ -384,7 +399,7 @@ export default function PaddleCheckoutPage() {
     return () => {
       canceled = true;
     };
-  }, [authLoading, checkoutEmail, lang, params.lang, params.orderId, params.productKey, params.returnTo, params.transactionId, session?.access_token, setLang]);
+  }, [authLoading, checkoutEmail, lang, params.lang, params.orderId, params.productKey, params.returnTo, params.transactionId, requiresLogin, session?.access_token, setLang]);
 
   const returnHref = paymentAppLink(normalizeReturnTo(params.returnTo));
   const isError = status === "error";
@@ -479,7 +494,7 @@ export default function PaddleCheckoutPage() {
                     {isError ? t("payment.checkoutAttentionTitle") : t("payment.checkoutPanelTitle")}
                   </h2>
                 </div>
-                <p className="text-xs text-gray-500 lg:text-sm">{t(messageKey)}</p>
+                <p className="text-xs text-gray-500 lg:text-sm">{t(isAuthRequired ? authMessageKey : messageKey)}</p>
                 {errorMessage && (
                   <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
                     {errorMessage}
@@ -488,9 +503,15 @@ export default function PaddleCheckoutPage() {
               </div>
             )}
 
+            {guestAllowed && (!session || isGuest) && <CheckoutAccountPrompt />}
             {isAuthRequired ? (
               <div className="flex min-h-[520px] items-center justify-center">
-                <AuthOptions className="w-full max-w-sm" />
+                <div className="w-full max-w-sm">
+                  {guestAllowed && !session && <>
+                    {errorMessage && <button type="button" disabled={Boolean(activeProvider)} onClick={async () => { const outcome = await continueAsGuest(); if (!outcome.error) setErrorMessage(''); }} className="mb-3 w-full rounded-lg bg-emerald-700 px-5 py-3 font-semibold text-white disabled:opacity-50">{t('maib.result.retry')}</button>}
+                  </>}
+                  {pricingCheckout && <AuthOptions />}
+                </div>
               </div>
             ) : !isError && (
               <div
@@ -509,7 +530,7 @@ export default function PaddleCheckoutPage() {
                 {isError
                   ? t("payment.checkoutErrorNextStep")
                   : isAuthRequired
-                    ? t("payment.loginRequiredForCheckout")
+                    ? t(authMessageKey)
                     : t("payment.checkoutNextStep")}
               </p>
             </div>

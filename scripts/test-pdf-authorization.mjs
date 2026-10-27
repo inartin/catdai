@@ -6,6 +6,7 @@ import fs from 'node:fs/promises';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 import { maibProduct } from '../src/lib/maib/products.mjs';
+import { FEATURE_PURCHASE_CONTENT } from '../src/lib/feature-purchase-content.js';
 const require = createRequire(import.meta.url);
 const { transform, loadBindings } = require('next/dist/build/swc');
 await loadBindings();
@@ -62,7 +63,9 @@ const payment = await load('src/lib/paid-feature-usage.js', {
   } },
 });
 let loggedIn = true;
+const pdfAccess = await load('src/lib/pdf-report-access.js', { '@/lib/paid-feature-usage': payment });
 const route = await load('src/app/api/pdf-generation-authorizations/route.js', {
+  '@/lib/pdf-report-access': pdfAccess,
   'next/server': { NextResponse: { json: (payload, options) => Response.json(payload, options) } },
   '@/lib/access-tier': { resolveAccessTier: async () => ({ user_id: loggedIn ? 'user' : null }) },
   '@/lib/paid-feature-usage': payment,
@@ -99,7 +102,7 @@ const dialog = await load('src/components/ValuationPdfDialog.js', {
   '@/lib/tracking': { getDeviceId: noop, getSessionId: noop },
   '@/lib/browser-pdf': { createPdfPageCanvas: noop, PDF_CANVAS_HEIGHT: 1000, PDF_CANVAS_WIDTH: 700,
     downloadCanvasesAsPdf: () => { downloads++; } },
-}, { document: { body: {} }, fetch: async () => response,
+}, { document: { body: {} }, fetch: async (...args) => typeof response==='function'?response(...args):response,
   console: { error: noop } }, 'buildReportCanvases = async () => [];');
 function find(node, predicate) {
   if (!node || typeof node !== 'object') return [];
@@ -129,11 +132,29 @@ for (const [token, status, payload, outcome] of [
   assert(offer, 'purchase offer remains visible after download attempts');
   assert.equal(offer.props.offer.product_key, 'pdf_report_single');
 }
+for (const full_access of [false,true]) {
+  slots=[]; cursor=0; downloads=0; const requested=[];
+  response=async(url,options)=>{
+    requested.push(url);
+    if(url==='/api/pdf-generation-authorizations') return Response.json({ok:true});
+    if(url==='/api/pdf-generation-events') return Response.json({ok:true});
+    assert.equal(url,'/api/estimate-rent');
+    assert.equal(JSON.parse(options.body).pdf_report_key.estimate_type,'rent');
+    return Response.json({full_access});
+  };
+  const tree=dialog.default({open:true,data:{full_access:false,estimate_type:'rent',input:{city:'Chisinau',rooms_count:2}},accessToken:'guest-token',onClose:noop});
+  await find(tree,node=>node.type==='button'&&node.props.children?.at?.(-1)==='result.pdfGenerate')[0].props.onClick();
+  assert.equal(downloads,full_access?1:0,'never generate a masked paid report');
+  assert.deepEqual(requested.slice(0,2),['/api/pdf-generation-authorizations','/api/estimate-rent'],'authorize the PDF before reading its full matching data');
+}
 const messages = Object.fromEntries(await Promise.all(['ro', 'ru'].map(async lang =>
   [lang, JSON.parse(await fs.readFile(`src/locales/${lang}.json`, 'utf8'))])));
 let lang = 'ro';
 const pricing = await load('src/components/FeaturePricingAction.js', {
-  react: { useState, useEffect: noop, useRef: value => ({ current: value }) },
+  react: { useState, useEffect: noop, useRef: value => ({ current: value }), useId: () => 'drawer', useSyncExternalStore: () => null },
+  'react-dom': { createPortal: node => node },
+  '@/lib/feature-purchase-content': { FEATURE_PURCHASE_CONTENT },
+  '@/components/FeaturePurchaseBenefits': { default: noop },
   'next/link': { default: 'Link' },
   '@/components/usePaymentProvider': { default: () => 'maib' },
   '@/lib/maib/products.mjs': { maibProduct },
@@ -141,7 +162,7 @@ const pricing = await load('src/components/FeaturePricingAction.js', {
   '@/context/LanguageContext': { useTranslation: () => ({ lang, t: (key, args = {}) =>
     Object.entries(args).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, replacement), messages[lang][key] || key) }) },
   '@/lib/tracking': { trackPaymentCheckoutEvent: noop },
-  '@/lib/payment-urls.mjs': { paymentSiteOrigin: value => value },
+  '@/lib/payment-urls.mjs': { featureCheckoutUrl: value => value },
 });
 function text(node) {
   if (node == null || typeof node === 'boolean') return '';

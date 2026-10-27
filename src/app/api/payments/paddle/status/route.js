@@ -35,7 +35,7 @@ export async function GET(request) {
 
   let query = supabaseAdmin
     .from("paddle_payment_orders")
-    .select("id, user_id, product_key, status, paddle_transaction_id, paddle_subscription_id, paddle_checkout_url, amount_minor, currency_code, paid_at")
+    .select("id, user_id, product_key, status, paddle_transaction_id, paddle_subscription_id, paddle_checkout_url, amount_minor, currency_code, paid_at, request_payload")
     .eq("user_id", user.id)
     .limit(1);
 
@@ -60,5 +60,6 @@ export async function GET(request) {
     amount_minor: data.amount_minor,
     currency_code: data.currency_code,
     paid_at: data.paid_at,
+    return_to: data.request_payload?.return_to || null,
   });
 }

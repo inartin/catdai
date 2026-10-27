@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { paymentAppLink } from "@/lib/payment-urls.mjs";
+import { featureResultPath } from '@/lib/guest-checkout.mjs';
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import LockIcon from "@/components/icons/LockIcon";
@@ -114,13 +115,13 @@ function getDisplayState({ loading, error, order, checkout }) {
 
 export default function PaddlePaymentSuccessPage() {
   const { lang, setLang, t } = useTranslation();
-  const { session, isAuthenticated, loading: authLoading } = useAuth();
+  const { session, isGuest, loading: authLoading } = useAuth();
   const params = useMemo(() => getInitialParams(), []);
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const immediateError =
-    !authLoading && (!isAuthenticated || !session?.access_token)
+    !authLoading && !session?.access_token
       ? t("payment.statusLoginRequired")
       : !params.orderId && !params.transactionId
         ? t("payment.statusMissingReference")
@@ -183,6 +184,10 @@ export default function PaddlePaymentSuccessPage() {
         }
 
         setOrder(payload);
+        if (isGuest && payload.status === 'paid' && featureResultPath(payload.return_to)) {
+          window.location.replace(paymentAppLink(payload.return_to));
+          return;
+        }
         setError("");
         setLoading(false);
 
@@ -202,7 +207,7 @@ export default function PaddlePaymentSuccessPage() {
       active = false;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [authLoading, immediateError, params.checkout, params.orderId, params.transactionId, session?.access_token, t]);
+  }, [authLoading, immediateError, isGuest, params.checkout, params.orderId, params.transactionId, session?.access_token, t]);
 
   const display = getDisplayState({ loading: loading && !immediateError, error: immediateError || error, order, checkout: params.checkout });
   const accentClass = display.tone === "success" ? "bg-emerald-500" : display.tone === "error" ? "bg-red-500" : "bg-primary";

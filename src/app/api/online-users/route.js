@@ -1,6 +1,8 @@
 import { getOnlineUserCount } from "@/lib/online-users";
 import { getCanonicalSiteUrl } from "@/lib/seo";
-import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { getStatisticsUserId, getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
+import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,6 +42,18 @@ async function handlePost(request) {
   const visitor = getStatisticsVisitor();
   if (!visitor?.device_id) return textResponse("Browser ID required", 400);
   if (visitor.device_type === "Bot") return countResponse();
+  if (shouldPersistRuntimeData()) {
+    try {
+      const { error } = await supabaseAdmin.rpc("record_visitor_activity", {
+        p_device_id: visitor.device_id,
+        p_user_id: getStatisticsUserId(),
+      });
+      if (error) throw new Error(error.message);
+    } catch (error) {
+      // A statistics outage must not disable live presence.
+      console.error("[online-users] activity unavailable:", error.message);
+    }
+  }
   return countResponse(visitor.device_id);
 }
 

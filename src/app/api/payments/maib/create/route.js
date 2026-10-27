@@ -7,6 +7,7 @@ import { maibProduct, maibOrderQuantity } from '@/lib/maib/products.mjs';
 import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '@/lib/maib/purchase.mjs';
 import { checked, publicOrder } from '@/lib/maib/service.mjs';
 import { UUID, requestUser, paymentOrigin, paymentError } from '@/lib/maib/http';
+import { allowsGuestCheckout } from '@/lib/guest-checkout.mjs';
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
 export async function POST(request) {
   if (getPaymentProvider() !== 'maib') return NextResponse.json({ error: 'MAIB checkout is inactive.' }, { status: 409 });
@@ -14,6 +15,7 @@ export async function POST(request) {
   if (!user) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   if (!limiter.check(user.id).allowed) return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   const body = await request.json().catch(() => null);
+  if (user.is_anonymous && !allowsGuestCheckout(body)) return NextResponse.json({ error: 'Sign in to buy from pricing.' }, { status: 401 });
   const product = maibProduct(body?.product_key, body?.quantity);
   if (!product || !UUID.test(body?.request_key || '')) return NextResponse.json({ error: 'Invalid product or request key.' }, { status: 400 });
   if (body.terms_accepted !== true || body.terms_version !== MAIB_TERMS_VERSION) return NextResponse.json({ error: 'Accept the current Terms and Conditions.' }, { status: 400 });
@@ -21,6 +23,7 @@ export async function POST(request) {
   if (!email) return NextResponse.json({ error: 'A valid receipt email is required.' }, { status: 400 });
   try {
     if (!process.env.MAIB_SIGNATURE_KEY) throw new Error('MAIB callback signature key is missing');
+    if (user.is_anonymous) await checked(db.from('guest_checkout_accounts').upsert({ guest_user_id: user.id }, { onConflict: 'guest_user_id', ignoreDuplicates: true }));
     const existing = await checked(db.from('maib_payment_orders').select('*').eq('user_id', user.id)
       .eq('environment', environment()).eq('request_key', body.request_key).maybeSingle());
     if (existing) {

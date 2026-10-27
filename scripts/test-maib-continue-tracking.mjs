@@ -13,7 +13,7 @@ let bankCalls = 0;
 let fail = true;
 const state = {
   inFlight: { current: false }, product: { key: 'cadastru_lookup_single', quantity: 1 },
-  session: { access_token: 'token' }, user: { id: 'buyer' }, accepted: true,
+  session: { access_token: 'token' }, user: { id: 'buyer' }, accepted: true, guestAllowed: false,
   email: 'buyer@example.com', lang: 'ro', params: new URLSearchParams({ checkout_source: 'pricing' }),
   receiptEmail, MAIB_TERMS_VERSION, crypto: { randomUUID: () => 'request' },
   sessionStorage: { getItem: () => 'request', setItem() {} },
@@ -52,7 +52,7 @@ assert.equal(events.length, 3);
 
 const rows = [];
 const mocks = {
-  "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
+  "@/lib/statistics-context": { getStatisticsVisitor: () => null, shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
   'next/server': { NextResponse: { json: (body, options) => Response.json(body, options) } },
   '@/lib/access-tier': { resolveAccessTier: async () => ({ user_id: 'buyer' }) },
   '@/lib/rate-limit': { rateLimit: () => ({ check: () => ({ allowed: true }) }) },

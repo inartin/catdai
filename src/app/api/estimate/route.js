@@ -2,6 +2,7 @@ import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } 
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
+import { authorizedPdfEvaluation } from '@/lib/pdf-report-access';
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import {
   consumeFreeMonthlyFeatureUsage,
@@ -508,6 +509,10 @@ function shareParamsMatchSaleBody(shareParams = {}, body = {}) {
 
 async function resolveEstimateAccess(request, body, params) {
   const access = await resolveAccessTier(request);
+  if (body.pdf_report_key) {
+    const allowed = await authorizedPdfEvaluation({ userId: access.user_id, reportKey: body.pdf_report_key, estimateType: 'sale', params });
+    return { access, hasFullAccess: allowed, accessSource: allowed ? 'pdf_report' : null };
+  }
   let hasFullAccess = isPaidAccessTier(access.tier);
   let accessSource = hasFullAccess ? "paid" : null;
   let freeMonthlyUsage = null;
@@ -614,7 +619,7 @@ function buildEstimateAccessPayload(data, estimateAccess) {
   }
 
   const preview = buildEstimatePreview(data, {
-    hideMarketEstimate: !estimateAccess.access?.user_id,
+    hideMarketEstimate: !estimateAccess.access?.user_id || estimateAccess.access?.is_guest,
     showMarketTrend: true,
   });
 

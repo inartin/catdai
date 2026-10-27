@@ -11,17 +11,13 @@ class FixedDate extends Date {
 }
 let authorized = true;
 let activityError = null;
+let missingStats = false;
 let failingUserPage = null;
 let users = [
   { id: "returning", created_at: "2026-09-01T12:00:00Z" },
   { id: "new", created_at: "2026-10-17T21:00:00Z" },
   { id: "yesterday", created_at: "2026-10-17T20:59:59Z" },
   { id: "never-visited", created_at: "2026-08-01T12:00:00Z" },
-];
-const activity = [
-  { user_id: "returning", last_seen_at: "2026-10-18T09:00:00Z" },
-  { user_id: "new", last_seen_at: "2026-10-17T21:00:00Z" },
-  { user_id: "yesterday", last_seen_at: "2026-10-17T20:59:59Z" },
 ];
 const activityQueries = [];
 const json = (data, { status = 200 } = {}) => Response.json(data, { status });
@@ -35,10 +31,19 @@ const mocks = {
       auth: { admin: { listUsers: async ({ page, perPage }) => page === failingUserPage
         ? { data: null, error: { message: "User read failed" } }
         : { data: { users: users.slice((page - 1) * perPage, page * perPage) } } } },
-      async rpc(name) { assert.equal(name, "admin_external_api_usage_since"); return { data: [], error: null }; },
+      async rpc(name, args) {
+        if (name === "admin_external_api_usage_since") return { data: [], error: null };
+        assert.equal(name, "admin_active_user_stats");
+        activityQueries.push(args);
+        const today = args.p_since === "2026-10-17T21:00:00.000Z";
+        return { data: missingStats ? [] : [{
+          active_users: today ? 5 : 6,
+          new_registered_users: today ? 1 : args.p_since ? 2 : 4,
+          old_registered_users: today ? 1 : args.p_since ? 1 : 0,
+        }], error: activityError };
+      },
       from(table) {
         const query = { filters: [] };
-        if (table === "user_activity") activityQueries.push(query);
         const builder = {
           select(columns, options) { Object.assign(query, { columns, options }); return builder; },
           gte(column, value) { query.filters.push([column, value]); return builder; },
@@ -48,11 +53,7 @@ const mocks = {
           order() { return builder; },
           range() { return builder; },
           then(resolve, reject) {
-            let result = { data: [], count: 0, error: null };
-            if (table === "user_activity") {
-              const matches = activity.filter((row) => query.filters.every(([column, since]) => Date.parse(row[column]) >= Date.parse(since)));
-              result = { data: null, count: activityError ? null : matches.length, error: activityError };
-            }
+            const result = { data: [], count: 0, error: null };
             return Promise.resolve(result).then(resolve, reject);
           },
         };
@@ -78,27 +79,33 @@ assert.equal((await get()).status, 401);
 assert.equal(activityQueries.length, 0);
 authorized = true;
 let response = await (await get()).json();
-assert.equal(response.activeUsers, 2, "Return visits and the local midnight boundary count, yesterday and missing visits do not");
+assert.equal(response.activeUsers, 5, "Total includes anonymous visitors and registered users");
 assert.equal(response.newUsers, 1, "New registrations use local midnight");
+assert.equal(response.oldUsers, 1, "Returning registered users are shown separately");
 assert.equal(response.totalUsers, 4, "Total users includes every registration");
 assert.deepEqual(JSON.parse(JSON.stringify(activityQueries.at(-1))), {
-  columns: "*", options: { count: "exact", head: true },
-  filters: [["last_seen_at", "2026-10-17T21:00:00.000Z"]],
-}, "Count existing activity rows without loading visits or adding tracking");
+  p_since: "2026-10-17T21:00:00.000Z",
+}, "Aggregate every visitor with the selected local-midnight cutoff");
 for (const period of ["week", "month", "all"]) {
   response = await (await get(`period=${period}&fresh=1`)).json();
-  assert.equal(response.activeUsers, 3);
+  assert.equal(response.activeUsers, 6);
   assert.equal(response.newUsers, period === "all" ? 4 : 2);
+  assert.equal(response.oldUsers, period === "all" ? 0 : 1);
   assert.equal(response.totalUsers, 4);
 }
 activityError = { message: "Activity read failed" };
 assert.equal((await (await get()).json()).activeUsers, null, "Read failure cannot appear as zero");
+assert.equal((await (await get()).json()).newUsers, null);
+assert.equal((await (await get()).json()).oldUsers, null);
 activityError = null;
-assert.equal((await (await get()).json()).activeUsers, 2, "Hard refresh recovers after a failure");
+assert.equal((await (await get()).json()).activeUsers, 5, "Hard refresh recovers after a failure");
+missingStats = true;
+assert.equal((await (await get()).json()).activeUsers, null, "Missing aggregation cannot appear as zero");
+missingStats = false;
 users = Array.from({ length: 1001 }, (_, index) => ({ id: String(index), created_at: "2026-10-18T09:00:00Z" }));
 response = await (await get()).json();
 assert.equal(response.totalUsers, 1001);
-assert.equal(response.newUsers, 1001);
+assert.equal(response.newUsers, 1, "The breakdown comes from eligible active accounts, not every auth account");
 failingUserPage = 2;
 assert.equal((await get()).status, 500, "A failed user page cannot return partial registration totals");
 failingUserPage = null;

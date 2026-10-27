@@ -86,8 +86,8 @@ export default function AdminCadastruPage() {
         <div className="space-y-6" aria-busy={loading}>
           <section aria-label="Stored property totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <StatCard label="Unique cadastral numbers" value={stats.total} detail="All property types" accent />
-            <StatCard label="Apartment buildings" value={stats.buildings} detail="Verified blocks · shared details stored once" />
-            <StatCard label="Apartments / units" value={stats.apartments.total}
+            <StatCard label="Apartment buildings" value={stats.buildings} detail="Verified blocks" />
+            <StatCard label="Apartments" value={stats.apartments.total}
               detail={`${fmtNum(stats.apartments.linked)} linked to shared buildings`} />
             <StatCard label="Units with details" value={stats.apartments.details}
               detail={`${fmtNum(stats.apartments.references)} references still awaiting details`} />
@@ -147,7 +147,7 @@ export default function AdminCadastruPage() {
         {cityStats?.available ? <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500"><tr>
-              {[["City", "text-left"], ["Apartment buildings", "text-right"], ["Apartments / units", "text-right"], ["Other properties", "text-right"]].map(([label, align]) =>
+              {[["City", "text-left"], ["Apartment buildings", "text-right"], ["Apartments", "text-right"], ["Other properties", "text-right"]].map(([label, align]) =>
                 <th key={label} scope="col" className={`whitespace-nowrap px-5 py-3 font-medium ${align}`}>{label}</th>)}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">

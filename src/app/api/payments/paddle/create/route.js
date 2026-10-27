@@ -1,5 +1,6 @@
 import { getPaymentProvider } from "@/lib/payment-provider";
 import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
+import { allowsGuestCheckout } from '@/lib/guest-checkout.mjs';
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { rateLimit } from "@/lib/rate-limit";
@@ -164,6 +165,11 @@ export async function POST(request) {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  if (user.is_anonymous && !allowsGuestCheckout(body)) return NextResponse.json({ error: 'Sign in to buy from pricing.' }, { status: 401 });
+  if (user.is_anonymous) {
+    const { error } = await supabaseAdmin.from('guest_checkout_accounts').upsert({ guest_user_id: user.id }, { onConflict: 'guest_user_id', ignoreDuplicates: true });
+    if (error) return NextResponse.json({ error: 'Guest checkout is unavailable.' }, { status: 503 });
   }
 
   const configuredProduct = getPaddleProduct(body?.product_key);

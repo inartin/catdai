@@ -29,6 +29,7 @@ await q("select grant_user_feature_credits($1,'pdf_report',2)", [existing]);
 await q("select * from consume_free_monthly_feature_usage($1,'sale_estimate','old-free',date_trunc('month',now()),date_trunc('month',now())+interval '1 month',1)", [existing]);
 const migration = await fs.readFile('supabase/migrations/20261017141519_universal_paid_credits.sql','utf8');
 await db.exec(migration); await db.exec(migration);
+await db.exec(await fs.readFile('supabase/migrations/20261026194452_guest_feature_checkout.sql','utf8'));
 assert.equal((await balance(existing)).remaining_uses,2);
 assert.equal((await consume(existing,'cadastru_lookup')).remaining_uses,1);
 assert.equal((await free(existing,'pdf_report')).allowed,false,'old monthly free usage counts globally');

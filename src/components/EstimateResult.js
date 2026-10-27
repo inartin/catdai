@@ -2042,7 +2042,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   }, [openAuthModal, cadastralPurchaseOffer]);
 
   useEffect(() => {
-    if (!isAuthenticated || typeof window === "undefined") return;
+    if (!session?.access_token || typeof window === "undefined") return;
     if (!hasPdfLoginReturn()) return;
 
     const timeoutId = window.setTimeout(() => {
@@ -2052,7 +2052,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
-  }, [isAuthenticated]);
+  }, [session?.access_token]);
 
   const setListingsMode = (enabled) => {
     setShowListingsView(enabled);

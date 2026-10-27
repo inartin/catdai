@@ -33,6 +33,9 @@ try {
   let now = Date.now();
   class Clock extends Date { static now() { return now; } }
   let available = true;
+  let persist = true;
+  let activityError = null;
+  const activityWrites = [];
   const key = "catdai:online-users:v1";
   const browserA = "11111111-1111-4111-8111-111111111111";
   const browserB = "22222222-2222-4222-8222-222222222222";
@@ -44,6 +47,12 @@ try {
     "node:async_hooks": { AsyncLocalStorage },
     "@/lib/cache": { getSharedCacheClient: async () => available ? client : null },
     "@/lib/seo": { getCanonicalSiteUrl: () => "https://catdai.test" },
+    "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => persist },
+    "@/lib/supabase-admin": { supabaseAdmin: { rpc: async (name, args) => {
+      assert.equal(name, "record_visitor_activity");
+      activityWrites.push(args);
+      return { error: activityError };
+    } } },
     "@/lib/access-tier": { getRequestUser: async (request) => {
       const token = request.headers.get("authorization")?.replace("Bearer ", "");
       if (token === "outage") throw new Error("Auth unavailable");
@@ -85,12 +94,16 @@ try {
   assert.equal((await POST(request(browserA, { origin: "https://other.test" }))).status, 403);
   assert.equal((await POST(request(browserA, { "sec-fetch-site": "cross-site" }))).status, 403);
   assert.equal(await client.exists(key), 0, "Invalid requests do not write");
+  assert.equal(activityWrites.length, 0);
 
   await count(await POST(request()), 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(activityWrites.at(-1))), { p_device_id: browserA, p_user_id: null });
   await count(await POST(request()), 1);
   const concurrent = await Promise.all(Array.from({ length: 10 }, () => POST(request())));
   for (const response of concurrent) await count(response, 1);
   await count(await POST(request(browserB, { Authorization: "Bearer member" })), 2);
+  assert.equal(activityWrites.at(-1).p_user_id, "member", "Account identity comes from verified auth");
+  const writesBeforeExclusions = activityWrites.length;
   const ttl = await client.ttl(key);
   assert(ttl > 90 && ttl <= 180, "Idle sets expire without a cleanup job");
   const before = await client.zRangeWithScores(key, 0, -1);
@@ -100,6 +113,14 @@ try {
   await count(await POST(request("44444444-4444-4444-8444-444444444444", { "user-agent": "Googlebot/2.1" })), 2);
   await count(await GET(request("55555555-5555-4555-8555-555555555555")), 2);
   assert.deepEqual(await client.zRangeWithScores(key, 0, -1), before, "Reads, bots and excluded sessions do not write");
+  assert.equal(activityWrites.length, writesBeforeExclusions, "Excluded requests also skip persistent activity");
+  persist = false;
+  await count(await POST(request()), 2);
+  assert.equal(activityWrites.length, writesBeforeExclusions, "Local development does not persist visits");
+  persist = true;
+  activityError = { message: "Database unavailable" };
+  await count(await POST(request()), 2, "Database errors do not disable presence");
+  activityError = null;
 
   now += 60_000;
   await count(await POST(request(browserA)), 2);

@@ -1337,7 +1337,7 @@ function DashboardContent() {
           <StatCard
             label="Active Users"
             value={s.activeUsers == null ? "Unavailable" : fmtNum(s.activeUsers)}
-            detail={<><span className="block">New users: {fmtNum(s.newUsers)}</span>{dashboardPeriod === "all" && <span className="block">Total users: {fmtNum(s.totalUsers)}</span>}</>}
+            detail={<><span className="block">New reg. users: {s.newUsers == null ? "Unavailable" : fmtNum(s.newUsers)}</span><span className="block">Old reg. users: {s.oldUsers == null ? "Unavailable" : fmtNum(s.oldUsers)}</span></>}
             onClick={toggleUsersList}
             active={showUsersList}
           />

@@ -37,10 +37,10 @@ export async function resolveAccessTierFromToken(token) {
     return { tier: "free", user_id: null };
   }
 
-  return { tier: "free", user_id: authData.user.id };
+  return { tier: "free", user_id: authData.user.id, ...(authData.user.is_anonymous ? { is_guest: true } : {}) };
 }
 
 export async function resolveAccessTier(request) {
   const { data, error } = await getRequestUser(request);
-  return { tier: "free", user_id: error ? null : data?.user?.id || null };
+  return { tier: "free", user_id: error ? null : data?.user?.id || null, ...(!error && data?.user?.is_anonymous ? { is_guest: true } : {}) };
 }

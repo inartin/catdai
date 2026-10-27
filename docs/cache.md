@@ -24,7 +24,7 @@ Backend prepared and active when Redis is reachable.
 
 ## Live Presence
 - `catdai:online-users:v1` is a Redis sorted set of browser IDs scored by the server heartbeat timestamp. `POST /api/online-users` atomically removes entries at least 90 seconds old, updates one browser and returns the current count. Each heartbeat renews a 180-second TTL on the set; reads do not extend it.
-- `GET /api/online-users` counts only timestamps newer than the 90-second cutoff and returns uncached plain text. Redis is required: failures return `503`, without a process-local fallback or a misleading zero. No schema or extra service is needed.
+- `GET /api/online-users` counts only timestamps newer than the 90-second cutoff and returns uncached plain text. Redis is required: failures return `503`, without a process-local fallback or a misleading zero. Accepted POSTs separately save throttled `visitor_activity` for the dashboard's period totals; database failures do not disable live presence. See [Admin](admin.md#dashboard).
 - Check with `pnpm exec node --experimental-vm-modules scripts/test-online-users.mjs` (requires `redis-server`; starts and stops an isolated, non-persistent instance).
 
 ## Cadastru Cache

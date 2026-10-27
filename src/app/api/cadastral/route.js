@@ -1,6 +1,7 @@
 import { withStatisticsContext } from "@/lib/statistics-context";
 import { withCadastruOutcome } from "@/lib/cadastru-outcome";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
+import { cadastruPaidHistoryMetadata } from "@/lib/cadastru-paid-history";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
@@ -531,13 +532,14 @@ async function handlePost(request) {
       return res;
     }
 
-    const creditUsage = process.env.NODE_ENV === "development" && cadastruSearchType
-      ? creditCheck
-      : await consumeFeatureCredit({
+    const creditUsage = await consumeFeatureCredit({
         userId: access.user_id,
         featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
         idempotencyKey: creditIdempotencyKey,
         metadata: {
+          ...cadastruPaidHistoryMetadata({ payload, searchType: 'number',
+            lookupId: getCadastruLookupTracking(body).lookupId,
+            city: resolveCityFromPayload(payload), district: resolveDistrictFromPayload(payload), resultType: classifyCadastralResult(payload) }),
           feature: "cadastru_lookup",
           cadastral_number: trimmed,
           search_context: cadastruSearchType,

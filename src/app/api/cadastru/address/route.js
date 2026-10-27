@@ -1,6 +1,7 @@
 import { withStatisticsContext } from "@/lib/statistics-context";
 import { withCadastruOutcome } from "@/lib/cadastru-outcome";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
+import { cadastruPaidHistoryMetadata } from "@/lib/cadastru-paid-history";
 import { suggestRoadTypes, suggestStreets } from "@/lib/cadastru-street-suggestions";
 import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSuggestionRecovery } from "@/lib/cadastru-suggestion-recovery";
 import { resolveStreet, inspectStreetAddress } from "@/lib/cadastru-streets/street-resolver";
@@ -17,7 +18,6 @@ import { cadastruNeedsRefresh, withCadastruFreshness } from "@/lib/cadastru-cach
 import { scheduleCadastruRefresh, isUsableCadastruRefresh } from "@/lib/cadastru-refresh";
 import { resolveAccessTier } from "@/lib/access-tier";
 import {
-  checkFeatureAccess,
   consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
@@ -304,6 +304,10 @@ async function handlePost(request) {
       featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
       idempotencyKey,
       metadata: {
+        ...cadastruPaidHistoryMetadata({ payload, searchType: 'address',
+          searchRequest: { city, road_type: roadType === 'bd' ? 'bulevard' : roadType === 'str-la' ? 'str-la' : 'strada',
+            street: resolution.street, house_number: houseNumber, ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}) },
+          lookupId: getCadastruLookupTracking(body).lookupId, city, district: resolvePayloadDistrict(payload), resultType: classifyAddressPayload(payload) }),
         feature: "cadastru_lookup",
         search_type: "address",
         raw_address: rawAddress,
@@ -313,9 +317,7 @@ async function handlePost(request) {
     };
     let creditUsage;
     try {
-      creditUsage = process.env.NODE_ENV === "development" && shouldTrackCadastruSearch
-        ? await checkFeatureAccess(creditArgs)
-        : await consumeFeatureCredit(creditArgs);
+      creditUsage = await consumeFeatureCredit(creditArgs);
     } catch (cause) {
       throw Object.assign(new Error("Cadastru credit authorization failed", { cause }), { code: "credit_authorization_failed" });
     }

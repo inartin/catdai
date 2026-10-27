@@ -2,6 +2,7 @@ import { getStatisticsVisitor, shouldCollectStatistics, withStatisticsContext } 
 import crypto from "node:crypto";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { isPaidAccessTier, resolveAccessTier } from "@/lib/access-tier";
+import { authorizedPdfEvaluation } from '@/lib/pdf-report-access';
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { logCalculatorUsageEvent } from "@/lib/calculator-usage-events";
 import {
@@ -544,6 +545,10 @@ async function consumeYieldCalculatorCredit(calculatorAccess, body, params) {
 
 async function resolveRentEstimateAccess(request, body, params) {
   const access = await resolveAccessTier(request);
+  if (body.pdf_report_key) {
+    const allowed = await authorizedPdfEvaluation({ userId: access.user_id, reportKey: body.pdf_report_key, estimateType: 'rent', params });
+    return { access, hasFullAccess: allowed, accessSource: allowed ? 'pdf_report' : null };
+  }
   let hasFullAccess = isPaidAccessTier(access.tier);
   let accessSource = hasFullAccess ? "paid" : null;
   let freeMonthlyUsage = null;
@@ -649,7 +654,7 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
   }
 
   const preview = buildRentEstimatePreview(data, {
-    hideMarketEstimate: !estimateAccess.access?.user_id,
+    hideMarketEstimate: !estimateAccess.access?.user_id || estimateAccess.access?.is_guest,
   });
 
   return {

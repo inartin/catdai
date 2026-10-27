@@ -6,6 +6,7 @@ import {
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
 import { rateLimit } from "@/lib/rate-limit";
+import { stablePdfReportKey, getStablePdfUsage } from '@/lib/pdf-report-access';
 
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const PDF_REPORT_FEATURE_KEY = "pdf_report";
@@ -43,10 +44,11 @@ export async function POST(request) {
     return NextResponse.json({ error: "report_key_required" }, { status: 400 });
   }
 
-  const usage = await consumeFeatureCredit({
+  const existing = await getStablePdfUsage(access.user_id, body.report_key);
+  const usage = existing ? { allowed: true, remaining_uses: null } : await consumeFeatureCredit({
     userId: access.user_id,
     featureKey: PDF_REPORT_FEATURE_KEY,
-    idempotencyKey: makePaidFeatureUsageKey(PDF_REPORT_FEATURE_KEY, body.report_key),
+    idempotencyKey: makePaidFeatureUsageKey(PDF_REPORT_FEATURE_KEY, access.is_guest ? stablePdfReportKey(body.report_key) : body.report_key),
     metadata: {
       feature: "pdf_report",
       report_key: body.report_key,

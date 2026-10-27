@@ -2,7 +2,7 @@
 
 import { getDeviceId } from "@/lib/visitor-browser";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
 
@@ -10,6 +10,7 @@ const AuthContext = createContext(null);
 const ACTIVITY_PING_INTERVAL_MS = 5 * 60 * 1000;
 const TELEGRAM_LOGIN_SCRIPT_SRC = "https://oauth.telegram.org/js/telegram-login.js?5";
 const AUTH_RETURN_TO_KEY = "catdai:auth-return-to";
+const GUEST_UPGRADE_PENDING_KEY = 'catdai:guest-upgrade-pending';
 const OAUTH_URL_KEYS = [
   "access_token",
   "refresh_token",
@@ -200,11 +201,61 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeProvider, setActiveProvider] = useState(null);
+  const [guestUpgradeError, setGuestUpgradeError] = useState(false);
+  const guestSessionRequest = useRef(null);
+
+  const syncGuestUpgrade = useCallback(async (accessToken) => {
+    const response = await fetch('/api/auth/guest-upgrade', {
+      method: 'POST', headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!response.ok) throw new Error('Guest purchases could not be linked.');
+  }, []);
+
+  const prepareGuestUpgrade = useCallback(async () => {
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (data?.session?.user?.is_anonymous) {
+      await syncGuestUpgrade(data.session.access_token);
+      localStorage.setItem(GUEST_UPGRADE_PENDING_KEY, '1');
+    }
+  }, [syncGuestUpgrade]);
+
+  const continueAsGuest = useCallback(() => {
+    if (guestSessionRequest.current) return guestSessionRequest.current;
+    guestSessionRequest.current = (async () => {
+      setError(null);
+      setActiveProvider('guest');
+      try {
+        const { data: current, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (current?.session) return { error: null, session: current.session };
+        const { data, error: guestError } = await supabase.auth.signInAnonymously();
+        if (guestError) throw guestError;
+        return { error: null, session: data?.session };
+      } catch (guestError) {
+        setError(guestError.message || 'Guest checkout is unavailable.');
+        return { error: guestError };
+      } finally { setActiveProvider(null); }
+    })().finally(() => { guestSessionRequest.current = null; });
+    return guestSessionRequest.current;
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     const syncAuthState = async (nextSession) => {
+      // Finish ownership transfer before feature pages request their paid result.
+      let needsGuestUpgrade = false;
+      try { needsGuestUpgrade = localStorage.getItem(GUEST_UPGRADE_PENDING_KEY) === '1'; } catch { /* No pending handoff. */ }
+      if (nextSession?.user && !nextSession.user.is_anonymous && needsGuestUpgrade) {
+        try {
+          await syncGuestUpgrade(nextSession.access_token);
+          localStorage.removeItem(GUEST_UPGRADE_PENDING_KEY);
+          setGuestUpgradeError(false);
+        }
+        catch { setGuestUpgradeError(true); return; }
+      }
+      if (!isMounted) return;
       setSession(nextSession ?? null);
 
       if (!nextSession) {
@@ -264,11 +315,11 @@ export function AuthProvider({ children }) {
       isMounted = false;
       data.subscription.unsubscribe();
     };
-  }, []);
+  }, [syncGuestUpgrade]);
 
   useEffect(() => {
     const accessToken = session?.access_token;
-    if (!accessToken) return;
+    if (!accessToken || session?.user?.is_anonymous) return;
 
     pingUserActivity(accessToken);
     trackAdSourceLogin(accessToken);
@@ -291,16 +342,17 @@ export function AuthProvider({ children }) {
       window.clearInterval(intervalId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [session?.access_token]);
+  }, [session?.access_token, session?.user?.is_anonymous]);
 
   const signInWithProviders = useCallback(async (providerKey, providers) => {
     setActiveProvider(providerKey);
     setError(null);
 
-    const redirectTo = persistAuthReturnTo();
     let lastError = null;
 
     try {
+      await prepareGuestUpgrade();
+      const redirectTo = persistAuthReturnTo();
       for (const provider of providers) {
         const { data, error: signInError } = await supabase.auth.signInWithOAuth({
           provider,
@@ -329,7 +381,7 @@ export function AuthProvider({ children }) {
     const message = lastError?.message || "Authentication failed.";
     setError(message);
     return { error: lastError };
-  }, []);
+  }, [prepareGuestUpgrade]);
 
   const signInWithGoogle = useCallback(async () => {
     return signInWithProviders("google", ["google"]);
@@ -349,6 +401,7 @@ export function AuthProvider({ children }) {
     persistAuthReturnTo();
 
     try {
+      await prepareGuestUpgrade();
       const telegramLogin = await loadTelegramLoginScript();
       return await new Promise((resolve) => {
         telegramLogin.auth(
@@ -402,7 +455,17 @@ export function AuthProvider({ children }) {
       setActiveProvider(null);
       return { error: telegramError };
     }
-  }, []);
+  }, [prepareGuestUpgrade]);
+
+  const retryGuestUpgrade = useCallback(async () => {
+    try {
+      const { data, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !data?.session?.access_token) throw sessionError || new Error('Session missing.');
+      await syncGuestUpgrade(data.session.access_token);
+      localStorage.removeItem(GUEST_UPGRADE_PENDING_KEY);
+      window.location.reload();
+    } catch { setGuestUpgradeError(true); }
+  }, [syncGuestUpgrade]);
 
   const signOut = useCallback(async () => {
     setError(null);
@@ -443,7 +506,11 @@ export function AuthProvider({ children }) {
       loading,
       error,
       activeProvider,
-      isAuthenticated: !!session,
+      isAuthenticated: !!session && !user?.is_anonymous,
+      isGuest: user?.is_anonymous === true,
+      continueAsGuest,
+      guestUpgradeError,
+      retryGuestUpgrade,
       signInWithGoogle,
       signInWithTelegram,
       signInWithMaibTest,
@@ -456,6 +523,9 @@ export function AuthProvider({ children }) {
       loading,
       error,
       activeProvider,
+      continueAsGuest,
+      guestUpgradeError,
+      retryGuestUpgrade,
       signInWithGoogle,
       signInWithTelegram,
       signInWithMaibTest,

@@ -1,4 +1,5 @@
 import { sharedPaidCreditBalance, sharedFreeMonthlyCredit } from "../src/lib/shared-credit-balance.mjs";
+import * as guestCheckout from '../src/lib/guest-checkout.mjs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -98,6 +99,7 @@ globalThis.fetch=realFetch;
 
 // Route boundary checks run with explicit mocks; no network or real database calls.
 async function loadRoute(file,mocks) {
+  mocks['@/lib/guest-checkout.mjs'] = guestCheckout;
   const context=vm.createContext({console:{error(){}},Response,Request,Headers,URL,URLSearchParams,Date,Buffer,process});
   const routeModule=new vm.SourceTextModule(await fs.readFile(file,'utf8'),{context});
   await routeModule.link(name=>{assert.ok(mocks[name],`Missing mock ${name}`); const exports=mocks[name];return new vm.SyntheticModule(Object.keys(exports),function(){for(const [key,value] of Object.entries(exports))this.setExport(key,value);},{context});});
@@ -220,7 +222,8 @@ for(const mode of ['development','production']) for(const provider of ['maib','p
 }
 delete process.env.PAYMENT_PROVIDER;
 let insertSnapshot, existingSnapshot=null, createUser=null, bankCreates=0, bankPayload, expectedBankAmount=99;
-const createDb={from(){let single=false;const query={select(){return query;},eq(){return query;},in(){return query;},update(){return query;},insert(row){insertSnapshot={...row,id,created_at:new Date().toISOString(),status:'pending'};return query;},maybeSingle(){return Promise.resolve({data:existingSnapshot});},single(){single=true;return query;},then(resolve,reject){return Promise.resolve({data:single?insertSnapshot:null}).then(resolve,reject);}};return query;}};
+const guestRegistrations=[];
+const createDb={from(){let single=false;const query={select(){return query;},eq(){return query;},in(){return query;},update(){return query;},upsert(row){guestRegistrations.push(row);return query;},insert(row){insertSnapshot={...row,id,created_at:new Date().toISOString(),status:'pending'};return query;},maybeSingle(){return Promise.resolve({data:existingSnapshot});},single(){single=true;return query;},then(resolve,reject){return Promise.resolve({data:single?insertSnapshot:null}).then(resolve,reject);}};return query;}};
 const create=await loadRoute('src/app/api/payments/maib/create/route.js',{
   ...next,'@/lib/supabase-admin':{supabaseAdmin:createDb},'@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
   '@/lib/payment-provider':{getPaymentProvider},'@/lib/maib/products.mjs':{maibProduct,maibOrderQuantity},
@@ -309,6 +312,18 @@ for (const [quantity, amount] of [[1,15],[3,45],[5,75],[10,150],[20,300],[21,315
   assert.deepEqual(insertSnapshot.grants,{cadastru_lookup:quantity});
   assert.equal(service.publicOrder(insertSnapshot).quantity,quantity);
 }
+createUser.is_anonymous=true;
+const guestSingle={...purchaseBody,product_key:'sale_estimate_single',return_to:'/evaluare?city=Chisinau'};
+const beforeGuest=bankCreates;
+for(const context of [{checkout_source:'pricing'},{return_to:'/pricing'},{return_to:'//evil.test/evaluare'}]) {
+  assert.equal((await create.POST(createRequest({...guestSingle,...context}))).status,401);
+}
+assert.equal(bankCreates,beforeGuest,'pricing-origin guest requests never contact the bank');
+expectedBankAmount=15;
+assert.equal((await create.POST(createRequest(guestSingle))).status,200);
+assert.equal(insertSnapshot.user_id,createUser.id,'guest orders retain verified session ownership');
+assert.equal(guestRegistrations.at(-1).guest_user_id,createUser.id);
+delete createUser.is_anonymous;
 let freeDbCalls=0;
 const freeUsage=await loadRoute('src/lib/free-monthly-feature-usage.js',{
   'node:crypto':{default:crypto},
@@ -317,9 +332,9 @@ const freeUsage=await loadRoute('src/lib/free-monthly-feature-usage.js',{
 });
 assert.equal(freeUsage.getFreeMonthlyFeatureLimit('cadastru_lookup'),1);
 assert.equal(freeUsage.getFreeMonthlyFeatureLimit('sale_estimate'),1);
-assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,true);
-assert.equal((await freeUsage.consumeFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,true);
-assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'sale_estimate',idempotencyKey:'one'})).allowed,true);
+assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,false);
+assert.equal((await freeUsage.consumeFreeMonthlyFeatureUsage({userId:id,featureKey:'cadastru_lookup',idempotencyKey:'one'})).allowed,false);
+assert.equal((await freeUsage.checkFreeMonthlyFeatureUsage({userId:id,featureKey:'sale_estimate',idempotencyKey:'one'})).allowed,false,'local sessions do not receive new free credits');
 assert.equal(freeDbCalls,0,'development mode does not persist free usage');
 // Real monthly access helper counts usage across all features and fails closed without RPC.
 let freeRpcError = null;
@@ -380,7 +395,7 @@ assert.equal(paidUses,1,'reloading a paid result does not spend another credit')
 assert.equal(paidConsumptionCalls,1,'paid idempotency is checked before free usage');
 freeUses=1;paidUses=0;freeEvents.clear();
 assert.equal((await paidFeature.consumeFeatureCredit(featureRequest('third'))).source,'free_monthly','past purchases do not suppress next month\'s free use');
-let reportedFreeEvents=[];
+let reportedFreeEvents=[{remaining_uses:1}];
 const profileCredits=await loadRoute('src/app/api/profile/credits/route.js',{
   '@/lib/shared-credit-balance.mjs':{sharedPaidCreditBalance,sharedFreeMonthlyCredit},
   ...next,
@@ -398,12 +413,12 @@ const profileCredits=await loadRoute('src/app/api/profile/credits/route.js',{
 });
 const profilePayload=await (await profileCredits.GET(new Request('https://catdai.test/api/profile/credits'))).json();
 const saleFree=profilePayload.freeMonthlyCredits.find(row=>row.featureKey==='sale_estimate');
-assert.equal(saleFree.remainingUses,1,'a paid buyer still sees the monthly free use');
+assert.equal(saleFree.remainingUses,1,'a paid buyer still sees a retained free use');
 assert.equal(saleFree.eligible,true);
 assert.equal(profilePayload.freeMonthlyCredits.find(row=>row.featureKey==='cadastru_lookup').totalGranted,1);
 assert.equal(profilePayload.sharedCredits.remainingUses,2);
 assert.equal(profilePayload.freeMonthlyCredit.remainingUses,1);
-reportedFreeEvents=[{feature_key:'sale_estimate'}];
+reportedFreeEvents=[{remaining_uses:0}];
 const usedProfilePayload=await (await profileCredits.GET(new Request('https://catdai.test/api/profile/credits'))).json();
 assert.equal(usedProfilePayload.freeMonthlyCredits.find(row=>row.featureKey==='sale_estimate').remainingUses,0,'free usage is counted independently of paid credits');
 assert.equal(usedProfilePayload.freeMonthlyCredit.remainingUses,0);
@@ -418,7 +433,8 @@ console.log('MAIB checkout input, login boundary, RO/RU and provider rollback ch
 
 // Paddle rollback checkout must also stay on the development merchant domain.
 const paddleProduct={key:'standard_pack',priceReference:'pri_test',priceId:'pri_test',billingMode:'one_time'};
-const paddleDb={auth:{getUser:async()=>({data:{user:{id,email:'buyer@example.com'}}})},from(){const query={insert(){return query;},select(){return query;},single:async()=>({data:{id}}),update(){return query;},eq:async()=>({error:null})};return query;}};
+let paddleUser={id,email:'buyer@example.com'};
+const paddleDb={auth:{getUser:async()=>({data:{user:paddleUser}})},from(){const query={upsert:async row=>{guestRegistrations.push(row);return {};},insert(){return query;},select(){return query;},single:async()=>({data:{id}}),update(){return query;},eq:async()=>({error:null})};return query;}};
 const paddleCreate=await loadRoute('src/app/api/payments/paddle/create/route.js',{
   ...next, '@/lib/payment-provider':{getPaymentProvider}, '@/lib/payment-urls.mjs':{paymentSiteOrigin},
   '@/lib/supabase-admin':{supabaseAdmin:paddleDb}, '@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
@@ -440,6 +456,11 @@ for (const mode of ['development','production']) {
   assert.equal(checkout.searchParams.get('return_to'),'/evaluare?foo=1');
   assert.equal(checkout.searchParams.get('existing'),'1');
 }
+paddleUser={id,is_anonymous:true};
+const paddleGuestRequest=checkout_source=>new Request('https://catdai.test/api/payments/paddle/create',{method:'POST',headers:{Authorization:'Bearer guest'},body:JSON.stringify({product_key:'standard_pack',return_to:'/evaluare?city=Chisinau',checkout_source})});
+assert.equal((await paddleCreate.POST(paddleGuestRequest('pricing'))).status,401,'Paddle also retains the pricing login gate');
+assert.equal((await paddleCreate.POST(paddleGuestRequest())).status,200,'feature-origin Paddle checkout accepts its guest owner');
+assert.equal(guestRegistrations.at(-1).guest_user_id,id);
 delete process.env.PAYMENT_PROVIDER;
 assert.equal(usedProfilePayload.freeMonthlyCredit.remainingUses,0);
 assert.ok(usedProfilePayload.freeMonthlyCredits.every(row=>row.remainingUses===0),'free use on one feature exhausts all feature access projections');

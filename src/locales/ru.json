@@ -1,4 +1,13 @@
 {
+  "landing.cadastruEyebrow": "КАДАСТР · ОФИЦИАЛЬНЫЕ ДАННЫЕ",
+  "landing.cadastruTitle": "Об объекте больше, чем в объявлении.",
+  "landing.cadastruDescription": "Найдите кадастровые данные квартиры, дома или участка в одном месте.",
+  "landing.cadastruProperty": "Официальные кадастровые данные",
+  "landing.cadastruMap": "Расположение на карте",
+  "landing.cadastruNearby": "Что находится рядом",
+  "landing.cadastruCta": "Найти кадастровые данные",
+  "landing.cadastruSearchHint": "По адресу или кадастровому номеру",
+  "landing.cadastruNumberExample": "0100201.999",
   "cadastru.localityAlternativeIntro": "Не удалось найти адрес {street}, дом {house}, в городе {city}. Такой же адрес найден в {localities}.",
   "cadastru.localityAlternativeConfirm": "Это нужный вам адрес?",
   "cadastru.searchSuggestedLocality": "Найти «{city}, {street} {house}»",

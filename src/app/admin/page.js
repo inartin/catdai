@@ -210,7 +210,13 @@ function fmtPaymentAmount(amountMinor, currencyCode) {
 }
 
 function fmtCheckoutSummary(item) {
-  return `${fmtNum(item?.uniqueVisitors || 0)} users`;
+  const count = item?.uniqueVisitors || 0;
+  return (
+    <span>
+      <strong className="font-semibold text-gray-900 dark:text-slate-100">{fmtNum(count)}</strong>{" "}
+      {count === 1 ? "user" : "users"}
+    </span>
+  );
 }
 
 function fmtExternalApiService(service, endpoint = "") {
@@ -475,37 +481,207 @@ function fmtProperty(row) {
   ].filter(Boolean).join(" · ") || "\u2014";
 }
 
-function StatCard({ label, value, detail, onClick, active = false }) {
-  const cardClassName = `bg-white rounded-xl p-5 shadow-sm border transition-colors ${active
-    ? "border-primary/40 ring-1 ring-primary/20"
-    : "border-gray-100"
-    }`;
+function CadastruResultBadges({ byResultType }) {
+  const counts = byResultType || {};
+  const items = [
+    { key: "full", label: "full", count: counts.full_data },
+    { key: "apt", label: "apt", count: counts.apartment_only },
+    { key: "land", label: "land", count: counts.land_only },
+    { key: "addr", label: "address", count: counts.address_only },
+    { key: "none", label: "none", count: counts.no_data },
+    { key: "fail", label: "failed", count: counts.error, isError: true },
+  ].filter((item) => Boolean(item.count));
 
-  if (onClick) {
+  if (!items.length) {
+    return <span className="admin-stat-detail-subtle">No search data yet</span>;
+  }
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {items.map((item) => (
+        <span
+          key={item.key}
+          className={item.isError ? "admin-stat-badge admin-stat-badge-danger" : "admin-stat-badge"}
+        >
+          {fmtNum(item.count)} {item.label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function ListingAnalysesSummary({ analyses }) {
+  const success = analyses?.success || 0;
+  const unsupported = analyses?.unsupported || 0;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5 font-medium">
+      <span className="text-emerald-600 dark:text-emerald-400">
+        {fmtNum(success)} analyzed
+      </span>
+      <span className="opacity-40">/</span>
+      <span className={unsupported > 0 ? "text-amber-600 dark:text-amber-400" : "opacity-60"}>
+        {fmtNum(unsupported)} rejected
+      </span>
+    </span>
+  );
+}
+
+function CalculatorUsageSummary({ usage }) {
+  const registered = usage?.registered || 0;
+  const anonymous = usage?.anonymous || 0;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span>
+        <strong className="font-semibold text-gray-900 dark:text-slate-100">{fmtNum(registered)}</strong> registered
+      </span>
+      <span className="opacity-40">/</span>
+      <span>
+        <strong className="font-semibold text-gray-900 dark:text-slate-100">{fmtNum(anonymous)}</strong> anon
+      </span>
+    </span>
+  );
+}
+
+function PdfGenerationSummary({ pdf }) {
+  const registered = pdf?.registered || 0;
+  const anonymous = pdf?.anonymous || 0;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span>
+        <strong className="font-semibold text-gray-900 dark:text-slate-100">{fmtNum(registered)}</strong> registered
+      </span>
+      <span className="opacity-40">/</span>
+      <span>
+        <strong className="font-semibold text-gray-900 dark:text-slate-100">{fmtNum(anonymous)}</strong> anon
+      </span>
+    </span>
+  );
+}
+
+function ExternalApiBadges({ usage }) {
+  if (!usage?.total) {
+    return <span className="admin-stat-detail-subtle">No external calls yet</span>;
+  }
+  const byService = usage.byService || {};
+  const listing999 = byService["999_listing"]?.total || 0;
+  const cadastru = (byService.cadastru_number?.total || 0) + (byService.cadastru_address?.total || 0);
+  const nearby = byService.cadastru_nearby?.total || 0;
+  const failure = usage.failure || 0;
+
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <span className="admin-stat-badge">
+        999: {fmtNum(listing999)}
+      </span>
+      <span className="admin-stat-badge">
+        cad: {fmtNum(cadastru)}
+      </span>
+      <span className="admin-stat-badge">
+        near: {fmtNum(nearby)}
+      </span>
+      {failure > 0 && (
+        <span className="admin-stat-badge admin-stat-badge-danger">
+          {fmtNum(failure)} failed
+        </span>
+      )}
+    </span>
+  );
+}
+
+function ActiveUsersSummary({ s }) {
+  return (
+    <span className="flex flex-col gap-0.5">
+      <span>
+        New reg. users:{" "}
+        <strong className="font-semibold text-gray-900 dark:text-slate-100">
+          {s.newUsers == null ? "—" : fmtNum(s.newUsers)}
+        </strong>
+      </span>
+      <span>
+        Old reg. users:{" "}
+        <strong className="font-semibold text-gray-900 dark:text-slate-100">
+          {s.oldUsers == null ? "—" : fmtNum(s.oldUsers)}
+        </strong>
+      </span>
+    </span>
+  );
+}
+
+function StatCard({ label, value, detail, onClick, active = false }) {
+  const isClickable = Boolean(onClick);
+
+  const inner = (
+    <>
+      <div className="w-full">
+        <div className="flex items-start justify-between gap-1.5">
+          <p className="admin-stat-label line-clamp-2">
+            {label}
+          </p>
+          {isClickable && (
+            <span
+              className={`shrink-0 inline-flex items-center justify-center w-4 h-4 rounded transition-all duration-150 ${
+                active
+                  ? "text-primary dark:text-indigo-400 bg-primary/10 dark:bg-indigo-500/20"
+                  : "text-gray-400 dark:text-slate-500 group-hover:text-primary dark:group-hover:text-indigo-400"
+              }`}
+              aria-hidden="true"
+            >
+              <svg
+                className={`w-3 h-3 transition-transform duration-200 ${active ? "rotate-180" : ""}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.5}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </span>
+          )}
+        </div>
+
+        <div className="admin-stat-value">
+          {value}
+        </div>
+      </div>
+
+      {detail && (
+        <div className="admin-stat-detail">
+          {typeof detail === "string" && isClickable ? (
+            <span
+              className={`inline-flex items-center gap-1 font-medium transition-colors ${
+                active
+                  ? "text-primary dark:text-indigo-400"
+                  : "text-gray-600 dark:text-slate-300 group-hover:text-primary dark:group-hover:text-indigo-300"
+              }`}
+            >
+              {detail}
+            </span>
+          ) : (
+            detail
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  const cardClasses = `admin-stat-card group w-full ${isClickable ? "is-clickable" : ""} ${
+    active ? "is-active" : ""
+  }`;
+
+  if (isClickable) {
     return (
       <button
         type="button"
         onClick={onClick}
-        className={`${cardClassName} text-left hover:border-primary/40 hover:ring-1 hover:ring-primary/20 cursor-pointer`}
+        aria-pressed={active}
+        className={cardClasses}
       >
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-          {label}
-        </p>
-        <p className="mt-1 text-2xl font-semibold text-gray-900">{value}</p>
-        {detail && <p className="mt-1 text-xs text-gray-400">{detail}</p>}
+        {inner}
       </button>
     );
   }
 
-  return (
-    <div className={cardClassName}>
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold text-gray-900">{value}</p>
-      {detail && <p className="mt-1 text-xs text-gray-400">{detail}</p>}
-    </div>
-  );
+  return <div className={cardClasses}>{inner}</div>;
 }
 
 function CadastruSearchDetails({ row, userName }) {
@@ -1333,18 +1509,18 @@ function DashboardContent() {
       {/* Users & App Usage */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">Users & App Usage</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-12 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 min-[1800px]:grid-cols-6 gap-3.5">
           <StatCard
             label="Active Users"
             value={s.activeUsers == null ? "Unavailable" : fmtNum(s.activeUsers)}
-            detail={<><span className="block">New reg. users: {s.newUsers == null ? "Unavailable" : fmtNum(s.newUsers)}</span><span className="block">Old reg. users: {s.oldUsers == null ? "Unavailable" : fmtNum(s.oldUsers)}</span></>}
+            detail={<ActiveUsersSummary s={s} />}
             onClick={toggleUsersList}
             active={showUsersList}
           />
           <StatCard
             label="Payments"
             value={s.payments?.available === false ? "Unavailable" : fmtNum(s.payments?.total)}
-            detail={showPaymentsList ? "Click to hide list" : "Click to view payments"}
+            detail={showPaymentsList ? "Hide payment records" : "View payment records"}
             onClick={() => setShowPaymentsList((value) => !value)}
             active={showPaymentsList}
           />
@@ -1371,63 +1547,71 @@ function DashboardContent() {
           <StatCard
             label="Prețuri actuale Popup"
             value={s.marketTrendsPopup?.available === false ? "—" : fmtNum(s.marketTrendsPopup?.total)}
-            detail={s.marketTrendsPopup?.available === false ? "Apply market trends popup SQL" : "Popup opens"}
+            detail={s.marketTrendsPopup?.available === false ? "Apply trends SQL" : "Popup impressions"}
           />
           <StatCard
             label="Sale Estimations"
             value={fmtNum(s.totalSaleEstimations ?? s.totalEstimations)}
-            detail={activeEstimationsType === "sale" ? "Click to hide list" : "Click to view recent sale estimations"}
+            detail={activeEstimationsType === "sale" ? "Hide estimations list" : "View recent estimations"}
             onClick={() => toggleEstimationsList("sale")}
             active={activeEstimationsType === "sale"}
           />
           <StatCard
             label="Rent Estimations"
             value={fmtNum(s.totalRentEstimations)}
-            detail={activeEstimationsType === "rent" ? "Click to hide list" : "Click to view recent rent estimations"}
+            detail={activeEstimationsType === "rent" ? "Hide estimations list" : "View recent estimations"}
             onClick={() => toggleEstimationsList("rent")}
             active={activeEstimationsType === "rent"}
           />
           <StatCard
             label="Cadastru Searches"
             value={fmtNum(s.cadastruSearches?.total)}
-            detail={showCadastruSearchesList ? "Click to hide list" : fmtCadastruResultSummary(s.cadastruSearches?.byResultType)}
+            detail={showCadastruSearchesList ? "Hide search records" : <CadastruResultBadges byResultType={s.cadastruSearches?.byResultType} />}
             onClick={() => setShowCadastruSearchesList((value) => !value)}
             active={showCadastruSearchesList}
           />
           <StatCard
             label="999 Link Analyses"
             value={fmtNum(s.listingLinkAnalyses?.total)}
-            detail={showListingLinkAnalysesList ? "Click to hide list" : `${fmtNum(s.listingLinkAnalyses?.success)} analyzed / ${fmtNum(s.listingLinkAnalyses?.unsupported)} rejected`}
+            detail={showListingLinkAnalysesList ? "Hide analyses list" : <ListingAnalysesSummary analyses={s.listingLinkAnalyses} />}
             onClick={() => setShowListingLinkAnalysesList((value) => !value)}
             active={showListingLinkAnalysesList}
           />
           <StatCard
             label="Calculator Usage"
             value={fmtNum(s.calculatorUsage?.total)}
-            detail={showCalculatorUsageList ? "Click to hide list" : `${fmtNum(s.calculatorUsage?.registered)} registered / ${fmtNum(s.calculatorUsage?.anonymous)} anonymous`}
+            detail={showCalculatorUsageList ? "Hide calculator logs" : <CalculatorUsageSummary usage={s.calculatorUsage} />}
             onClick={() => setShowCalculatorUsageList((value) => !value)}
             active={showCalculatorUsageList}
           />
           <StatCard
             label="PDF Reports"
             value={fmtNum(s.pdfGeneration?.total)}
-            detail={showPdfGenerationList ? "Click to hide list" : `${fmtNum(s.pdfGeneration?.registered)} registered / ${fmtNum(s.pdfGeneration?.anonymous)} anonymous`}
+            detail={showPdfGenerationList ? "Hide report logs" : <PdfGenerationSummary pdf={s.pdfGeneration} />}
             onClick={() => setShowPdfGenerationList((value) => !value)}
             active={showPdfGenerationList}
           />
-          <StatCard label="Shared Links" value={fmtNum(s.totalSharedLinks)} />
-          <StatCard label="Favorites" value={fmtNum(s.totalFavorites)} />
+          <StatCard
+            label="Shared Links"
+            value={fmtNum(s.totalSharedLinks)}
+            detail="Total shared properties"
+          />
+          <StatCard
+            label="Favorites"
+            value={fmtNum(s.totalFavorites)}
+            detail="Saved to favorites"
+          />
           <StatCard
             label="Telegram Alerts"
             value={fmtNum(s.totalTelegramAlerts)}
-            detail={showTelegramAlertsList ? "Click to hide list" : "Click to view alerts"}
+            detail={showTelegramAlertsList ? "Hide alerts list" : "View active alerts"}
             onClick={() => setShowTelegramAlertsList((value) => !value)}
             active={showTelegramAlertsList}
           />
           <StatCard
             label="External API"
             value={fmtNum(s.externalApiUsage?.total)}
-            detail={showExternalApiUsageList ? "Click to hide details" : fmtExternalApiUsageSummary(s.externalApiUsage)}
+            detail={showExternalApiUsageList ? "Hide API request logs" : <ExternalApiBadges usage={s.externalApiUsage} />}
             onClick={() => setShowExternalApiUsageList((value) => !value)}
             active={showExternalApiUsageList}
           />

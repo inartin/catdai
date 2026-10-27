@@ -9,7 +9,8 @@ Implemented.
 - Landing example-results section is titled `Cum arată o estimare` and uses a subtitle about real CatDai-generated result examples.
 - Landing hero copy positions the product as apartment market analysis for sellers, buyers, and monthly rent context.
 - Landing hero subtitle says the product estimates the market price for sale, purchase, or rent.
-- Landing shows compact sell/buy/rent scope cards below the main market card.
+- Landing places Cadastru between the market scope cards and the 999.md analyzer section in a full-width sage background band with subtle grid lines and generous vertical spacing. Content stays aligned to the existing card width, without an enclosing card border or shadow. Its atlas-style panel reuses the animated Moldova outline with an illustrative parcel boundary, survey vertices, and building footprint beneath the pulsing location dot (decorative, with reduced-motion support). The panel footer shows a cadastral-number example without a prefix; the tilted background parcel grid is omitted; concise RO/RU copy highlights property data, map location, and nearby context. The Romanian headline breaks between its two sentences. The `Caută date cadastrale` CTA (localized in Russian) opens the localized cadastral search page by address or number.
+- Landing shows compact sell/buy/rent scope cards between the main market card and the Cadastru section.
 - Landing scope card descriptions explain realistic seller pricing before publishing or accepting an agent offer, buyer price checks against similar area/parameters, and estimated rent by area and characteristics.
 - Landing mobile replaces the three large sell/buy/rent scope cards with one compact grouped card using small chips.
 - Landing marks visible rent scope labels with a localized `În curând` / `Скоро` badge until rent analysis is active.
@@ -17,7 +18,7 @@ Implemented.
 - Landing mobile combines live prices and compact four-month trend charts in one softly blurred Chișinău image-backed market card, with the city in the header, each price label above its matching green or blue chart, the first known price shown above the chart's starting point, and analyzed-listing count at the bottom.
 - The full Chișinău market card is clickable and opens a scrollable popup with separate four-month new-build and secondary-market charts for Chișinău sectors available in the `/estimeaza` form; sectors whose request fails or has no usable trend data are hidden. Landing and popup trends exclude snapshots before 1 July 2026.
 - Each popup open is recorded through a deferred browser-idle beacon and atomically increments the current Chișinău calendar-day counter, so analytics do not block the popup or district-chart loading.
-- Landing places the 999.md link analyzer below the sell/buy/rent scope cards on desktop, and above them on mobile.
+- Landing places the 999.md link analyzer below the Cadastru section on both desktop and mobile.
 - Landing 999.md link analyzer shows flat white paper-style feature tabs with custom line icons dropping from under the analyzer for price analysis, similar-listing comparison, duplicate checks, and price history.
 - Landing shows an all-time usage-stat card between the product scope/link analyzer and `How it works`, using the same white surface, `rounded-2xl`, emerald border, and standard landing shadow as the existing market card.
 - Landing `How it works` intro says users can see whether the price is below market, near market, or too high.

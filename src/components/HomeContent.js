@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Hero from "@/components/Hero";
 import CategoryCards from "@/components/CategoryCards";
+import LandingCadastruCard from "@/components/LandingCadastruCard";
 import HowItWorks from "@/components/HowItWorks";
 import LandingUsageStats from "@/components/LandingUsageStats";
 import ExampleResults from "@/components/ExampleResults";
@@ -246,9 +247,6 @@ function MarketScopeCards() {
             </div>
           ))}
         </div>
-        <div className="order-1 mx-auto max-w-4xl text-left sm:mt-24">
-          <LinkAnalyzer showFeaturePapers />
-        </div>
       </div>
     </section>
   );
@@ -269,6 +267,12 @@ export default function HomeContent({ prices }) {
       <Hero onPrimaryCta={() => handleCategorySelect("imobil")} />
       <CategoryCards />
       <MarketScopeCards />
+      <LandingCadastruCard />
+      <section className="px-4 pb-8 pt-4 sm:pt-8">
+        <div className="mx-auto max-w-4xl text-left">
+          <LinkAnalyzer showFeaturePapers />
+        </div>
+      </section>
       <LandingUsageStats />
       <HowItWorks />
       <ExampleResults />

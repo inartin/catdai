@@ -1,0 +1,42 @@
+.section {
+  background: #eaf0e5;
+  border-block: 1px solid rgb(6 78 59 / 10%);
+}
+
+.section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(rgb(6 78 59 / 5%) 1px, transparent 1px), linear-gradient(90deg, rgb(6 78 59 / 5%) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(90deg, transparent 40%, #000);
+}
+
+.atlas {
+  background: radial-gradient(ellipse at center, #d9ead5 0%, transparent 70%);
+}
+
+
+@media (min-width: 640px) {
+  .atlas {
+    border: 1px solid rgb(6 78 59 / 12%);
+    border-radius: 16px;
+    background-color: #eef3e8;
+    background-image: linear-gradient(rgb(6 78 59 / 5%) 1px, transparent 1px), linear-gradient(90deg, rgb(6 78 59 / 5%) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+
+  .map {
+    filter: drop-shadow(0 8px 14px rgb(6 78 59 / 12%));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map :global(.animate-moldova-stroke),
+  .map :global(.animate-moldova-ping) {
+    animation: none;
+  }
+}

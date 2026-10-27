@@ -1,4 +1,13 @@
 {
+  "landing.cadastruEyebrow": "CADASTRU · DATE OFICIALE",
+  "landing.cadastruTitle": "Cunoaște imobilul.\nDincolo de anunț.",
+  "landing.cadastruDescription": "Găsește datele cadastrale ale unui apartament, ale unei case sau ale unui teren, într-un singur loc.",
+  "landing.cadastruProperty": "Date cadastrale oficiale",
+  "landing.cadastruMap": "Amplasare pe hartă",
+  "landing.cadastruNearby": "Ce este în apropiere",
+  "landing.cadastruCta": "Caută date cadastrale",
+  "landing.cadastruSearchHint": "Caută după adresă sau număr cadastral",
+  "landing.cadastruNumberExample": "0100201.999",
   "cadastru.localityAlternativeIntro": "Nu am găsit adresa {street}, nr. {house}, în {city}. Am găsit aceeași adresă în {localities}.",
   "cadastru.localityAlternativeConfirm": "Este aceasta adresa dorită?",
   "cadastru.searchSuggestedLocality": "Caută „{city}, {street} {house}”",

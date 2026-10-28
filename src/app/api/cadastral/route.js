@@ -10,7 +10,7 @@ import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
 import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { resolveAccessTier } from "@/lib/access-tier";
-import { cadastruExpiresAt, writeCadastruCache, cleanCadastruPayload, cadastruNeedsRefresh, withCadastruFreshness } from "@/lib/cadastru-cache";
+import { cadastruPayloadExpiresAt, writeCadastruCache, cleanCadastruPayload, cadastruNeedsRefresh, withCadastruFreshness } from "@/lib/cadastru-cache";
 import { scheduleCadastruNumberRefresh } from "@/lib/cadastru-record-refresh";
 import {
   checkFeatureAccess,
@@ -516,7 +516,7 @@ async function handlePost(request) {
       if (!saved) {
         const fetchedAt = new Date().toISOString();
         const entry = { payload: cleanCadastruPayload(payload), lookupSource, fetchedAt,
-          expiresAt: cadastruExpiresAt(fetchedAt) };
+          expiresAt: cadastruPayloadExpiresAt(payload, fetchedAt) };
         await writeCadastruCache("number", trimmed, entry);
         payload = withCadastruFreshness(entry);
       }
@@ -530,6 +530,12 @@ async function handlePost(request) {
       const res = NextResponse.json({ ...preview, cadastru_evaluation_token: evaluationToken });
       res.headers.set("X-RateLimit-Remaining", String(remaining));
       return res;
+    }
+
+    // Verified outage data remains available to entitled viewers without
+    // recording a full-result unlock. Anonymous previews keep their masking.
+    if (payload.registry_unavailable) {
+      return NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
     }
 
     const creditUsage = await consumeFeatureCredit({

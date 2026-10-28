@@ -4,7 +4,7 @@ import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { matchDistrict } from "@/lib/validation";
 import { resolveCadastruSupportedCity, resolveCadastruCityFromAddress } from "@/lib/cadastru-supported-cities";
-import { cadastruExpiresAt, isFreshCadastru, cleanCadastruPayload, readCadastruCache, writeCadastruCache, withCadastruFreshness } from "@/lib/cadastru-cache";
+import { cadastruPayloadExpiresAt, cadastruExpiresAt, isFreshCadastru, cleanCadastruPayload, readCadastruCache, writeCadastruCache, withCadastruFreshness } from "@/lib/cadastru-cache";
 import { apartmentBuildingNumber, isApartmentBlock, storeSharedBuilding, getSharedBuilding, composeBuildingEntry } from "@/lib/cadastru-buildings";
 import { validMapGeometry } from "@/lib/cadastru-map";
 
@@ -410,7 +410,7 @@ function buildRecordRow(payload, options = {}, existing = null) {
     payload_hash: payloadHash,
     data_updated_at: existing?.payload_hash && existing.payload_hash === payloadHash ? existing.data_updated_at : now,
     last_official_fetch_at: options.officialFetch ? now : existing?.last_official_fetch_at || options.fetchedAt || null,
-    next_refresh_after: options.officialFetch ? cadastruExpiresAt(now) : existing ? recordExpiry(existing) : options.expiresAt || cadastruExpiresAt(now),
+    next_refresh_after: options.officialFetch ? cadastruPayloadExpiresAt(storagePayload, now) : existing ? recordExpiry(existing) : options.expiresAt || cadastruPayloadExpiresAt(storagePayload, now),
   };
 }
 
@@ -503,6 +503,11 @@ export async function persistCadastruRecord(payload, options = {}) {
   try {
     if (!options.skipBuildingBundles) await persistBuildingBundles(payload, options);
     const existing = await findRecordByNumber(payload?.cadastral_number || options.cadastralNumber);
+    // A forced lookup during an outage must not replace a richer saved result
+    // or renew its original source dates.
+    if (payload?.registry_unavailable && existing && !existing.raw_payload?.registry_unavailable) {
+      return (await composeBuildingEntry(recordEntry(existing))).payload;
+    }
     const row = buildRecordRow(payload, options, existing);
     if (!row) return null;
 

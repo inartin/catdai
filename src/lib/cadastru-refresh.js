@@ -6,11 +6,11 @@ const RETRY_SECONDS = 5 * 60;
 const pending = new Map();
 
 export function isUsableCadastruRefresh(previous, next) {
-  if (!next || typeof next !== "object" || next.incomplete || next.cache?.stale) return false;
+  if (!next || typeof next !== "object" || next.incomplete || next.registry_unavailable || next.cache?.stale) return false;
   const digits = value => String(value || "").replace(/\D/g, "");
   if (previous.cadastral_number && digits(next.cadastral_number) !== digits(previous.cadastral_number)) return false;
   const retains = (old, fresh) => !old || Object.entries(old).every(([key, value]) =>
-    value === null || value === undefined || value === "" || (fresh?.[key] !== null && fresh?.[key] !== undefined && fresh?.[key] !== ""));
+    key === "partial" || value === null || value === undefined || value === "" || (fresh?.[key] !== null && fresh?.[key] !== undefined && fresh?.[key] !== ""));
   if (!["apartment", "building"].every(key => retains(previous[key], next[key]))) return false;
   return ["lands", "buildings"].every(key => !previous[key]?.length || previous[key].every(property =>
     next[key]?.some(candidate => digits(candidate.cadastral_number) === digits(property.cadastral_number) && retains(property, candidate))));

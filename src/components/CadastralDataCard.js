@@ -14,6 +14,8 @@ export default function CadastralDataCard({
   revealButtonLabel,
   desktopRevealButtonLabel,
   desktopRevealDescription,
+  onRegistryRetry,
+  registryRetrying = false,
   children,
 }) {
   const { lang, t } = useTranslation();
@@ -291,6 +293,15 @@ export default function CadastralDataCard({
               <LockIcon size={20} strokeWidth={2.2} />
               {desktopRevealButtonLabel}
             </button>
+          </div>
+        ) : null}
+        {cadastral.registry_unavailable ? (
+          <div role="status" className="mt-4 rounded-xl bg-sky-50 p-4 text-sm text-sky-950">
+            <p>{t("cadastru.registryUnavailablePartial")}</p>
+            {onRegistryRetry ? <button type="button" disabled={registryRetrying}
+              onClick={onRegistryRetry} className="mt-2 cursor-pointer font-semibold underline disabled:cursor-wait disabled:opacity-60">
+              {t(registryRetrying ? "cadastru.registryRetrying" : "cadastru.retrySearch")}
+            </button> : null}
           </div>
         ) : null}
         <CadastruFreshnessNote freshness={cadastral.data_freshness} />

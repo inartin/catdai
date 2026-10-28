@@ -79,6 +79,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     source: payload?.source,
     method: payload?.method,
     partial: payload?.partial,
+    ...(payload?.registry_unavailable ? { registry_unavailable: true } : {}),
     ...(payload?.apartment_unavailable ? { apartment_unavailable: true } : {}),
     ...(payload?.data_freshness ? { data_freshness: payload.data_freshness } : {}),
     district: payload?.district || null,

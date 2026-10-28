@@ -1,6 +1,12 @@
 import crypto from "node:crypto";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 
+export const CADASTRU_OUTAGE_RETRY_SECONDS = 5 * 60;
+
+export function cadastruPayloadExpiresAt(payload, fetchedAt = new Date().toISOString()) {
+  return cadastruExpiresAt(fetchedAt, payload?.registry_unavailable ? CADASTRU_OUTAGE_RETRY_SECONDS : CADASTRU_TTL_SECONDS);
+}
+
 export const CADASTRU_TTL_SECONDS = 90 * 24 * 60 * 60;
 export const CADASTRU_BUILDING_TTL_SECONDS = 180 * 24 * 60 * 60;
 export const CADASTRU_REGISTRY_TTL_SECONDS = 30 * 24 * 60 * 60;

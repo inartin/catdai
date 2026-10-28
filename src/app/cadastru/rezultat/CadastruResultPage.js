@@ -518,6 +518,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const originalStreet = originalStreetParam || String(state.data?.street_resolution?.original || "").slice(0, 80);
   const resolvedStreet = resolvedStreetParam || String(state.data?.street_resolution?.resolved || "").slice(0, 80);
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
+  const canUnlock = isLockedPreview && !state.data?.registry_unavailable;
   const purchaseOffer = state.data?.access_limit?.purchase || (isLockedPreview ? { product_key: "cadastru_lookup_single" } : null);
   const singlePurchaseProduct = purchaseOffer?.product_key?.endsWith("_single") ? maibProduct(purchaseOffer.product_key) : null;
   const checkoutProductKey = paymentProvider === "maib" && singlePurchaseProduct ? singlePurchaseProduct.key : "extra_pack";
@@ -609,7 +610,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       key={nearbyKey}
       address={nearbyAddress}
       cadastralNumber={validateCadastralNumber(nearbyNumber).valid ? nearbyNumber : ""}
-      onUnlock={isLockedPreview ? startCheckout : undefined}
+      onUnlock={canUnlock ? startCheckout : undefined}
     /> : null;
   const map = protectedMap || (mapUrl && (
     <div className="mt-6 w-full overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md">
@@ -906,7 +907,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       try {
         const body = {
           cadastral_number: cadastralNumber,
-          ...(skipCache ? { skip_cache: true } : {}),
+          ...(skipCache || (lookupRetry?.key === requestKey && lookupRetry.forceRefresh) ? { skip_cache: true } : {}),
           ...(searchSource === "number" ? { search_context: "cadastru", search_type: searchSource } : {}),
           ...(searchSource === "address" ? { preview_origin: "address" } : {}),
         };
@@ -924,7 +925,10 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
             if (active) setState({ loading: false, error: t("cadastru.loginToUse"), data: null });
             return;
           }
-          if (active) setState({ loading: false, error: isLookupUnavailable(response) ? t("cadastru.serviceUnavailable") : readLookupError(response.data, t), data: addressData,
+          if (active) setState((current) => current.data?.registry_unavailable ? {
+            ...current, loading: false, detailsLoading: false, retrying: false, error: "",
+            partialRetry: { key: requestKey, attempt },
+          } : { loading: false, error: isLookupUnavailable(response) ? t("cadastru.serviceUnavailable") : readLookupError(response.data, t), data: addressData,
             ...lookupRetryState(response, requestKey, attempt),
             fallbackAddress: !addressData && source === "address" && isLookupUnavailable(response)
               ? formatLookupAddress(readAddressLookupRequest()) : "" });
@@ -932,7 +936,9 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
         }
 
         if (active) {
-          setState({ loading: false, error: "", data: addressData && response.data ? {
+          setState({ loading: false, error: "",
+            partialRetry: response.data?.registry_unavailable ? { key: requestKey, attempt } : null,
+            data: addressData && response.data ? {
             ...response.data,
             request_address: response.data.request_address || addressData.request_address,
             resolved_address: response.data.resolved_address || addressData.resolved_address,
@@ -941,7 +947,10 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
       } catch {
         if (active) {
           loadedRequestKey.current = attemptKey;
-          setState({ loading: false, error: t("cadastru.serviceUnavailable"), data: addressData,
+          setState((current) => current.data?.registry_unavailable ? {
+            ...current, loading: false, detailsLoading: false, retrying: false, error: "",
+            partialRetry: { key: requestKey, attempt },
+          } : { loading: false, error: t("cadastru.serviceUnavailable"), data: addressData,
             ...lookupRetryState({ status: 503 }, requestKey, attempt),
             fallbackAddress: !addressData && source === "address" ? formatLookupAddress(readAddressLookupRequest()) : "" });
         }
@@ -1331,11 +1340,15 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
               <CadastralDataCard
                 cadastral={state.data}
                 locked={isLockedPreview}
-                showRevealButton={isLockedPreview}
+                onRegistryRetry={state.partialRetry ? () => setLookupRetry({
+                  key: state.partialRetry.key, attempt: state.partialRetry.attempt + 1, forceRefresh: true,
+                }) : undefined}
+                registryRetrying={Boolean(state.retrying)}
+                showRevealButton={canUnlock}
                 revealButtonLabel={t("cadastru.payToUnlock")}
                 desktopRevealButtonLabel={t("cadastru.unlockCompleteCta", { price: unlockPriceLabel })}
                 desktopRevealDescription={t("cadastru.unlockCompleteDescription")}
-                onLockedClick={isLockedPreview ? startCheckout : undefined}
+                onLockedClick={canUnlock ? startCheckout : undefined}
               >
                 {map}
               </CadastralDataCard>
@@ -1414,7 +1427,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
         </section>
       </main>
       <Footer />
-      {isLockedPreview && purchaseOffer ? (
+      {canUnlock && purchaseOffer ? (
         <div className="lg:hidden">
           <FeaturePricingAction offer={purchaseOffer} mobileDock />
         </div>

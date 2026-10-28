@@ -220,6 +220,16 @@ The autocomplete bundles 1,682 settlement entries from the official BNS `https:/
 
 Russian picker labels use reviewed exonyms in `src/lib/cadastru-locality-labels.js`: Кишинёв, Бельцы, Оргеев, Дурлешты and Криково. The same labels appear in administrative context. Both display and original CUATM spellings remain searchable; Romanian labels, IDs and canonical request values are unchanged. Unreviewed names retain the catalogue spelling, with no automatic transliteration. References: [city tourism](https://visit.chisinau.md/ru/istoric/), [municipal suburb site](https://suburbii.chisinau.md/ru/durlesti/), [Moldova tourism](https://moldova.travel/ru/turisticheskiye-priklyucheniya/marshrut-codru/), and [local Russian news usage](https://point.md/ru/novosti/obschestvo/na-kishinev-prikhoditsia-pochti-tret-zhitelei-strany-bolee-700-tys-zhitelei/).
 
+## Parcel results during registry outages
+
+Number lookups keep the existing 20-second app / 19-second worker deadlines. The worker bounds the entire parcel registry phase to eight seconds, reserving time for exact Geodata recovery. Verified recovery results carry `registry_unavailable: true` separately from ordinary `partial` results. Registry-list/detail failures retain verified land and construction identities with the same marker.
+
+The number route saves these results with a five-minute refresh deadline; expired snapshots remain available while the existing background refresh retries. Outage responses cannot replace richer saved records or renew their source dates. A recovered registry response can replace a partial snapshot without retaining its temporary outage flags. No schema change is required.
+
+Preview masking and map access checks still apply. Outage results do not consume an unlock credit, and standalone results suppress purchase actions until registry data recovers. The property card explains the outage; its manual retry bypasses the cache, retains the same lookup ID and keeps the available result visible if retry fails. Successful fallback responses do not trigger the two-second automatic error retry. Deploy app and worker together.
+
+Checks: `pnpm exec node --experimental-vm-modules scripts/test-cadastru-outage.mjs` covers outage storage, credit behavior, masking, stale reads, registry recovery and preservation of richer records.
+
 ## Worker host failover
 
 All six worker endpoints (cadastral number, address, nearby places, transport, municipal reports and 999 listing) try configured hosts in this order: `pi` → `mac` → `curiosity`. Set server-only values in the main CatDai app:

@@ -181,14 +181,14 @@ async function fetchCadastruHistory(userId, cursor, pageSize) {
   return { data: [], error: null };
 }
 
-async function fetchPaidEvaluationSnapshots(userId, cursor, pageSize) {
+async function fetchPaidEvaluationSnapshots(userId, cursor, pageSize, cadastruOnly = false) {
   const res = await applyCursor(
     supabaseAdmin
       .from("user_feature_usage_events")
       .select(PAID_USAGE_COLUMNS)
       .eq("user_id", userId)
       .eq("source", "paid_credit")
-      .in("feature_key", [...PAID_EVALUATION_FEATURE_KEYS, 'cadastru_lookup'])
+      .in("feature_key", cadastruOnly ? ['cadastru_lookup'] : [...PAID_EVALUATION_FEATURE_KEYS, 'cadastru_lookup'])
       .order("created_at", { ascending: false })
       .limit(pageSize + 1),
     cursor
@@ -213,6 +213,7 @@ export async function GET(request) {
   }
 
   const { searchParams } = new URL(request.url);
+  const cadastruOnly = searchParams.get("type") === "cadastru";
   const pageSize = parseLimit(searchParams.get("limit"));
   const cursor = decodeCursor(searchParams.get("cursor"));
 
@@ -221,9 +222,9 @@ export async function GET(request) {
   }
 
   const [estimateRes, cadastruRes, paidSnapshotRes] = await Promise.all([
-    fetchEstimateHistory(access.user_id, cursor, pageSize),
+    cadastruOnly ? { data: [], error: null } : fetchEstimateHistory(access.user_id, cursor, pageSize),
     fetchCadastruHistory(access.user_id, cursor, pageSize),
-    fetchPaidEvaluationSnapshots(access.user_id, cursor, pageSize),
+    fetchPaidEvaluationSnapshots(access.user_id, cursor, pageSize, cadastruOnly),
   ]);
 
   if (estimateRes.error || cadastruRes.error || paidSnapshotRes.error) {
@@ -231,7 +232,7 @@ export async function GET(request) {
       "[profile-history] history failed:",
       estimateRes.error?.message || cadastruRes.error?.message || paidSnapshotRes.error?.message
     );
-    return NextResponse.json({ history: [], nextCursor: null });
+    return NextResponse.json({ history: [], nextCursor: null }, { status: cadastruOnly ? 503 : 200 });
   }
 
   const paidSnapshotRows = paidSnapshotRes.data || [];

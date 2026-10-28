@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import CadastruSourceNote from "@/components/CadastruSourceNote";
 import CadastruSearchForm from "@/components/CadastruSearchForm";
 import CadastruLoadingPage from "@/components/CadastruLoadingPage";
+import CadastruHistory from "@/components/CadastruHistory";
 import { useTranslation } from "@/context/LanguageContext";
 
 const exampleImages = [
@@ -106,6 +107,7 @@ export default function CadastruPage() {
               </div>
             </div>
           </details>
+          <CadastruHistory />
           <p className="mt-6 text-center text-sm text-gray-500">{t("cadastru.disclaimer")}</p>
         </section>
       </main>

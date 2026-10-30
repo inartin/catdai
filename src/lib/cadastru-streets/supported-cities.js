@@ -97,7 +97,8 @@ export function resolveSupportedCityFromAddress(value) {
     const marker = markers[index];
     if (/^(raionul|raion|r nul|r n|sectorul|sector|sect)$/.test(marker[1])) continue;
     const name = localityPrefix.slice(marker.index + marker[0].length, markers[index + 1]?.index);
-    return resolveLocality(name, localityPrefix) || (localityAliases(resolveSupportedCity(name)).length === 0 ? resolveSupportedCity(name) : null);
+    const settlementType = /^(satul|sat|comuna|com)$/.test(marker[1]) ? "rural" : "urban";
+    return resolveLocality(name, localityPrefix.slice(0, marker.index), settlementType) || (localityAliases(resolveSupportedCity(name)).length === 0 ? resolveSupportedCity(name) : null);
   }
 
   // Flat user addresses and city aliases have no administrative hierarchy.
@@ -110,7 +111,14 @@ export function resolveSupportedCityFromGeocode(result) {
   const address = result.address || {};
   const locality = address.village || address.hamlet || address.town
     || (resolveSupportedCity(address.suburb) ? address.suburb : null) || address.city;
-  if (locality) return resolveLocality(locality, result.display_name || Object.values(address).join(", "));
+  // Backup providers also use city for rural settlements; only explicit place
+  // fields supply a type, while generic city/suburb labels retain exact matching.
+  const settlementType = address.village || address.hamlet ? "rural" : address.town ? "urban" : "";
+  // A settlement name must not double as evidence for its same-named district.
+  const context = settlementType
+    ? [address.municipality, address.county, address.state_district, address.state, address.region].filter(Boolean).join(", ")
+    : result.display_name || Object.values(address).join(", ");
+  if (locality) return resolveLocality(locality, context, settlementType);
   if (result.display_name) return resolveSupportedCityFromAddress(result.display_name);
   return resolveSupportedCity(address.municipality);
 }

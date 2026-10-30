@@ -12,11 +12,14 @@ for (const row of LOCALITIES) {
     nameCounts[lang].set(key, (nameCounts[lang].get(key) || 0) + 1);
   }
 }
+function localityType(row, lang) {
+  return ['3','5'].includes(row.status) ? (lang === 'ru' ? 'город' : 'oraș') : (lang === 'ru' ? 'село' : 'sat');
+}
 function selectedLabel(row, lang) {
   const name = localityLabel(row, lang);
   if ((nameCounts[lang === 'ru' ? 'ru' : 'ro'].get(normalizeLocality(name)) || 0) < 2) return name;
   const context = row.ancestors.map(ancestor => localityLabel(ancestor, lang));
-  if (row.city.includes('[')) context.push(row.id);
+  if (row.city.includes('[')) context.unshift(localityType(row, lang));
   return context.length ? `${name} (${context.join(' · ')})` : name;
 }
 
@@ -61,8 +64,8 @@ export default function CadastruLocalityInput({ value, onChange, lang }) {
       className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary-light" />
     {open && <ul id={`${id}-list`} role="listbox" className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
       {options.map((row,index) => <li key={row.id} id={`${id}-${index}`} role="option" aria-selected={index===active} onMouseDown={event => event.preventDefault()} onClick={event => { event.preventDefault(); event.stopPropagation(); choose(row); }} className={`cursor-pointer rounded-lg px-3 py-2 ${index===active?'bg-primary/10':'hover:bg-gray-50'}`}>
-        <div className="font-medium text-gray-900">{label(row)} <span className="text-xs font-normal text-gray-500">{['3','5'].includes(row.status) ? (lang==='ru'?'город':'oraș') : (lang==='ru'?'село':'sat')}</span></div>
-        <div className="text-xs text-gray-500">{row.ancestors.map(a => localityLabel(a, lang)).join(' · ')}{row.city.includes('[') ? ` · ${row.id}` : ''}</div>
+        <div className="font-medium text-gray-900">{label(row)} <span className="text-xs font-normal text-gray-500">{localityType(row, lang)}</span></div>
+        <div className="text-xs text-gray-500">{row.ancestors.map(a => localityLabel(a, lang)).join(' · ')}</div>
       </li>)}
       {!options.length && <li className="px-3 py-2 text-sm text-gray-500">{lang==='ru'?'Населённый пункт не найден. Проверьте название.':'Localitatea nu a fost găsită. Verifică denumirea.'}</li>}
     </ul>}

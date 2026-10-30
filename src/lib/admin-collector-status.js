@@ -23,6 +23,9 @@ export async function fetchCollectorStatus() {
         || !["total", "processed", "complete", "partial", "pending", "running", "skipped"].every(key => Number.isSafeInteger(data.totals?.[key]) && data.totals[key] >= 0)
         || !["cadastru", "transport", "nearby", "reports"].every(key => Number.isSafeInteger(data.categories?.[key]?.saved) && Number.isSafeInteger(data.categories[key].missing))
         || !Array.isArray(data.retry)) return null;
+      const progress = data.addressProgress;
+      if (progress != null && (!["complete", "retry", "working", "empty"].every(key => Number.isSafeInteger(progress[key]) && progress[key] >= 0)
+        || ["complete", "retry", "working", "empty"].reduce((sum, key) => sum + progress[key], 0) !== data.totals.total)) return null;
       return { ...data, worker: worker.name };
     } catch { return null; }
   }));

@@ -68,14 +68,22 @@ export default function AdminCollectorStatus({ refreshKey = 0 }) {
             <p><strong className="font-semibold tabular-nums text-gray-900">{fmt(result.totals.processed)}</strong> processed of <strong className="font-semibold tabular-nums text-gray-900">{fmt(result.totals.total)}</strong> addresses</p>
             <p className="text-xs">{result.worker} · Checkpoint {new Date(result.updatedAt).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</p>
           </div>
-          <dl className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg bg-gray-50 p-4"><dt className="text-sm text-gray-600">Complete</dt><dd className="mt-2 text-2xl font-semibold tabular-nums text-primary">{fmt(result.totals.complete)}</dd><p className="mt-1 text-xs text-gray-500">All collection datasets saved</p></div>
-            <div className="rounded-lg bg-gray-50 p-4"><dt className="text-sm text-gray-600">Partial</dt><dd className="mt-2 text-2xl font-semibold tabular-nums text-amber-800">{fmt(result.totals.partial)}</dd>
-              <button type="button" onClick={() => setShowRetry(value => !value)} aria-expanded={showRetry} aria-controls="collector-retry" className="mt-1 cursor-pointer text-xs font-medium text-primary hover:underline">{showRetry ? "Hide missing data" : "See what is missing"}</button>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-4"><dt className="text-sm text-gray-600">Pending</dt><dd className="mt-2 text-2xl font-semibold tabular-nums text-gray-900">{fmt(result.totals.pending)}</dd><p className="mt-1 text-xs text-gray-500">Waiting or currently being processed</p></div>
-          </dl>
-          {result.totals.skipped > 0 && <p className="text-xs text-gray-500">{fmt(result.totals.skipped)} addresses skipped</p>}
+          {result.addressProgress ? <>
+            <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ["complete", "Complete", "All four datasets saved", "text-primary"],
+                ["retry", "Needs retry", "Some data saved; finished attempt left gaps", "text-amber-800"],
+                ["working", "Partly saved / queued", "Some data saved; work remains", "text-gray-900"],
+                ["empty", "No data saved", "Nothing saved yet, including failed empty attempts", "text-gray-900"],
+              ].map(([key, label, description, color]) => <div key={key} className="rounded-lg bg-gray-50 p-4">
+                <dt className="text-sm text-gray-600">{label}</dt>
+                <dd className={`mt-2 text-2xl font-semibold tabular-nums ${color}`}>{fmt(result.addressProgress[key])}</dd>
+                <p className="mt-1 text-xs text-gray-500">{description}</p>
+              </div>)}
+            </dl>
+            <p className="text-xs text-gray-500">Each known address is counted once. No data saved can include failed attempts that need a retry.</p>
+          </> : <p className="text-sm text-amber-800">Update the collector API worker to show the four address groups.</p>}
+          <button type="button" onClick={() => setShowRetry(value => !value)} aria-expanded={showRetry} aria-controls="collector-retry" className="cursor-pointer text-xs font-medium text-primary hover:underline">{showRetry ? "Hide missing data" : "See what is missing"}</button>
           <div className="rounded-lg border border-gray-100 p-4">
             <p className="text-xs font-medium text-gray-500">{result.state === "running" ? "Currently collecting" : "Collector activity"}</p>
             <p className="mt-1 text-sm font-medium text-gray-900">{result.state === "running" ? result.current?.address || "Checking the queue…" : result.state === "stopped" ? "Collector is stopped" : "Current activity unavailable"}</p>

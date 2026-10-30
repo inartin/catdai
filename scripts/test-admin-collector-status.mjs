@@ -8,6 +8,7 @@ import { loadAppModule } from "./lib/load-app-module.mjs";
 const data = {
   available: true, state: "running", updatedAt: "2026-10-26T09:30:00.000Z",
   totals: { total: 3471, processed: 740, complete: 702, partial: 38, pending: 2731, running: 2, skipped: 0 },
+  addressProgress: { complete: 702, retry: 30, working: 100, empty: 2639 },
   categories: Object.fromEntries(["cadastru", "nearby", "transport", "reports"].map(key => [key, { saved: 702, missing: 38 }])),
   current: { address: "Chișinău, str Test 5", categories: { cadastru: "complete", nearby: "pending" } },
   retry: [{ id: "one", address: "Chișinău, str Test 2", missing: [{ category: "nearby", error: "Provider timed out" }] }],
@@ -79,7 +80,7 @@ const mocks = { react: {
   useState(initial) { const index = cursor++; if (!(index in slots)) slots[index] = initial;
     return [slots[index], value => { slots[index] = typeof value === "function" ? value(slots[index]) : value; }]; },
   useEffect(effect) { effects.push(effect); },
-}, "react/jsx-runtime": { jsx, jsxs: jsx } };
+}, "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "fragment" } };
 const transformed = await transform(await fs.readFile("src/components/admin/AdminCollectorStatus.js", "utf8"), {
   filename: "AdminCollectorStatus.js", jsc: { parser: { syntax: "ecmascript", jsx: true }, transform: { react: { runtime: "automatic" } } }, module: { type: "es6" },
 });
@@ -100,7 +101,7 @@ timerCallback();
 assert.equal(fetches, 1, "polls cannot overlap a pending request");
 resolveFetch(Response.json({ ...data, worker: "mac" })); await settle();
 tree = render();
-for (const value of ["702", "740", "38", "Running", "Chișinău, str Test 5", "Nearby places"]) assert(textOf(tree).includes(value));
+for (const value of ["702", "740", "38", "Running", "Chișinău, str Test 5", "Nearby places", "Needs retry", "Partly saved / queued", "No data saved"]) assert(textOf(tree).includes(value));
 nodes(tree).find(node => node.type === "button" && textOf(node) === "See what is missing").props.onClick();
 tree = render();
 assert(textOf(tree).includes("Provider timed out"));
@@ -115,7 +116,7 @@ tree = render();
 assert(textOf(tree).includes("Showing the last received statistics"));
 assert(textOf(tree).includes("702"));
 timerCallback();
-resolveFetch(Response.json({ ...data, worker: "mac", state: "stopped", current: null, totals: { ...data.totals, complete: 703 } })); await settle();
+resolveFetch(Response.json({ ...data, worker: "mac", state: "stopped", current: null, totals: { ...data.totals, complete: 703 }, addressProgress: { ...data.addressProgress, complete: 703, empty: 2638 } })); await settle();
 tree = render();
 assert(textOf(tree).includes("Stopped"));
 assert(textOf(tree).includes("703"));
@@ -123,3 +124,12 @@ assert(!textOf(tree).includes("Showing the last received statistics"));
 cleanup();
 assert(timerCleared); assert.equal(listeners.size, 0);
 console.log("Collector UI passed: real totals/current address, missing-data details, polling, tab visibility, stopped state, stale snapshots and cleanup.");
+
+replies.mac = { ...data, addressProgress: { ...data.addressProgress, empty: 1 } };
+assert.equal((await helper.namespace.fetchCollectorStatus()).available, false, "inconsistent address totals are rejected");
+const legacy = { ...data }; delete legacy.addressProgress;
+replies.mac = legacy;
+assert.equal((await helper.namespace.fetchCollectorStatus()).available, true, "older workers retain existing status data");
+slots[0] = { ...legacy, worker: "mac" };
+assert(textOf(render()).includes("Update the collector API worker"));
+console.log("Collector address groups passed: exact counts, invalid-total rejection and older-worker notice.");

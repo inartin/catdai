@@ -5,13 +5,13 @@ import { useTranslation } from "@/context/LanguageContext";
 
 function formatPrice(num) {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   return "€" + Math.round(value).toLocaleString("ro-MD");
 }
 
 function formatTrendPercent(num) {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
 }

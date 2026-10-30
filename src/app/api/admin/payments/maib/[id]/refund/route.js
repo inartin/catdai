@@ -10,7 +10,7 @@ export async function POST(request, context) {
   const { id } = await context.params;
   const body = await request.json().catch(() => ({}));
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
-  if (!UUID.test(id) || !reason || reason.length > 500) return NextResponse.json({ error: 'Order and refund reason (1–500 characters) required.' }, { status: 400 });
+  if (!UUID.test(id) || !reason || reason.length > 500) return NextResponse.json({ error: 'Order and refund reason (1-500 characters) required.' }, { status: 400 });
   try {
     const order = await getOrder(id);
     if (!order) return NextResponse.json({ error: 'Order not found in the active MAIB environment.' }, { status: 404 });

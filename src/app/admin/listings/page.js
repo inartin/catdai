@@ -6,17 +6,17 @@ import Link from "next/link";
 const PRICE_CHANGE_LOAD_SIZE = 10;
 
 function fmtNum(n) {
-  if (n == null) return "\u2014";
+  if (n == null) return "-";
   return Number(n).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
 }
 
 function fmtPrice(amount, currency) {
-  if (amount == null) return "\u2014";
+  if (amount == null) return "-";
   return `${fmtNum(amount)} ${currency || "\u20AC"}`;
 }
 
 function fmtDate(d) {
-  if (!d) return "\u2014";
+  if (!d) return "-";
   return new Date(d).toLocaleDateString("ro-RO", {
     day: "2-digit",
     month: "short",
@@ -25,21 +25,21 @@ function fmtDate(d) {
 }
 
 function fmtPct(n) {
-  if (n == null || !Number.isFinite(n)) return "\u2014";
+  if (n == null || !Number.isFinite(n)) return "-";
   const sign = n > 0 ? "+" : "";
   return `${sign}${n.toFixed(1)}%`;
 }
 
 function fmtChange(n) {
-  if (n == null || !Number.isFinite(n)) return "\u2014";
+  if (n == null || !Number.isFinite(n)) return "-";
   const sign = n > 0 ? "+" : "";
   return `${sign}${fmtNum(Math.round(n))} \u20AC`;
 }
 
 function fmtSignedPrice(amount, currency) {
-  if (amount == null) return "\u2014";
+  if (amount == null) return "-";
   const value = Number(amount);
-  if (!Number.isFinite(value)) return "\u2014";
+  if (!Number.isFinite(value)) return "-";
   const sign = value > 0 ? "+" : value < 0 ? "-" : "";
   return `${sign}${fmtPrice(Math.abs(value), currency)}`;
 }
@@ -218,7 +218,7 @@ function PriceChangeListingsSection({ listings, total, loadingMore, onLoadMore }
                         {l.title}
                       </Link>
                       <p className="mt-0.5 text-xs text-gray-400 truncate">
-                        {[l.district, l.sector].filter(Boolean).join(", ") || "\u2014"}
+                        {[l.district, l.sector].filter(Boolean).join(", ") || "-"}
                       </p>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap font-medium">
@@ -467,7 +467,7 @@ export default function ListingsPage() {
                       : pc.up > pc.down
                         ? "Rising"
                         : "Stable"
-                    : "\u2014"
+                    : "-"
                 }
                 color={
                   pc.total > 0
@@ -539,12 +539,12 @@ export default function ListingsPage() {
                         {fmtPrice(l.price_amount, l.price_currency)}
                       </td>
                       <td className="px-4 py-3">
-                        {l.area_m2 ? `${l.area_m2} m\u00B2` : "\u2014"}
+                        {l.area_m2 ? `${l.area_m2} m\u00B2` : "-"}
                       </td>
-                      <td className="px-4 py-3">{l.rooms_count ?? "\u2014"}</td>
+                      <td className="px-4 py-3">{l.rooms_count ?? "-"}</td>
                       <td className="px-4 py-3">
                         {[l.district, l.sector].filter(Boolean).join(", ") ||
-                          "\u2014"}
+                          "-"}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -662,17 +662,17 @@ export default function ListingsPage() {
                       {fmtPrice(l.price_amount, l.price_currency)}
                     </td>
                     <td className="px-4 py-3">
-                      {l.area_m2 ? `${l.area_m2} m\u00B2` : "\u2014"}
+                      {l.area_m2 ? `${l.area_m2} m\u00B2` : "-"}
                     </td>
-                    <td className="px-4 py-3">{l.rooms_count ?? "\u2014"}</td>
+                    <td className="px-4 py-3">{l.rooms_count ?? "-"}</td>
                     <td className="px-4 py-3">
                       {l.floor != null
                         ? `${l.floor}/${l.total_floors || "?"}`
-                        : "\u2014"}
+                        : "-"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {[l.district, l.sector].filter(Boolean).join(", ") ||
-                        "\u2014"}
+                        "-"}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -697,7 +697,7 @@ export default function ListingsPage() {
                           View
                         </Link>
                       ) : (
-                        "\u2014"
+                        "-"
                       )}
                     </td>
                   </tr>

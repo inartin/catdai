@@ -62,29 +62,36 @@ const noBuildings=summarizeCadastruStorage({...source,buildings:[],addresses:[]}
 assert.equal(noBuildings.storedDatasets.transport.saved,1,'datasets remain visible with no cadastral buildings');
 assert.equal(noBuildings.coverage.transport.total,0);
 
-let reads=0,fail=false;
+let reads=0,fail=false,rpcFail=false;
 const selections=[];
-const tables={cadastru_public_transport:Array.from({length:1002},(_,i)=>({origin_key:`address${i}`,expires_at:future})),cadastru_records:Array.from({length:1001},(_,i)=>({cadastral_number:`p${i}`,city:'Test'}))};
+const calls=[];
+const tables={cadastru_public_transport:Array.from({length:1002},(_,i)=>({origin_key:`address${i}`,expires_at:future}))};
+const inventory={total:100001,fullData:90000,buildings:0,apartments:{total:100000,linked:0,details:90000,references:10000,fresh:90000},other:1,linkedCities:{}};
+const cityInventory=[{city:'Test',buildings:0,apartments:100000,other:1}];
 const route=await loadAppModule('src/app/api/admin/cadastru-storage/route.js',{
   'next/server':{NextResponse:{json:data=>Response.json(data)}},
   '@/lib/admin-auth':{requireAdminApiAuth:req=>req.authorized?null:new Response(null,{status:401})},
-  '@/lib/supabase-admin':{supabaseAdmin:{from(table){ reads++;return {select(columns){selections.push({table,columns});return this;},order(){return this;},async range(from,to){return {data:(tables[table]||[]).slice(from,to+1),error:fail?{message:'offline'}:null};}};}}},
+  '@/lib/supabase-admin':{supabaseAdmin:{
+    async rpc(name,args){reads++;calls.push({name,args:JSON.parse(JSON.stringify(args))});return {data:args.p_view==='cities'?{byCity:cityInventory}:{...inventory,...(args.p_view==='all'?{byCity:cityInventory}:{})},error:rpcFail?{message:'missing function'}:null};},
+    from(table){assert.notEqual(table,'cadastru_records','property rows must be aggregated in Postgres');reads++;return {select(columns){selections.push({table,columns});return this;},order(){return this;},async range(from,to){return {data:(tables[table]||[]).slice(from,to+1),error:fail?{message:'offline'}:null};}};},
+  }},
 });
 const request=(authorized=true,fresh=false,view='all')=>({authorized,nextUrl:new URL(`http://local/?fresh=${fresh?'1':'0'}&view=${view}`)});
 assert.equal((await route.GET(request(false))).status,401);
 assert.equal(reads,0,'authentication happens before all DB/cache access');
-assert.equal((await (await route.GET(request())).json()).total,1001,'all pages counted');
+assert.equal((await (await route.GET(request())).json()).total,100001,'database aggregates are returned without downloading property rows');
+assert.deepEqual(calls[0],{name:'admin_cadastru_inventory_stats',args:{p_view:'all'}});
 const prior=reads;
 await route.GET(request()); assert.equal(reads,prior,'five-minute cache retained');
 const overviewData=await (await route.GET(request(true,false,'overview'))).json();
-assert.equal(overviewData.total,1001);
+assert.equal(overviewData.total,100001);
 assert.deepEqual(overviewData.storedDatasets.transport,{saved:1002,fresh:1002},'API counts every page of independent address snapshots');
 assert.equal('byCity' in overviewData,false,'overview response excludes the deferred city table');
 selections.length=0;
 const cities=await (await route.GET(request(true,false,'cities'))).json();
-assert.deepEqual(cities.byCity,[{city:'Test',buildings:0,apartments:0,other:1001}],'city-only request reads every inventory page');
-assert.deepEqual([...new Set(selections.map(({table})=>table))].sort(),['cadastru_buildings','cadastru_records'],'city request never reads coverage stores');
-assert(selections.every(({columns})=>!/(raw_payload|expires_at|collection_snapshot|result_type)/.test(columns)),'city request omits details and coverage metadata');
+assert.deepEqual(cities.byCity,cityInventory,'city-only request returns complete database aggregates');
+assert.deepEqual(selections,[],'city request never downloads inventory or coverage rows');
+assert.deepEqual(calls.at(-1),{name:'admin_cadastru_inventory_stats',args:{p_view:'cities'}});
 const cachedReads=reads;
 await route.GET(request(true,false,'overview'));
 await route.GET(request(true,false,'cities'));
@@ -93,8 +100,11 @@ assert.equal((await route.GET(request(false,false,'cities'))).status,401);
 assert.equal(reads,cachedReads,'warm city cache still requires authentication');
 fail=true;
 assert.deepEqual(await (await route.GET(request(true,true))).json(),{available:false},'failed table reads never display false zeros');
-assert.deepEqual(await (await route.GET(request(true,true,'cities'))).json(),{available:false},'city failures cannot look like an empty inventory');
 fail=false;
+rpcFail=true;
+assert.deepEqual(await (await route.GET(request(true,true,'overview'))).json(),{available:false},'failed RPC cannot display false totals');
+assert.deepEqual(await (await route.GET(request(true,true,'cities'))).json(),{available:false},'city failures cannot look like an empty inventory');
+rpcFail=false;
 const beforeFresh=reads;
 await route.GET(request(true,true,'cities'));
 assert(reads>beforeFresh,'hard refresh bypasses the city cache');

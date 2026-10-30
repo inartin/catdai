@@ -11,13 +11,22 @@ assert.ok(!Object.hasOwn(config,'merchant'),'legacy merchant override is ignored
 for(const invalid of ['telegram-123@auth.catdai.md','test\r\nBcc: a@example.com','a(comment)@example.com','a..b@example.com','a@example.com,b@example.com']) assert.equal(receiptEmail(invalid),null);
 assert.equal(receiptEmail(' buyer+receipt@example.com '),'buyer+receipt@example.com');
 const order={id:'00000000-0000-0000-0000-000000000001',environment:'sandbox',language:'ro',product_key:'standard_pack',product_title:maibProductTitle('standard_pack','ro'),amount_minor:9900,currency_code:'MDL',paid_at:'2026-10-05T10:00:00Z',receipt_email:'buyer@example.com',grants:{sale_estimate:2,pdf_report:2},refunded_minor:0};
+const languages={
+  ro:{subject:'Confirmarea plății - CatDai',quantity:'Cantitate',sandbox:'Mod de test',delivery:'Creditele sunt adăugate',refund:'Sumă rambursată'},
+  ru:{subject:'Подтверждение оплаты - CatDai',quantity:'Количество',sandbox:'Тестовый режим',delivery:'После проверки подтверждения maib использования добавляются',refund:'Возвращённая сумма'},
+  en:{subject:'Payment confirmation - CatDai',quantity:'Quantity',sandbox:'Test mode',delivery:'Credits are added',refund:'Refunded amount'},
+};
 const savedUrlEnv={NODE_ENV:process.env.NODE_ENV,MAIB_PUBLIC_URL:process.env.MAIB_PUBLIC_URL};
-for(const mode of ['development','production']) for(const language of ['ro','ru']) {
+for(const mode of ['development','production']) for(const [language,copy] of Object.entries(languages)) {
   process.env.NODE_ENV=mode;
   process.env.MAIB_PUBLIC_URL='https://catdai.md';
   const expectedOrigin=mode==='development'?'https://dev.catdai.md':'https://catdai.md';
-  const receipt=buildReceipt({...order,language,product_title:maibProductTitle('standard_pack',language)});
-  assert.equal(receipt.subject,`${language==='ro'?'Confirmarea plății':'Подтверждение оплаты'} — CatDai — ${order.id}`);
+  const localizedOrder={...order,language,product_title:maibProductTitle('standard_pack',language)};
+  const receipt=buildReceipt(localizedOrder);
+  assert.equal(receipt.subject,copy.subject);
+  assert.ok(!receipt.subject.includes(order.id),'order number stays out of the subject');
+  assert.deepEqual(receipt,buildReceipt({...localizedOrder,environment:'production'}),'sandbox uses the exact live receipt content');
+  assert.doesNotMatch(`${receipt.subject}\n${receipt.text}`,/[\u2013\u2014]/u,'receipts use normal dashes');
   for(const required of [order.id,'CatDai','99','MDL','2026','Europe/Chisinau',expectedOrigin]) assert.ok(receipt.text.includes(required),required);
   assert.ok(!receipt.text.includes('{merchant}'));
   assert.ok(!receipt.text.includes(MERCHANT.legalName));
@@ -28,25 +37,25 @@ for(const mode of ['development','production']) for(const language of ['ro','ru'
   const returnUrl=new URL(urls[1]);
   assert.equal(returnUrl.searchParams.get('order_id'),order.id);
   assert.equal(returnUrl.searchParams.get('lang'),language);
-  assert.ok(receipt.text.includes(language==='ro'?'Cantitate: 1':'Количество: 1'));
-  assert.ok(receipt.text.includes(language==='ro'?'Mod de test':'Тестовый режим'));
-  assert.ok(receipt.text.includes(language==='ro'?'Creditele sunt adăugate':'После проверки подтверждения maib использования добавляются'));
-  assert.ok(!receipt.text.includes(language==='ro'?'Sumă rambursată:':'Возвращённая сумма:'));
+  assert.ok(receipt.text.includes(`${copy.quantity}: 1`));
+  assert.ok(!receipt.text.includes(copy.sandbox));
+  assert.ok(receipt.text.includes(copy.delivery));
+  assert.ok(!receipt.text.includes(`${copy.refund}:`));
   const stream=nodemailer.createTransport({streamTransport:true,buffer:true});
   const rendered=await stream.sendMail({from:{name:'CatDai',address:config.from},to:order.receipt_email,...receipt});
   assert.match(rendered.message.toString(),/^From: CatDai <receipts@example\.com>$/m);
   assert.ok(rendered.message.length>100);assert.ok(rendered.envelope.to.includes(order.receipt_email));stream.close();
 }
-for(const language of ['ro','ru']) {
+for(const [language,copy] of Object.entries(languages)) {
   const receipt=buildReceipt({...order,environment:'production',language,refunded_minor:2500});
-  assert.ok(!receipt.text.includes(language==='ro'?'Mod de test':'Тестовый режим'));
-  assert.ok(receipt.text.includes(language==='ro'?'Sumă rambursată: 25.00 MDL':'Возвращённая сумма: 25.00 MDL'));
+  assert.ok(!receipt.text.includes(copy.sandbox));
+  assert.ok(receipt.text.includes(`${copy.refund}: 25.00 MDL`));
   const bulkReceipt=buildReceipt({...order,language,product_key:'cadastru_lookup_single',product_title:maibProductTitle('cadastru_lookup_single',language,4),amount_minor:9400,grants:{cadastru_lookup:4}});
-  assert.ok(bulkReceipt.text.includes(language==='ro'?'Cantitate: 4':'Количество: 4'));
+  assert.ok(bulkReceipt.text.includes(`${copy.quantity}: 4`));
   assert.match(bulkReceipt.text,/94[.,]00 MDL/);
   assert.ok(bulkReceipt.text.includes('× 4'));
   const tierReceipt=buildReceipt({...order,language,product_key:'cadastru_lookup_single',product_title:maibProductTitle('cadastru_lookup_single',language,10),amount_minor:16900,grants:{cadastru_lookup:10}});
-  assert.ok(tierReceipt.text.includes(language==='ro'?'Cantitate: 10':'Количество: 10'));
+  assert.ok(tierReceipt.text.includes(`${copy.quantity}: 10`));
   assert.match(tierReceipt.text,/169[.,]00 MDL/);
 }
 for(const [key,value] of Object.entries(savedUrlEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
@@ -68,4 +77,4 @@ await deliverReceipts(db,'sandbox',{config,createTransport});assert.equal(sends,
 reset();deliveryError=Object.assign(Error('auth'),{command:'AUTH'});await deliverReceipts(db,'sandbox',{config,createTransport});assert.equal(state.status,'failed');assert.ok(Date.parse(state.next_attempt_at)>Date.now());
 reset();deliveryError=Object.assign(Error('timeout after DATA'),{command:'DATA'});await deliverReceipts(db,'sandbox',{config,createTransport});assert.equal(state.status,'unknown');await deliverReceipts(db,'sandbox',{config,createTransport});assert.equal(sends,1,'uncertain submission is not retried');
 reset();saveError=true;await assert.rejects(deliverReceipts(db,'sandbox',{config,createTransport}));assert.equal(state.status,'sending');assert.equal(sends,1,'failed outcome persistence retains uncertainty');
-console.log('MAIB receipt configuration, RO/RU MIME, retry and duplicate-delivery checks passed.');
+console.log('MAIB receipt configuration, RO/RU/EN live-content parity, MIME, retry and duplicate-delivery checks passed.');

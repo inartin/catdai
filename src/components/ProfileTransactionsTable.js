@@ -20,7 +20,7 @@ function formatNumber(value, lang, options = {}) {
 }
 
 function formatHistoryDate(value, lang) {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
   const locale = lang === "ru" ? "ru-RU" : "ro-RO";
   const datePart = date.toLocaleDateString(locale, {
@@ -37,7 +37,7 @@ function formatHistoryDate(value, lang) {
 
 function formatPaymentAmount(amountMinor, currencyCode, lang) {
   const amount = Number(amountMinor);
-  if (!Number.isFinite(amount)) return "—";
+  if (!Number.isFinite(amount)) return "-";
 
   return new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-RO", {
     style: "currency",
@@ -84,14 +84,14 @@ export default function ProfileTransactionsTable({
                   {formatHistoryDate(row.paidAt || row.createdAt, lang)}
                 </td>
                 <td className={`px-4 py-3 font-medium ${isDarkMode ? "text-[#e2e8f0]" : "text-gray-900"}`}>
-                  <div>{formatProduct ? formatProduct(row.productKey) : row.productKey || "—"}</div>
+                  <div>{formatProduct ? formatProduct(row.productKey) : row.productKey || "-"}</div>
                   <div className={`mt-0.5 text-xs font-normal ${isDarkMode ? "text-[#9ca3af]" : "text-gray-500"}`}>
                     {copy.paymentOrderId}: {row.id}
                     <span className="ml-2 uppercase">{row.provider}{row.environment === "sandbox" ? " · TEST" : ""}</span>
                   </div>
                 </td>
                 <td className={`whitespace-nowrap px-4 py-3 ${isDarkMode ? "text-[#e2e8f0]" : "text-gray-700"}`}>
-                  {formatStatus ? formatStatus(row.status) : row.status || "—"}
+                  {formatStatus ? formatStatus(row.status) : row.status || "-"}
                   {row.refundStatus && <div className="text-xs">{row.refundStatus}</div>}
                   {allowRefund && row.provider === "maib" && <MaibRefundAction order={row} onUpdate={onPaymentUpdate} />}
                 </td>
@@ -100,7 +100,7 @@ export default function ProfileTransactionsTable({
                   {row.refundedMinor > 0 && <div className="text-xs font-normal">−{formatPaymentAmount(row.refundedMinor, row.currencyCode, lang)}</div>}
                 </td>
                 <td className={`whitespace-nowrap px-4 py-3 font-mono text-xs ${isDarkMode ? "text-[#9ca3af]" : "text-gray-600"}`}>
-                  {row.transactionId || "—"}
+                  {row.transactionId || "-"}
                 </td>
               </tr>
             ))}

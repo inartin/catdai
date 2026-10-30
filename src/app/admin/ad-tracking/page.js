@@ -19,12 +19,12 @@ const PERIOD_OPTIONS = [
 ];
 
 function fmtNum(n) {
-  if (n == null) return "\u2014";
+  if (n == null) return "-";
   return Number(n).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
 }
 
 function fmtDateTime(d) {
-  if (!d) return "\u2014";
+  if (!d) return "-";
   return new Date(d).toLocaleString("ro-RO", {
     day: "numeric",
     month: "long",
@@ -68,7 +68,7 @@ const PAYMENT_PRODUCT_LABELS = {
 
 function fmtAdEventName(eventName, sourceConfig) {
   if (eventName === "source_landing_visit") return `Opened landing page from ${sourceConfig.label}`;
-  return AD_EVENT_LABELS[eventName] || eventName || "\u2014";
+  return AD_EVENT_LABELS[eventName] || eventName || "-";
 }
 
 function fmtAdEventDetail(event, sourceConfig) {
@@ -78,13 +78,13 @@ function fmtAdEventDetail(event, sourceConfig) {
       meta.rooms_count ? `${meta.rooms_count} rooms` : null,
       meta.district,
       meta.city,
-    ].filter(Boolean).join(" · ") || "\u2014";
+    ].filter(Boolean).join(" · ") || "-";
   }
   if (event.event_name === "estimate_submit") return "Estimate form submitted";
   if (event.event_name === "landing_estimate_cta") return "Moved from landing page to estimate form";
   if (event.event_name === "source_landing_visit") return `First visit with ${sourceConfig.entryPath}`;
   if (event.event_name === "signed_in") return "User account attached to this visit";
-  return event.path || "\u2014";
+  return event.path || "-";
 }
 
 function fmtUser(journey) {
@@ -398,7 +398,7 @@ export default function AdTrackingPage() {
                           </p>
                         </div>
                         <div className="text-xs text-gray-400 lg:text-right">
-                          <div className="font-mono">{journey.sessionId || "\u2014"}</div>
+                          <div className="font-mono">{journey.sessionId || "-"}</div>
                           {journey.userId && <div className="mt-1 font-mono">{journey.userId}</div>}
                         </div>
                       </div>
@@ -436,7 +436,7 @@ export default function AdTrackingPage() {
                                   {fmtAdEventDetail(event, sourceConfig)}
                                 </td>
                                 <td className="py-2 pr-4 text-gray-600 min-w-64">
-                                  {event.path || "\u2014"}
+                                  {event.path || "-"}
                                 </td>
                                 <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">
                                   {event.count > 1

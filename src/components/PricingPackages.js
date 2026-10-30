@@ -60,7 +60,7 @@ export default function PricingPackages() {
                 {provider === "maib" && (
                   <button type="button" onClick={() => startCheckout(productKey)}
                     className={`mt-8 inline-flex w-full cursor-pointer items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary ${recommended ? "border-primary bg-primary text-white hover:border-primary-dark hover:bg-primary-dark" : "border-primary bg-white text-primary-dark hover:bg-primary/5 active:bg-primary/10"}`}
-                    aria-label={`${t("pricing.sharedChoose")} — ${t(`pricing.shared.${key}.uses`)}`}>
+                    aria-label={`${t("pricing.sharedChoose")} - ${t(`pricing.shared.${key}.uses`)}`}>
                     {t("pricing.sharedChoose")}
                   </button>
                 )}

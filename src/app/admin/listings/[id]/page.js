@@ -5,17 +5,17 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 
 function fmtNum(n) {
-  if (n == null) return "\u2014";
+  if (n == null) return "-";
   return Number(n).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
 }
 
 function fmtPrice(amount, currency) {
-  if (amount == null) return "\u2014";
+  if (amount == null) return "-";
   return `${fmtNum(amount)} ${currency || "\u20AC"}`;
 }
 
 function fmtDate(d) {
-  if (!d) return "\u2014";
+  if (!d) return "-";
   return new Date(d).toLocaleDateString("ro-RO", {
     day: "2-digit",
     month: "short",
@@ -24,7 +24,7 @@ function fmtDate(d) {
 }
 
 function fmtDateTime(d) {
-  if (!d) return "\u2014";
+  if (!d) return "-";
   return new Date(d).toLocaleDateString("ro-RO", {
     day: "2-digit",
     month: "short",
@@ -39,7 +39,7 @@ function InfoRow({ label, value }) {
     <div className="flex justify-between py-2.5 border-b border-gray-100 last:border-0">
       <span className="text-sm text-gray-500">{label}</span>
       <span className="text-sm font-medium text-gray-900 text-right max-w-[60%] wrap-break-word">
-        {value || "\u2014"}
+        {value || "-"}
       </span>
     </div>
   );

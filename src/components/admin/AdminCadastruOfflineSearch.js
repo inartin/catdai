@@ -63,7 +63,7 @@ function onlyDigits(value, maxLength) {
 }
 
 function fmtDate(value) {
-  if (!value) return "—";
+  if (!value) return "-";
   try {
     return new Date(value).toLocaleString("ro-RO", {
       dateStyle: "medium",

@@ -9,7 +9,7 @@ const cadastral = { map_geometry: { type: "Polygon", coordinates: [
 
 export default function MapDiagnostic() {
   return <main className="mx-auto max-w-5xl p-8">
-    <h1>Temporary map rendering diagnostic — synthetic outline</h1>
+    <h1>Temporary map rendering diagnostic - synthetic outline</h1>
     <CadastruParcelMap location={location} cadastral={cadastral} fallbackUrl="about:blank" />
   </main>;
 }

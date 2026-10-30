@@ -17,7 +17,7 @@ function HistoryExample({ copy }) {
       <div className="flex flex-wrap justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{c.label}</p>
-          <p className="mt-1 text-xs text-gray-500">{c.dates[0]} – {c.dates[2]}</p>
+          <p className="mt-1 text-xs text-gray-500">{c.dates[0]} - {c.dates[2]}</p>
         </div>
         <div className="ml-auto text-right">
           <p className="text-xs text-gray-500">{c.latest}</p>

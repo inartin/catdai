@@ -11,27 +11,27 @@ import AdminWorkerStatus from "@/components/admin/AdminWorkerStatus";
 import AdminOnlineUsers from "@/components/admin/AdminOnlineUsers";
 
 function fmtNum(n) {
-  if (n == null) return "\u2014";
+  if (n == null) return "-";
   return Number(n).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
 }
 
 function fmtPrice(amount, currency) {
-  if (amount == null) return "\u2014";
+  if (amount == null) return "-";
   return `${fmtNum(amount)} ${currency || "\u20AC"}`;
 }
 
 function fmtPct(value) {
-  if (value == null) return "\u2014";
+  if (value == null) return "-";
   return `${Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 1 })}%`;
 }
 
 function fmtYears(value) {
-  if (value == null) return "\u2014";
+  if (value == null) return "-";
   return `${Number(value).toLocaleString("ro-RO", { maximumFractionDigits: 1 })} years`;
 }
 
 function fmtDateTime(d) {
-  if (!d) return "\u2014";
+  if (!d) return "-";
   return new Date(d).toLocaleString("ro-RO", {
     day: "numeric",
     month: "long",
@@ -42,7 +42,7 @@ function fmtDateTime(d) {
 }
 
 function fmtDate(d) {
-  if (!d) return "\u2014";
+  if (!d) return "-";
   return new Date(d).toLocaleDateString("ro-RO", {
     day: "numeric",
     month: "long",
@@ -126,7 +126,7 @@ const EXTERNAL_API_STATUS_FILTERS = [
 function fmtCadastruSearchType(type) {
   if (type === "address") return "Address";
   if (type === "number") return "Cadastral number";
-  return type || "\u2014";
+  return type || "-";
 }
 
 function fmtCadastruResultSummary(byResultType) {
@@ -164,7 +164,7 @@ function fmtListingLinkStatus(status) {
   if (status === "not_a_listing") return "Not a listing";
   if (status === "fetch_failed") return "Fetch failed";
   if (status === "upstream_blocked") return "Upstream blocked";
-  return status || "\u2014";
+  return status || "-";
 }
 
 function fmtListingLinkProperty(row) {
@@ -172,7 +172,7 @@ function fmtListingLinkProperty(row) {
     row.rooms_count ? `${row.rooms_count} rooms` : null,
     row.district,
     row.city,
-  ].filter(Boolean).join(" · ") || "\u2014";
+  ].filter(Boolean).join(" · ") || "-";
 }
 
 function fmtCalculatorProperty(row) {
@@ -181,7 +181,7 @@ function fmtCalculatorProperty(row) {
     row.area_m2 ? `${fmtNum(row.area_m2)} m\u00B2` : null,
     row.district,
     row.city,
-  ].filter(Boolean).join(" · ") || "\u2014";
+  ].filter(Boolean).join(" · ") || "-";
 }
 
 function fmtTopDistricts(byDistrict) {
@@ -202,7 +202,7 @@ function fmtExternalApiUsageSummary(usage) {
 }
 
 function fmtPaymentAmount(amountMinor, currencyCode) {
-  if (amountMinor == null) return "\u2014";
+  if (amountMinor == null) return "-";
   return new Intl.NumberFormat("ro-RO", {
     style: "currency",
     currency: currencyCode || "MDL",
@@ -226,7 +226,7 @@ function fmtExternalApiService(service, endpoint = "") {
   if (service === "cadastru_number") return "Cadastru number";
   if (service === "cadastru_address") return "Cadastru address";
   if (service === "cadastru_nearby") return "Nearby places";
-  return service || "\u2014";
+  return service || "-";
 }
 
 function fmtExternalApiNodes(rows) {
@@ -307,9 +307,9 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                     {row.status === "failure" ? "Failed" : "Successful"}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right text-gray-600">{row.http_status ?? "—"}</td>
+                <td className="px-4 py-3 text-right text-gray-600">{row.http_status ?? "-"}</td>
                 <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
-                  {row.duration_ms == null ? "—" : `${fmtNum(row.duration_ms)} ms`}
+                  {row.duration_ms == null ? "-" : `${fmtNum(row.duration_ms)} ms`}
                 </td>
                 <td className="max-w-xs truncate px-4 py-3 text-gray-600">
                   {row.error_message || row.error_code || (row.response_payload ? "Response received" : "Completed")}
@@ -320,7 +320,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                       <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Recovered with suggestion</span>
                       <p className="mt-1 text-xs text-gray-600">{row.suggestion_recovery.suggested_street}</p>
                     </div>
-                  ) : <span className="text-gray-400">—</span>}
+                  ) : <span className="text-gray-400">-</span>}
                 </td>
                 <td className="px-4 py-3 text-gray-600 break-all">
                   <AdminUserCell row={row} />
@@ -361,15 +361,15 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Duration</p>
-                            <p className="mt-1 text-sm font-medium text-gray-800">{row.duration_ms == null ? "—" : `${fmtNum(row.duration_ms)} ms`}</p>
+                            <p className="mt-1 text-sm font-medium text-gray-800">{row.duration_ms == null ? "-" : `${fmtNum(row.duration_ms)} ms`}</p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Error code</p>
-                            <p className="mt-1 break-all text-sm font-medium text-gray-800">{row.error_code || "—"}</p>
+                            <p className="mt-1 break-all text-sm font-medium text-gray-800">{row.error_code || "-"}</p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Error message</p>
-                            <p className="mt-1 break-words text-sm font-medium text-gray-800">{row.error_message || "—"}</p>
+                            <p className="mt-1 break-words text-sm font-medium text-gray-800">{row.error_message || "-"}</p>
                           </div>
                         </div>
                       </div>
@@ -399,7 +399,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                         <div className="min-w-0 lg:col-span-2">
                           <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Successful suggestion retry</p>
                           <p className="mt-1 text-sm text-gray-800">{row.suggestion_recovery.resolved_address}</p>
-                          <p className="mt-1 text-xs text-gray-500">{fmtDateTime(row.suggestion_recovery.recovered_at)} · Source: {row.suggestion_recovery.lookup_source || "—"}</p>
+                          <p className="mt-1 text-xs text-gray-500">{fmtDateTime(row.suggestion_recovery.recovered_at)} · Source: {row.suggestion_recovery.lookup_source || "-"}</p>
                         </div>
                       )}
                     </div>
@@ -460,7 +460,7 @@ function fmtAlertValue(key, value) {
 }
 
 function fmtFilterSummary(filters, labels) {
-  if (!filters || typeof filters !== "object") return "\u2014";
+  if (!filters || typeof filters !== "object") return "-";
 
   const parts = Object.entries(labels)
     .map(([key, label]) => {
@@ -469,7 +469,7 @@ function fmtFilterSummary(filters, labels) {
     })
     .filter(Boolean);
 
-  return parts.length > 0 ? parts.join(" \u00B7 ") : "\u2014";
+  return parts.length > 0 ? parts.join(" \u00B7 ") : "-";
 }
 
 function fmtProperty(row) {
@@ -478,7 +478,7 @@ function fmtProperty(row) {
     row.areaM2 ? `${fmtNum(row.areaM2)} m\u00B2` : null,
     row.district,
     row.city,
-  ].filter(Boolean).join(" · ") || "\u2014";
+  ].filter(Boolean).join(" · ") || "-";
 }
 
 function CadastruResultBadges({ byResultType }) {
@@ -594,13 +594,13 @@ function ActiveUsersSummary({ s }) {
       <span>
         New reg. users:{" "}
         <strong className="font-semibold text-gray-900 dark:text-slate-100">
-          {s.newUsers == null ? "—" : fmtNum(s.newUsers)}
+          {s.newUsers == null ? "-" : fmtNum(s.newUsers)}
         </strong>
       </span>
       <span>
         Old reg. users:{" "}
         <strong className="font-semibold text-gray-900 dark:text-slate-100">
-          {s.oldUsers == null ? "—" : fmtNum(s.oldUsers)}
+          {s.oldUsers == null ? "-" : fmtNum(s.oldUsers)}
         </strong>
       </span>
     </span>
@@ -803,18 +803,18 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
                         : "bg-green-50 text-green-700"}`}>
                         {row.result_type === "error" ? "Failed" : row.result_type === "no_data" ? "No result" : "Success"}
                       </span>
-                    ) : "\u2014"}
+                    ) : "-"}
                   </td>
                   <td className="max-w-xs break-words px-4 py-3 text-gray-600">
                     {row.search_type === "address"
-                      ? row.search_address || row.cadastral_number || "\u2014"
-                      : row.cadastral_number || "\u2014"}
+                      ? row.search_address || row.cadastral_number || "-"
+                      : row.cadastral_number || "-"}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    {row.district || "\u2014"}
+                    {row.district || "-"}
                   </td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                    {row.valuation_completed_at ? "Completed" : row.valuation_clicked_at ? "Started" : "\u2014"}
+                    {row.valuation_completed_at ? "Completed" : row.valuation_clicked_at ? "Started" : "-"}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{fmtBool(row.favorited)}</td>
                   <td className="px-4 py-3 text-right text-gray-600">{fmtNum(row.share_count)}</td>
@@ -1316,7 +1316,7 @@ function DashboardContent() {
           <div ref={selectedUserPopupRef} className="w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="flex flex-col gap-4 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">{selectedUser.name || "\u2014"}</h2>
+                <h2 className="text-lg font-semibold text-gray-900">{selectedUser.name || "-"}</h2>
                 <VisitorTags visitor={selectedUser.visitor} />
                 {selectedUser.email && <p className="mt-0.5 text-sm text-gray-500">{selectedUser.email}</p>}
                 <button
@@ -1462,8 +1462,8 @@ function DashboardContent() {
                       if (response.ok) { const data = await response.json(); setSelectedUserTransactions(data.transactions || []); }
                     }}
                     lang="ro"
-                    formatProduct={(productKey) => PAYMENT_PRODUCT_LABELS_RO[productKey] || productKey || "—"}
-                    formatStatus={(status) => PAYMENT_STATUS_LABELS_RO[status] || status || "—"}
+                    formatProduct={(productKey) => PAYMENT_PRODUCT_LABELS_RO[productKey] || productKey || "-"}
+                    formatStatus={(status) => PAYMENT_STATUS_LABELS_RO[status] || status || "-"}
                     isDarkMode
                   />
                 )}
@@ -1546,7 +1546,7 @@ function DashboardContent() {
           />
           <StatCard
             label="Prețuri actuale Popup"
-            value={s.marketTrendsPopup?.available === false ? "—" : fmtNum(s.marketTrendsPopup?.total)}
+            value={s.marketTrendsPopup?.available === false ? "-" : fmtNum(s.marketTrendsPopup?.total)}
             detail={s.marketTrendsPopup?.available === false ? "Apply trends SQL" : "Popup impressions"}
           />
           <StatCard
@@ -1644,10 +1644,10 @@ function DashboardContent() {
                     {s.payments.orders.map((payment) => (
                       <tr key={`${payment.provider}:${payment.id}`} className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
                         <td className="px-4 py-3 text-gray-900 font-medium"><div title="Last recorded browser for this account"><AdminUserCell row={payment} name={payment.name || payment.user_id || "Deleted user"} /></div></td>
-                        <td className="px-4 py-3 text-gray-600">{payment.email || "\u2014"}</td>
+                        <td className="px-4 py-3 text-gray-600">{payment.email || "-"}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDateTime(payment.paid_at || payment.created_at)}</td>
                         <td className="px-4 py-3 text-gray-600">
-                          {PAYMENT_PRODUCT_LABELS_RO[payment.product_key] || payment.product_key || "\u2014"}
+                          {PAYMENT_PRODUCT_LABELS_RO[payment.product_key] || payment.product_key || "-"}
                           <div className="mt-0.5 text-xs text-gray-400">{payment.id}</div>
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
@@ -1727,7 +1727,7 @@ function DashboardContent() {
                               onClick={() => setSelectedUser(u)}
                               className="cursor-pointer text-left font-medium text-primary hover:underline"
                             >
-                              {u.name || "\u2014"}
+                              {u.name || "-"}
                             </button>
                             <VisitorTags visitor={u.visitor} />
                           </td>
@@ -1739,10 +1739,10 @@ function DashboardContent() {
                           <td className="px-4 py-3 text-gray-600">
                             {u.email ? (
                               <Tooltip text={u.email}>
-                                <span className="cursor-help">{u.authProvider || "\u2014"}</span>
+                                <span className="cursor-help">{u.authProvider || "-"}</span>
                               </Tooltip>
                             ) : (
-                              u.authProvider || "\u2014"
+                              u.authProvider || "-"
                             )}
                           </td>
                           <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
@@ -1851,7 +1851,7 @@ function DashboardContent() {
                         <td className="px-4 py-3 text-gray-900 font-medium">
                           <div>{fmtProperty(row)}</div>
                           <div className="mt-0.5 text-xs font-normal text-gray-500">
-                            {[row.buildingType, row.renovation].filter(Boolean).join(" · ") || "\u2014"}
+                            {[row.buildingType, row.renovation].filter(Boolean).join(" · ") || "-"}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600">
@@ -1913,10 +1913,10 @@ function DashboardContent() {
                           {fmtBool(row.included_cadastral)}
                         </td>
                         <td className="px-4 py-3 text-gray-500 break-all">
-                          {row.session_id || row.device_id || "\u2014"}
+                          {row.session_id || row.device_id || "-"}
                         </td>
                         <td className="px-4 py-3 text-gray-500 break-all">
-                          {row.estimate_log_id || "\u2014"}
+                          {row.estimate_log_id || "-"}
                         </td>
                       </tr>
                     ))}
@@ -1998,7 +1998,7 @@ function DashboardContent() {
                               {row.external_id || row.listing_url}
                             </a>
                           ) : (
-                            row.external_id || "\u2014"
+                            row.external_id || "-"
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-600">
@@ -2226,7 +2226,7 @@ function DashboardContent() {
                         <td className="px-4 py-3 text-gray-900 font-medium">
                           <div>{fmtCalculatorProperty(row)}</div>
                           <div className="mt-0.5 text-xs font-normal text-gray-500">
-                            {[row.building_type, row.renovation].filter(Boolean).join(" · ") || "\u2014"}
+                            {[row.building_type, row.renovation].filter(Boolean).join(" · ") || "-"}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
@@ -2281,13 +2281,13 @@ function DashboardContent() {
                     {s.telegramAlerts.map((alert) => (
                       <tr key={alert.id} className="hover:bg-gray-50 align-top">
                         <td className="px-4 py-3 text-gray-900 font-medium min-w-48">
-                          <div>{alert.label || "\u2014"}</div>
+                          <div>{alert.label || "-"}</div>
                           <div className="mt-0.5 text-xs font-normal text-gray-400">
-                            <AdminUserCell row={alert} name={alert.user_id || "\u2014"} />
+                            <AdminUserCell row={alert} name={alert.user_id || "-"} />
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          {alert.telegram_chat_id || "\u2014"}
+                          {alert.telegram_chat_id || "-"}
                         </td>
                         <td className="px-4 py-3 text-gray-600 min-w-64">
                           {fmtFilterSummary(alert.base_filters, BASE_FILTER_LABELS)}

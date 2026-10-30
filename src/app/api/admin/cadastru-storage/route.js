@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
-import { summarizeCadastruCities, summarizeCadastruStorage } from "@/lib/admin-cadastru-storage-stats";
+import { summarizeCadastruCoverage } from "@/lib/admin-cadastru-storage-stats";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 const PAGE = 1000;
@@ -20,22 +20,27 @@ async function readRows(table, columns, order) {
 }
 
 async function fetchCadastruStorageStats(view) {
+  const readInventory = async () => {
+    const { data, error } = await supabaseAdmin.rpc("admin_cadastru_inventory_stats", { p_view: view });
+    if (error || !data) throw new Error(`Inventory stats query failed: ${error?.message || "empty response"}`);
+    if (data.byCity) data.byCity.sort((a, b) => (b.buildings + b.apartments + b.other) - (a.buildings + a.apartments + a.other) || a.city.localeCompare(b.city, "ro"));
+    return data;
+  };
   if (view === "cities") {
-    const [records, buildings] = await Promise.all([
-      readRows("cadastru_records", "cadastral_number,city,shared_building_number", "id"),
-      readRows("cadastru_buildings", "cadastral_number,lookup_input", "cadastral_number"),
-    ]);
-    return summarizeCadastruCities({ records, buildings });
+    return { available: true, updatedAt: new Date().toISOString(), ...await readInventory() };
   }
-  // Read only counting/coverage metadata, never entire property or nearby payloads.
-  const [records, buildings, addresses, nearby, transport, reports] = await Promise.all([
-    readRows("cadastru_records", "cadastral_number,city,shared_building_number,result_type,apartment_area_m2,apartment_floor,next_refresh_after,unit_list_entry:raw_payload->unit_list_entry", "id"),
+  // Aggregate the large property table in Postgres; only coverage metadata crosses the API.
+  const [inventory, buildings, addresses, nearby, transport, reports] = await Promise.all([
+    readInventory(),
     readRows("cadastru_buildings", "cadastral_number,lookup_input,expires_at,collection_snapshot", "cadastral_number"),
     readRows("cadastru_building_addresses", "building_number,origin_key", "origin_key,building_number"),
     ...["cadastru_nearby", "cadastru_public_transport", "cadastru_municipal_reports"].map((table) =>
       readRows(table, "origin_key,expires_at,incomplete:raw_payload->incomplete,stale:raw_payload->cache->stale", "origin_key")),
   ]);
-  return summarizeCadastruStorage({ records, buildings, addresses, nearby, transport, reports }, Date.now(), { includeCities: view === "all" });
+  const { linkedCities, ...counts } = inventory;
+  return { available: true, updatedAt: new Date().toISOString(), ...counts,
+    ...summarizeCadastruCoverage({ buildings, addresses, nearby, transport, reports, linkedCities }),
+  };
 }
 
 export async function GET(request) {

@@ -247,7 +247,7 @@ assert(!text.includes("Original description") && !text.includes("2 fotografii"),
 assert(text.includes(ro["cadastru.reportsPrivate"]));
 const coordinates = { ...data, address_match_available: false, summary: { ...data.summary, at_address: null } };
 text = textOf(card.default({ reports: coordinates }));
-assert(text.includes("—") && text.includes(ro["cadastru.reportsAddressUnknown"]));
+assert(text.includes("-") && text.includes(ro["cadastru.reportsAddressUnknown"]));
 assert(!text.includes(ro["cadastru.reportsAtAddress"]), "coordinate-only data cannot claim exact-address matches");
 text = textOf(card.default({ reports: { ...data, summary: { at_address: 0, nearby: 0, solved: 0, total: 0 } } }));
 assert(text.includes(ro["cadastru.reportsEmpty"]));

@@ -36,12 +36,12 @@ const COLORS = {
 
 function formatPrice(num) {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   return `€${Math.round(value).toLocaleString("ro-MD")}`;
 }
 
 function formatValue(value) {
-  if (value === null || value === undefined || value === "") return "—";
+  if (value === null || value === undefined || value === "") return "-";
   return String(value);
 }
 

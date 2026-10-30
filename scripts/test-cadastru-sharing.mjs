@@ -352,7 +352,7 @@ for (const lang of ["ro", "ru", "en"]) {
   metadataCookieLang = lang === "ro" ? "ru" : "ro";
   const metadata = await shareMetadata.getCadastruShareMetadata(privateReport);
   const path = await getCadastruSharePath(shared.slug, lang);
-  assert.equal(metadata.title, `${({ ro, ru, en }[lang])["cadastru.sharedMetaTitle"]} — Chișinău, bd. Test 1, ap. 7 | Catdai`);
+  assert.equal(metadata.title, `${({ ro, ru, en }[lang])["cadastru.sharedMetaTitle"]} - Chișinău, bd. Test 1, ap. 7 | Catdai`);
   assert.equal(metadata.openGraph.title, metadata.title);
   assert.equal(metadata.twitter.title, metadata.title);
   assert.equal(metadata.openGraph.description, metadata.description);

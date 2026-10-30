@@ -52,7 +52,7 @@ function VisitorHistory({ id, onClose }) {
         : !result.events.length ? <p className="mt-5 text-sm text-gray-500">No recorded actions for this browser.</p>
           : <ul className="mt-4 divide-y divide-gray-100">{result.events.map((event) => <li key={`${event.source}:${event.id}`} className="py-3 text-sm">
             <div className="flex flex-wrap justify-between gap-2"><span className="font-medium">{event.label}</span><time className="text-xs text-gray-500">{new Date(event.created_at).toLocaleString("ro-RO")}</time></div>
-            <p className="mt-1 break-words text-xs text-gray-500">{event.summary || "—"}</p>
+            <p className="mt-1 break-words text-xs text-gray-500">{event.summary || "-"}</p>
             <p className="mt-1 break-all text-xs text-gray-600">{event.user_name || event.user_id || "Anonymous"}</p>
             <VisitorTags visitor={event.visitor} deviceId={id} />
           </li>)}</ul>}

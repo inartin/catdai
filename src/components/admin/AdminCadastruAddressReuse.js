@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from "react";
 
 const fmtNum = (value) => Number(value).toLocaleString("ro-RO");
-const fmtDate = (value) => value ? new Date(value).toLocaleString("ro-RO", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Chisinau" }) : "—";
+const fmtDate = (value) => value ? new Date(value).toLocaleString("ro-RO", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Chisinau" }) : "-";
 
 function Counts({ row }) {
   return <>

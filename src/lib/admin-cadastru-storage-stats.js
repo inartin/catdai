@@ -55,6 +55,14 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
       if (fresh(row.next_refresh_after, now)) apartments.fresh++;
     } else { other++; }
   }
+  return { available: true, updatedAt: new Date(now).toISOString(), total: allIds.size, fullData,
+    buildings: buildings.length, apartments, other,
+    ...summarizeCadastruCoverage({ buildings, addresses, nearby, transport, reports, linkedCities: Object.fromEntries(linkedCities) }, now),
+    ...(includeCities ? { byCity: summarizeCadastruCities({ records, buildings }, now).byCity } : {}),
+  };
+}
+
+export function summarizeCadastruCoverage({ buildings, addresses, nearby, transport, reports, linkedCities }, now = Date.now()) {
   const aliases = new Map();
   for (const row of addresses) {
     if (!aliases.has(row.building_number)) aliases.set(row.building_number, new Set());
@@ -72,7 +80,7 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
   const collection = { harvested: 0, partial: 0, notHarvested: 0 };
   let allCategories = 0;
   for (const building of buildings) {
-    const relatedCity = linkedCities.get(building.cadastral_number);
+    const relatedCity = linkedCities[building.cadastral_number];
     const buildingCity = building.lookup_input?.city || relatedCity;
     const keys = new Set(aliases.get(building.cadastral_number) || []);
     if (building.lookup_input) keys.add(originKey(building.lookup_input));
@@ -93,8 +101,5 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
     else if (building.collection_snapshot) collection.partial++;
     else collection.notHarvested++;
   }
-  return { available: true, updatedAt: new Date(now).toISOString(), total: allIds.size, fullData,
-    buildings: buildings.length, apartments, other, coverage, storedDatasets, allCategories, collection,
-    ...(includeCities ? { byCity: summarizeCadastruCities({ records, buildings }, now).byCity } : {}),
-  };
+  return { coverage, storedDatasets, allCategories, collection };
 }

@@ -47,7 +47,7 @@ export default function OwnersPage() {
   }
 
   function getPhones(owner) {
-    if (!owner.phones) return "\u2014";
+    if (!owner.phones) return "-";
     if (Array.isArray(owner.phones)) return owner.phones.join(", ");
     return String(owner.phones);
   }
@@ -106,10 +106,10 @@ export default function OwnersPage() {
                 owners.map((o) => (
                   <tr key={o.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {o.display_name || "\u2014"}
+                      {o.display_name || "-"}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {o.login || "\u2014"}
+                      {o.login || "-"}
                     </td>
                     <td className="px-4 py-3">
                       {o.owner_type ? (
@@ -117,7 +117,7 @@ export default function OwnersPage() {
                           {o.owner_type}
                         </span>
                       ) : (
-                        "\u2014"
+                        "-"
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-xs">

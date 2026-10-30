@@ -27,7 +27,7 @@ export default function ProfileCreditBalances({
   const paid = remaining(sharedCredits);
   const free = remaining(freeMonthlyCredit);
   const total = paid == null || free == null ? null : paid + free;
-  const display = (value) => value == null ? "—" : formatValue(value);
+  const display = (value) => value == null ? "-" : formatValue(value);
 
   return (
     <section className={`rounded-2xl border border-gray-200 bg-gray-50 p-5 sm:p-6 ${className}`}>

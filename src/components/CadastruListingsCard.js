@@ -119,14 +119,14 @@ export default function CadastruListingsCard({ data = null, children }) {
                 <div>
                   <p className="mb-2 text-base text-emerald-100">{tab === "active" ? label("currentMedian") : label("archiveMedian")}</p>
                   <p className="text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
-                    {currentMedian ? number.format(currentMedian) : "—"}
+                    {currentMedian ? number.format(currentMedian) : "-"}
                     <span className="ml-2 text-xl font-normal text-emerald-200">€/m²</span>
                   </p>
                 </div>
               )}
               {nearbyMedian != null && (
                 <div className="pb-1 text-base leading-relaxed text-emerald-100">
-                  <p>{label("sameStreetMedian")} <strong className="font-semibold text-white">{nearbyMedian ? money(nearbyMedian) : "—"} / m²</strong></p>
+                  <p>{label("sameStreetMedian")} <strong className="font-semibold text-white">{nearbyMedian ? money(nearbyMedian) : "-"} / m²</strong></p>
                   {difference !== null && (
                     <p className="mt-1">{difference === 0 ? label("similar") : t(`cadastru.market.${difference < 0 ? "below" : "above"}`, { percent: Math.abs(difference) })}</p>
                   )}
@@ -181,12 +181,12 @@ export default function CadastruListingsCard({ data = null, children }) {
                     <span className="block text-base font-semibold text-gray-950 sm:text-lg">{house.address}</span>
                     <span className="mt-1 block text-base text-gray-500">{house.listings.length} {label(house.listings.length === 1 ? "listingSingular" : "listings")}{house.distance ? ` · ${house.distance} m` : ""}</span>
                   </span>
-                  <span className="block text-xl font-semibold tabular-nums tracking-tight text-gray-950 sm:text-2xl">{house.median != null ? money(house.median) : "—"}<span className="ml-1 text-base font-normal text-gray-500">/ m²</span></span>
+                  <span className="block text-xl font-semibold tabular-nums tracking-tight text-gray-950 sm:text-2xl">{house.median != null ? money(house.median) : "-"}<span className="ml-1 text-base font-normal text-gray-500">/ m²</span></span>
                 </span>
                 {house.median != null && <span className="mt-4 block h-3 overflow-hidden rounded-full bg-stone-200/70" aria-hidden="true">
                   <span className={`block h-full rounded-full ${isSelected ? "bg-emerald-600" : "bg-stone-400"}`} style={{ width: `${house.median / comparisonMax * 100}%` }} />
                 </span>}
-                {minimum !== null && minimum !== maximum && <span className="mt-3 block text-base tabular-nums text-gray-600">{label("priceRange")} {number.format(minimum)}–{money(maximum)} / m²</span>}
+                {minimum !== null && minimum !== maximum && <span className="mt-3 block text-base tabular-nums text-gray-600">{label("priceRange")} {number.format(minimum)}-{money(maximum)} / m²</span>}
               </button>
             );
           })}
@@ -213,7 +213,7 @@ export default function CadastruListingsCard({ data = null, children }) {
                       <span className="mt-1 block text-sm text-gray-500 sm:text-base">{listing.renovationLabel || label(listing.renovation || "unknown")}</span>
                       {!listing.active && (observedFrom || observedTo) && <span className="mt-1 block text-sm text-gray-500">
                         {label("observedDates")} {observedFrom ? <time dateTime={listing.firstSeenAt}>{observedFrom}</time> : <time dateTime={listing.lastSeenAt}>{observedTo}</time>}
-                        {observedFrom && observedTo && observedTo !== observedFrom && <> – <time dateTime={listing.lastSeenAt}>{observedTo}</time></>}
+                        {observedFrom && observedTo && observedTo !== observedFrom && <> - <time dateTime={listing.lastSeenAt}>{observedTo}</time></>}
                       </span>}
                     </span>
                     <span className="shrink-0 text-right">

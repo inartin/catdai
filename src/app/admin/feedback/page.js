@@ -5,7 +5,7 @@ import AdminUserCell from "@/components/admin/AdminUserCell";
 import { useCallback, useEffect, useState } from "react";
 
 function fmtDateTime(value) {
-  if (!value) return "\u2014";
+  if (!value) return "-";
   return new Date(value).toLocaleString("ro-RO", {
     day: "numeric",
     month: "long",
@@ -16,7 +16,7 @@ function fmtDateTime(value) {
 }
 
 function fmtImageSize(value) {
-  if (!value) return "\u2014";
+  if (!value) return "-";
   if (value >= 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} MB`;
   return `${Math.ceil(value / 1024)} KB`;
 }

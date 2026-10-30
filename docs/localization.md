@@ -15,6 +15,7 @@ Romanian and Russian UI; English is available for Cadastru search/results/shared
 ## UI
 - Desktop Navbar shows only the current language by default. Clicking it expands the other languages horizontally to its left; selection, outside click, focus leaving the selector, or Escape collapses it. The mobile menu always shows all available language buttons in one row, highlighting the current language. RO/RU are available throughout, plus EN on Cadastru search, result and compact-report routes. Switching preserves the query and fragment and navigates the document so rewritten route layouts refresh SEO metadata.
 - `document.documentElement.lang` follows selected language.
+- Use the normal ASCII dash `-` in authored RO/RU/EN copy, email subjects/bodies, metadata and empty-value placeholders.
 - `/estimeaza` sets a localized browser title from `estimeaza.pageTitle`.
 - `/evaluare` sets a localized browser title from `evaluare.pageTitle`.
 - `/anunt` sets a localized browser title from `anunt.pageTitle`.
@@ -22,7 +23,7 @@ Romanian and Russian UI; English is available for Cadastru search/results/shared
 - `/cadastru` has RO/RU/EN server metadata, search/result copy, example images, loading/error states, nearby/transport/report cards, and checkout actions. Known registry categories are translated for English display; official names, identifiers, unknown values and source-authored free text remain intact.
 - `/estimeaza`, `/evaluare`, `/alerts`, and `/profile` also read the `catdai-lang` cookie in route metadata so hard refreshes render the selected language title before hydration.
 - `/calculator` reads the `catdai-lang` cookie in route metadata and client copy through the shared translation files.
-- MAIB and Paddle checkout/status pages use RO/RU/EN copy and server metadata. English survives guest checkout, order snapshots, receipts, retry and property-return links. Apply `20261030152614_english_maib_payment_language.sql` before releasing English MAIB orders.
+- MAIB and Paddle checkout/status pages use RO/RU/EN copy and server metadata. English survives guest checkout, order snapshots, receipts, retry and property-return links. `20261030152614_english_maib_payment_language.sql` was applied to the shared CatDai database on 30 October 2026; it permits English order snapshots while retaining Romanian as the default.
 - Localized FAQ routes exist at `/ro/faq` and `/ru/faq`.
 - `/noutati` and `/noutati/[slug]` localize static page chrome from the URL language or `catdai-lang` cookie through a route-level language provider; database-backed news content is not translated by the app.
 - Landing 999.md analyzer feature paper labels are localized through `linkAnalyzer.feature*` keys.

@@ -43,7 +43,7 @@ export async function POST(request) {
     try {
       const result = await maibRequest('/v2/checkouts', { method: 'POST', body: {
         amount: product.amount_mdl, currency: 'MDL', language: lang,
-        orderInfo: { id: order.id, description: `CatDai — ${order.product_title}`, date: order.created_at,
+        orderInfo: { id: order.id, description: `CatDai - ${order.product_title}`, date: order.created_at,
           orderAmount: product.amount_mdl, orderCurrency: 'MDL', items: [{ externalId: product.key, title: order.product_title, amount: product.amount_mdl, currency: 'MDL', quantity: 1 }] },
         payerInfo: { email: order.receipt_email },
         callbackUrl: `${origin}/api/maib/callback`, successUrl: returnUrl, failUrl: returnUrl,

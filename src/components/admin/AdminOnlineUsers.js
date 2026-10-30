@@ -44,7 +44,7 @@ export default function AdminOnlineUsers() {
       className="flex w-full items-center justify-center gap-2 whitespace-nowrap text-sm text-gray-500 lg:w-auto lg:flex-1">
       <span aria-hidden="true" className={`h-2 w-2 rounded-full ${result?.error ? "bg-amber-500" : result ? "bg-emerald-500" : "bg-gray-300"}`} />
       <span>Online now: <strong className={result?.error ? "font-medium text-amber-700" : "font-semibold text-gray-900"}>
-        {result?.error ? "Unavailable" : result ? result.count.toLocaleString("ro-RO") : "—"}
+        {result?.error ? "Unavailable" : result ? result.count.toLocaleString("ro-RO") : "-"}
       </strong></span>
     </div>
   );

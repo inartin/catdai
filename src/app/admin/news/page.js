@@ -10,7 +10,7 @@ const emptyForm = {
 };
 
 function fmtDateTime(value) {
-  if (!value) return "\u2014";
+  if (!value) return "-";
   return new Date(value).toLocaleString("ro-RO", {
     day: "numeric",
     month: "long",

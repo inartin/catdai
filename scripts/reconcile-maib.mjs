@@ -1,4 +1,4 @@
-// PM2 owns this worker. No HTTP endpoint or additional credential is needed.
+// PM2 or the local tunnel launcher owns this worker. No HTTP endpoint or additional credential is needed.
 import nextEnv from '@next/env';
 nextEnv.loadEnvConfig(process.cwd(), process.env.NODE_ENV !== 'production');
 const { supabaseAdmin: db } = await import('../src/lib/supabase-admin.js');

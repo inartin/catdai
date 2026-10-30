@@ -6,9 +6,9 @@ import Image from "next/image";
 import { useTranslation } from "@/context/LanguageContext";
 
 const examples = [
-  { src: "/images/example1.png", alt: "Apartament 2 camere · 50m² — €109.900" },
+  { src: "/images/example1.png", alt: "Apartament 2 camere · 50m² - €109.900" },
   { src: "/images/example3.png", alt: "Date cadastrale oficiale" },
-  { src: "/images/example2.png", alt: "Apartament 1 cameră · 40m² — €61.500" },
+  { src: "/images/example2.png", alt: "Apartament 1 cameră · 40m² - €61.500" },
 ];
 
 export default function ExampleResults() {

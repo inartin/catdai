@@ -24,7 +24,7 @@ function formatNumber(value, lang, options = {}) {
 }
 
 function formatHistoryDate(value, lang) {
-  if (!value) return "—";
+  if (!value) return "-";
   const datePart = formatLocalizedDate(value, lang, {
     day: "numeric",
     month: "long",
@@ -38,7 +38,7 @@ function formatHistoryDate(value, lang) {
 }
 
 function formatHistoryPrice(amount, lang) {
-  if (amount == null) return "—";
+  if (amount == null) return "-";
   return `${formatNumber(amount, lang, { maximumFractionDigits: 0 })} €`;
 }
 
@@ -70,7 +70,7 @@ function formatHistoryProperty(row, t, lang) {
     row.areaM2 ? `${formatNumber(row.areaM2, lang, { maximumFractionDigits: 0 })} m²` : null,
     translateDataValues("data.district", row.districts?.length ? row.districts : row.district, t),
     translateDataValue("data.city", row.city, t),
-  ].filter(Boolean).join(" · ") || "—";
+  ].filter(Boolean).join(" · ") || "-";
 }
 
 function formatHistoryPropertyDetails(row, t) {
@@ -80,13 +80,13 @@ function formatHistoryPropertyDetails(row, t) {
       row.resultType ? t(`profile.historyCadastruResultType.${row.resultType}`) : null,
       translateDataValue("data.city", row.city, t),
       translateDataValue("data.district", row.district, t),
-    ].filter(Boolean).join(" · ") || "—";
+    ].filter(Boolean).join(" · ") || "-";
   }
 
   return [
     translateDataValues("data.buildingType", row.buildingTypes?.length ? row.buildingTypes : row.buildingType, t),
     translateDataValue("data.renovationType", row.renovation, t),
-  ].filter(Boolean).join(" · ") || "—";
+  ].filter(Boolean).join(" · ") || "-";
 }
 
 function formatHistoryResult(row, lang, t) {
@@ -110,7 +110,7 @@ function formatHistoryType(row, t) {
 function formatPaymentProduct(productKey, t) {
   const key = `profile.paymentProduct.${productKey}`;
   const translated = t(key);
-  return translated === key ? productKey || "—" : translated;
+  return translated === key ? productKey || "-" : translated;
 }
 
 function formatPaymentStatus(status, t) {

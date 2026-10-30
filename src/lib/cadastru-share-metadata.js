@@ -42,7 +42,7 @@ export async function getCadastruShareMetadata(report) {
   const lang = normalizeLanguage(urlLang || cookieLang);
   const copy = translations[lang];
   const address = reportAddress(report?.payload);
-  const title = `${copy["cadastru.sharedMetaTitle"]}${address ? ` — ${address}` : ""} | Catdai`;
+  const title = `${copy["cadastru.sharedMetaTitle"]}${address ? ` - ${address}` : ""} | Catdai`;
   const description = copy["cadastru.sharedMetaDescription"];
   const paths = Object.fromEntries(await Promise.all(LANGUAGES.map(async (language) =>
     [language, report ? await getCadastruSharePath(report.slug, language) : `/${language}/cadastru`])));

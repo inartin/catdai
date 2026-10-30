@@ -193,13 +193,13 @@ const PAGE_LABELS = {
 
 function formatPrice(value) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return "—";
+  if (!Number.isFinite(number)) return "-";
   return `€${Math.round(number).toLocaleString("ro-MD")}`;
 }
 
 function formatNumber(value) {
   const number = Number(value);
-  if (!Number.isFinite(number)) return "—";
+  if (!Number.isFinite(number)) return "-";
   return Math.round(number).toLocaleString("ro-MD");
 }
 
@@ -275,7 +275,7 @@ export default function StaticMarketAnalysisPage({
   const trendToneClass = trendChange >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600";
   const trendValue = Number.isFinite(trendChange)
     ? `${trendChange > 0 ? "+" : ""}${trendChange}%`
-    : "—";
+    : "-";
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",

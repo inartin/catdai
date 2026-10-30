@@ -94,7 +94,7 @@ async function readListings(db, input) {
     houses: [current, ...others].map((house) => ({ id: house === current ? "current" : house, address: `${prefix} ${resolved.street} ${house.toUpperCase()}`, distance: null })),
     listings: chosen.map((row) => ({ id: row.external_id || row.id, house: row.house === current ? "current" : row.house,
       active: row.is_active === true, rooms: row.rooms_count, area: positive(row.area_m2),
-      floor: [row.floor, row.total_floors].filter((value) => value != null).join("/") || "—",
+      floor: [row.floor, row.total_floors].filter((value) => value != null).join("/") || "-",
       renovationLabel: row.renovation, firstSeenAt: row.first_seen_at, lastSeenAt: row.last_seen_at, price: Number(row.price_amount),
       pricePerM2: positive(row.price_per_m2), sourceUrl: /^\d{5,12}$/.test(row.external_id || "") ? `https://999.md/ro/${row.external_id}` : null,
       history: histories.get(row.id) || [],

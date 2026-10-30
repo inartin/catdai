@@ -63,7 +63,7 @@ function buildListingSeo(params = {}, slug = "") {
     rooms === "1" ? "1 cameră" : rooms ? `${rooms} camere` : "";
   const titleParts = [roomsLabel, area ? `${area}m²` : ""].filter(Boolean);
   const title = titleParts.length
-    ? `Apartament ${titleParts.join(" · ")} — ${[district, city].filter(Boolean).join(", ")} | Catdai`
+    ? `Apartament ${titleParts.join(" · ")} - ${[district, city].filter(Boolean).join(", ")} | Catdai`
     : "Evaluare apartament | Catdai";
   const details = [buildingType, renovation, floor, balconies].filter(Boolean);
   const description = `Analiza Pieței: ${roomsLabel}${area ? `, ${area}m²` : ""} în ${[district, city].filter(Boolean).join(", ")}.${details.length ? ` ${details.join(" · ")}.` : ""} Preț estimat, comparație pe sectoare și statistici de piață.`;
@@ -82,7 +82,7 @@ export async function generateMetadata({ params }) {
     .maybeSingle();
 
   if (!data) {
-    return { title: "Link inexistent — Catdai" };
+    return { title: "Link inexistent - Catdai" };
   }
   const seo = buildListingSeo(data.params || {}, slug);
 

@@ -140,7 +140,7 @@ export default function CadastruMunicipalReportsCard({ reports, loading, unavail
               [reports.summary.solved, "cadastru.reportsCountSolved"],
             ].map(([value, label]) => (
               <div key={label}>
-                <dd className="text-2xl font-bold text-gray-950 sm:text-3xl">{value === null ? "—" : formatNumber.format(value)}</dd>
+                <dd className="text-2xl font-bold text-gray-950 sm:text-3xl">{value === null ? "-" : formatNumber.format(value)}</dd>
                 <dt className="mt-1 text-xs text-gray-500 sm:text-sm">{t(label)}</dt>
               </div>
             ))}

@@ -44,12 +44,12 @@ export default function AdminUserCredits({ user, disabled = false, onUpdate, onB
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-gray-200 bg-white p-3">
           <p className="text-xs text-gray-500">Credite disponibile</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">{paid?.remainingUses ?? "—"}</p>
-          <p className="mt-1 text-xs text-gray-500">{paid?.totalUsed ?? "—"} utilizate · {paid?.totalGranted ?? "—"} acordate</p>
+          <p className="mt-1 text-2xl font-semibold text-gray-900">{paid?.remainingUses ?? "-"}</p>
+          <p className="mt-1 text-xs text-gray-500">{paid?.totalUsed ?? "-"} utilizate · {paid?.totalGranted ?? "-"} acordate</p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white p-3">
           <p className="text-xs text-gray-500">Credit gratuit păstrat</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">{free?.remainingUses ?? "—"}</p>
+          <p className="mt-1 text-2xl font-semibold text-gray-900">{free?.remainingUses ?? "-"}</p>
           <p className="mt-1 text-xs text-gray-500">Nu se reînnoiește</p>
         </div>
       </div>

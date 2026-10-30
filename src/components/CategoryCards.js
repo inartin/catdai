@@ -45,20 +45,20 @@ function trackDistrictTrendsPopupOpen() {
 }
 
 function formatListings(n) {
-  if (!n) return "—";
+  if (!n) return "-";
   if (n >= 1000) return `~${Math.round(n / 1000)}k`;
   return String(n);
 }
 
 function formatPrice(num) {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   return "€" + Math.round(value).toLocaleString("ro-MD");
 }
 
 function formatTrendPercent(num) {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
 }
@@ -103,7 +103,7 @@ function LivePricePanel({ t, priceData }) {
             {t("categories.newConstruction")}
           </span>
           <span className={`text-xl font-bold tabular-nums sm:text-2xl ${MARKET_SERIES.constructii_noi.textClass}`}>
-            €{cn ?? "—"}
+            €{cn ?? "-"}
             <span className={`ml-1 text-xs font-semibold ${MARKET_SERIES.constructii_noi.unitClass}`}>/m²</span>
             {trend && (
               <span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} ml-1 text-sm`}>
@@ -117,7 +117,7 @@ function LivePricePanel({ t, priceData }) {
             {t("categories.secondary")}
           </span>
           <span className={`text-xl font-bold tabular-nums sm:text-2xl ${MARKET_SERIES.secundar.textClass}`}>
-            €{sec ?? "—"}
+            €{sec ?? "-"}
             <span className={`ml-1 text-xs font-semibold ${MARKET_SERIES.secundar.unitClass}`}>/m²</span>
             {trend && (
               <span className={`${TREND_COLORS[trend.direction] || TREND_COLORS.stable} ml-1 text-sm`}>

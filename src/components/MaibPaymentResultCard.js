@@ -56,7 +56,7 @@ export default function MaibPaymentResultCard({ order, checking, error, lang, t,
         <dl className="space-y-4 text-sm">
           <div><dt className="font-medium text-gray-900">{t('maib.orderNumber')}</dt><dd className="mt-1 break-all text-gray-500">{order.order_id}</dd></div>
           <div><dt className="font-medium text-gray-900">{t('payment.statusLabel')}</dt><dd className="mt-1 text-gray-500">{t(`maib.status.${status}`)}</dd></div>
-          <div><dt className="font-medium text-gray-900">{t('maib.paymentDate')}</dt><dd className="mt-1 text-gray-500">{order.paid_at ? new Date(order.paid_at).toLocaleString(lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-MD' : 'ro-MD', { timeZone: 'Europe/Chisinau', dateStyle: 'long', timeStyle: 'short' }) : pending ? t('maib.notPaid') : '—'}</dd></div>
+          <div><dt className="font-medium text-gray-900">{t('maib.paymentDate')}</dt><dd className="mt-1 text-gray-500">{order.paid_at ? new Date(order.paid_at).toLocaleString(lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-MD' : 'ro-MD', { timeZone: 'Europe/Chisinau', dateStyle: 'long', timeStyle: 'short' }) : pending ? t('maib.notPaid') : '-'}</dd></div>
           <div><dt className="font-medium text-gray-900">{t('maib.quantity')}</dt><dd className="mt-1 text-gray-500">{order.quantity}</dd></div>
           {order.refunded_minor > 0 && <div><dt className="font-medium text-gray-900">{t('maib.result.refundedAmount')}</dt><dd className="mt-1 text-gray-500">{(order.refunded_minor / 100).toLocaleString(lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-MD' : 'ro-MD')} {order.currency_code}</dd></div>}
         </dl>

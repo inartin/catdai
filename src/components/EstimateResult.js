@@ -74,25 +74,25 @@ function LockedOverlayIcon({ className = "" }) {
 
 function formatPrice(num) {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   return "€" + Math.round(value).toLocaleString("ro-MD");
 }
 
 function formatNullablePrice(num) {
-  if (num === null || num === undefined || num === "") return "—";
+  if (num === null || num === undefined || num === "") return "-";
   return formatPrice(num);
 }
 
 function formatCompactEuro(num) {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   if (Math.abs(value) >= 1000) return `€${Math.round(value / 1000)}k`;
   return formatPrice(value);
 }
 
 function formatCurrencyPrice(num, currency = "EUR") {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   const normalizedCurrency = String(currency || "EUR").toUpperCase();
   if (normalizedCurrency === "EUR") return formatPrice(value);
   return `${Math.round(value).toLocaleString("ro-MD")} ${normalizedCurrency}`;
@@ -100,22 +100,22 @@ function formatCurrencyPrice(num, currency = "EUR") {
 
 function formatTrendPercent(num) {
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
 }
 
 function formatPlainPercent(num) {
-  if (num === null || num === undefined || num === "") return "—";
+  if (num === null || num === undefined || num === "") return "-";
   const value = Number(num);
-  if (!Number.isFinite(value)) return "—";
+  if (!Number.isFinite(value)) return "-";
   return `${value.toFixed(1)}%`;
 }
 
 function formatYears(num, t) {
-  if (num === null || num === undefined || num === "") return "—";
+  if (num === null || num === undefined || num === "") return "-";
   const value = Number(num);
-  if (!Number.isFinite(value) || value <= 0) return "—";
+  if (!Number.isFinite(value) || value <= 0) return "-";
   return t("calculator.resultYearsValue", { years: value.toFixed(1) });
 }
 
@@ -808,7 +808,7 @@ function DistrictComparison({
                       onClick={onLockedClick}
                     />
                   ) : totalPrice == null
-                    ? (Number.isFinite(medianValue) ? `${formatPrice(medianValue)}${showPricePerM2 ? "/m²" : ""}` : "—")
+                    ? (Number.isFinite(medianValue) ? `${formatPrice(medianValue)}${showPricePerM2 ? "/m²" : ""}` : "-")
                     : `€${totalPrice.toLocaleString("ro-MD")}`}
                 </span>
               </div>
@@ -2658,7 +2658,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 <div className="rounded-xl border border-gray-100 bg-white p-4 text-center shadow-sm">
                   <p className="text-xs font-medium text-gray-400">{t("result.listingAskingPerM2")}</p>
                   <p className={`mt-1 text-lg font-bold ${canShowListingPerM2 ? listingVerdictColor : "text-gray-900"}`}>
-                    {canShowListingPerM2 ? `${formatPrice(listingPricePerM2)}/m²` : "—"}
+                    {canShowListingPerM2 ? `${formatPrice(listingPricePerM2)}/m²` : "-"}
                   </p>
                   <p className="mt-0.5 text-xs text-gray-400">
                     {hidePriceTiers ? (
@@ -2965,7 +2965,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                 <FilterBadge
                   label={
                     filters_used?.area !== false && filters_used?.area_tolerance
-                      ? `${Math.round(input.area_m2 * (1 - filters_used.area_tolerance))}–${Math.round(input.area_m2 * (1 + filters_used.area_tolerance))}m²`
+                      ? `${Math.round(input.area_m2 * (1 - filters_used.area_tolerance))}-${Math.round(input.area_m2 * (1 + filters_used.area_tolerance))}m²`
                       : `~${input.area_m2}m²`
                   }
                   active={filters_used?.area !== false}

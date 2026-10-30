@@ -32,7 +32,7 @@ Infrastructure:
 Tailwind CSS 4 with PostCSS
 Sharp for image processing
 QRCode generation for PDF reports
-Cloudflared tunnel for local dev testing (scripts/dev-tunnel.sh); the script now traps normal exit and signals so `pnpm test` does not leave `cloudflared` running afterward.
+Cloudflared tunnel for local dev testing (scripts/dev-tunnel.sh); `pnpm dev` and `pnpm test` also start the MAIB reconciliation/receipt worker with the development env and dev.catdai.md receipt links. Stopping the launcher or any service stops the server, worker and tunnel together. See docs/maib-payments.md for SMTP configuration.
 Key Features
 Authentication:
 

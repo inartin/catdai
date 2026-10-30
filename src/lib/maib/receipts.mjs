@@ -25,7 +25,6 @@ export function buildReceipt(order) {
   const values = {
     siteUrl: origin, orderId: order.id, paidAt, amount,
     currency: order.currency_code, productTitle: order.product_title, quantity: maibOrderQuantity(order),
-    sandbox: order.environment === 'sandbox' ? messages['maib.sandbox'] : '',
     features: Object.entries(order.grants).filter(([feature]) => MAIB_FEATURE_LABELS[feature])
       .map(([feature, count]) => `${messages[MAIB_FEATURE_LABELS[feature]]}: ${count}`).join('\n\n'),
     refund: order.refunded_minor > 0

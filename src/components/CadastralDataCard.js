@@ -3,6 +3,7 @@
 import { useTranslation } from "@/context/LanguageContext";
 import LockIcon from "@/components/icons/LockIcon";
 import CadastruFreshnessNote from "@/components/CadastruFreshnessNote";
+import { cadastruValueLabel } from "@/lib/cadastru-value-labels";
 
 export default function CadastralDataCard({
   cadastral,
@@ -126,7 +127,7 @@ export default function CadastralDataCard({
       <div className="flex items-start justify-between gap-4 text-base">
         <span className="text-gray-500">{label}</span>
         <span className={valueClassName(section, field)} {...lockedValueProps(section, field)}>
-          {value}
+          {cadastruValueLabel(value, field, lang)}
         </span>
       </div>
     );
@@ -142,7 +143,7 @@ export default function CadastralDataCard({
   const formatSquareMeters = (value) => {
     const number = Number(value);
     if (!Number.isFinite(number)) return value ? `${value} m²` : null;
-    return `${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 2 }).format(number)} m²`;
+    return `${new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 2 }).format(number)} m²`;
   };
   const formatEstimatedValue = (value) => (
     value === null || value === undefined || value === "" ? null : `${value} MDL`
@@ -238,7 +239,7 @@ export default function CadastralDataCard({
                   {detailRow("apartment", "toilet", t("form.cadastralToilet"), cadastral.apartment?.toilet)}
                   {detailRow("apartment", "bathroom", t("form.cadastralBathroom"), cadastral.apartment?.bathroom)}
                   {detailRow("apartment", "is_last_floor", t("form.cadastralLastFloor"), cadastral.apartment?.is_last_floor)}
-                  {detailRow("apartment", "estimated_value_lei", t("form.cadastralEstimatedValue"), cadastral.apartment?.estimated_value_lei ? `${cadastral.apartment.estimated_value_lei} lei` : null)}
+                  {detailRow("apartment", "estimated_value_lei", t("form.cadastralEstimatedValue"), cadastral.apartment?.estimated_value_lei ? `${cadastral.apartment.estimated_value_lei} ${lang === "en" ? "MDL" : "lei"}` : null)}
                   {detailRow("apartment", "object_type", t("form.cadastralObjectType"), cadastral.apartment?.object_type)}
                   {detailRow("apartment", "type", t("form.cadastralRoomType"), roomTypeValue)}
                   {detailRow("apartment", "destination", t("form.cadastralDestination"), cadastral.apartment?.destination)}

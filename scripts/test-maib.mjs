@@ -24,6 +24,8 @@ for (const [key, amount, grants] of [
   ['cadastru_lookup_5', 99, { cadastru_lookup: 5 }],
   ['cadastru_lookup_20', 299, { cadastru_lookup: 20 }],
   ['property_combo_1', 59, { cadastru_lookup: 1, sale_estimate: 1, pdf_report: 1 }],
+  ['credits_10', 79, { cadastru_lookup: 10 }],
+  ['credits_50', 249, { cadastru_lookup: 50 }],
 ]) {
   const product = maibProduct(key);
   assert.equal(product.amount_minor, amount * 100);
@@ -41,6 +43,8 @@ for (const [lang, single, five, twenty] of [['ro', '1 utilizare', '30 utilizări
   assert.equal(maibProductTitle('cadastru_lookup_single', lang, 1, 'pricing'), single, 'Pricing single-use checkout uses the universal package name');
   assert.equal(maibProductTitle('all_features_5', lang), five);
   assert.equal(maibProductTitle('all_features_20', lang), twenty);
+  assert.equal(maibProductTitle('credits_10', lang), lang === 'ro' ? '10 utilizări' : '10 использований');
+  assert.equal(maibProductTitle('credits_50', lang), lang === 'ro' ? '50 de utilizări' : '50 использований');
   assert.equal(maibProductTitle('cadastru_lookup_single', lang), lang === 'ro' ? 'Date cadastrale' : 'Кадастровые данные', 'Feature popups retain their selected feature');
   assert.equal(maibProductTitle('cadastru_lookup_single', lang, 1, 'arbitrary title'), maibProductTitle('cadastru_lookup_single', lang), 'Unknown sources cannot supply display text');
 }
@@ -59,6 +63,10 @@ for (const key of ['sale_estimate_single','rent_estimate_single','listing_analys
 for (const quantity of [null,0,-1,1.5,'4',NaN,Infinity,MAX_SINGLE_QUANTITY + 1]) assert.equal(maibProduct('cadastru_lookup_single',quantity),null);
 assert.equal(maibProduct('all_features_5',2),null,'pack quantity cannot be multiplied with the individual discount');
 assert.equal(maibOrderQuantity({product_key:'all_features_5',grants:maibProduct('all_features_5').grants}),1);
+for (const key of ['credits_10', 'credits_50']) {
+  assert.equal(maibProduct(key, 2), null, 'Universal packs are sold as one bundle');
+  assert.equal(maibOrderQuantity({ product_key: key, grants: maibProduct(key).grants }), 1);
+}
 for(const path of ['https://evil.test','//evil.test','/\\evil.test','/\n/evil.test']) assert.equal(client.safeReturnTo(path),'/profile');
 assert.equal(client.safeReturnTo('/evaluare?test=1#result'),'/evaluare?test=1#result');
 assert.equal(client.minorUnits(50.61),5061);
@@ -266,12 +274,14 @@ assert.equal((await create.POST(createRequest({...purchaseBody,product_key:'prop
 assert.equal(insertSnapshot.amount_minor,5900);
 assert.deepEqual(insertSnapshot.grants,{cadastru_lookup:1,sale_estimate:1,pdf_report:1});
 assert.equal(insertSnapshot.product_title,maibProductTitle('property_combo_1','ro'));
-for (const key of ['all_features_5', 'all_features_20', 'pdf_report_single']) {
+for (const key of ['all_features_5', 'all_features_20', 'credits_10', 'credits_50', 'pdf_report_single']) {
   const product = maibProduct(key);
   expectedBankAmount = product.amount_mdl;
   assert.equal((await create.POST(createRequest({...purchaseBody, product_key:key, request_key:crypto.randomUUID(), grants:{pdf_report:999}, amount_minor:1}))).status,200);
   assert.equal(insertSnapshot.amount_minor, product.amount_minor);
   assert.deepEqual(insertSnapshot.grants, product.grants, 'checkout snapshots server grants for the selected offer');
+  assert.equal(insertSnapshot.product_title, maibProductTitle(key, 'ro'));
+  assert.equal(bankPayload.orderInfo.items[0].title, insertSnapshot.product_title);
 }
 const bulkBody={...purchaseBody,product_key:'cadastru_lookup_single',quantity:4,request_key:crypto.randomUUID(),amount_minor:1,grants:{cadastru_lookup:999}};
 expectedBankAmount=15;

@@ -56,6 +56,58 @@ function formatNotificationTime(value, lang) {
   });
 }
 
+function LanguageSelector({ lang, includeEnglish, onChange, label }) {
+  const selectorRef = useRef(null);
+  const languages = includeEnglish ? ["ro", "ru", "en"] : ["ro", "ru"];
+
+  useEffect(() => {
+    const closeOutside = (event) => {
+      const selector = selectorRef.current;
+      if (selector && !selector.contains(event.target)) selector.open = false;
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, []);
+
+  return (
+    <details
+      ref={selectorRef}
+      className="group relative shrink-0"
+      onBlur={(event) => {
+        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape" || !event.currentTarget.open) return;
+        event.stopPropagation();
+        event.currentTarget.open = false;
+        event.currentTarget.querySelector("summary")?.focus();
+      }}
+    >
+      <summary
+        aria-label={`${label}: ${lang.toUpperCase()}`}
+        className="inline-flex h-9 cursor-pointer list-none items-center rounded-lg border border-gray-200 bg-gray-50 px-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary group-open:rounded-l-none [&::-webkit-details-marker]:hidden"
+      >
+        {lang.toUpperCase()}
+      </summary>
+      <div role="group" aria-label={label} className="absolute right-full top-0 z-10 flex h-9 items-center rounded-l-lg border border-r-0 border-gray-200 bg-white p-0.5 shadow-sm">
+        {languages.filter((language) => language !== lang).map((language) => (
+          <button
+            key={language}
+            type="button"
+            onClick={() => {
+              selectorRef.current.open = false;
+              onChange(language);
+            }}
+            className="h-full cursor-pointer rounded-md px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            {language.toUpperCase()}
+          </button>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 function NotificationSidebar({ open, notifications, onClear, onClose, loading, lang, t }) {
   const unreadCount = notifications.filter((notification) => !notification.read_at).length;
 
@@ -178,7 +230,8 @@ export default function Navbar() {
   const effectiveNotificationOpen = isAuthenticated && notificationOpen;
   const unreadNotificationCount = notifications.filter((notification) => !notification.read_at).length;
   const cadastruHref = `/${lang}/cadastru`;
-  const isCadastruPath = pathname === "/cadastru" || /^\/(ro|ru)\/cadastru\/?$/.test(pathname);
+  const isCadastruPath = pathname === "/cadastru" || /^\/(ro|ru|en)\/cadastru\/?$/.test(pathname);
+  const isCadastruRoute = /^\/(?:(?:ro|ru|en)\/)?(?:cadastru(?:\/|$)|c\/)/.test(pathname);
   const isCalculatorPath = pathname === "/calculator";
   const isPricingPath = pathname === "/pricing";
 
@@ -197,9 +250,12 @@ export default function Navbar() {
     if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {
       const target = `/${nextLang}/faq`;
       if (pathname !== target) router.replace(target);
-    } else if (isCadastruPath) {
-      const target = `/${nextLang}/cadastru`;
-      if (pathname !== target) router.replace(target);
+    } else if (isCadastruRoute) {
+      const basePath = pathname.replace(/^\/(ro|ru|en)(?=\/)/, "");
+      const target = `/${nextLang}${basePath}${window.location.search}${window.location.hash}`;
+      // These URLs rewrite to one route. A document navigation also refreshes
+      // the server layout metadata, which the client router otherwise retains.
+      if (pathname !== target) window.location.assign(target);
     }
   };
 
@@ -403,36 +459,7 @@ export default function Navbar() {
             onClick={handleNotificationToggle}
             t={t}
           />
-          <div
-            className="flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-sm font-medium"
-            role="group"
-            aria-label={t("nav.langAriaLabel")}
-          >
-            <button
-              type="button"
-              onClick={() => handleLangChange("ro")}
-              className={`cursor-pointer rounded-md px-3 py-1.5 transition-colors ${
-                lang === "ro"
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-gray-500 hover:text-foreground"
-              }`}
-              aria-pressed={lang === "ro"}
-            >
-              RO
-            </button>
-            <button
-              type="button"
-              onClick={() => handleLangChange("ru")}
-              className={`cursor-pointer rounded-md px-3 py-1.5 transition-colors ${
-                lang === "ru"
-                  ? "bg-white text-foreground shadow-sm"
-                  : "text-gray-500 hover:text-foreground"
-              }`}
-              aria-pressed={lang === "ru"}
-            >
-              RU
-            </button>
-          </div>
+          <LanguageSelector lang={lang} includeEnglish={isCadastruRoute} onChange={handleLangChange} label={t("nav.langAriaLabel")} />
         </div>
 
       <div ref={mobileMenuRef} className="flex items-center gap-2 md:hidden">
@@ -510,35 +537,18 @@ export default function Navbar() {
                   <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">
                     {t("nav.langAriaLabel")}
                   </p>
-                  <div
-                    className="flex rounded-lg bg-white p-0.5 text-sm font-medium"
-                    role="group"
-                    aria-label={t("nav.langAriaLabel")}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleLangChange("ro")}
-                      className={`cursor-pointer flex-1 rounded-md px-3 py-1.5 transition-colors ${
-                        lang === "ro"
-                          ? "bg-gray-50 text-foreground shadow-sm"
-                          : "text-gray-500 hover:text-foreground"
-                      }`}
-                      aria-pressed={lang === "ro"}
-                    >
-                      RO
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleLangChange("ru")}
-                      className={`cursor-pointer flex-1 rounded-md px-3 py-1.5 transition-colors ${
-                        lang === "ru"
-                          ? "bg-gray-50 text-foreground shadow-sm"
-                          : "text-gray-500 hover:text-foreground"
-                      }`}
-                      aria-pressed={lang === "ru"}
-                    >
-                      RU
-                    </button>
+                  <div role="group" aria-label={t("nav.langAriaLabel")} className="flex gap-1 rounded-lg bg-white p-0.5">
+                    {(isCadastruRoute ? ["ro", "ru", "en"] : ["ro", "ru"]).map((language) => (
+                      <button
+                        key={language}
+                        type="button"
+                        onClick={() => handleLangChange(language)}
+                        aria-pressed={lang === language}
+                        className={`h-9 flex-1 cursor-pointer rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-primary ${lang === language ? "bg-gray-50 text-gray-900 shadow-sm" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"}`}
+                      >
+                        {language.toUpperCase()}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>

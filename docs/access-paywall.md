@@ -8,7 +8,7 @@ Preview paywall implemented. Shared checkout selects MAIB by default, with Paddl
 - Anonymous users are `free`.
 - Authenticated Supabase users are `free` by default; authentication and paid access are separate.
 - Monthly free grants are retired. The retirement migration snapshots one unused current allowance for existing users into `user_retained_free_credits`. This one-time credit works across all six features, never expires or renews, and is absent for new users. Historical unlock events remain intact. Unpaid anonymous/guest results remain masked.
-- All purchased uses form one shared balance. One new paid action consumes one credit regardless of its purchase feature. Existing balances and product totals are preserved: Standard = 12, Pro = 60, Extra = 300, `all_features_5` = 30, `all_features_20` = 120, combo = 3, and single products = selected quantity.
+- All purchased uses form one shared balance. One new paid action consumes one credit regardless of its purchase feature. Pricing packs `credits_10`/`credits_50` grant exactly 10/50 universal credits. Existing balances and legacy product totals are preserved: Standard = 12, Pro = 60, Extra = 300, `all_features_5` = 30, `all_features_20` = 120, combo = 3, and single products = selected quantity.
 - `user_feature_credits` and `maib_credit_grants` retain source buckets for payment lifecycle accounting. `user_credit_balances` sums them through `user_feature_credit_balances`. The transactional `consume_user_credit` RPC spends one legacy source row first, then the oldest MAIB grant, irrespective of feature. Usage events keep the actual feature; metadata records `credit_grant_feature_key` separately.
 - MAIB credits remain additive/non-expiring. Paddle Extra resets its legacy source rows to 300 total per paid period and clears them on failed/inactive renewal, preserving MAIB credits.
 - Approved full Paddle refunds and chargebacks mark the local payment as refunded/chargeback and remove remaining paid credits from that payment; already consumed credits remain visible in usage totals.
@@ -23,7 +23,7 @@ Preview paywall implemented. Shared checkout selects MAIB by default, with Paddl
 - `db/paddle_payments.sql` prepares Paddle payment orders, Extra subscription state, webhook audit rows, one-time grants, and idempotent monthly subscription resets into the same feature-credit system.
 - `POST /api/payments/paddle/create` (only with `PAYMENT_PROVIDER=paddle`) and `POST /api/paddle/webhooks` create Paddle transactions and grant or reset credits only after verified `transaction.completed` notifications.
 - `POST /api/paddle/webhooks` also handles approved full Paddle refund/chargeback adjustments and revokes remaining credits so refunded orders no longer keep paid access.
-- Existing MAIB feature popups still show the selected feature for 15 MDL, but the purchase grants one universal credit. Pricing-page packs grant 30 credits for 99 MDL or 120 for 299 MDL.
+- Existing MAIB feature popups still show the selected feature for 15 MDL, but the purchase grants one universal credit. Pricing-page packs grant 10 credits for 79 MDL or 50 for 249 MDL.
 - Logged-out result pages and their popups show the same matching single-use offer even when the preview has no purchase offer; checkout preserves that product through login.
 - In the desktop result sidebar, the unlock card appears above the PDF/share/compare actions; the unlock button is green and the PDF action is black.
 - Shared purchase cards use the same green border and subtle green ring as the recommended pricing-page card.

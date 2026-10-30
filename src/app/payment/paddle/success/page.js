@@ -128,7 +128,7 @@ export default function PaddlePaymentSuccessPage() {
         : "";
 
   useEffect(() => {
-    if ((params.lang === "ro" || params.lang === "ru") && params.lang !== lang) {
+    if (["ro", "ru", "en"].includes(params.lang) && params.lang !== lang) {
       setLang(params.lang);
     }
   }, [lang, params.lang, setLang]);

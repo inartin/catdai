@@ -14,13 +14,14 @@ Implemented.
 - Landing hero body copy intentionally echoes the homepage H1 wording so heading keywords also appear in visible page text.
 - Landing page includes a localized FAQ preview with visible paragraph answers and result-page terminology so homepage body copy is less thin for basic SEO analyzers.
 - Shared result pages at `/imobil/[slug]` generate OG/Twitter metadata and JSON-LD before redirecting.
-- Shared Cadastru reports use server-rendered RO/RU Open Graph/Twitter metadata containing only the saved address and generic cadastral-report copy. Compact and legacy links use the same localized compact report URL; other query criteria cannot alter previews. See [Cadastru sharing](favorites-sharing.md#cadastru-reports).
+- Shared Cadastru reports use server-rendered RO/RU/EN Open Graph/Twitter metadata containing only the saved address and generic cadastral-report copy. Compact and legacy links use the same localized compact report URL; other query criteria cannot alter previews. See [Cadastru sharing](favorites-sharing.md#cadastru-reports).
 - Admin, profile, and API routes are marked `noindex` in `next.config.mjs`.
-- `/ro/estimeaza`, `/ru/estimeaza`, `/ro/evaluare`, `/ru/evaluare`, `/ro/alerts`, `/ru/alerts`, `/ro/cadastru`, and `/ru/cadastru` are indexable localized entry points with alternate metadata.
+- `/ro/estimeaza`, `/ru/estimeaza`, `/ro/evaluare`, `/ru/evaluare`, `/ro/alerts`, `/ru/alerts`, `/ro/cadastru`, `/ru/cadastru`, and `/en/cadastru` are indexable localized entry points with alternate metadata.
 - `/verifica-anunt` is an indexable Romanian entry point for 999.md listing-link analysis, with canonical, description, Open Graph, and Twitter metadata; `/999` is only a redirect shortcut.
 - `/noutati` and `/noutati/[slug]` are indexable Romanian news entry points backed by `news_posts`; article pages server-render sanitized rich HTML, stable slugs, canonical metadata, Open Graph/Twitter metadata, `NewsArticle` JSON-LD, and sitemap entries.
 - Direct `/evaluare` keeps a `noindex` metadata directive to avoid duplicating the localized evaluation URLs. Generated listing-analysis result URLs on `/anunt` are also noindex.
-- Direct `/cadastru` keeps a `noindex` metadata directive to avoid duplicating `/ro/cadastru` and `/ru/cadastru`; `/cadastru/rezultat` is also `noindex` because it is a user-query result page.
+- Direct `/cadastru` keeps a `noindex` metadata directive to avoid duplicating `/ro/cadastru`, `/ru/cadastru`, and `/en/cadastru`; `/cadastru/rezultat` is also `noindex` because it is a user-query result page.
+- All three Cadastru search versions have self-canonicals and the same reciprocal `ro`, `ru`, `en`, and `x-default` links; `x-default` points to `/ro/cadastru`. The sitemap includes all three with absolute alternate URLs. Result, shared-report and payment pages retain noindex.
 - Static market-analysis pages can use saved local valuation snapshots without API queries; the first Botanica pairs cover the same 2-room, 50 m², eurorepaired apartment profile in old-building and new-building variants, with reciprocal comparison links.
 
 ## Structured Data

@@ -32,7 +32,7 @@ export default function AdSourceTracker() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (window.location.pathname.startsWith("/admin")) return;
-    if (process.env.NODE_ENV === "development" && /^\/(?:ro\/|ru\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
+    if (process.env.NODE_ENV === "development" && /^\/(?:ro\/|ru\/|en\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
 
     getDeviceId();
     const currentPath = getCurrentPath();

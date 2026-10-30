@@ -17,7 +17,7 @@ export default function MaibPaymentResultCard({ order, checking, error, lang, t,
   const description = paid ? t(`maib.result.purchased.${context.feature}.${plural}`, { count: context.count })
     : failed ? t('maib.result.failedMessage') : status === 'refunded' ? '' : t('maib.result.pendingMessage');
   const buttonClass = 'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700 disabled:cursor-wait disabled:opacity-60';
-  const amount = order ? `${(order.amount_minor / 100).toLocaleString(lang === 'ru' ? 'ru-MD' : 'ro-MD')} ${order.currency_code}` : '';
+  const amount = order ? `${(order.amount_minor / 100).toLocaleString(lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-MD' : 'ro-MD')} ${order.currency_code}` : '';
 
   return <section aria-labelledby="payment-result-title" className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
     <div role={failed ? 'alert' : 'status'} aria-live="polite" className="text-center">
@@ -56,9 +56,9 @@ export default function MaibPaymentResultCard({ order, checking, error, lang, t,
         <dl className="space-y-4 text-sm">
           <div><dt className="font-medium text-gray-900">{t('maib.orderNumber')}</dt><dd className="mt-1 break-all text-gray-500">{order.order_id}</dd></div>
           <div><dt className="font-medium text-gray-900">{t('payment.statusLabel')}</dt><dd className="mt-1 text-gray-500">{t(`maib.status.${status}`)}</dd></div>
-          <div><dt className="font-medium text-gray-900">{t('maib.paymentDate')}</dt><dd className="mt-1 text-gray-500">{order.paid_at ? new Date(order.paid_at).toLocaleString(lang === 'ru' ? 'ru-MD' : 'ro-MD', { timeZone: 'Europe/Chisinau', dateStyle: 'long', timeStyle: 'short' }) : pending ? t('maib.notPaid') : '—'}</dd></div>
+          <div><dt className="font-medium text-gray-900">{t('maib.paymentDate')}</dt><dd className="mt-1 text-gray-500">{order.paid_at ? new Date(order.paid_at).toLocaleString(lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-MD' : 'ro-MD', { timeZone: 'Europe/Chisinau', dateStyle: 'long', timeStyle: 'short' }) : pending ? t('maib.notPaid') : '—'}</dd></div>
           <div><dt className="font-medium text-gray-900">{t('maib.quantity')}</dt><dd className="mt-1 text-gray-500">{order.quantity}</dd></div>
-          {order.refunded_minor > 0 && <div><dt className="font-medium text-gray-900">{t('maib.result.refundedAmount')}</dt><dd className="mt-1 text-gray-500">{(order.refunded_minor / 100).toLocaleString(lang === 'ru' ? 'ru-MD' : 'ro-MD')} {order.currency_code}</dd></div>}
+          {order.refunded_minor > 0 && <div><dt className="font-medium text-gray-900">{t('maib.result.refundedAmount')}</dt><dd className="mt-1 text-gray-500">{(order.refunded_minor / 100).toLocaleString(lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-MD' : 'ro-MD')} {order.currency_code}</dd></div>}
         </dl>
         <ul className="mt-5 space-y-3 border-t border-gray-100 pt-4 text-sm">
           {Object.entries(order.grants || {}).filter(([feature]) => MAIB_FEATURE_LABELS[feature]).map(([feature, count]) => <li key={feature}>

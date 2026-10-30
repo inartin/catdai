@@ -51,7 +51,7 @@ export default function RootLayout({ children }) {
     "@type": "WebSite",
     name: "CatDai",
     url: siteUrl,
-    inLanguage: ["ro", "ru"],
+    inLanguage: ["ro", "ru", "en"],
   };
 
   return (
@@ -73,7 +73,7 @@ export default function RootLayout({ children }) {
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
                   var isAdminRoute = window.location.pathname.startsWith('/admin');
-                  var isDevCadastruRoute = ${process.env.NODE_ENV === "development"} && /^\\/(?:ro\\/|ru\\/)?cadastru(?:\\/|$)/.test(window.location.pathname);
+                  var isDevCadastruRoute = ${process.env.NODE_ENV === "development"} && /^\\/(?:ro\\/|ru\\/|en\\/)?cadastru(?:\\/|$)/.test(window.location.pathname);
                   if (!isAdminRoute && !isDevCadastruRoute) {
                   var cookieConsent = localStorage.getItem('cookie_consent');
                   var googleConsent = cookieConsent === 'granted' ? 'granted' : 'denied';
@@ -94,7 +94,7 @@ export default function RootLayout({ children }) {
                   window.dataLayer = window.dataLayer || [];
                   function gtag(){window.dataLayer.push(arguments);}
                   var isAdminRoute = window.location.pathname.startsWith('/admin');
-                  var isDevCadastruRoute = ${process.env.NODE_ENV === "development"} && /^\\/(?:ro\\/|ru\\/)?cadastru(?:\\/|$)/.test(window.location.pathname);
+                  var isDevCadastruRoute = ${process.env.NODE_ENV === "development"} && /^\\/(?:ro\\/|ru\\/|en\\/)?cadastru(?:\\/|$)/.test(window.location.pathname);
                   if (!isAdminRoute && !isDevCadastruRoute) {
                   gtag('js', new Date());
                   ${googleTagIds

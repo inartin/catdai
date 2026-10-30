@@ -1,5 +1,6 @@
 // Isolated UI checks; no servers, network, or database writes.
 // pnpm exec node --experimental-vm-modules scripts/test-cadastru-unlock-actions.mjs
+import { cadastruValueLabel } from "../src/lib/cadastru-value-labels.js";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
@@ -60,6 +61,7 @@ function textOf(node) {
 
 const CadastralDataCard = await loadJsx("src/components/CadastralDataCard.js", {
   "@/context/LanguageContext": translation,
+  "@/lib/cadastru-value-labels": { cadastruValueLabel },
 });
 const address = "22, Strada Luceafărul, Stăuceni";
 const purchase = { product_key: "cadastru_lookup_single", price_mdl: 25 };

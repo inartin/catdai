@@ -90,7 +90,7 @@ async function handlePost(request) {
     }
     if (!slug) throw new Error("Could not allocate a unique report code");
 
-    const lang = body.lang === "ru" ? "ru" : "ro";
+    const lang = ["ro", "ru", "en"].includes(body.lang) ? body.lang : "ro";
     const origin = process.env.NODE_ENV === "production" ? "https://catdai.md" : new URL(request.url).origin;
     return NextResponse.json({ slug, url: `${origin}${await getCadastruSharePath(slug, lang)}` });
   } catch (error) {

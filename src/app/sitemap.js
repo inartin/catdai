@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getCanonicalSiteUrl } from "@/lib/seo";
+import { cadastruLanguageAlternates } from "@/lib/language";
 
 const INDEXABLE_STATIC_PATHS = [
   "/",
@@ -11,6 +12,7 @@ const INDEXABLE_STATIC_PATHS = [
   "/ru/alerts",
   "/ro/cadastru",
   "/ru/cadastru",
+  "/en/cadastru",
   "/pricing",
   "/verifica-anunt",
   "/noutati",
@@ -32,6 +34,10 @@ export default async function sitemap() {
   const entries = INDEXABLE_STATIC_PATHS.map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: new Date(),
+    ...(/^\/(ro|ru|en)\/cadastru$/.test(path) ? {
+      alternates: { languages: Object.fromEntries(Object.entries(cadastruLanguageAlternates())
+        .map(([language, url]) => [language, `${siteUrl}${url}`])) },
+    } : {}),
   }));
 
   try {

@@ -1,5 +1,6 @@
 import ro from '../../locales/ro.json' with { type: 'json' };
 import ru from '../../locales/ru.json' with { type: 'json' };
+import en from '../../locales/en.json' with { type: 'json' };
 
 export const MAIB_TERMS_VERSION = '2026-10-10';
 export const MAIB_FEATURE_LABELS = {
@@ -17,13 +18,13 @@ export function receiptEmail(value) {
   return email;
 }
 
-export function purchaseMessages(language) { return language === 'ru' ? ru : ro; }
+export function purchaseMessages(language) { return language === 'en' ? en : language === 'ru' ? ru : ro; }
 export function maibProductTitle(key, language, quantity = 1, checkoutSource) {
   const messages = purchaseMessages(language);
   const title = messages[`profile.paymentProduct.${key}`];
   if (title && checkoutSource === 'pricing' && key.endsWith('_single')) {
-    const plural = new Intl.PluralRules(language === 'ru' ? 'ru' : 'ro').select(quantity);
-    const separator = language !== 'ru' && plural === 'other' ? ' de ' : ' ';
+    const plural = new Intl.PluralRules(['ro', 'ru', 'en'].includes(language) ? language : 'ro').select(quantity);
+    const separator = language !== 'ru' && language !== 'en' && plural === 'other' ? ' de ' : ' ';
     return `${quantity}${separator}${messages[`pricing.quantityUnit.${plural}`]}`;
   }
   return title && quantity > 1 ? `${title} × ${quantity}` : title;

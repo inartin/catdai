@@ -10,7 +10,7 @@ export default function OnlineUsersTracker() {
 
   useEffect(() => {
     if (!pathname || pathname.startsWith("/admin")) return;
-    if (process.env.NODE_ENV === "development" && /^\/(?:ro\/|ru\/)?cadastru(?:\/|$)/.test(pathname)) return;
+    if (process.env.NODE_ENV === "development" && /^\/(?:ro\/|ru\/|en\/)?cadastru(?:\/|$)/.test(pathname)) return;
 
     const controller = new AbortController();
     let inFlight = false;

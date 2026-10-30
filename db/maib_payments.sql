@@ -10,7 +10,7 @@ create table if not exists public.maib_payment_orders (
   amount_minor integer not null check (amount_minor > 100),
   currency_code text not null default 'MDL' check (currency_code = 'MDL'),
   grants jsonb not null,
-  language text not null default 'ro' check (language in ('ro','ru')),
+  language text not null default 'ro' check (language in ('ro','ru','en')),
   return_to text not null default '/profile',
   status text not null default 'pending' check (status in ('pending','registered','creation_unknown','paid','partially_refunded','refunded','failed','canceled','expired')),
   checkout_id uuid unique,

@@ -11,6 +11,9 @@ const products = {
   cadastru_lookup_single: { amount_mdl: 15, grants: { cadastru_lookup: 1 } },
   cadastru_lookup_5: { amount_mdl: 99, grants: { cadastru_lookup: 5 } },
   cadastru_lookup_20: { amount_mdl: 299, grants: { cadastru_lookup: 20 } },
+  // One source bucket funds the shared balance for every feature.
+  credits_10: { amount_mdl: 79, grants: { cadastru_lookup: 10 } },
+  credits_50: { amount_mdl: 249, grants: { cadastru_lookup: 50 } },
   all_features_20: { amount_mdl: 299, grants: allFeatures(20) },
   all_features_5: { amount_mdl: 99, grants: allFeatures(5) },
   property_combo_1: { amount_mdl: 59, grants: { cadastru_lookup: 1, sale_estimate: 1, pdf_report: 1 } },

@@ -1,10 +1,5 @@
-export const metadata = {
-  title: "Paddle payment status | Catdai",
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
+import { paymentMetadata } from '@/lib/payment-metadata';
+export const generateMetadata = () => paymentMetadata(true);
 
 export default function PaddleSuccessLayout({ children }) {
   return children;

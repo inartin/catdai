@@ -21,7 +21,7 @@ export function attachCadastruFavorites(searches, favorites) {
     if (!favorite.user_id || !favorite.url_path) continue;
     let url;
     try { url = new URL(favorite.url_path, "https://catdai.md"); } catch { continue; }
-    if (!/^\/(?:ro\/|ru\/)?cadastru\/rezultat\/?$/.test(url.pathname)) continue;
+    if (!/^\/(?:ro\/|ru\/|en\/)?cadastru\/rezultat\/?$/.test(url.pathname)) continue;
     const number = url.searchParams.get("cadastral_number")?.trim();
     const address = getSavedCadastruAddress(url.searchParams);
     if (number) keys.add(`${favorite.user_id}|number|${number}`);

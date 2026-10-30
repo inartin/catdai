@@ -1,9 +1,11 @@
 import { cookies, headers } from "next/headers";
 import ro from "@/locales/ro.json";
 import ru from "@/locales/ru.json";
+import en from "@/locales/en.json";
+import { cadastruLanguageAlternates, OG_LOCALES } from "@/lib/language";
 import { LanguageProvider } from "@/context/LanguageContext";
 
-const translations = { ro, ru };
+const translations = { ro, ru, en };
 
 function resolveLanguage(urlLang, cookieLang) {
   if (translations[urlLang]) return urlLang;
@@ -24,7 +26,7 @@ async function getRequestLanguage() {
 
 export async function generateMetadata() {
   const { hasUrlLang, lang } = await getRequestLanguage();
-  const canonicalLang = lang === "ru" ? "ru" : "ro";
+  const canonicalLang = lang;
   const title = translations[lang]["cadastru.metaTitle"];
   const description = translations[lang]["cadastru.metaDescription"];
 
@@ -34,11 +36,7 @@ export async function generateMetadata() {
     robots: hasUrlLang ? undefined : { index: false, follow: true },
     alternates: {
       canonical: `/${canonicalLang}/cadastru`,
-      languages: {
-        ro: "/ro/cadastru",
-        ru: "/ru/cadastru",
-        "x-default": "/ro/cadastru",
-      },
+      languages: cadastruLanguageAlternates(),
     },
     openGraph: {
       title,
@@ -46,8 +44,8 @@ export async function generateMetadata() {
       url: `/${canonicalLang}/cadastru`,
       siteName: "Catdai",
       type: "website",
-      locale: lang === "ru" ? "ru_MD" : "ro_MD",
-      alternateLocale: lang === "ru" ? ["ro_MD"] : ["ru_MD"],
+      locale: OG_LOCALES[lang],
+      alternateLocale: Object.values(OG_LOCALES).filter((locale) => locale !== OG_LOCALES[lang]),
     },
     twitter: {
       card: "summary",
@@ -60,5 +58,5 @@ export async function generateMetadata() {
 export default async function CadastruLayout({ children }) {
   const { lang } = await getRequestLanguage();
 
-  return <LanguageProvider initialLang={lang}>{children}</LanguageProvider>;
+  return <LanguageProvider key={lang} initialLang={lang}>{children}</LanguageProvider>;
 }

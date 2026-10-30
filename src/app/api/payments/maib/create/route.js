@@ -30,7 +30,7 @@ export async function POST(request) {
       if (existing.product_key !== product.key || maibOrderQuantity(existing) !== product.quantity) return NextResponse.json({ error: 'Request key already used.' }, { status: 409 });
       return NextResponse.json(publicOrder(existing));
     }
-    const lang = body.lang === 'ru' ? 'ru' : 'ro';
+    const lang = ['ro', 'ru', 'en'].includes(body.lang) ? body.lang : 'ro';
     const order = await checked(db.from('maib_payment_orders').insert({
       user_id: user.id, environment: environment(), request_key: body.request_key, product_key: product.key,
       amount_minor: product.amount_minor, currency_code: 'MDL', grants: product.grants, language: lang,

@@ -28,7 +28,7 @@ export default function CadastruNearbyCard({ nearby, loading, unavailable }) {
     category,
     places: Array.isArray(nearby?.categories?.[category]?.places) ? nearby.categories[category].places : [],
   })).filter((group) => group.places.length);
-  const formatDistance = new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 0 });
+  const formatDistance = new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 0 });
 
   return (
     <section className="mx-1 mt-6 rounded-2xl border-2 border-emerald-200 bg-white p-5 shadow-md sm:p-7" aria-busy={loading}>

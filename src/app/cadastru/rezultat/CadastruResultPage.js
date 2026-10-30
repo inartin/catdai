@@ -525,7 +525,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const unlockPriceMdl = paymentProvider === "maib"
     ? (singlePurchaseProduct || maibProduct("extra_pack")).amount_mdl
     : Number(process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499);
-  const unlockPriceLabel = `${new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD").format(unlockPriceMdl)} MDL`;
+  const unlockPriceLabel = `${new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD").format(unlockPriceMdl)} MDL`;
   const startCheckout = () => {
     const current = new URL(window.location.href);
     const path = getCadastruFavoritePath({ lang, cadastralNumber, cadastral: state.data,

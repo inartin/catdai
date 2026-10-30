@@ -12,10 +12,10 @@ import { featureCheckoutUrl } from "@/lib/payment-urls.mjs";
 import FeaturePurchaseBenefits from "@/components/FeaturePurchaseBenefits";
 import { FEATURE_PURCHASE_CONTENT } from "@/lib/feature-purchase-content";
 
-function formatMdl(value) {
+function formatMdl(value, lang) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return null;
-  return `${Math.round(amount).toLocaleString("ro-MD")} lei`;
+  return `${Math.round(amount).toLocaleString(lang === "en" ? "en-GB" : "ro-MD")} ${lang === "en" ? "MDL" : "lei"}`;
 }
 
 const subscribeToPortal = () => () => {};
@@ -131,7 +131,7 @@ export default function FeaturePricingAction({
     window.location.href = featureCheckoutUrl(packageOffer.product_key, lang, window.location.href);
   };
 
-  const offerTitle = t(isCadastruProduct ? "cadastru.mobilePurchaseTitle" : isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl) });
+  const offerTitle = t(isCadastruProduct ? "cadastru.mobilePurchaseTitle" : isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl, lang) });
   const packageDetails = isCadastruProduct ? (
     <ul className="mt-4 space-y-3 border-t border-gray-100 pt-4">
       {["cadastru.mobilePurchaseArea", "cadastru.purchaseBuilding", "cadastru.mobilePurchaseOfficial"].map((key) => (
@@ -178,7 +178,7 @@ export default function FeaturePricingAction({
             {t(featureContent.title)}
           </h2>
           <p className="mt-6 border-b border-gray-200 pb-5 text-lg font-semibold text-gray-950">
-            {t(featureContent.summary, { price: formatMdl(packageOffer.price_mdl) })}
+            {t(featureContent.summary, { price: formatMdl(packageOffer.price_mdl, lang) })}
           </p>
           <p className="mt-5 text-base font-medium text-gray-950">
             {t("payment.featureIncludes")}
@@ -199,7 +199,7 @@ export default function FeaturePricingAction({
         disabled={authLoading || status === "loading" || status === "redirecting"}
         className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
       >
-        {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : isPaywallOffer ? t("payment.featureUnlockCta", { price: formatMdl(packageOffer.price_mdl) }) : t(isSingleOffer ? "maib.continueSingleFeature" : "payment.continueWithExtra")}
+        {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : isPaywallOffer ? t("payment.featureUnlockCta", { price: formatMdl(packageOffer.price_mdl, lang) }) : t(isSingleOffer ? "maib.continueSingleFeature" : "payment.continueWithExtra")}
         <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M5 12h14" />
           <path d="m13 6 6 6-6 6" />

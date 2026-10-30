@@ -18,10 +18,10 @@ export function buildReceipt(order) {
   if (!receiptEmail(order.receipt_email) || !order.paid_at || !order.product_title) throw new Error('Incomplete receipt');
   const messages = purchaseMessages(order.language);
   const origin = paymentSiteOrigin();
-  const paidAt = new Date(order.paid_at).toLocaleString(order.language === 'ru' ? 'ru-MD' : 'ro-MD', {
+  const paidAt = new Date(order.paid_at).toLocaleString(order.language === 'en' ? 'en-GB' : order.language === 'ru' ? 'ru-MD' : 'ro-MD', {
     timeZone: 'Europe/Chisinau', dateStyle: 'long', timeStyle: 'short',
   });
-  const amount = (order.amount_minor / 100).toLocaleString(order.language === 'ru' ? 'ru-MD' : 'ro-MD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const amount = (order.amount_minor / 100).toLocaleString(order.language === 'en' ? 'en-GB' : order.language === 'ru' ? 'ru-MD' : 'ro-MD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const values = {
     siteUrl: origin, orderId: order.id, paidAt, amount,
     currency: order.currency_code, productTitle: order.product_title, quantity: maibOrderQuantity(order),
@@ -30,7 +30,7 @@ export function buildReceipt(order) {
       .map(([feature, count]) => `${messages[MAIB_FEATURE_LABELS[feature]]}: ${count}`).join('\n\n'),
     refund: order.refunded_minor > 0
       ? `${messages['maib.refundedAmount']}: ${(order.refunded_minor / 100).toFixed(2)} ${order.currency_code}` : '',
-    orderUrl: `${origin}/payment/maib/success?order_id=${encodeURIComponent(order.id)}&lang=${order.language === 'ru' ? 'ru' : 'ro'}`,
+    orderUrl: `${origin}/payment/maib/success?order_id=${encodeURIComponent(order.id)}&lang=${['ro', 'ru', 'en'].includes(order.language) ? order.language : 'ro'}`,
   };
   const fill = template => template.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? values[key] : match);
   return {

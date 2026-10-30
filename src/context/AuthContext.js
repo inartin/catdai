@@ -179,7 +179,7 @@ function stripOAuthParamsFromUrl() {
 function pingUserActivity(accessToken) {
   if (!accessToken) return;
   if (typeof window !== "undefined" && process.env.NODE_ENV === "development"
-    && /^\/(?:ro\/|ru\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
+    && /^\/(?:ro\/|ru\/|en\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
 
   fetch("/api/activity/ping", {
     method: "POST",

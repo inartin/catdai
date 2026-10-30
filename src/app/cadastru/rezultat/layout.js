@@ -1,8 +1,10 @@
 import { cookies, headers } from "next/headers";
 import ro from "@/locales/ro.json";
 import ru from "@/locales/ru.json";
+import en from "@/locales/en.json";
+import { cadastruLanguageAlternates } from "@/lib/language";
 
-const translations = { ro, ru };
+const translations = { ro, ru, en };
 
 function resolveLanguage(urlLang, cookieLang) {
   if (translations[urlLang]) return urlLang;
@@ -16,7 +18,7 @@ export async function generateMetadata() {
   const urlLang = requestHeaders.get("x-catdai-lang");
   const cookieLang = cookieStore.get("catdai-lang")?.value;
   const lang = resolveLanguage(urlLang, cookieLang);
-  const canonicalLang = lang === "ru" ? "ru" : "ro";
+  const canonicalLang = lang;
   const title = translations[lang]["cadastru.resultPageTitle"];
   const description = translations[lang]["cadastru.resultMetaDescription"];
 
@@ -26,11 +28,7 @@ export async function generateMetadata() {
     robots: { index: false, follow: true },
     alternates: {
       canonical: `/${canonicalLang}/cadastru`,
-      languages: {
-        ro: "/ro/cadastru",
-        ru: "/ru/cadastru",
-        "x-default": "/ro/cadastru",
-      },
+      languages: cadastruLanguageAlternates(),
     },
   };
 }

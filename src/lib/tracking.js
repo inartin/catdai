@@ -49,7 +49,7 @@ export function getActiveAdSource() {
 
 export function trackAdSourceEvent(eventName, metadata = {}) {
   if (typeof window !== "undefined" && process.env.NODE_ENV === "development"
-    && /^\/(?:ro\/|ru\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
+    && /^\/(?:ro\/|ru\/|en\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
   const attribution = getActiveAdSource();
   if (!attribution || typeof window === "undefined") return;
 
@@ -84,7 +84,7 @@ export function trackAdSourceEvent(eventName, metadata = {}) {
 export function trackPaymentCheckoutEvent(eventType, metadata = {}) {
   if (typeof window === "undefined") return;
   if (process.env.NODE_ENV === "development"
-    && /^\/(?:ro\/|ru\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
+    && /^\/(?:ro\/|ru\/|en\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
 
   const { accessToken, ...eventMetadata } = metadata || {};
   const body = JSON.stringify({

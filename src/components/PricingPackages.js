@@ -23,8 +23,8 @@ export default function PricingPackages() {
 
   const offers = [
     { key: "single", productKey: "cadastru_lookup_single" },
-    { key: "five", productKey: "all_features_5" },
-    { key: "twenty", productKey: "all_features_20" },
+    { key: "ten", productKey: "credits_10" },
+    { key: "fifty", productKey: "credits_50" },
   ];
 
   const startCheckout = (productKey) => {

@@ -36,7 +36,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
   useEffect(() => { setParams(new URLSearchParams(window.location.search)); }, []);
   useEffect(() => {
     const requested = params?.get('lang');
-    if (['ro','ru'].includes(requested) && requested !== lang) setLang(requested);
+    if (['ro','ru','en'].includes(requested) && requested !== lang) setLang(requested);
   }, [params, lang, setLang]);
   const quantity = params?.has('quantity') ? Number(params.get('quantity')) : 1;
   const product = maibProduct(result ? order?.product_key : params?.get('product_key'), result ? 1 : quantity);
@@ -108,10 +108,10 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
     } catch { setError(t(guestSessionFailed ? 'payment.guestUnavailable' : 'maib.checkoutError')); setBusy(false); inFlight.current = false; }
   }
   // The result destination comes only from the authenticated server order.
-  const amount = `${((order?.amount_minor ?? product?.amount_minor ?? 0) / 100).toLocaleString(lang === 'ru' ? 'ru-MD' : 'ro-MD')} ${order?.currency_code || product?.currency_code || 'MDL'}`;
+  const amount = `${((order?.amount_minor ?? product?.amount_minor ?? 0) / 100).toLocaleString(lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-MD' : 'ro-MD')} ${order?.currency_code || product?.currency_code || 'MDL'}`;
   const useCount = Object.values(grants).reduce((total, count) => total + count, 0);
   const usePlural = new Intl.PluralRules(lang).select(useCount);
-  const hasUseCountTitle = params?.get('checkout_source') === 'pricing' || product?.key.startsWith('all_features_');
+  const hasUseCountTitle = params?.get('checkout_source') === 'pricing' || product?.key.startsWith('all_features_') || product?.key.startsWith('credits_');
   const isFeatureCheckout = !result && params?.get('checkout_source') !== 'pricing' && product?.key.endsWith('_single');
   const featureContent = isFeatureCheckout ? FEATURE_PURCHASE_CONTENT[product.key] : null;
   const isContextualCheckout = Boolean(featureContent);

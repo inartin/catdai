@@ -102,8 +102,8 @@ export default function CadastruMunicipalReportsCard({ reports, loading, unavail
   const { lang, t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const contentId = useId();
-  const formatNumber = new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 0 });
-  const checkedDate = reports ? new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "ro-MD", {
+  const formatNumber = new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 0 });
+  const checkedDate = reports ? new Intl.DateTimeFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", {
     day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Chisinau",
   }).format(new Date(reports.cache.fetched_at)) : "";
   const groups = reports ? [

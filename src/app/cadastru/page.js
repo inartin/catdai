@@ -25,7 +25,10 @@ const exampleImages = [
 ];
 
 export default function CadastruPage() {
-  const { t } = useTranslation();
+  const { lang, t } = useTranslation();
+  const images = lang === "en"
+    ? exampleImages.map((image) => ({ ...image, src: image.src.replace(".png", "-en.png") }))
+    : exampleImages;
   const [openImage, setOpenImage] = useState(null);
   const [loadingSearch, setLoadingSearch] = useState(null);
 
@@ -87,7 +90,7 @@ export default function CadastruPage() {
               <div className="mt-4">
                 <p className="mb-3 text-sm font-semibold text-gray-900">{t("cadastru.infoExampleLabel")}</p>
                 <div className="space-y-4">
-                  {exampleImages.map((image) => (
+                  {images.map((image) => (
                     <button
                       key={image.src}
                       type="button"

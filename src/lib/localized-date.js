@@ -1,5 +1,5 @@
 export function resolveDisplayLocale(lang) {
-  return String(lang || "").trim().toLowerCase() === "ru" ? "ru-RU" : "ro-RO";
+  return String(lang || "").trim().toLowerCase() === "en" ? "en-GB" : String(lang || "").trim().toLowerCase() === "ru" ? "ru-RU" : "ro-RO";
 }
 
 function capitalizeFirstLetter(value, locale) {
@@ -55,6 +55,7 @@ const MONTH_NAME_REPLACEMENTS = {
 
 export function normalizeLocalizedDateText(value, lang) {
   const text = String(value || "");
+  if (String(lang || "").trim().toLowerCase() === "en") return text;
   const primaryLang = String(lang || "").trim().toLowerCase() === "ru" ? "ru" : "ro";
   const monthReplacements = [
     ...MONTH_NAME_REPLACEMENTS[primaryLang],

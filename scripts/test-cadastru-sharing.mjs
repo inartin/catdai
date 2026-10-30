@@ -6,6 +6,7 @@ import vm from "node:vm";
 import crypto from "node:crypto";
 import { createRequire } from "node:module";
 import { PGlite } from "@electric-sql/pglite";
+import * as language from "../src/lib/language.js";
 import { validateCadastralNumber } from "../src/lib/validation.js";
 import { decodeCadastruShareCode, getCadastruSharePath } from "../src/lib/cadastru-share-url.js";
 
@@ -13,7 +14,7 @@ import { decodeCadastruShareCode, getCadastruSharePath } from "../src/lib/cadast
 const slugFixtures = ["0".repeat(48), "f".repeat(48), "fb".repeat(24),
   "000102030405060708090a0b0c0d0e0f1011121314151617", ...Array.from({ length: 100 }, () => crypto.randomBytes(24).toString("hex"))];
 for (const slug of slugFixtures) {
-  for (const lang of ["ro", "ru"]) {
+  for (const lang of ["ro", "ru", "en"]) {
     const path = await getCadastruSharePath(slug, lang);
     const code = path.split("/").at(-1);
     assert.match(path, new RegExp(`^/${lang}/c/[A-Za-z0-9_-]{12}$`));
@@ -38,6 +39,7 @@ let storageError = false, lookupCalls = [], creditKeys = [], rows = [], insertCo
 let allowed = true;
 let metadataUrlLang = "ro", metadataCookieLang = "ru";
 const ro = JSON.parse(await fs.readFile("src/locales/ro.json", "utf8"));
+const en = JSON.parse(await fs.readFile("src/locales/en.json", "utf8"));
 const ru = JSON.parse(await fs.readFile("src/locales/ru.json", "utf8"));
 const clone = (value) => structuredClone(value);
 const supabaseAdmin = { from(table) {
@@ -100,6 +102,8 @@ const mocks = {
   "@/lib/seo": { toAbsoluteUrl: (path) => `https://catdai.md${path}` },
   "@/locales/ro.json": { default: ro },
   "@/locales/ru.json": { default: ru },
+  "@/locales/en.json": { default: en },
+  "@/lib/language": language,
 };
 async function load(file) {
   const context = vm.createContext({ console: { error() {} }, URL, process: { env: { NODE_ENV: "production" } } });
@@ -343,26 +347,26 @@ const privateReport = { slug: shared.slug, payload: {
   cadastral_number: "0100999.888.77.666",
   apartment: { area_m2: 123.456, estimated_value: "PRIVATE_VALUE", ownership: "PRIVATE_OWNER", restrictions: "PRIVATE_RESTRICTION" },
 } };
-for (const lang of ["ro", "ru"]) {
+for (const lang of ["ro", "ru", "en"]) {
   metadataUrlLang = lang;
   metadataCookieLang = lang === "ro" ? "ru" : "ro";
   const metadata = await shareMetadata.getCadastruShareMetadata(privateReport);
   const path = await getCadastruSharePath(shared.slug, lang);
-  assert.equal(metadata.title, `${(lang === "ro" ? ro : ru)["cadastru.sharedMetaTitle"]} — Chișinău, bd. Test 1, ap. 7 | Catdai`);
+  assert.equal(metadata.title, `${({ ro, ru, en }[lang])["cadastru.sharedMetaTitle"]} — Chișinău, bd. Test 1, ap. 7 | Catdai`);
   assert.equal(metadata.openGraph.title, metadata.title);
   assert.equal(metadata.twitter.title, metadata.title);
   assert.equal(metadata.openGraph.description, metadata.description);
   assert.equal(metadata.twitter.description, metadata.description);
   assert.equal(metadata.openGraph.url, `https://catdai.md${path}`);
   assert.equal(metadata.alternates.canonical, path);
-  assert.equal(metadata.openGraph.locale, lang === "ru" ? "ru_MD" : "ro_MD");
+  assert.equal(metadata.openGraph.locale, language.OG_LOCALES[lang]);
   assert.equal(metadata.robots.index, false);
   for (const value of ["0100999.888.77.666", "123.456", "PRIVATE_VALUE", "PRIVATE_OWNER", "PRIVATE_RESTRICTION", "Different official"]) {
     assert(!JSON.stringify(metadata).includes(value), `Preview must exclude ${value}`);
   }
   for (const payload of [null, {}, { request_address: "0100999.888.77.666" }, { request_address: { owner: "PRIVATE_OWNER" } }]) {
     const generic = await shareMetadata.getCadastruShareMetadata({ slug: shared.slug, payload });
-    assert.equal(generic.title, `${(lang === "ro" ? ro : ru)["cadastru.sharedMetaTitle"]} | Catdai`);
+    assert.equal(generic.title, `${({ ro, ru, en }[lang])["cadastru.sharedMetaTitle"]} | Catdai`);
   }
   for (const payload of [{ resolved_address: address }, { apartment: { address } }, { building: { address } },
     { lands: [{ address }] }, { buildings: [{ address }] }]) {
@@ -392,7 +396,7 @@ await resultRoute.link((name) => new vm.SyntheticModule(Object.keys(resultMocks[
 await resultRoute.evaluate();
 assert.equal(Object.keys(await resultRoute.namespace.generateMetadata({ searchParams: Promise.resolve({ cadastral_number: number }) })).length, 0,
   "ordinary results keep their existing metadata");
-for (const lang of ["ro", "ru"]) {
+for (const lang of ["ro", "ru", "en"]) {
   metadataUrlLang = lang;
   const legacy = await resultRoute.namespace.generateMetadata({ searchParams: Promise.resolve({ share_slug: shared.slug, street: "INJECTED", owner: "PRIVATE_OWNER" }) });
   const compact = await shortRoute.namespace.generateMetadata({ params: Promise.resolve({ code: savedCode }) });

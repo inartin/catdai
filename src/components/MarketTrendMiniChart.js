@@ -19,7 +19,7 @@ function formatTrendPercent(num) {
 function formatTrendDate(date, lang) {
   if (!date) return "";
   return new Date(`${date}T00:00:00`).toLocaleDateString(
-    lang === "ru" ? "ru-RU" : "ro-RO",
+    lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-RO",
     { day: "2-digit", month: "short" }
   );
 }

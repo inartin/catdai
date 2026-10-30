@@ -1,3 +1,5 @@
+import { normalizeLanguage } from "./language.js";
+
 // The database indexes this same 72-bit SHA-256 prefix for existing and new reports.
 export async function getCadastruSharePath(slug, lang = "ro") {
   if (!/^[a-f0-9]{48}$/.test(slug)) throw new Error("Invalid cadastru share slug");
@@ -5,7 +7,7 @@ export async function getCadastruSharePath(slug, lang = "ro") {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const code = btoa(String.fromCharCode(...new Uint8Array(digest, 0, 9)))
     .replace(/\+/g, "-").replace(/\//g, "_");
-  return `/${lang === "ru" ? "ru" : "ro"}/c/${code}`;
+  return `/${normalizeLanguage(lang)}/c/${code}`;
 }
 
 export function decodeCadastruShareCode(code) {

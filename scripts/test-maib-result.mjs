@@ -180,7 +180,12 @@ for (const lang of ['ro', 'ru']) {
     }
   }
 
-  for (const [product_key, grants, count] of [['cadastru_lookup_single', { cadastru_lookup: 1 }, 1], ['all_features_5', products.maibProduct('all_features_5').grants, 30]]) {
+  for (const [product_key, grants, count] of [
+    ['cadastru_lookup_single', { cadastru_lookup: 1 }, 1],
+    ['all_features_5', products.maibProduct('all_features_5').grants, 30],
+    ['credits_10', products.maibProduct('credits_10').grants, 10],
+    ['credits_50', products.maibProduct('credits_50').grants, 50],
+  ]) {
     const pricing = await page(lang, 'paid', { order: { product_key, grants, return_to: '/profile' } });
     const pricingTree = await pricing.render();
     assert.equal(pricing.redirects.length, 0, 'Pricing purchases stay on the summary page');

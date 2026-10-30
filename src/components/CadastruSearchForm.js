@@ -267,7 +267,7 @@ export default function CadastruSearchForm({
           <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_180px]">
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">
-                {lang === "ru" ? "Населённый пункт" : "Localitate"}
+                {lang === "en" ? "Locality" : lang === "ru" ? "Населённый пункт" : "Localitate"}
               </span>
               <CadastruLocalityInput value={addressForm.city} lang={lang} onChange={(value) => setAddressField("city", value)} />
             </label>

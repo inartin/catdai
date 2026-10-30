@@ -39,7 +39,7 @@ export function municipalReportDate(value, lang) {
   // Provider timestamps are local. Keep their calendar date regardless of browser timezone.
   const date = new Date(`${String(value || "").slice(0, 10)}T00:00:00Z`);
   if (!Number.isFinite(date.getTime())) return "";
-  return new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "ro-MD", {
+  return new Intl.DateTimeFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", {
     day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC",
   }).format(date);
 }

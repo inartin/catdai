@@ -70,11 +70,11 @@ export default function CadastruListingsCard({ data = null, children }) {
   const contentId = useId();
   if (!data) return null;
   const label = (key) => t(`cadastru.market.${key}`);
-  const number = new Intl.NumberFormat(lang === "ru" ? "ru-RU" : "ro-MD");
+  const number = new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD");
   const money = (value) => `${number.format(value)} €`;
-  const date = (value) => new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "ro-MD", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(value.includes("T") ? value : `${value}T12:00:00Z`));
+  const date = (value) => new Intl.DateTimeFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(value.includes("T") ? value : `${value}T12:00:00Z`));
   const observationDate = (value) => value && Number.isFinite(Date.parse(value))
-    ? new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "ro-MD", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Chisinau" }).format(new Date(value)) : null;
+    ? new Intl.DateTimeFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { day: "numeric", month: "short", year: "numeric", timeZone: "Europe/Chisinau" }).format(new Date(value)) : null;
   const groups = (data.houses || []).map((house) => {
     const listings = (data.listings || []).filter((item) => item.house === house.id && item.active === (tab === "active"));
     const prices = listings.map(unitPrice).filter((value) => value !== null);
@@ -233,7 +233,7 @@ export default function CadastruListingsCard({ data = null, children }) {
         </div>}
       </div>
       <footer hidden={!expanded || !hasListings} className="border-t border-stone-100 px-5 py-4 text-sm text-gray-500 sm:px-8">
-        {label("snapshotDate")} {new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "ro-MD", { dateStyle: "medium", timeZone: "Europe/Chisinau" }).format(new Date(data.capturedAt))}
+        {label("snapshotDate")} {new Intl.DateTimeFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { dateStyle: "medium", timeZone: "Europe/Chisinau" }).format(new Date(data.capturedAt))}
       </footer>
     </section>
   );

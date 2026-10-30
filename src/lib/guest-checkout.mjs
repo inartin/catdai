@@ -3,7 +3,7 @@ export function featureResultPath(value) {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || /[\\\x00-\x1f]/.test(value)) return null;
   try {
     const url = new URL(value, 'https://catdai.local');
-    return url.origin === 'https://catdai.local' && /^\/(?:ro\/|ru\/)?(?:cadastru\/rezultat|evaluare|anunt|calculator)\/?$/.test(url.pathname)
+    return url.origin === 'https://catdai.local' && /^\/(?:ro\/|ru\/|en\/)?(?:cadastru\/rezultat|evaluare|anunt|calculator)\/?$/.test(url.pathname)
       ? `${url.pathname}${url.search}${url.hash}` : null;
   } catch { return null; }
 }

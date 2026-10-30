@@ -64,16 +64,16 @@ function readStoredProduct(orderId) {
   }
 }
 
-function formatMoneyMdl(value) {
+function formatMoneyMdl(value, lang) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return "";
-  return `≈ ${Math.round(amount).toLocaleString("ro-MD")} lei`;
+  return `≈ ${Math.round(amount).toLocaleString(lang === "en" ? "en-GB" : "ro-MD")} ${lang === "en" ? "MDL" : "lei"}`;
 }
 
-function formatMoneyEur(value) {
+function formatMoneyEur(value, lang) {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return "";
-  return `${amount.toLocaleString("ro-MD", {
+  return `${amount.toLocaleString(lang === "en" ? "en-GB" : "ro-MD", {
     minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
     maximumFractionDigits: 2,
   })} €`;
@@ -99,10 +99,10 @@ function getConfiguredMdlAmount(productKey) {
   return Number.isFinite(amount) && amount > 0 ? amount : null;
 }
 
-function getProductSummary(product, t) {
+function getProductSummary(product, t, lang) {
   const key = String(product?.key || product?.product_key || "").trim();
-  const amountMdl = formatMoneyMdl(getConfiguredMdlAmount(key) || product?.amount_mdl);
-  const amountEur = formatMoneyEur(product?.amount_eur || getConfiguredEurAmount(key));
+  const amountMdl = formatMoneyMdl(getConfiguredMdlAmount(key) || product?.amount_mdl, lang);
+  const amountEur = formatMoneyEur(product?.amount_eur || getConfiguredEurAmount(key), lang);
 
   const summaries = {
     standard_pack: {
@@ -156,7 +156,7 @@ function getProductSummary(product, t) {
 
   return {
     ...summaries[key],
-    amountPrimary: key === "extra_pack" && (amountEur || amountMdl) ? `${amountEur || amountMdl}/luna` : amountEur || amountMdl,
+    amountPrimary: key === "extra_pack" && (amountEur || amountMdl) ? `${amountEur || amountMdl}/${lang === "en" ? "month" : lang === "ru" ? "мес." : "lună"}` : amountEur || amountMdl,
     amountSecondary: amountEur ? amountMdl : "",
   };
 }
@@ -242,7 +242,7 @@ export default function PaddleCheckoutPage() {
 
   useEffect(() => {
     if (authLoading || params.transactionId || !params.productKey || requiresLogin) return undefined;
-    if ((params.lang === "ro" || params.lang === "ru") && params.lang !== lang) return undefined;
+    if (["ro", "ru", "en"].includes(params.lang) && params.lang !== lang) return undefined;
 
     let active = true;
 
@@ -294,7 +294,7 @@ export default function PaddleCheckoutPage() {
   }, [authLoading, lang, params.lang, params.productKey, params.returnTo, params.checkoutSource, params.transactionId, requiresLogin, session?.access_token, t]);
 
   useEffect(() => {
-    if ((params.lang === "ro" || params.lang === "ru") && params.lang !== lang) {
+    if (["ro", "ru", "en"].includes(params.lang) && params.lang !== lang) {
       setLang(params.lang);
       return undefined;
     }
@@ -404,7 +404,7 @@ export default function PaddleCheckoutPage() {
   const returnHref = paymentAppLink(normalizeReturnTo(params.returnTo));
   const isError = status === "error";
   const isAuthRequired = status === "auth_required";
-  const productSummary = getProductSummary(product, t);
+  const productSummary = getProductSummary(product, t, lang);
 
   return (
     <div className="min-h-screen bg-[#f7f8f5] text-gray-950">

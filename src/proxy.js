@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateCadastralNumber } from "@/lib/validation";
+import { normalizeLanguage } from "@/lib/language";
 
 const ADMIN_SESSION_VERSION = "v1";
 
@@ -52,10 +53,10 @@ async function verifyAdminSessionToken(token) {
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
-  const numberSearch = pathname.match(/^\/(?:(ro|ru)\/)?(?:c|cadastru)\/([\d.]+)\/?$/);
+  const numberSearch = pathname.match(/^\/(?:(ro|ru|en)\/)?(?:c|cadastru)\/([\d.]+)\/?$/);
   const cadastralNumber = numberSearch && validateCadastralNumber(numberSearch[2]);
   if (cadastralNumber?.valid) {
-    const lang = numberSearch[1] || (request.cookies.get("catdai-lang")?.value === "ru" ? "ru" : "ro");
+    const lang = numberSearch[1] || normalizeLanguage(request.cookies.get("catdai-lang")?.value);
     const url = request.nextUrl.clone();
     url.pathname = `/${lang}/cadastru/rezultat`;
     url.searchParams.delete("share_slug");
@@ -65,9 +66,12 @@ export async function proxy(request) {
     return NextResponse.redirect(url);
   }
 
-  // Language prefix rewrite: /ru/... or /ro/... → serve the actual route
-  const langMatch = pathname.match(/^\/(ro|ru)(\/.*)?$/);
+  // English is available for Cadastru and payment routes during this rollout.
+  const langMatch = pathname.match(/^\/(ro|ru|en)(\/.*)?$/);
   if (langMatch) {
+    if (langMatch[1] === "en" && !/^\/(?:cadastru(?:\/|$)|c\/|payment(?:\/|$))/.test(langMatch[2] || "/")) {
+      return NextResponse.next();
+    }
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-catdai-lang", langMatch[1]);
 
@@ -107,6 +111,12 @@ export async function proxy(request) {
     }
   }
 
+  if (pathname.startsWith("/payment/")) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-catdai-lang", normalizeLanguage(request.nextUrl.searchParams.get("lang") || request.cookies.get("catdai-lang")?.value));
+    return NextResponse.next({ request: { headers: requestHeaders } });
+  }
+
   // Admin routes: secret key + password + cookie token authentication
   if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
     const isLoginPage = pathname === "/admin/login";
@@ -134,5 +144,5 @@ export async function proxy(request) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*", "/ro/:path*", "/ru/:path*", "/c/:code", "/cadastru/:number"],
+  matcher: ["/admin/:path*", "/api/admin/:path*", "/ro/:path*", "/ru/:path*", "/en/:path*", "/payment/:path*", "/c/:code", "/cadastru/:number"],
 };

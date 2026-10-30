@@ -3,8 +3,9 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import ro from "@/locales/ro.json";
 import ru from "@/locales/ru.json";
+import en from "@/locales/en.json";
 
-const translations = { ro, ru };
+const translations = { ro, ru, en };
 const LanguageContext = createContext(null);
 const LANG_COOKIE = "catdai-lang";
 
@@ -22,10 +23,15 @@ function getInitialLanguage(initialLang) {
   const normalizedInitialLang = hasInitialLang ? initialLang : "ro";
   if (typeof window === "undefined") return normalizedInitialLang;
 
-  const pathLangMatch = window.location.pathname.match(/^\/(ro|ru)(\/|$)/);
+  const pathLangMatch = window.location.pathname.match(/^\/(ro|ru|en)(\/|$)/);
   if (pathLangMatch && translations[pathLangMatch[1]]) return pathLangMatch[1];
 
   if (hasInitialLang) return normalizedInitialLang;
+
+  if (window.location.pathname.startsWith("/payment/")) {
+    const paymentLang = new URLSearchParams(window.location.search).get("lang");
+    if (translations[paymentLang]) return paymentLang;
+  }
 
   const saved = localStorage.getItem(LANG_COOKIE);
   return saved && translations[saved] ? saved : "ro";
@@ -35,7 +41,7 @@ export function LanguageProvider({ children, initialLang }) {
   const [lang, setLangState] = useState(() => getInitialLanguage(initialLang));
 
   useEffect(() => {
-    const pathLangMatch = !initialLang ? window.location.pathname.match(/^\/(ro|ru)(\/|$)/) : null;
+    const pathLangMatch = !initialLang ? window.location.pathname.match(/^\/(ro|ru|en)(\/|$)/) : null;
     const pathLang = pathLangMatch?.[1];
     const documentLang = pathLang && translations[pathLang] ? pathLang : lang;
 

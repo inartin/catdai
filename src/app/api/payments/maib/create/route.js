@@ -8,6 +8,7 @@ import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '@/lib/maib/p
 import { checked, publicOrder } from '@/lib/maib/service.mjs';
 import { UUID, requestUser, paymentOrigin, paymentError } from '@/lib/maib/http';
 import { allowsGuestCheckout } from '@/lib/guest-checkout.mjs';
+import { buildMaibCadastruDelivery } from '@/lib/maib/cadastru-delivery';
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
 export async function POST(request) {
   if (getPaymentProvider() !== 'maib') return NextResponse.json({ error: 'MAIB checkout is inactive.' }, { status: 409 });
@@ -31,12 +32,17 @@ export async function POST(request) {
       return NextResponse.json(publicOrder(existing));
     }
     const lang = ['ro', 'ru', 'en'].includes(body.lang) ? body.lang : 'ro';
+    const returnTo = safeReturnTo(body.return_to);
+    const cadastruDelivery = await buildMaibCadastruDelivery({
+      productKey: product.key, returnTo, checkoutSource: body.checkout_source, user,
+    });
     const order = await checked(db.from('maib_payment_orders').insert({
       user_id: user.id, environment: environment(), request_key: body.request_key, product_key: product.key,
       amount_minor: product.amount_minor, currency_code: 'MDL', grants: product.grants, language: lang,
       product_title: maibProductTitle(product.key, lang, product.quantity, body.checkout_source), receipt_email: email,
       terms_version: MAIB_TERMS_VERSION, terms_accepted_at: new Date().toISOString(),
-      return_to: safeReturnTo(body.return_to), next_check_at: new Date(Date.now() + 60_000).toISOString(),
+      return_to: returnTo, cadastru_delivery: cadastruDelivery,
+      next_check_at: new Date(Date.now() + 60_000).toISOString(),
     }).select('*').single());
     const origin = paymentOrigin();
     const returnUrl = `${origin}/payment/maib/success?order_id=${order.id}&lang=${lang}`;

@@ -1161,7 +1161,7 @@
   "payment.currencyNote.maib": "Оплата обрабатывается в MDL через maib.",
   "payment.currencyNote.paddle": "Оплата обрабатывается в EUR через Paddle. Цены в леях указаны ориентировочно.",
   "maib.acceptTerms": "Принимаю",
-  "maib.receiptEmail": "Электронная почта для подтверждения",
+  "maib.receiptEmail": "Почта для подтверждения оплаты",
   "maib.receiptEmailPlaceholder": "adres@email.com",
   "maib.orderNumber": "Номер заказа",
   "maib.paymentDate": "Дата оплаты",
@@ -1177,6 +1177,19 @@
   "maib.service.pdf_report": "Скачивание PDF-отчёта для доступного результата CatDai. Создание анализа для отчёта может отдельно расходовать использование соответствующей функции.",
   "maib.receiptTitle": "Подтверждение оплаты",
   "maib.receiptSubject": "Подтверждение оплаты - CatDai",
+  "maib.cadastruReceiptSubject": "Ваш кадастровый отчёт - CatDai",
+  "maib.cadastruReceiptAddress": "Адрес поиска",
+  "maib.cadastruReceiptNumber": "Кадастровый номер",
+  "maib.cadastruReceiptBody": [
+    "Оплата {amount} {currency} за {productTitle} подтверждена.",
+    "{searchLabelTitle}: {searchLabel}",
+    "Открыть кадастровый отчёт:\n{reportUrl}",
+    "Сохраните это письмо, чтобы вернуться к результату с любого устройства без входа в аккаунт.",
+    "Любой, у кого есть эта ссылка, может просмотреть отчёт.",
+    "Номер заказа: {orderId}",
+    "{refund}",
+    "CatDai\ninfo@catdai.md"
+  ],
   "maib.receiptBody": [
     "Подтверждение оплаты",
     "Сайт/приложение: CatDai - {siteUrl}",

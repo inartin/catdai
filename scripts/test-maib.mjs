@@ -215,6 +215,7 @@ let redirectedTo;
 const entry=await loadRoute('src/app/payment/checkout/page.js',{
   'next/navigation':{redirect:value=>{redirectedTo=value;}},'@/lib/payment-provider':{getPaymentProvider},
   '@/lib/payment-urls.mjs':{paymentAppLink},
+  '@/lib/request-language':{getRequestLanguage:async()=>'ro'},
 });
 for(const mode of ['development','production']) for(const provider of ['maib','paddle']) {
   process.env.NODE_ENV=mode;
@@ -230,12 +231,14 @@ for(const mode of ['development','production']) for(const provider of ['maib','p
 }
 delete process.env.PAYMENT_PROVIDER;
 let insertSnapshot, existingSnapshot=null, createUser=null, bankCreates=0, bankPayload, expectedBankAmount=99;
+let deliverySnapshot=null, deliveryInput;
 const guestRegistrations=[];
 const createDb={from(){let single=false;const query={select(){return query;},eq(){return query;},in(){return query;},update(){return query;},upsert(row){guestRegistrations.push(row);return query;},insert(row){insertSnapshot={...row,id,created_at:new Date().toISOString(),status:'pending'};return query;},maybeSingle(){return Promise.resolve({data:existingSnapshot});},single(){single=true;return query;},then(resolve,reject){return Promise.resolve({data:single?insertSnapshot:null}).then(resolve,reject);}};return query;}};
 const create=await loadRoute('src/app/api/payments/maib/create/route.js',{
   ...next,'@/lib/supabase-admin':{supabaseAdmin:createDb},'@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
   '@/lib/payment-provider':{getPaymentProvider},'@/lib/maib/products.mjs':{maibProduct,maibOrderQuantity},
   '@/lib/maib/purchase.mjs':{MAIB_TERMS_VERSION,receiptEmail,maibProductTitle},
+  '@/lib/maib/cadastru-delivery':{buildMaibCadastruDelivery:async input=>{deliveryInput=input;return deliverySnapshot;}},
   '@/lib/maib/client.mjs':{...client,maibRequest:async(path,{body})=>{bankPayload=body;bankCreates++;assert.equal(body.amount,expectedBankAmount);assert.equal(body.currency,'MDL');return {checkoutId,checkoutUrl:`https://checkout-sandbox.maib.md/${checkoutId}`};}},
   '@/lib/maib/service.mjs':{checked:async query=>(await query).data,publicOrder:x=>x},
   '@/lib/maib/http':{UUID:uuid,requestUser:async()=>createUser,paymentOrigin:http.paymentOrigin,paymentError:()=>Response.json({},{status:502})},
@@ -260,6 +263,13 @@ assert.equal(insertSnapshot.product_title,maibProductTitle('standard_pack','ru')
 const publicSnapshot=service.publicOrder({...insertSnapshot,paid_at:'2026-10-05T12:00:00Z'});
 assert.equal(publicSnapshot.paid_at,'2026-10-05T12:00:00Z');assert.equal(publicSnapshot.quantity,1);
 assert.deepEqual(publicSnapshot.grants,insertSnapshot.grants);assert.equal(publicSnapshot.receipt_email,undefined);
+deliverySnapshot={payload:{apartment:{area_m2:52}},search_label:'server-authored'};
+assert.equal((await create.POST(createRequest({...purchaseBody,return_to:'/en/cadastru/rezultat?cadastral_number=0100106.131',cadastru_delivery:{payload:{injected:true}}}))).status,200);
+assert.equal(insertSnapshot.cadastru_delivery,deliverySnapshot,'only the server prepares email snapshots');
+assert.equal(deliveryInput.returnTo,'/en/cadastru/rezultat?cadastral_number=0100106.131');
+assert.equal(deliveryInput.user,createUser);
+assert.equal(service.publicOrder(insertSnapshot).cadastru_delivery,undefined,'locked checkout responses never expose the official snapshot');
+deliverySnapshot=null;
 for (const mode of ['development','production']) {
   process.env.NODE_ENV=mode;
   process.env.MAIB_PUBLIC_URL='https://catdai.md';

@@ -24,6 +24,7 @@ Romanian and Russian UI; English is available for Cadastru search/results/shared
 - `/estimeaza`, `/evaluare`, `/alerts`, and `/profile` also read the `catdai-lang` cookie in route metadata so hard refreshes render the selected language title before hydration.
 - `/calculator` reads the `catdai-lang` cookie in route metadata and client copy through the shared translation files.
 - MAIB and Paddle checkout/status pages use RO/RU/EN copy and server metadata. English survives guest checkout, order snapshots, receipts, retry and property-return links. `20261030152614_english_maib_payment_language.sql` was applied to the shared CatDai database on 30 October 2026; it permits English order snapshots while retaining Romanian as the default.
+- Standalone Cadastru payment emails use `maib.cadastruReceipt*` in all three locales. The saved order language controls the subject, searched-address/number label, body and public report URL; official addresses and identifiers remain as searched.
 - Localized FAQ routes exist at `/ro/faq` and `/ru/faq`.
 - `/noutati` and `/noutati/[slug]` localize static page chrome from the URL language or `catdai-lang` cookie through a route-level language provider; database-backed news content is not translated by the app.
 - Landing 999.md analyzer feature paper labels are localized through `linkAnalyzer.feature*` keys.

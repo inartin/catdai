@@ -43,7 +43,11 @@ for i in {1..10}; do
 done
 
 echo "✉️ Starting MAIB reconciliation and payment receipt delivery..."
-node scripts/reconcile-maib.mjs &
+if [ "$RUN_MODE" = "prod" ]; then
+  node scripts/reconcile-maib.mjs &
+else
+  node --watch --watch-preserve-output scripts/reconcile-maib.mjs &
+fi
 SERVICE_PIDS+=("$!")
 
 echo "☁️ Starting cloudflared tunnel '$TUNNEL_NAME' (ENV: $RUN_MODE)..."

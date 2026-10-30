@@ -1154,7 +1154,7 @@
   "payment.currencyNote.maib": "Plata se procesează în MDL prin maib.",
   "payment.currencyNote.paddle": "Plata se procesează în EUR prin Paddle. Prețurile în lei sunt afișate orientativ.",
   "maib.acceptTerms": "Accept",
-  "maib.receiptEmail": "E-mail pentru confirmare",
+  "maib.receiptEmail": "E-mail pentru confirmarea plății",
   "maib.receiptEmailPlaceholder": "adresa@email.com",
   "maib.orderNumber": "Numărul comenzii",
   "maib.paymentDate": "Data achitării",
@@ -1170,6 +1170,19 @@
   "maib.service.pdf_report": "Descărcarea unui raport PDF pentru un rezultat disponibil în CatDai. Generarea analizei necesare raportului poate consuma separat utilizarea funcției respective.",
   "maib.receiptTitle": "Confirmarea plății",
   "maib.receiptSubject": "Confirmarea plății - CatDai",
+  "maib.cadastruReceiptSubject": "Raportul tău cadastral - CatDai",
+  "maib.cadastruReceiptAddress": "Adresa căutată",
+  "maib.cadastruReceiptNumber": "Numărul cadastral căutat",
+  "maib.cadastruReceiptBody": [
+    "Plata de {amount} {currency} pentru {productTitle} a fost confirmată.",
+    "{searchLabelTitle}: {searchLabel}",
+    "Deschide raportul cadastral:\n{reportUrl}",
+    "Păstrează acest email pentru a reveni la rezultat de pe orice dispozitiv, fără autentificare.",
+    "Oricine are acest link poate vedea raportul.",
+    "Numărul comenzii: {orderId}",
+    "{refund}",
+    "CatDai\ninfo@catdai.md"
+  ],
   "maib.receiptBody": [
     "Confirmarea plății",
     "Website/aplicație: CatDai - {siteUrl}",

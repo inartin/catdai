@@ -14,7 +14,7 @@ const fs = require('node:fs');
 const command = require('node:path').basename(process.argv[1]);
 const args = process.argv.slice(2);
 if (command === 'nc') process.exit(0);
-const service = command === 'node' ? (args[0].includes('reconcile-maib') ? 'worker' : 'next') : command;
+const service = command === 'node' ? (args.some(arg => arg.includes('reconcile-maib')) ? 'worker' : 'next') : command;
 const log = event => fs.appendFileSync(process.env.LAUNCHER_TEST_LOG, JSON.stringify({
   event, service, args, pid: process.pid, mode: process.env.NODE_ENV, bank: process.env.MAIB_ENVIRONMENT,
 }) + '\\n');
@@ -68,7 +68,8 @@ async function check(name, args, { signal = 'SIGTERM', exitService = '', buildCo
       assert.equal(code, exitService ? 7 : signal === 'SIGINT' ? 130 : 143, output);
       const services = started.filter(event => event.service !== 'pnpm');
       assert.deepEqual(services.map(event => event.service).sort(), ['cloudflared', 'next', 'worker']);
-      assert.deepEqual(services.find(event => event.service === 'worker').args, ['scripts/reconcile-maib.mjs']);
+      assert.deepEqual(services.find(event => event.service === 'worker').args,
+        production ? ['scripts/reconcile-maib.mjs'] : ['--watch', '--watch-preserve-output', 'scripts/reconcile-maib.mjs']);
       assert.deepEqual(services.find(event => event.service === 'next').args,
         ['node_modules/next/dist/bin/next', production ? 'start' : 'dev']);
       assert.deepEqual(services.find(event => event.service === 'cloudflared').args,

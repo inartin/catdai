@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
+import crypto from 'node:crypto';
 import { paymentSiteOrigin } from '../payment-urls.mjs';
+import { getCadastruSharePath } from '../cadastru-share-url.js';
 import { MAIB_FEATURE_LABELS, purchaseMessages, receiptEmail } from './purchase.mjs';
 import { maibOrderQuantity } from './products.mjs';
 
@@ -14,7 +16,7 @@ export function receiptConfig(env = process.env) {
   } };
 }
 
-export function buildReceipt(order) {
+export function buildReceipt(order, reportPath = null) {
   if (!receiptEmail(order.receipt_email) || !order.paid_at || !order.product_title) throw new Error('Incomplete receipt');
   const messages = purchaseMessages(order.language);
   const origin = paymentSiteOrigin();
@@ -30,11 +32,14 @@ export function buildReceipt(order) {
     refund: order.refunded_minor > 0
       ? `${messages['maib.refundedAmount']}: ${(order.refunded_minor / 100).toFixed(2)} ${order.currency_code}` : '',
     orderUrl: `${origin}/payment/maib/success?order_id=${encodeURIComponent(order.id)}&lang=${['ro', 'ru', 'en'].includes(order.language) ? order.language : 'ro'}`,
+    reportUrl: reportPath ? `${origin}${reportPath}` : '',
+    searchLabel: order.cadastru_delivery?.search_label || '',
+    searchLabelTitle: messages[order.cadastru_delivery?.search_type === 'address' ? 'maib.cadastruReceiptAddress' : 'maib.cadastruReceiptNumber'],
   };
   const fill = template => template.replace(/\{(\w+)\}/g, (match, key) => Object.hasOwn(values, key) ? values[key] : match);
   return {
-    subject: fill(messages['maib.receiptSubject']),
-    text: messages['maib.receiptBody'].map(fill).filter(Boolean).join('\n\n'),
+    subject: fill(messages[reportPath ? 'maib.cadastruReceiptSubject' : 'maib.receiptSubject']),
+    text: messages[reportPath ? 'maib.cadastruReceiptBody' : 'maib.receiptBody'].map(fill).filter(Boolean).join('\n\n'),
   };
 }
 
@@ -62,7 +67,22 @@ export async function deliverReceipts(db, bankEnvironment, { config = receiptCon
       let submitted = false;
       try {
         const order = await checked(db.from('maib_payment_orders').select('*').eq('id', claim.order_id).eq('environment', bankEnvironment).single());
-        const receipt = buildReceipt(order);
+        let reportPath = null;
+        if (order.cadastru_delivery) {
+          let slug;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              slug = await checked(db.rpc('publish_maib_cadastru_result', {
+                p_order_id: order.id, p_slug: crypto.randomBytes(24).toString('hex'),
+              }));
+              break;
+            } catch (error) {
+              if (error.code !== '23505' || attempt === 2) throw error;
+            }
+          }
+          if (slug) reportPath = await getCadastruSharePath(slug, order.language);
+        }
+        const receipt = buildReceipt(order, reportPath);
         submitted = true;
         const info = await transport.sendMail({
           from: { name: 'CatDai', address: config.from }, to: order.receipt_email,
@@ -75,7 +95,8 @@ export async function deliverReceipts(db, bankEnvironment, { config = receiptCon
         const retry = !submitted || retryableReceiptError(error);
         const delay = Math.min(60, 2 ** Math.min(claim.attempts - 1, 6)) * 60_000;
         result = { status: retry ? 'failed' : 'unknown', next_attempt_at: new Date(Date.now() + delay).toISOString(),
-          last_error: retry ? 'SMTP rejected delivery; retry scheduled.' : 'Delivery outcome unknown; inspect SMTP logs before retrying.' };
+          last_error: !submitted ? 'Receipt preparation failed; retry scheduled.'
+            : retry ? 'SMTP rejected delivery; retry scheduled.' : 'Delivery outcome unknown; inspect SMTP logs before retrying.' };
       }
       // If saving the outcome fails, retain the sending lease; expiration becomes unknown.
       await checked(db.from('maib_payment_receipts').update({ ...result, lease_until: null, lease_token: null })

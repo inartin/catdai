@@ -20,7 +20,7 @@ export function withCadastruOutcome(handler) {
     if (response.status >= 500 && body?.search_context === "cadastru") {
       const address = !body.cadastral_number;
       const city = resolveCadastruSupportedCity(body.city || "Chișinău") || clean(body.city);
-      const road = body.road_type === "bulevard" ? "bd" : body.road_type === "str-la" ? "str-la" : "str";
+      const road = body.road_type === "bulevard" ? "bd" : body.road_type === "str-la" ? "str-la" : body.road_type === "sos" ? "sos" : "str";
       const apartment = /^\d{1,4}$/.test(clean(body.apartment_number)) ? String(Number(body.apartment_number)) : clean(body.apartment_number);
       await logCadastruSearchEvent(request, address ? "address" : "number", {
         lookupId: body.lookup_id,

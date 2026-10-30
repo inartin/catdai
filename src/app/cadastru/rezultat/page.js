@@ -7,6 +7,8 @@ export async function generateMetadata({ searchParams }) {
   return getCadastruShareMetadata(await getCadastruSharedReport(shareSlug));
 }
 
-export default function CadastruResultRoute() {
-  return <CadastruResultPage />;
+export default async function CadastruResultRoute({ searchParams }) {
+  const { share_slug: shareSlug } = await searchParams;
+  const report = shareSlug ? await getCadastruSharedReport(shareSlug) : null;
+  return <CadastruResultPage initialSharedReport={report} />;
 }

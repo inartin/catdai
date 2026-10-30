@@ -36,6 +36,7 @@ export default function CadastruResultLoading({ cadastralNumber = "", address = 
     strada: "cadastru.roadTypeStreet",
     "str-la": "cadastru.roadTypeLane",
     bulevard: "cadastru.roadTypeBoulevard",
+    sos: "cadastru.roadTypeHighway",
   }[searchAddress?.road_type];
   const streetAddress = [
     roadTypeKey ? t(roadTypeKey) : searchAddress?.road_type,

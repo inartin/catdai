@@ -10,6 +10,13 @@ const ROAD_TYPES = {
   bul: "bulevard",
   bulevard: "bulevard",
   bulevardul: "bulevard",
+  sos: "sos",
+  "șos": "sos",
+  "şos": "sos",
+  soseaua: "sos",
+  "șoseaua": "sos",
+  "şoseaua": "sos",
+  "шоссе": "sos",
 };
 
 export function nearbyAddressFromCadastru(payload) {
@@ -28,7 +35,7 @@ export function nearbyAddressFromCadastru(payload) {
     const address = inputAddress.replace(/\s*\/\s*/g, "/");
     const city = resolveCadastruCityFromAddress(address)
       || resolveCadastruSupportedCity(payload?.form_fields?.city || payload?.location?.city);
-    const road = address.match(/(?:^|[,;]\s*|\s)(str-la|strădela|stradela|strada|str\.?|bd\.?|bul\.?|bulevard(?:ul)?|ул\.?|улица)\s+([^,;]+)/i);
+    const road = address.match(/(?:^|[,;]\s*|\s)(str-la|strădela|stradela|strada|str\.?|bd\.?|bul\.?|bulevard(?:ul)?|sos\.?|șos\.?|şos\.?|soseaua|șoseaua|şoseaua|шоссе|ул\.?|улица)\s+([^,;]+)/i);
     if (!city || !road) continue;
     const roadType = ROAD_TYPES[road[1].toLowerCase().replace(/\.$/, "")]
       || (/^(ул|улица)/i.test(road[1]) ? "strada" : null);

@@ -105,6 +105,7 @@ const routeMocks = {
   "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true, remaining: 10 }) }) },
   "@/lib/access-tier": { resolveAccessTier: async () => ({ tier: "free", user_id: null }) },
   "@/lib/paid-feature-usage": {
+    checkFeatureAccess: async () => ({ allowed: false, reason: "no_credit" }),
     consumeFeatureCredit: async () => ({ allowed: false, reason: "no_credit" }),
     buildFeatureCreditRequiredPayload: (_feature, reason) => ({ reason }),
     makePaidFeatureUsageKey: (_feature, params) => JSON.stringify(params),
@@ -184,4 +185,71 @@ const request = body => new Request("http://localhost/api/cadastru/address", { m
   assert.equal(confirmation.status, 422);
   assert.deepEqual((await confirmation.json()).address_suggestions, [choice]);
   console.log('Letter suffix regressions passed: exact app validation, worker forwarding, conflict/confirmation, records, cache separation and nearby origins.');
+}
+
+// Șoseaua selection stays exact through the app API, storage identity and secondary origins.
+{
+  const fields = { city: "Chișinău", road_type: "sos", street: "Hincesti", house_number: "140/2" };
+  const submissions = [], reads = [], events = [];
+  let confirmation = false;
+  const route = await load("src/app/api/cadastru/address/route.js", {
+    ...routeMocks,
+    "@/lib/cadastru-records": {
+      getCadastruRecordByAddress: async (address, options) => { reads.push({ address, ...clone(options) }); return null; },
+      persistCadastruAddressResult: async payload => payload,
+    },
+    "@/lib/cadastru-search-events": { logCadastruSearchEvent: async (_request, _type, options) => { events.push(clone(options)); } },
+    "@/lib/cadastru-external-api": { fetchExternalCadastruAddressData: async input => {
+      submissions.push(clone(input));
+      if (confirmation) throw Object.assign(new Error("confirm"), { code: "address_confirmation_required", status: 422,
+        addressSuggestions: [{ ...fields, street: "Hâncești", house_number: "140/2/A" },
+          { ...fields, street: "Hâncești", house_number: "140/2", apartment_number: undefined }] });
+      return { lands: [{ cadastral_number: "0100217.173", address: "mun. Chișinău, șos. Hâncești 140/2" }] };
+    } },
+  });
+  for (const street of ["Hâncești", "Hîncești", "Hincesti", "Soseul Hincesti"]) {
+    const response = await route.POST(request({ ...fields, street }));
+    assert.equal(response.status, 200);
+    const payload = await response.json();
+    assert.equal(payload.resolved_address, "Chișinău, sos Hâncești 140/2");
+    assert.equal(submissions.at(-1).road_type, "sos");
+    assert.equal(submissions.at(-1).street, "Hâncești");
+    assert.equal(submissions.at(-1).house_number, "140/2");
+    assert.equal(reads.at(-1).address, "Chișinău, sos Hâncești 140/2");
+    assert.equal(reads.at(-1).structuredAddress.street, "Șos. Hâncești");
+    assert.equal(events.at(-1).searchRequest.road_type, "sos");
+  }
+  const row = { city: "Chișinău", full_address: "mun. Chișinău, șos. Hâncești 140/2",
+    street: "șos. Hâncești", house_number: "140/2" };
+  const structured = { city: "Chișinău", street: "Șos. Hâncești", houseNumber: "140/2" };
+  assert(storage.recordMatchesStructuredAddress(row, "", structured));
+  assert(!storage.recordMatchesStructuredAddress(row, "", { ...structured, street: "Strada Hâncești" }));
+  assert(!storage.recordMatchesStructuredAddress(row, "", { ...structured, houseNumber: "140" }));
+  for (const marker of ["sos", "șos.", "Șoseaua", "шоссе"]) {
+    assert.deepEqual(clone(nearbyParsing.nearbyAddressFromCadastru({ request_address: `Chișinău, ${marker} Hâncești, 140/2` })),
+      { ...fields, street: "Hâncești" });
+  }
+  const suggestions = await load("@/lib/cadastru-street-suggestions");
+  assert.deepEqual(clone(suggestions.suggestRoadTypes({ city: "Chișinău", roadType: "str", street: "Hincesti" })),
+    [{ road_type: "sos", street: "Hâncești" }]);
+  assert.deepEqual(clone(suggestions.suggestRoadTypes({ city: "Chișinău", roadType: "sos", street: "Hincesti" })), []);
+  const market = await load("@/lib/cadastru-market");
+  const listing = { id: 1, external_id: "12345678", is_active: true, price_currency: "EUR", price_amount: 100000,
+    attributes: { sourceStreet: "șos. Hîncești", sourceBuildingNumber: "140/2" } };
+  const db = { from(table) {
+    assert(["listing", "listing_price_history"].includes(table), table);
+    const query = { then(resolve, reject) { return Promise.resolve({ data: table === "listing"
+      ? [listing, { ...listing, id: 2, attributes: { ...listing.attributes, sourceStreet: "str. Hîncești" } }] : [], error: null }).then(resolve, reject); } };
+    for (const method of ["select", "eq", "or", "order", "limit", "in", "range"]) query[method] = () => query;
+    return query;
+  } };
+  const prices = await market.loadCadastruMarket(db, { address: "Chișinău, sos Hâncești 140/2" });
+  assert.equal(prices.collectedCount, 1, "market matching cannot mix strada and șoseaua listings");
+  assert.equal(prices.listings.length, 1);
+  assert.equal(prices.houses[0].address, "șos. Hâncești 140/2");
+  confirmation = true;
+  const response = await route.POST(request({ ...fields, apartment_number: "9" }));
+  assert.equal(response.status, 422);
+  assert.deepEqual((await response.json()).address_suggestions, [{ ...fields, street: "Hâncești" }]);
+  console.log("Șoseaua regressions passed: exact aliases, worker requests, cache identity, history request type, confirmation and secondary origins.");
 }

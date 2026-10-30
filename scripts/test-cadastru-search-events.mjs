@@ -108,6 +108,10 @@ const id = eventId(tokens[0]);
 assert(tokens.every((token) => eventId(token) === id), "three concurrent requests share one event");
 const getRow = async (id) => (await db.query("select * from cadastru_search_events where id=$1", [id])).rows[0];
 const original = await getRow(id);
+const highwayRequest = { city: "Chișinău", road_type: "sos", street: "Hâncești", house_number: "140/2" };
+const highwayId = eventId(await search({ lookupId: crypto.randomUUID(), searchRequest: highwayRequest,
+  searchAddress: "Chișinău, sos Hâncești 140/2" }));
+assert.deepEqual((await getRow(highwayId)).search_request, highwayRequest, "Șoseaua history retains replayable request fields");
 await db.query("update cadastru_search_events set valuation_clicked_at=now(), valuation_completed_at=now() where id=$1", [id]);
 assert.equal(eventId(await search()), id, "a completed replay returns the same signed event");
 const replay = await getRow(id);

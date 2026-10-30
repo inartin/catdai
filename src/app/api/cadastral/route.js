@@ -18,7 +18,7 @@ import {
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
 import { matchDistrict, validateCadastralNumber } from "@/lib/validation";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
 // Retain the backup implementation, but never contact official sources from AWS.
@@ -480,11 +480,11 @@ async function handlePost(request) {
   const skipCache = body?.skip_cache === true || body?.skipcache === true;
   const maskPreviewCadastralNumber = cadastruSearchType === "address" || body?.preview_origin === "address";
   const creditIdempotencyKey = makeCadastruLookupUsageKey(trimmed);
-  const creditCheck = await checkFeatureAccess({
-    userId: access.user_id,
-    featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
-    idempotencyKey: creditIdempotencyKey,
-  });
+  const [creditCheck, stored] = await Promise.all([
+    checkFeatureAccess({ userId: access.user_id, featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
+      idempotencyKey: creditIdempotencyKey }),
+    skipCache ? null : getCadastruRecordByNumber(trimmed, { requireDetailPayload: true, allowExpired: true }),
+  ]);
 
   let lookupSource = null;
   const recordCadastruSearch = async (payload, resultType = null, optionsLookupSource = null) => {
@@ -538,7 +538,7 @@ async function handlePost(request) {
       return NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
     }
 
-    const creditUsage = await consumeFeatureCredit({
+    const creditUsage = creditCheck.reason === "already_consumed" ? creditCheck : await consumeFeatureCredit({
         userId: access.user_id,
         featureKey: CADASTRU_LOOKUP_FEATURE_KEY,
         idempotencyKey: creditIdempotencyKey,
@@ -562,7 +562,7 @@ async function handlePost(request) {
       return res;
     }
 
-    await persistCadastruRecord(payload, {
+    const usageOptions = {
       cadastralNumber: trimmed,
       lookupSource,
       resultType: options.resultType || classifyCadastralResult(payload),
@@ -570,7 +570,13 @@ async function handlePost(request) {
       officialFetch: false,
       fetchedAt: payload.data_freshness?.property?.fetched_at,
       expiresAt: options.expiresAt,
-    });
+    };
+    if (options.cached || options.officialFetch) {
+      // The snapshot is already saved. Only usage metadata changes on a repeat read.
+      after(() => persistCadastruRecord(payload, { ...usageOptions, usageOnly: true }));
+    } else {
+      await persistCadastruRecord(payload, usageOptions);
+    }
     const { district_lookup_checked, building_bundles, ...publicPayload } = payload;
     const res = NextResponse.json({ ...publicPayload, cadastru_evaluation_token: evaluationToken });
     res.headers.set("X-RateLimit-Remaining", String(remaining));
@@ -584,7 +590,6 @@ async function handlePost(request) {
     );
   };
 
-  const stored = skipCache ? null : await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true, allowExpired: true });
   if (stored) {
     if (cadastruNeedsRefresh(stored)) scheduleCadastruNumberRefresh(stored);
     lookupSource = stored.lookupSource;

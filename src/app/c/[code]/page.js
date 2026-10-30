@@ -11,5 +11,5 @@ export default async function SharedCadastruPage({ params }) {
   const { code } = await params;
   const report = await getCadastruSharedReport(code);
   if (!report) notFound();
-  return <CadastruResultPage shareSlug={report.slug} />;
+  return <CadastruResultPage shareSlug={report.slug} initialSharedReport={report} />;
 }

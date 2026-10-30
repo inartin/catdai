@@ -501,6 +501,16 @@ export async function persistCadastruRecord(payload, options = {}) {
   if (!isCadastruDbEnabled() || hasDerivedIdentity(payload)) return null;
 
   try {
+    if (options.usageOnly) {
+      if (!shouldCollectStatistics() || options.countLookup === false) return null;
+      const { data, error } = await supabaseAdmin.rpc("record_cadastru_lookup_usage", {
+        p_number: payload?.cadastral_number || options.cadastralNumber,
+      });
+      if (error) { logDbError("lookup usage update failed", error); return null; }
+      if (data !== false) return null;
+      // Recover a Redis-only snapshot if its original database write failed.
+      return persistCadastruRecord(payload, { ...options, usageOnly: false });
+    }
     if (!options.skipBuildingBundles) await persistBuildingBundles(payload, options);
     const existing = await findRecordByNumber(payload?.cadastral_number || options.cadastralNumber);
     // A forced lookup during an outage must not replace a richer saved result

@@ -57,12 +57,14 @@ async function handlePost(request) {
     : nearbyAddressFromCadastru({ request_address: address });
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
-  const mapAccess = await canReadCadastruMapData(request, { payload: entry?.payload, number, address });
+  const [mapAccess, stored] = await Promise.all([
+    canReadCadastruMapData(request, { payload: entry?.payload, number, address }),
+    getStoredPublicTransport(input),
+  ]);
   const respond = (publicTransport) => NextResponse.json({ public_transport: mapAccess ? publicTransport : redactCadastruMapData(publicTransport) }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 
-  const stored = await getStoredPublicTransport(input);
   const refresh = async () => {
     try {
       const publicTransport = await fetchExternalPublicTransportData(input, stored ? { trackUsage: false } : getCadastruLookupTracking(body));

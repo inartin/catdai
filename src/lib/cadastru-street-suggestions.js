@@ -37,7 +37,7 @@ for (const entry of [...streets.streets, ...corrections]) {
 }
 
 export function suggestStreets({ city, roadType, street, excludeStreet = street }) {
-  const type = ["str", "strada"].includes(roadType) ? "str" : ["bd", "bulevard"].includes(roadType) ? "bd" : null;
+  const type = ["str", "strada"].includes(roadType) ? "str" : ["bd", "bulevard"].includes(roadType) ? "bd" : roadType === "sos" ? "sos" : null;
   const scope = scopes.get(`${resolveSupportedCity(city)}|${type}`);
   const query = suggestionKey(street);
   if (!scope || query.length < 4 || query.length > 80) return [];
@@ -74,14 +74,14 @@ export function suggestStreets({ city, roadType, street, excludeStreet = street 
 
 export function suggestRoadTypes({ city, roadType, street }) {
   const selectedType = ["str", "strada"].includes(roadType) ? "str"
-    : ["bd", "bulevard"].includes(roadType) ? "bd" : roadType === "str-la" ? "str-la" : null;
+    : ["bd", "bulevard"].includes(roadType) ? "bd" : roadType === "str-la" ? "str-la" : roadType === "sos" ? "sos" : null;
   if (!selectedType || !resolveSupportedCity(city)) return [];
   if (resolveStreet({ city, roadType: selectedType, street, exactOnly: true }).status === "exact") return [];
 
-  return ["str", "bd", "str-la"]
+  return ["str", "bd", "str-la", "sos"]
     .filter((type) => type !== selectedType)
     .map((type) => ({ type, match: resolveStreet({ city, roadType: type, street, exactOnly: true }) }))
     .filter(({ match }) => match.status === "exact")
-    .map(({ type, match }) => ({ road_type: type === "bd" ? "bulevard" : type === "str-la" ? "str-la" : "strada",
+    .map(({ type, match }) => ({ road_type: type === "bd" ? "bulevard" : type === "str-la" ? "str-la" : type === "sos" ? "sos" : "strada",
       street: match.street }));
 }

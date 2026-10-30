@@ -37,6 +37,7 @@ const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet", fullLabel: "cadastru.roadTypeStreetFull" },
   { value: "str-la", label: "cadastru.roadTypeLane", fullLabel: "cadastru.roadTypeLaneFull" },
   { value: "bulevard", label: "cadastru.roadTypeBoulevard", fullLabel: "cadastru.roadTypeBoulevardFull" },
+  { value: "sos", label: "cadastru.roadTypeHighway", fullLabel: "cadastru.roadTypeHighwayFull" },
 ];
 const STREET_MAX_LENGTH = 80;
 const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/(?:\d{1,4}|[a-z]))?$/i;
@@ -468,7 +469,7 @@ function readAddressLookupRequest(lookupId) {
   }
 }
 
-function CadastruResultContent({ sharedReportSlug = "" } = {}) {
+function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = null } = {}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { lang, t } = useTranslation();
@@ -506,7 +507,10 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   const loadedMarketKey = useRef("");
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalCopyKey, setAuthModalCopyKey] = useState("cadastru.loginToUse");
-  const [state, setState] = useState({
+  const sharedPayload = initialSharedReport?.slug === shareSlug ? initialSharedReport.payload : null;
+  const [state, setState] = useState(() => sharedPayload ? {
+    loading: false, error: "", data: sharedPayload, shareSlug,
+  } : {
     loading: true,
     error: "",
     data: null,
@@ -707,6 +711,10 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
 
   useEffect(() => {
     if (shareSlug) {
+      if (sharedPayload) {
+        setState({ loading: false, error: "", data: sharedPayload, shareSlug });
+        return;
+      }
       let active = true;
       loadedRequestKey.current = "";
       setState({ loading: true, error: "", data: null });
@@ -962,7 +970,7 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
     return () => {
       active = false;
     };
-  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, lookupRetry, router, savedAddressKey, searchLookupId, session?.access_token, session?.user?.id, shareSlug, skipCache, source, t]);
+  }, [addressRequestKey, authLoading, cadastralNumber, clearAuthError, isAddressPreviewHandoff, isAddressResultHandoff, isAuthenticated, isHistoryAddress, isPendingAddressLookup, lang, lookupRetry, router, savedAddressKey, searchLookupId, session?.access_token, session?.user?.id, sharedPayload, shareSlug, skipCache, source, t]);
 
   useEffect(() => {
     if (authLoading || !shareSlug || state.shareSlug !== shareSlug || !state.data) return;
@@ -1436,10 +1444,10 @@ function CadastruResultContent({ sharedReportSlug = "" } = {}) {
   );
 }
 
-export default function CadastruResultPage({ shareSlug = "" } = {}) {
+export default function CadastruResultPage({ shareSlug = "", initialSharedReport = null } = {}) {
   return (
     <Suspense fallback={<CadastruRouteLoading />}>
-      <CadastruResultContent sharedReportSlug={shareSlug} />
+      <CadastruResultContent sharedReportSlug={shareSlug} initialSharedReport={initialSharedReport} />
     </Suspense>
   );
 }

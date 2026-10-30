@@ -332,6 +332,8 @@ storageError = false;
 const shortPage = await shortRoute.namespace.default({ params: Promise.resolve({ code: new URL(shared.url).pathname.split("/").at(-1) }) });
 assert.equal(shortPage.type, ResultPage);
 assert.equal(shortPage.props.shareSlug, shared.slug);
+assert.equal(shortPage.props.initialSharedReport.slug, shared.slug);
+assert.equal(JSON.stringify(shortPage.props.initialSharedReport.payload), JSON.stringify(rows.find(row => row.slug === shared.slug).payload), 'the page reuses the saved public payload');
 await assert.rejects(shortRoute.namespace.default({ params: Promise.resolve({ code: "invalid" }) }), /404/);
 await assert.rejects(shortRoute.namespace.default({ params: Promise.resolve({ code: "0".repeat(12) }) }), /404/);
 const legacyPage = await shortRoute.namespace.default({ params: Promise.resolve({ code: Buffer.from(shared.slug, "hex").toString("base64url") }) });
@@ -394,6 +396,8 @@ await resultRoute.link((name) => new vm.SyntheticModule(Object.keys(resultMocks[
   for (const [key, value] of Object.entries(resultMocks[name])) this.setExport(key, value);
 }, { context }));
 await resultRoute.evaluate();
+assert.equal((await resultRoute.namespace.default({ searchParams: Promise.resolve({ share_slug: shared.slug }) })).props.initialSharedReport.slug, shared.slug, 'legacy query links also pass the server-read report');
+assert.equal((await resultRoute.namespace.default({ searchParams: Promise.resolve({ cadastral_number: number }) })).props.initialSharedReport, null, 'private number links receive no public snapshot');
 assert.equal(Object.keys(await resultRoute.namespace.generateMetadata({ searchParams: Promise.resolve({ cadastral_number: number }) })).length, 0,
   "ordinary results keep their existing metadata");
 for (const lang of ["ro", "ru", "en"]) {

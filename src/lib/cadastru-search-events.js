@@ -66,7 +66,7 @@ function cleanSearchRequest(value) {
   const street = typeof value.street === "string" ? value.street.trim().slice(0, 80) : "";
   const houseNumber = typeof value.house_number === "string" ? value.house_number.trim().slice(0, 10) : "";
   const apartmentNumber = typeof value.apartment_number === "string" ? value.apartment_number.trim().slice(0, 4) : "";
-  if (!city || !["strada", "str-la", "bulevard"].includes(roadType) || !street || !houseNumber) return null;
+  if (!city || !["strada", "str-la", "bulevard", "sos"].includes(roadType) || !street || !houseNumber) return null;
   return { city, road_type: roadType, street, house_number: houseNumber, ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}) };
 }
 

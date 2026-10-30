@@ -4,7 +4,7 @@ import { matchCity, matchDistrict } from "@/lib/validation";
 
 const MAX_STREET_LISTINGS = 1000;
 const FIELDS = "id,external_id,is_active,price_amount,price_currency,price_per_m2,area_m2,rooms_count,floor,total_floors,renovation,first_seen_at,last_seen_at,attributes";
-const roadKey = (value) => ({ strada: "str", bulevard: "bd", "str-la": "str-la" })[value];
+const roadKey = (value) => ({ strada: "str", bulevard: "bd", "str-la": "str-la", sos: "sos" })[value];
 const houseKey = (value) => String(value || "").trim().replace(/[.,;]+$/, "").replace(/\s+/g, "").toLowerCase();
 const positive = (value) => value != null && Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : null;
 
@@ -15,15 +15,16 @@ function streetIdentity(city, road, street) {
 
 function listingHouse(row, input) {
   const street = String(row.attributes?.sourceStreet || "").trim();
-  const markerMatch = street.match(/^(?:[-–]\s*)?(str-la|stradela|strădela|strada|str|bd|bul|bulevardul|bulevard|бд|бул|бульвар|ул|улица|проспект|пр)(?=[.\s])/iu);
+  const markerMatch = street.match(/^(?:[-–]\s*)?(str-la|stradela|strădela|strada|str|bd|bul|bulevardul|bulevard|sos|șos|şos|soseaua|șoseaua|şoseaua|шоссе|бд|бул|бульвар|ул|улица|проспект|пр)(?=[.\s])/iu);
   const marker = markerMatch?.[1]?.toLowerCase();
   const name = markerMatch ? street.slice(markerMatch[0].length).replace(/^[.\s]+/, "") : street;
   const road = /^(?:bd|bul|bulevard|bulevardul|бд|бул|бульвар|проспект|пр)$/.test(marker || "") ? "bd"
     : /^(?:str-la|stradela|strădela)$/.test(marker || "") ? "str-la"
+    : /^(?:sos|șos|şos|soseaua|șoseaua|şoseaua|шоссе)$/.test(marker || "") ? "sos"
     : marker ? "str" : null;
   // A missing road type is safe only if the catalogue identifies this street
   // under exactly one road type in this locality.
-  const possible = road ? [road] : ["str", "bd", "str-la"].filter((type) => streetIdentity(input.city, type, name));
+  const possible = road ? [road] : ["str", "bd", "str-la", "sos"].filter((type) => streetIdentity(input.city, type, name));
   if (possible.length !== 1 || possible[0] !== roadKey(input.road_type)) return null;
   if (streetIdentity(input.city, possible[0], name) !== streetIdentity(input.city, roadKey(input.road_type), input.street)) return null;
   const house = houseKey(row.attributes?.sourceBuildingNumber);
@@ -85,7 +86,7 @@ async function readListings(db, input) {
       }
     }
   } catch (error) { histories.clear(); console.error("[cadastru-market] history unavailable:", error.message); }
-  const prefix = input.road_type === "bulevard" ? "bd." : input.road_type === "str-la" ? "str-la" : "str.";
+  const prefix = input.road_type === "bulevard" ? "bd." : input.road_type === "str-la" ? "str-la" : input.road_type === "sos" ? "șos." : "str.";
   const currentRows = matched.filter((row) => row.house === current);
   const collectedSince = currentRows.map((row) => row.first_seen_at).filter((value) => Number.isFinite(Date.parse(value))).sort((a, b) => Date.parse(a) - Date.parse(b))[0] || null;
   return {
@@ -114,6 +115,6 @@ export async function loadCadastruMarket(db, { payload = {}, address, city, dist
   const areaTrend = trendResult.status === "fulfilled" ? trendResult.value : null;
   if (!listings.listings.length && !areaTrend) return null;
   return { ...listings, areaTrend, capturedAt: new Date().toISOString(),
-    address: input ? `${input.city} · ${input.road_type === "bulevard" ? "bd." : input.road_type === "str-la" ? "str-la" : "str."} ${input.street} ${input.house_number}` : resolvedDistrict || resolvedCity,
+    address: input ? `${input.city} · ${input.road_type === "bulevard" ? "bd." : input.road_type === "str-la" ? "str-la" : input.road_type === "sos" ? "șos." : "str."} ${input.street} ${input.house_number}` : resolvedDistrict || resolvedCity,
   };
 }

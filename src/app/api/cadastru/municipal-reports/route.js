@@ -55,12 +55,14 @@ async function handlePost(request) {
   const input = municipalReportsInputFromCadastru(entry?.payload || { request_address: address });
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
-  const mapAccess = await canReadCadastruMapData(request, { payload: entry?.payload, number, address });
+  const [mapAccess, stored] = await Promise.all([
+    canReadCadastruMapData(request, { payload: entry?.payload, number, address }),
+    getStoredMunicipalReports(input),
+  ]);
   const respond = (reports) => NextResponse.json({ municipal_reports: mapAccess ? reports : redactCadastruMapData(reports) }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 
-  const stored = await getStoredMunicipalReports(input);
   const refresh = async () => {
     try {
       const reports = await fetchExternalMunicipalReportsData(input, stored ? { trackUsage: false } : getCadastruLookupTracking(body));

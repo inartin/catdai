@@ -1,9 +1,83 @@
 [
   {
     "city": "Chișinău",
+    "road_type": "sos",
+    "street": "Hâncești",
+    "aliases": ["Hîncești", "Soseul Hincesti", "Soseul Hâncești"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "sos",
+    "street": "Muncești",
+    "aliases": ["Мунчештская", "Мунчешть"]
+  },
+  {
+    "city": "Comrat",
+    "road_type": "str",
+    "street": "Lenina",
+    "aliases": ["Ленина", "Lenin", "Vladimir Lenin"],
+    "merge_streets": ["Lenin", "Vladimir Lenin"]
+  },
+  {
+    "city": "Chișinău",
     "road_type": "bd",
     "street": "Ștefan cel Mare și Sfânt",
     "aliases": ["Ștefan cel Mare"]
+  },
+  {
+    "city": "Bălți",
+    "road_type": "str",
+    "street": "Ștefan cel Mare și Sfînt",
+    "aliases": ["Ștefan cel Mare", "Ștefan cel Mare și Sfânt"],
+    "merge_streets": ["Ștefan cel Mare", "Ștefan cel Mare și Sfânt"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "bd",
+    "street": "Moscova",
+    "aliases": ["Москва", "Москвы"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "București",
+    "aliases": ["Бухарест"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Odesa",
+    "aliases": ["Одесса"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Alexandr Pușkin",
+    "aliases": ["Пушкин", "Пушкина"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Lev Tolstoi",
+    "aliases": ["Толстой", "Толстого"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Alexei Mateevici",
+    "aliases": ["Матеевич", "Матеевича"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Alexei Șciusev",
+    "aliases": ["Щусев", "Щусева"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "bd",
+    "street": "Dimitrie Cantemir",
+    "aliases": ["Кантемир", "Кантемира"]
   },
   {
     "city": "Chișinău",

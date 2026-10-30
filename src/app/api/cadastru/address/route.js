@@ -18,6 +18,7 @@ import { cadastruNeedsRefresh, withCadastruFreshness } from "@/lib/cadastru-cach
 import { scheduleCadastruRefresh, isUsableCadastruRefresh } from "@/lib/cadastru-refresh";
 import { resolveAccessTier } from "@/lib/access-tier";
 import {
+  checkFeatureAccess,
   consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
@@ -49,12 +50,14 @@ function normalizeSpaces(value) {
 function normalizeRoadType(value) {
   if (value === "bulevard") return "bd";
   if (value === "str-la") return "str-la";
+  if (["sos", "sos.", "șoseaua", "şoseaua", "soseaua", "шоссе"].includes(String(value || "").trim().toLowerCase())) return "sos";
   return "str";
 }
 
 function displayRoadType(value) {
   if (value === "bulevard") return "Bulevard";
   if (value === "str-la") return "Str-la";
+  if (normalizeRoadType(value) === "sos") return "Șos.";
   return "Strada";
 }
 
@@ -242,7 +245,7 @@ async function handlePost(request) {
   });
   const addressConfirmationResponse = (error) => {
     if (error?.code !== "address_confirmation_required") return null;
-    const expectedRoadType = roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : "strada";
+    const expectedRoadType = roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : roadType === "sos" ? "sos" : "strada";
     const offered = error.addressSuggestions || error.address_suggestions;
     const suggestions = (Array.isArray(offered) ? offered : []).filter((value) => {
       if (!value || value.road_type !== expectedRoadType || value.street !== resolution.street ||
@@ -288,7 +291,7 @@ async function handlePost(request) {
         searchAddress: rawAddress,
         searchRequest: {
           city,
-          road_type: roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : "strada",
+          road_type: roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : roadType === "sos" ? "sos" : "strada",
           street: resolution.street,
           house_number: houseNumber,
           apartment_number: apartmentNumber,
@@ -310,7 +313,7 @@ async function handlePost(request) {
       idempotencyKey,
       metadata: {
         ...cadastruPaidHistoryMetadata({ payload, searchType: 'address',
-          searchRequest: { city, road_type: roadType === 'bd' ? 'bulevard' : roadType === 'str-la' ? 'str-la' : 'strada',
+          searchRequest: { city, road_type: roadType === 'bd' ? 'bulevard' : roadType === 'str-la' ? 'str-la' : roadType === 'sos' ? 'sos' : 'strada',
             street: resolution.street, house_number: houseNumber, ...(apartmentNumber ? { apartment_number: apartmentNumber } : {}) },
           lookupId: getCadastruLookupTracking(body).lookupId, city, district: resolvePayloadDistrict(payload), resultType: classifyAddressPayload(payload) }),
         feature: "cadastru_lookup",

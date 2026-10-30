@@ -55,7 +55,10 @@ async function handlePost(request) {
   const input = nearbyInputFromCadastru(entry?.payload || { request_address: address });
   if (!input) return NextResponse.json({ error: "location_unavailable" }, { status: 422 });
 
-  const mapAccess = await canReadCadastruMapData(request, { payload: entry?.payload, number, address });
+  const [mapAccess, cached] = await Promise.all([
+    canReadCadastruMapData(request, { payload: entry?.payload, number, address }),
+    getStoredNearby(input),
+  ]);
   const respond = (nearby) => NextResponse.json({ nearby: mapAccess ? nearby : {
     ...redactCadastruMapData(nearby),
     map_preview: { available: Number.isFinite(nearby?.location?.latitude) && Number.isFinite(nearby?.location?.longitude) },
@@ -63,7 +66,7 @@ async function handlePost(request) {
     headers: { "Cache-Control": "private, no-store" },
   });
 
-  let stored = await getStoredNearby(input);
+  let stored = cached;
   // Lazily move valid legacy snapshots to the shared building store without renewing them.
   if (!stored && validNearbyResult(entry?.payload.nearby) && Number.isFinite(Date.parse(entry.expiresAt))) {
     stored = await storeNearby(input, entry.payload.nearby, {

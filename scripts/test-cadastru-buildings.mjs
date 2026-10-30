@@ -7,7 +7,8 @@ import { loadAppModule } from "./lib/load-app-module.mjs";
 const db = new PGlite();
 await db.exec("create role anon; create role authenticated; create role service_role;");
 for (const file of ["db/cadastru_records.sql", "db/cadastru_nearby.sql", "db/cadastru_public_transport.sql",
-  "supabase/migrations/20261013155148_cadastru_shared_buildings.sql"]) await db.exec(await fs.readFile(file, "utf8"));
+  "supabase/migrations/20261013155148_cadastru_shared_buildings.sql",
+  "supabase/migrations/20261030201034_cadastru_cached_lookup_usage.sql"]) await db.exec(await fs.readFile(file, "utf8"));
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const quote = (value) => { assert.match(value, /^[a-z_][a-z_0-9]*$/); return `"${value}"`; };
 const supabase = {
@@ -162,10 +163,11 @@ const stale = await (await numberRoute.POST(request({ cadastral_number: number }
 assert.equal(stale.apartment.area_m2, 41.9);
 assert.equal(stale.data_freshness.apartment.stale, true);
 assert.equal(credits, 1);
-assert.equal(refreshCallbacks.length, 1, "expired data refreshes after returning the saved result");
+assert.equal(refreshCallbacks.length, 2, "source refresh and usage update both run after returning the saved result");
 const callsBeforeRefresh = upstream;
 await refreshCallbacks.shift()();
 assert.equal(upstream, callsBeforeRefresh + 1);
+await refreshCallbacks.shift()();
 const grants = await db.query("select has_table_privilege('anon','cadastru_buildings','SELECT') as exposed, has_function_privilege('anon','merge_cadastru_building(text,jsonb,timestamptz,timestamptz,jsonb)','EXECUTE') as callable");
 assert.equal(grants.rows[0].exposed, false); assert.equal(grants.rows[0].callable, false);
 const footprint = { type: "Polygon", coordinates: [[[28.8,47],[28.801,47],[28.801,47.001],[28.8,47]]] };

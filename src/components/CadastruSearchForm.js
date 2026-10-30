@@ -14,6 +14,7 @@ const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreetFull" },
   { value: "str-la", label: "cadastru.roadTypeLaneFull" },
   { value: "bulevard", label: "cadastru.roadTypeBoulevardFull" },
+  { value: "sos", label: "cadastru.roadTypeHighwayFull" },
 ];
 const STREET_MAX_LENGTH = 80;
 const HOUSE_NUMBER_MAX_LENGTH = 10;

@@ -20,7 +20,7 @@ Conflicting numbers return 422 `address_fields_conflict` with two corrected stre
 
 ## Data updates
 
-The snapshot contains 2,736 streets in 39 localities (2,192 with Russian aliases), sourced from the 2026-09-25 Geofabrik Moldova extract. Coverage is partial; Tiraspol retains the original search. Attribution: © OpenStreetMap contributors, [ODbL 1.0](https://www.openstreetmap.org/copyright). Source URL, checksum, boundary IDs and sample way IDs are retained in `data/streets.json`.
+The synced worker snapshot contains 29,580 streets in 1,200 localities (12,561 with Russian aliases, including 15 șoseaua entries), sourced from the 2026-10-20 Geofabrik Moldova extract. Coverage is partial; Tiraspol retains the original search. Attribution: © OpenStreetMap contributors, [ODbL 1.0](https://www.openstreetmap.org/copyright). Source URL, checksum, boundary IDs and sample way IDs are retained in `data/streets.json`.
 
 Maintain corrections and regenerate data in `catdai-api`, then run from this repository:
 
@@ -30,6 +30,8 @@ pnpm exec node --experimental-vm-modules scripts/test-cadastru-storage.mjs
 ```
 
 The sync script adapts only the loader and records worker source hashes in `source-hashes.json`. Review changes and deploy both projects with the same snapshot. No OSM service, database migration, or live import is needed at runtime. The dictionary stays in the server route, outside the form bundle.
+
+The Cadastru selector sends `road_type: "sos"` for Șoseaua (Шоссе / Highway). The API resolves that type directly and retains it in result URLs, confirmation choices and search history. The synced Chișinău șoseaua aliases `Hîncești`, `Hincesti`, and `Soseul Hincesti` resolve to `Hâncești`; house `140/2` remains exact. Secondary-card origins and market matching also retain the șoseaua type.
 
 ## Validation
 

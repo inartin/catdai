@@ -36,6 +36,8 @@ export function summarizeCadastruCities({ records, buildings }, now = Date.now()
 export function summarizeCadastruStorage({ records, buildings, addresses, nearby, transport, reports }, now = Date.now(), { includeCities = true } = {}) {
   const buildingIds = new Set(buildings.map((row) => digits(row.cadastral_number)));
   const allIds = new Set([...buildingIds, ...records.map((row) => digits(row.cadastral_number))]);
+  const fullData = new Set(records.filter((row) => row.result_type === "full_data" && !row.unit_list_entry)
+    .map((row) => digits(row.cadastral_number)).filter(Boolean)).size;
   const linkedCities = new Map(records.filter((row) => row.shared_building_number && row.city)
     .map((row) => [row.shared_building_number, row.city]));
   const apartments = { total: 0, linked: 0, details: 0, references: 0, fresh: 0 };
@@ -60,6 +62,12 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
   }
   const snapshots = Object.fromEntries(Object.entries({ nearby, transport, reports })
     .map(([name, rows]) => [name, new Map(rows.filter((row) => !row.incomplete && !row.stale).map((row) => [row.origin_key, row]))]));
+  // Address snapshots can exist before (or without) an apartment-building record.
+  // Count each stored origin once, independently of the building coverage join.
+  const storedDatasets = Object.fromEntries(Object.entries(snapshots).map(([name, rows]) => [name, {
+    saved: rows.size,
+    fresh: [...rows.values()].filter((row) => fresh(row.expires_at, now)).length,
+  }]));
   const coverage = Object.fromEntries(["cadastru", "nearby", "transport", "reports"].map((key) => [key, { saved: 0, fresh: 0, total: 0 }]));
   const collection = { harvested: 0, partial: 0, notHarvested: 0 };
   let allCategories = 0;
@@ -85,8 +93,8 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
     else if (building.collection_snapshot) collection.partial++;
     else collection.notHarvested++;
   }
-  return { available: true, updatedAt: new Date(now).toISOString(), total: allIds.size,
-    buildings: buildings.length, apartments, other, coverage, allCategories, collection,
+  return { available: true, updatedAt: new Date(now).toISOString(), total: allIds.size, fullData,
+    buildings: buildings.length, apartments, other, coverage, storedDatasets, allCategories, collection,
     ...(includeCities ? { byCity: summarizeCadastruCities({ records, buildings }, now).byCity } : {}),
   };
 }

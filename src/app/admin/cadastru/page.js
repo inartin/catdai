@@ -88,7 +88,7 @@ export default function AdminCadastruPage() {
       ) : stats?.available ? (
         <div className="space-y-6" aria-busy={loading}>
           <section aria-label="Stored property totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <StatCard label="Unique cadastral numbers" value={stats.total} detail="All property types" accent />
+            <StatCard label="Full cadastral records" value={stats.fullData} detail="Unique numbers with full cadastral data" accent />
             <StatCard label="Apartment buildings" value={stats.buildings} detail="Verified blocks" />
             <StatCard label="Apartments" value={stats.apartments.total}
               detail={`${fmtNum(stats.apartments.linked)} linked to shared buildings`} />
@@ -100,36 +100,44 @@ export default function AdminCadastruPage() {
           <section aria-labelledby="building-coverage-heading" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-gray-100 p-5 sm:p-6">
               <div>
-                <h2 id="building-coverage-heading" className="text-lg font-semibold text-gray-900">Building data coverage</h2>
-                <p className="mt-1 text-sm text-gray-500">Each dataset is counted once per apartment building.</p>
+                <h2 id="building-coverage-heading" className="text-lg font-semibold text-gray-900">Stored data coverage</h2>
+                <p className="mt-1 text-sm text-gray-500">Address totals include data saved before apartment-building details are available.</p>
               </div>
               <div className="rounded-lg bg-primary/5 px-4 py-2 text-right">
                 <p className="text-lg font-semibold tabular-nums text-primary">{fmtNum(stats.allCategories)} <span className="text-sm font-normal text-gray-500">/ {fmtNum(stats.buildings)}</span></p>
-                <p className="text-xs text-gray-500">with all applicable datasets saved</p>
+                <p className="text-xs text-gray-500">apartment buildings with all datasets saved</p>
               </div>
             </div>
             <div className="grid divide-y divide-gray-100 sm:grid-cols-2 sm:divide-y-0">
               {datasets.map(([key, label, detail]) => {
                 const item = stats.coverage[key];
+                const stored = key === "cadastru" ? item : stats.storedDatasets[key];
                 const share = percent(item.saved, item.total);
                 return (
                   <div key={key} className="p-5 sm:p-6">
                     <div className="flex items-start justify-between gap-3">
                       <div><h3 className="text-sm font-semibold text-gray-900">{label}</h3><p className="mt-1 text-xs text-gray-500">{detail}</p></div>
-                      <p className="text-sm font-semibold tabular-nums text-gray-900">{fmtNum(item.saved)} <span className="font-normal text-gray-500">/ {fmtNum(item.total)}</span></p>
+                      <div className="text-right tabular-nums">
+                        <p className="text-lg font-semibold text-gray-900">{fmtNum(stored.saved)}</p>
+                        <p className="text-xs text-gray-500">{key === "cadastru" ? "buildings saved" : "address snapshots saved"}</p>
+                      </div>
                     </div>
-                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-gray-100" role="progressbar" aria-label={`${label} saved coverage`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
+                    <p className="mt-3 text-xs tabular-nums text-gray-500">{fmtNum(stored.fresh)} fresh · {fmtNum(stored.saved - stored.fresh)} expired</p>
+                    <div className="mt-4 flex flex-wrap justify-between gap-2 text-xs text-gray-500">
+                      <span>Apartment-building coverage</span>
+                      <span className="tabular-nums">{fmtNum(item.saved)} / {fmtNum(item.total)}</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100" role="progressbar" aria-label={`${label} apartment-building coverage`} aria-valuenow={share} aria-valuemin={0} aria-valuemax={100}>
                       <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${share}%` }} />
                     </div>
                     <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs tabular-nums">
                       <span className="text-gray-500">{share}% saved · {fmtNum(item.total - item.saved)} missing</span>
-                      <span className="text-gray-500"><span className="text-primary">{fmtNum(item.fresh)} fresh</span> · {fmtNum(item.saved - item.fresh)} expired</span>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <p className="border-t border-gray-100 px-5 py-3 text-xs leading-5 text-gray-500 sm:px-6">Expired snapshots remain stored</p>
+            <p className="border-t border-gray-100 px-5 py-3 text-xs leading-5 text-gray-500 sm:px-6">Totals count saved lookup addresses; coverage bars count verified apartment buildings. Expired snapshots remain stored.</p>
           </section>
 
         </div>

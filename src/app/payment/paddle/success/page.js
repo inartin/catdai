@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { paymentAppLink } from "@/lib/payment-urls.mjs";
-import { featureResultPath } from '@/lib/guest-checkout.mjs';
+import { featureResultPath, queueGuestAccountPrompt } from '@/lib/guest-checkout.mjs';
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import LockIcon from "@/components/icons/LockIcon";
@@ -185,6 +185,7 @@ export default function PaddlePaymentSuccessPage() {
 
         setOrder(payload);
         if (isGuest && payload.status === 'paid' && featureResultPath(payload.return_to)) {
+          queueGuestAccountPrompt({ userId: session.user?.id, provider: 'paddle', order: payload });
           window.location.replace(paymentAppLink(payload.return_to));
           return;
         }
@@ -207,7 +208,7 @@ export default function PaddlePaymentSuccessPage() {
       active = false;
       if (timeoutId) window.clearTimeout(timeoutId);
     };
-  }, [authLoading, immediateError, isGuest, params.checkout, params.orderId, params.transactionId, session?.access_token, t]);
+  }, [authLoading, immediateError, isGuest, params.checkout, params.orderId, params.transactionId, session?.access_token, session?.user?.id, t]);
 
   const display = getDisplayState({ loading: loading && !immediateError, error: immediateError || error, order, checkout: params.checkout });
   const accentClass = display.tone === "success" ? "bg-emerald-500" : display.tone === "error" ? "bg-red-500" : "bg-primary";

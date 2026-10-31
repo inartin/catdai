@@ -4,7 +4,7 @@
 Preview paywall implemented. Shared checkout selects MAIB by default, with Paddle retained as backup and for existing subscription servicing. See [MAIB payments](maib-payments.md).
 
 ## Current Access Rule
-- Feature-result checkouts offer a persistent guest Supabase session, without registration. Verified payment unlocks the purchased feature and refreshes reuse the same paid usage record. An optional account banner appears after purchase; Google/Telegram login transfers purchases to the new or existing account before switching result identity. Pricing-origin checkout still requires registration. Guest source credits stay with the purchased feature until transferred, so a containing evaluation cannot spend a Cadastru/PDF credit. See [guest setup](auth-config.md#provider-config).
+- Feature-result checkouts offer a persistent guest Supabase session, without registration. Verified payment unlocks the purchased feature and refreshes reuse the same paid usage record. An optional account banner appears once on the matching result after verified payment; refreshes, later visits and unrelated results do not repeat it. Google/Telegram login transfers purchases to the new or existing account before switching result identity. Pricing-origin checkout still requires registration. Guest source credits stay with the purchased feature until transferred, so a containing evaluation cannot spend a Cadastru/PDF credit. See [guest setup](auth-config.md#provider-config).
 - Anonymous users are `free`.
 - Authenticated Supabase users are `free` by default; authentication and paid access are separate.
 - Monthly free grants are retired. The retirement migration snapshots one unused current allowance for existing users into `user_retained_free_credits`. This one-time credit works across all six features, never expires or renews, and is absent for new users. Historical unlock events remain intact. Unpaid anonymous/guest results remain masked.
@@ -25,9 +25,11 @@ Preview paywall implemented. Shared checkout selects MAIB by default, with Paddl
 - `POST /api/paddle/webhooks` also handles approved full Paddle refund/chargeback adjustments and revokes remaining credits so refunded orders no longer keep paid access.
 - Existing MAIB feature popups still show the selected feature for 15 MDL, but the purchase grants one universal credit. Pricing-page packs grant 10 credits for 79 MDL or 50 for 249 MDL.
 - Logged-out result pages and their popups show the same matching single-use offer even when the preview has no purchase offer; checkout preserves that product through login.
-- In the desktop result sidebar, the unlock card appears above the PDF/share/compare actions; the unlock button is green and the PDF action is black.
+- Desktop sale/rent previews also show a green priced unlock button directly beneath the main estimate. The result sidebar retains the unlock card above the PDF/share/compare actions; PDF uses the same neutral secondary styling as the other actions.
 - Shared purchase cards use the same green border and subtle green ring as the recommended pricing-page card.
 - Below the desktop sidebar breakpoint, result-page purchase cards become a compact fixed bottom drawer showing the price and unlock action. Tapping the handle, title, or chevron expands the included feature details; tapping again or pressing Escape collapses it. The drawer respects the bottom safe area and reserves scroll space. Comparison layouts and purchase/PDF popups retain inline cards.
+- Sale/rent mobile drawers show `Evaluare completă` (localized) with the catalog price in MDL on a separate line beneath it; the unlock button keeps its existing label.
+- Expanded sale-evaluation drawers reuse the Cadastru checkmark list and small packages link, with localized benefits for the estimated market price, three sale scenarios and detailed market analysis.
 - Only the fixed drawer is portaled to `document.body`; its spacing element stays in the pricing component's page layout, preventing empty space above the navbar.
 - Locked Cadastru results reuse `FeaturePricingAction` with `mobileDock` below the same breakpoint, offering the Cadastru purchase through the shared checkout. Full-access results omit the drawer.
 - Limit-reached blurred-value popups show the package price in MDL only and offer a single-feature use through MAIB. Paddle retains its Extra offer. The packages link remains in the offer and also appears beneath the checkout card.
@@ -56,6 +58,7 @@ Sale/buy estimate results return a preview for anonymous users:
 
 Locked preview sections include fast/target prices, price per m2, range numbers, market stats, district comparison values, seller breakdown, and listing details.
 The sale/buy evaluation preview shows real, unblurred sector/city trend data when available, including its values, chart, and interactive points, regardless of login or remaining credits. Other detailed-value sections remain locked.
+Sale/rent previews also expose `valuation_evidence` (comparable counts, last-observed date range and a district-adjustment flag), matching criteria and non-monetary adjustment explanations. Sample medians, individualized price per m², totals, ranges and percentile prices remain masked. Full-price RPC execution is restricted to `service_role` so public callers use the access-controlled estimate APIs.
 
 ## Full Payload
 Authenticated users receive the full sale/buy estimate response while they have a retained free credit or a paid credit remaining. Once both are exhausted, `/api/estimate` returns the locked detailed-value preview; anonymous previews additionally remove the headline estimate. Users with previously granted but exhausted shared paid credits receive `access_limit.reason = paid_evaluation_limit_reached`; other users receive `free_monthly_limit_reached`.

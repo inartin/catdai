@@ -136,6 +136,9 @@ BEGIN
   LOOP
     SELECT
       count(*)                                                        AS total,
+      count(last_seen_at)                                              AS observed_count,
+      min(last_seen_at)                                                AS observed_from,
+      max(last_seen_at)                                                AS observed_to,
       avg(price_per_m2)                                               AS avg_ppm,
       percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)      AS median_ppm,
       min(price_per_m2)                                               AS min_ppm,
@@ -418,6 +421,13 @@ BEGIN
           CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
       END
     ),
+    'valuation_evidence', jsonb_build_object(
+      'comparable_count', comparable_count,
+      'observed_count', base_stats.observed_count,
+      'observed_from', base_stats.observed_from,
+      'observed_to', base_stats.observed_to,
+      'district_adjustment_applied', used_district_coeff
+    ),
     'market_stats', jsonb_build_object(
       'comparable_count', comparable_count,
       'avg_price', round(base_stats.avg_price::numeric, 2),
@@ -470,3 +480,7 @@ BEGIN
   RETURN result;
 END;
 $$;
+
+-- Full-price RPCs are internal to the server-side estimate API.
+REVOKE EXECUTE ON FUNCTION public.estimate_price(text, text, int, numeric, int, boolean, boolean, int, text, text, int, int, text[], boolean, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.estimate_price(text, text, int, numeric, int, boolean, boolean, int, text, text, int, int, text[], boolean, boolean) TO service_role;

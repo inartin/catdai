@@ -28,7 +28,7 @@ import { NextResponse } from "next/server";
 const limiter = rateLimit({ interval: 60_000, limit: 30 });
 const RENT_EVALUATION_FEATURE_KEY = "rent_estimate";
 const YIELD_CALCULATOR_FEATURE_KEY = "yield_calculator";
-const ESTIMATE_RENT_CACHE_PREFIX = "catdai:estimate-rent:v7:";
+const ESTIMATE_RENT_CACHE_PREFIX = "catdai:estimate-rent:v8:";
 const ESTIMATE_RENT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const ESTIMATE_RENT_CACHE_TTL_SECONDS = 12 * 60 * 60;
 const ESTIMATE_RENT_CACHE_MAX_ENTRIES = 250;
@@ -473,7 +473,10 @@ function buildRentEstimatePreview(payload, { hideMarketEstimate = false } = {}) 
       median_price_per_m2: null,
       min_price_per_m2: null,
       max_price_per_m2: null,
+      p10_price_per_m2: null,
+      p90_price_per_m2: null,
     },
+    district_coefficient: null,
     district_comparison: buildRentDistrictComparisonPreview(payload.district_comparison),
     rent_level_listings: {},
     relevant_listings: [],

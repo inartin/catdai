@@ -9,6 +9,7 @@ import BackButton from "@/components/BackButton";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import InfoCallout from "@/components/InfoCallout";
 import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
+import { usePaymentConfig } from "@/components/usePaymentProvider";
 import { validateCadastralNumber } from "@/lib/validation";
 
 const cities = [
@@ -242,7 +243,8 @@ function isTrueValue(value) {
 
 export default function PropertyForm({ onBack, initialValues, onSubmit, onValidSubmit, cadastruEvaluationToken, variant = "estimate" }) {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
+  const paymentConfig = usePaymentConfig();
   const { session, isAuthenticated, clearAuthError } = useAuth();
   const isCalculatorMode = variant === "rentYieldCalculator";
   const estimateModes = [
@@ -253,6 +255,17 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   const initialLastFloor = isTrueValue(initialValues?.last_floor);
   const [estimateMode, setEstimateMode] = useState(isCalculatorMode ? "sale" : initialValues?.type === "rent" || initialValues?.mode === "rent" ? "rent" : "sale");
   const isRentMode = !isCalculatorMode && estimateMode === "rent";
+  const evaluationOffer = paymentConfig.evaluationOffers?.[estimateMode];
+  const evaluationPrice = paymentConfig.provider === "paddle" ? evaluationOffer?.price_eur : evaluationOffer?.price_mdl;
+  const formattedEvaluationPrice = evaluationPrice > 0
+    ? evaluationPrice.toLocaleString(lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "ro-MD", {
+      style: "currency",
+      currency: paymentConfig.provider === "paddle" ? "EUR" : "MDL",
+      currencyDisplay: "code",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })
+    : null;
   const [form, setForm] = useState({
     city: initialValues?.city ?? "Chișinău",
     district: initialValues?.district ?? "",
@@ -267,6 +280,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     bathrooms_count: initialValues?.bathrooms_count ?? null,
     balconies_count: initialValues?.balconies_count ?? null,
   });
+  const hasValidArea = Number.isFinite(Number(form.area_m2)) && Number(form.area_m2) >= 1 && Number(form.area_m2) <= 1000;
   const [calculatorForm, setCalculatorForm] = useState({
     apartment_price: initialValues?.apartment_price ?? "",
     additional_investments: initialValues?.additional_investments ?? "",
@@ -406,19 +420,22 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         ? "district"
         : form.rooms_count == null
           ? "rooms_count"
-          : !isRentMode && !form.building_type
-            ? "building_type"
-            : !form.renovation
-              ? "renovation"
-              : isCalculatorMode && !calculatorForm.apartment_price
-                ? "apartment_price"
-                : null;
+          : !isCalculatorMode && !hasValidArea
+            ? "area_m2"
+            : !isRentMode && !form.building_type
+              ? "building_type"
+              : !form.renovation
+                ? "renovation"
+                : isCalculatorMode && !calculatorForm.apartment_price
+                  ? "apartment_price"
+                  : null;
     if (firstMissing) {
       setHighlightField(firstMissing);
       const refMap = {
         city: refCity,
         district: refDistrict,
         rooms_count: refRooms,
+        area_m2: refArea,
         building_type: refBuildingType,
         renovation: refRenovation,
         apartment_price: refApartmentPrice,
@@ -504,6 +521,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     form.city
     && ((districtsByCity[form.city] || []).length === 0 || (isRentMode ? rentDistricts.length > 0 : form.district))
     && form.rooms_count != null
+    && (isCalculatorMode || hasValidArea)
     && (isRentMode || form.building_type)
     && form.renovation
     && (!isCalculatorMode || calculatorForm.apartment_price);
@@ -531,6 +549,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
 
   const renderCadastralQuickSearch = (className = "") => (
     <CadastralQuickSearchCard
+      compact={!isCalculatorMode}
       value={cadastralInput}
       defaultOpen={Boolean(initialValues?.cadastral_number)}
       onChange={(value) => {
@@ -871,7 +890,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
             </div>
 
             {!isRentMode && (
-              <div className="mb-6">
+              <div className="mb-4">
                 {renderCadastralQuickSearch()}
               </div>
             )}
@@ -965,14 +984,18 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
                   ref={refArea}
                   className={`rounded-xl transition-all duration-300 ${highlightField === "area_m2" ? "ring-2 ring-red-400 bg-red-50/50 p-2 -m-2" : ""}`}
                 >
-                  <label className="text-sm text-gray-600 mb-1.5 block">
+                  <label htmlFor="estimate-area" className="text-sm text-gray-600 mb-1.5 block">
                     {t("form.area")}
+                    {isCalculatorMode ? ` (${t("form.optionalBadge")})` : <span className="text-red-400 ml-0.5">*</span>}
                   </label>
                   <input
+                    id="estimate-area"
                     type="number"
                     inputMode="decimal"
+                    required={!isCalculatorMode}
                     min={1}
-                    max={10000}
+                    max={isCalculatorMode ? 10000 : 1000}
+                    step="any"
                     placeholder={t("form.areaPlaceholder")}
                     value={form.area_m2}
                     onChange={(e) => update("area_m2", e.target.value)}
@@ -1049,6 +1072,14 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
           </svg>
           {isCalculatorMode ? t("calculator.submit") : t("form.submit")}
         </button>
+
+        {!isCalculatorMode && (
+          <p className="mt-2 text-center text-xs text-gray-500">
+            {formattedEvaluationPrice
+              ? t("form.submitHint", { price: formattedEvaluationPrice })
+              : t("form.submitHintNoPrice")}
+          </p>
+        )}
 
         {!isCalculatorMode && (
         <p className="mt-4 text-center text-sm text-gray-500">

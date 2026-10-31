@@ -15,7 +15,7 @@ import { paymentAppLink } from '@/lib/payment-urls.mjs';
 import LockIcon from '@/components/icons/LockIcon';
 import FeaturePurchaseBenefits from '@/components/FeaturePurchaseBenefits';
 import { FEATURE_PURCHASE_CONTENT } from '@/lib/feature-purchase-content';
-import { allowsGuestCheckout, featureResultPath } from '@/lib/guest-checkout.mjs';
+import { allowsGuestCheckout, featureResultPath, queueGuestAccountPrompt } from '@/lib/guest-checkout.mjs';
 
 export default function MaibPaymentPage({ result = false, sandbox = false }) {
   const { session, user, loading, isGuest, continueAsGuest, activeProvider } = useAuth();
@@ -73,6 +73,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
         } else timer = setTimeout(poll, 5000);
         const destination = maibResultContext(data).autoReturnTo;
         if (['paid','partially_refunded'].includes(data.status) && destination) {
+          if (isGuest) queueGuestAccountPrompt({ userId: user?.id, provider: 'maib', order: data });
           window.location.replace(paymentAppLink(destination));
         }
       } catch {
@@ -81,7 +82,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
     }
     poll();
     return () => { stopped = true; clearTimeout(timer); controller.abort(); };
-  }, [result, params, session?.access_token, user?.id, refresh, t]);
+  }, [result, params, session?.access_token, user?.id, isGuest, refresh, t]);
   async function start(event) {
     event.preventDefault();
     if (inFlight.current || !product || (!session?.access_token && !guestAllowed) || !accepted || !receiptEmail(email)) return;

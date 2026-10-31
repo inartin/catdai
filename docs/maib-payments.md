@@ -33,6 +33,8 @@ For registered accounts the backend pools all purchased uses; feature-labelled g
 
 ## Checkout and verification
 
+The guest account-creation banner is queued only by a verified paid MAIB/Paddle status response for its stored feature-result destination. A short-lived session-storage notice matches the guest, localized path and full result query, and is consumed when displayed. Dismissal, refresh, navigation to another result and later app visits do not repeat it; historical credit balances do not trigger it. Blocked storage suppresses this optional notice without blocking the paid-result return.
+
 Feature-result purchases show the receipt email, Terms checkbox and Pay button immediately, while starting the guest session in the background. There is no **Continue as guest** step. Signed-out and anonymous buyers see a compact optional account card above the receipt-email field, with **Ai deja un cont?** and **Autentifică-te** opening the existing Google/Telegram menu. Both providers return to the same checkout URL, preserving the selected product, quantity, language and property destination. Registered buyers do not see the card. Pending guest startup is shared with Pay to prevent duplicate anonymous accounts; session failures preserve the form and Pay can retry. No bank request starts before a verified session, receipt email and accepted Terms are available. A persistent anonymous Supabase session owns the order and paid result; MAIB status and callback verification remain unchanged. After verified payment every buyer returns automatically to the stored result URL; guests see an optional account-creation banner there. Refreshes reuse the existing paid usage key. Pricing-origin purchases still require registered login. The Paddle fallback also starts the guest session automatically before opening its payment form and offers the same optional account card. The required `supabase/migrations/20261026194452_guest_feature_checkout.sql` was applied to the shared CatDai database on 27 October 2026; Anonymous Sign-Ins and service API access were verified, with RLS and service-only ownership-transfer permissions retained. Application deployment remains separate; see [auth setup](auth-config.md#provider-config).
 
 Guest single-feature grants can be consumed only by their source feature, preventing a containing valuation from spending an embedded Cadastru/PDF purchase. Registered accounts retain universal credits; account creation transfers guest balances, orders (including pending payments), subscriptions, unlocks and histories atomically. Signed browser proof and a verified registered session are required to claim them; neither receipt email nor tracking/device IDs authorize access.
@@ -95,6 +97,7 @@ Run targeted tests without `pnpm test` (that command starts the development tunn
 ```sh
 pnpm exec node --experimental-vm-modules scripts/test-maib.mjs
 pnpm exec node --experimental-vm-modules scripts/test-maib-result.mjs
+pnpm exec node --experimental-vm-modules scripts/test-guest-account-prompt.mjs
 pnpm exec node scripts/test-maib-database.mjs
 pnpm exec node scripts/test-maib-receipts.mjs
 pnpm exec node --experimental-vm-modules scripts/test-maib-cadastru-email.mjs

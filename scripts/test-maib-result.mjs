@@ -34,6 +34,12 @@ function text(node) {
 async function page(lang, initialStatus, options = {}) {
   const translations = JSON.parse(await fs.readFile(`src/locales/${lang}.json`, 'utf8'));
   const slots = [], effects = [], timers = new Map(), cleared = [], redirects = [];
+  const stored = new Map();
+  const storage = {
+    getItem: key => { if (options.storageError) throw Error('Storage blocked'); return stored.get(key) ?? null; },
+    setItem: (key, value) => { if (options.storageError) throw Error('Storage blocked'); stored.set(key, value); },
+    removeItem: key => { if (options.storageError) throw Error('Storage blocked'); stored.delete(key); cleared.push(key); },
+  };
   let cursor = 0, timerId = 0, status = initialStatus, fetchError = false, verificationPending = false, requests = 0;
   const react = {
     useState(initial) {
@@ -59,7 +65,8 @@ async function page(lang, initialStatus, options = {}) {
     '@/context/AuthContext': { useAuth: () => ({ session, user, loading: false, isGuest: options.isGuest || false }) },
     '@/context/LanguageContext': { useTranslation: () => language },
     '@/lib/maib/products.mjs': products, '@/lib/maib/purchase.mjs': purchase,
-    '@/lib/guest-checkout.mjs': guestCheckout,
+    '@/lib/guest-checkout.mjs': { ...guestCheckout,
+      queueGuestAccountPrompt: notice => guestCheckout.queueGuestAccountPrompt(notice, storage) },
     '@/lib/maib/result.mjs': paymentResult,
     '@/lib/feature-purchase-content': { FEATURE_PURCHASE_CONTENT },
     '@/lib/tracking': { trackPaymentCheckoutEvent: noop },
@@ -68,7 +75,7 @@ async function page(lang, initialStatus, options = {}) {
   const context = vm.createContext({
     console, URL, URLSearchParams, Date, process, AbortController,
     window: { location: { search: `?order_id=order&lang=${lang}&status=paid&return_to=%2Fevil`, replace: url => redirects.push(url) } },
-    sessionStorage: { removeItem: key => { if (options.storageError) throw Error('Storage blocked'); cleared.push(key); } },
+    sessionStorage: storage,
     setTimeout: fn => { timers.set(++timerId, fn); return timerId; }, clearTimeout: id => timers.delete(id),
     fetch: async (url, options) => {
       assert.equal(url, '/api/payments/maib/status?order_id=order');
@@ -109,7 +116,7 @@ async function page(lang, initialStatus, options = {}) {
     }
     return tree;
   }
-  return { render, cleared, redirects, timers, translations, requests: () => requests,
+  return { render, cleared, redirects, timers, translations, storage, requests: () => requests,
     unmount() { for (const slot of slots) slot?.cleanup?.(); },
     async update(nextStatus, { error = false, unverified = false } = {}) {
       status = nextStatus;
@@ -174,6 +181,10 @@ for (const lang of ['ro', 'ru']) {
       const success = await page(lang, 'paid', { isGuest, order: { product_key: feature + '_single', grants: { [feature]: 1 }, return_to: returnTo } });
       const paidTree = await success.render();
       assert.deepEqual(success.redirects, [returnTo], 'Both registered and guest users return immediately to the saved property');
+      assert.equal(guestCheckout.consumeGuestAccountPrompt('buyer', returnTo, success.storage), isGuest,
+        'Only a verified guest purchase queues the notice for its saved result');
+      assert.equal(guestCheckout.consumeGuestAccountPrompt('buyer', returnTo, success.storage), false,
+        'Refreshing the purchased result cannot repeat the notice');
       assert.equal(text(nodes(paidTree).find(node => node.type === 'h1')), success.translations['maib.result.successTitle']);
       assert(text(paidTree).includes(success.translations['maib.result.purchased.' + feature + '.one'].replace('{count}', '1')));
       assert(nodes(paidTree).some(node => node.type === 'Link' && text(node).includes(success.translations['maib.result.view.' + kind]) && node.props.href === returnTo));
@@ -222,7 +233,7 @@ assert.equal(polling.timers.size, 0);
 const leaving = await page('ro', 'registered');
 await leaving.render(); leaving.unmount();
 assert.equal(leaving.timers.size, 0, 'Leaving the page stops scheduled checks');
-const storageBlocked = await page('ro', 'paid', { storageError: true });
+const storageBlocked = await page('ro', 'paid', { storageError: true, isGuest: true });
 await storageBlocked.render();
 assert.equal(storageBlocked.redirects.length, 1, 'Restricted browser storage cannot block a verified return');
 for (const return_to of ['https://evil.test', '//evil.test', '/payment/maib/success?order_id=other']) {

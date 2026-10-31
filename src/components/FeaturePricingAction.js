@@ -12,15 +12,29 @@ import { featureCheckoutUrl } from "@/lib/payment-urls.mjs";
 import FeaturePurchaseBenefits from "@/components/FeaturePurchaseBenefits";
 import { FEATURE_PURCHASE_CONTENT } from "@/lib/feature-purchase-content";
 
-function formatMdl(value, lang) {
+function formatMdl(value, lang, currencyLabel = lang === "en" ? "MDL" : "lei") {
   const amount = Number(value);
   if (!Number.isFinite(amount) || amount <= 0) return null;
-  return `${Math.round(amount).toLocaleString(lang === "en" ? "en-GB" : "ro-MD")} ${lang === "en" ? "MDL" : "lei"}`;
+  return `${Math.round(amount).toLocaleString(lang === "en" ? "en-GB" : "ro-MD")} ${currencyLabel}`;
 }
 
 const subscribeToPortal = () => () => {};
 
-function MobilePurchaseDrawer({ title, children, onCheckout, disabled, pending }) {
+function PurchaseFeatureChecklist({ translationKeys }) {
+  const { t } = useTranslation();
+  return (
+    <ul className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+      {translationKeys.map((key) => (
+        <li key={key} className="flex items-start gap-2 text-sm leading-5 text-gray-700">
+          <span aria-hidden="true" className="shrink-0 font-semibold text-primary">✓</span>
+          <span>{t(key)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function MobilePurchaseDrawer({ title, price, children, onCheckout, disabled, pending }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -33,7 +47,7 @@ function MobilePurchaseDrawer({ title, children, onCheckout, disabled, pending }
       <div aria-hidden="true" className="h-[calc(6rem+env(safe-area-inset-bottom))] lg:hidden" />
       {createPortal(
         <section
-          aria-label={title}
+          aria-label={price ? `${title}, ${price}` : title}
           onKeyDown={(event) => {
             if (event.key === "Escape") setExpanded(false);
           }}
@@ -45,13 +59,16 @@ function MobilePurchaseDrawer({ title, children, onCheckout, disabled, pending }
               onClick={() => setExpanded((value) => !value)}
               aria-expanded={expanded}
               aria-controls={detailsId}
-              aria-label={`${title}. ${t(expanded ? "pricing.hideDetails" : "pricing.showDetails")}`}
+              aria-label={`${title}${price ? `, ${price}` : ""}. ${t(expanded ? "pricing.hideDetails" : "pricing.showDetails")}`}
               className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg text-left text-sm font-bold text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <span aria-hidden="true" className="absolute inset-x-0 top-0 flex h-4 cursor-pointer items-center justify-center">
                 <span className="h-1 w-9 rounded-full bg-primary/30" />
               </span>
-              <span>{title}</span>
+              <span className="min-w-0">
+                <span className="block">{title}</span>
+                {price && <span className="mt-0.5 block text-xs font-normal text-gray-600">{price}</span>}
+              </span>
               <svg viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 text-primary transition-transform motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="m6 15 6-6 6 6" />
               </svg>
@@ -95,6 +112,8 @@ export default function FeaturePricingAction({
   const selectedProductKey = isSingleOffer ? offer.product_key : "extra_pack";
   const selectedMaibProduct = maibProduct(selectedProductKey);
   const isCadastruProduct = isSingleOffer && selectedProductKey === "cadastru_lookup_single";
+  const isEvaluationProduct = isSingleOffer && ["sale_estimate_single", "rent_estimate_single"].includes(selectedProductKey);
+  const isSaleEvaluationProduct = isSingleOffer && selectedProductKey === "sale_estimate_single";
   const featureContent = isSingleOffer ? FEATURE_PURCHASE_CONTENT[selectedProductKey] : null;
   const isPaywallOffer = Boolean(featureContent && (variant === "paywall" || variant === "cadastru"));
 
@@ -133,14 +152,7 @@ export default function FeaturePricingAction({
 
   const offerTitle = t(isCadastruProduct ? "cadastru.mobilePurchaseTitle" : isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl, lang) });
   const packageDetails = isCadastruProduct ? (
-    <ul className="mt-4 space-y-3 border-t border-gray-100 pt-4">
-      {["cadastru.mobilePurchaseArea", "cadastru.purchaseBuilding", "cadastru.mobilePurchaseOfficial"].map((key) => (
-        <li key={key} className="flex items-start gap-2 text-sm leading-5 text-gray-700">
-          <span aria-hidden="true" className="shrink-0 font-semibold text-primary">✓</span>
-          <span>{t(key)}</span>
-        </li>
-      ))}
-    </ul>
+    <PurchaseFeatureChecklist translationKeys={["cadastru.mobilePurchaseArea", "cadastru.purchaseBuilding", "cadastru.mobilePurchaseOfficial"]} />
   ) : (
     <>
       <p className="mt-4 text-xs font-bold uppercase tracking-wide text-gray-400">
@@ -156,10 +168,10 @@ export default function FeaturePricingAction({
       </ul>
     </>
   );
-  const packagesLink = (
+  const renderPackagesLink = (compact = isCadastruProduct || isPaywallOffer) => (
     <Link
       href="/pricing"
-      className={isCadastruProduct || isPaywallOffer
+      className={compact
         ? "mx-auto mt-4 block w-fit text-sm text-gray-500 underline underline-offset-4 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
         : "mt-3 inline-flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-gray-800 transition-colors hover:border-gray-300 hover:bg-gray-50"}
     >
@@ -168,6 +180,30 @@ export default function FeaturePricingAction({
   );
   const useMobileDock = mobileDock && !isPaywallOffer;
   const checkoutPending = status === "loading" || status === "redirecting";
+  const checkoutButton = (
+    <button
+      type="button"
+      onClick={startCheckout}
+      disabled={authLoading || checkoutPending}
+      className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
+    >
+      {checkoutPending
+        ? t("payment.checkoutLoading")
+        : variant === "inline"
+          ? t("result.unlockEstimateCta", { price: `${Number(packageOffer.price_mdl).toLocaleString(lang === "ru" ? "ru-RU" : lang === "en" ? "en-GB" : "ro-MD")} MDL` })
+          : isPaywallOffer
+            ? t("payment.featureUnlockCta", { price: formatMdl(packageOffer.price_mdl, lang) })
+            : t(isSingleOffer ? "maib.continueSingleFeature" : "payment.continueWithExtra")}
+      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M5 12h14" />
+        <path d="m13 6 6 6-6 6" />
+      </svg>
+    </button>
+  );
+
+  if (variant === "inline") {
+    return <div className={className}>{checkoutButton}</div>;
+  }
 
   return (
     <>
@@ -193,24 +229,21 @@ export default function FeaturePricingAction({
           {packageDetails}
         </div>
       )}
-      <button
-        type="button"
-        onClick={startCheckout}
-        disabled={authLoading || status === "loading" || status === "redirecting"}
-        className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:-translate-y-0.5 hover:bg-primary-dark hover:shadow-xl hover:shadow-primary/25 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
-      >
-        {status === "loading" || status === "redirecting" ? t("payment.checkoutLoading") : isPaywallOffer ? t("payment.featureUnlockCta", { price: formatMdl(packageOffer.price_mdl, lang) }) : t(isSingleOffer ? "maib.continueSingleFeature" : "payment.continueWithExtra")}
-        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M5 12h14" />
-          <path d="m13 6 6 6-6 6" />
-        </svg>
-      </button>
-      {packagesLink}
+      {checkoutButton}
+      {renderPackagesLink()}
     </div>
     {useMobileDock && (
-      <MobilePurchaseDrawer title={offerTitle} onCheckout={startCheckout} disabled={authLoading || checkoutPending} pending={checkoutPending}>
-        {packageDetails}
-        {packagesLink}
+      <MobilePurchaseDrawer
+        title={isEvaluationProduct ? t("result.mobilePurchaseTitle") : offerTitle}
+        price={isEvaluationProduct ? formatMdl(packageOffer.price_mdl, lang, "MDL") : null}
+        onCheckout={startCheckout}
+        disabled={authLoading || checkoutPending}
+        pending={checkoutPending}
+      >
+        {isSaleEvaluationProduct ? (
+          <PurchaseFeatureChecklist translationKeys={["result.mobilePurchaseMarketPrice", "result.mobilePurchaseSaleScenarios", "result.mobilePurchaseMarketAnalysis"]} />
+        ) : packageDetails}
+        {renderPackagesLink(isCadastruProduct || isSaleEvaluationProduct)}
       </MobilePurchaseDrawer>
     )}
     </>

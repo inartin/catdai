@@ -10,6 +10,7 @@ import FeaturePricingAction from "@/components/FeaturePricingAction";
 import ListingAlertConfigurator from "@/components/ListingAlertConfigurator";
 import Tooltip from "@/components/Tooltip";
 import ValuationPdfDialog from "@/components/ValuationPdfDialog";
+import ValuationEvidenceSummary from "@/components/ValuationEvidenceSummary";
 import CadastralDataCard from "@/components/CadastralDataCard";
 import InfoCallout from "@/components/InfoCallout";
 import SharedMarketTrendMiniChart from "@/components/MarketTrendMiniChart";
@@ -697,7 +698,13 @@ function FilterBadge({ label, active }) {
 }
 
 function FeatureAdjustmentBadge({ item }) {
+  const { t } = useTranslation();
   const isPositive = item.pct > 0;
+  const label = item.type === "balconies"
+    ? item.count === 0 ? t("result.noBalcony") : t("result.evidenceBalconies", { count: item.count })
+    : item.type === "bathrooms"
+      ? item.count === 0 ? t("result.noBathroom") : t("result.evidenceBathrooms", { count: item.count })
+      : item.label;
   return (
     <span
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${isPositive
@@ -714,7 +721,7 @@ function FeatureAdjustmentBadge({ item }) {
           <path d="M8 12.5L3 7h10L8 12.5z" />
         </svg>
       )}
-      {isPositive ? "+" : ""}{item.pct}% · {item.label}
+      {isPositive ? "+" : ""}{item.pct}% · {label}
     </span>
   );
 }
@@ -1797,6 +1804,9 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             <p className="mt-2 text-base text-gray-500">
               {t("result.rentPerMonth")}
             </p>
+            {purchaseOffer && !compactLayout && (
+              <FeaturePricingAction offer={purchaseOffer} variant="inline" className="mt-5 hidden w-full lg:block" />
+            )}
           </div>
 
           <RentLevelListingCard
@@ -1809,12 +1819,17 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             locked={hideRentLevels}
             onLockedClick={openFullAnalysisAuthModal}
           />
+          <ValuationEvidenceSummary
+            evidence={data.valuation_evidence}
+            comparableCount={stats.comparable_count}
+            className="order-4 col-span-2 m-6 text-left sm:col-span-3"
+          />
         </div>
       )}
 
-      {!isPaid && (
+      {!isPaid && freeMonthlyLimitReached && (
         <p className="text-sm text-gray-600 px-1">
-          {freeMonthlyLimitReached ? t("result.freeMonthlyLimitReachedLine") : t("result.freeTierUncertaintyLine")}
+          {t("result.freeMonthlyLimitReachedLine")}
         </p>
       )}
 
@@ -1833,10 +1848,16 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
                 <FilterBadge key={buildingType} label={t(`data.buildingType.${buildingType}`)} active={filtersUsed.building_type !== false} />
               ))}
               {input.renovation && <FilterBadge label={t(`data.renovationType.${input.renovation}`)} active={filtersUsed.renovation !== false} />}
-              {input.area_m2 && <FilterBadge label={`~${input.area_m2}m²`} active={filtersUsed.area !== false} />}
+              {input.area_m2 && <FilterBadge
+                label={filtersUsed.area && filtersUsed.area_tolerance
+                  ? `${Math.round(input.area_m2 * (1 - filtersUsed.area_tolerance))}-${Math.round(input.area_m2 * (1 + filtersUsed.area_tolerance))}m²`
+                  : `~${input.area_m2}m²`}
+                active={filtersUsed.area !== false}
+              />}
             </div>
-            <p className="mt-4 text-sm font-medium text-gray-500">
-              {t("result.filtersComparableCount", { count: comparableCount })}
+            <p className="mt-4 text-xs leading-5 text-gray-500">
+              {t("result.evidenceFilterNote")}
+              {input.renovation && filtersUsed.renovation && ` ${t("result.evidenceRentUnknownRenovation")}`}
             </p>
           </div>
 
@@ -2320,8 +2341,6 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
   const supportColumnClassName = compactLayout
     ? "flex flex-col gap-5"
     : "flex flex-col gap-5";
-  const actionButtonClassName = getActionButtonClassName(compactLayout);
-  const primaryActionButtonClassName = `${actionButtonClassName} w-full cursor-pointer font-semibold bg-gray-950 text-white shadow-lg shadow-gray-900/15 hover:-translate-y-0.5 hover:bg-gray-800 hover:shadow-xl hover:shadow-gray-900/20 transition-all flex items-center justify-center gap-2`;
   const secondaryActionButtonClassName = getSecondaryActionButtonClassName(compactLayout);
   const actionIconClassName = getActionIconClassName(compactLayout);
   const closeAuthModal = useCallback(() => {
@@ -2720,6 +2739,14 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   `${formatPrice(estimate.price_per_m2)}/m²`
                 )}
               </p>
+              <ValuationEvidenceSummary
+                evidence={data.valuation_evidence}
+                comparableCount={market_stats?.comparable_count}
+                className="mx-auto mt-5 max-w-xl text-left"
+              />
+              {purchaseOffer && !compactLayout && (
+                <FeaturePricingAction offer={purchaseOffer} variant="inline" className="mx-auto mt-5 hidden w-full max-w-md lg:block" />
+              )}
             </div>
 
             <div className="grid grid-cols-2 divide-x divide-gray-100 sm:grid-cols-3">
@@ -2772,9 +2799,9 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         )}
       </div>
 
-      {!isPaid && (
+      {!isPaid && freeMonthlyLimitReached && (
         <p className={`${compactLayout ? "" : "order-3"} text-sm text-gray-600 px-1`}>
-          {freeMonthlyLimitReached ? t("result.freeMonthlyLimitReachedLine") : t("result.freeTierUncertaintyLine")}
+          {t("result.freeMonthlyLimitReachedLine")}
         </p>
       )}
 
@@ -2995,9 +3022,20 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
               )}
             </div>
 
+            {!listingComparison && (
+              <p className="mb-4 text-xs leading-5 text-gray-500">{t("result.evidenceFilterNote")}</p>
+            )}
+
+            {!listingComparison && data.valuation_evidence?.district_adjustment_applied && (
+              <p className="mb-4 rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                {t("result.evidenceDistrictAdjustment")}
+              </p>
+            )}
+
             {!listingComparison && feature_adjustments?.items?.length > 0 && (
               <div className="mb-4">
                 <p className="text-sm text-gray-400 mb-2">{t("result.featureAdjustments")}</p>
+                <p className="mb-2 text-xs leading-5 text-gray-500">{t("result.evidenceAdjustmentNote")}</p>
                 <div className="flex flex-wrap gap-2">
                   {feature_adjustments.items.map((item) => (
                     <FeatureAdjustmentBadge key={item.type} item={item} />
@@ -3011,6 +3049,10 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
                   {t("result.vsComparables")}
                 </p>
               </div>
+            )}
+
+            {!listingComparison && feature_adjustments?.items?.length === 0 && (
+              <p className="mb-4 text-sm text-gray-500">{t("result.evidenceNoAdjustments")}</p>
             )}
 
             {!listingComparison && anyDropped && (
@@ -3164,7 +3206,7 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
             <button
               type="button"
               onClick={() => setIsPdfDialogOpen(true)}
-              className={primaryActionButtonClassName}
+              className={secondaryActionButtonClassName}
             >
               <svg viewBox="0 0 24 24" className={actionIconClassName} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />

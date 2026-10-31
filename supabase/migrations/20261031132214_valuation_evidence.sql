@@ -1,0 +1,963 @@
+-- Comparable evidence uses the exact final valuation sample.
+-- Keep full-price RPC execution behind the server-side access checks.
+
+CREATE OR REPLACE FUNCTION public.estimate_price(
+  p_city text,
+  p_district text,
+  p_rooms_count int,
+  p_area_m2 numeric,
+  p_floor int DEFAULT NULL,
+  p_first_floor boolean DEFAULT false,
+  p_last_floor boolean DEFAULT false,
+  p_total_floors int DEFAULT NULL,
+  p_building_type text DEFAULT NULL,
+  p_renovation text DEFAULT NULL,
+  p_bathrooms_count int DEFAULT NULL,
+  p_balconies_count int DEFAULT NULL,
+  p_seller_categories text[] DEFAULT NULL,
+  p_include_district_comparison boolean DEFAULT true,
+  p_include_relevant_listings boolean DEFAULT true
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  result jsonb;
+  base_stats record;
+  comparable_count int;
+  min_comparables int := 5;
+
+  -- Track which filters are active (order = widening priority)
+  -- Balconies & bathrooms: NOT used as filters (sparse data, shown in impact only)
+  wants_first_floor boolean := COALESCE(p_first_floor, false);
+  wants_last_floor boolean := COALESCE(p_last_floor, false);
+  use_floor boolean := (p_floor IS NOT NULL OR wants_first_floor OR wants_last_floor);
+  has_input_area boolean := (p_area_m2 IS NOT NULL AND p_area_m2 > 0);
+  use_area boolean := has_input_area;
+  area_tolerance numeric := 0.20;  -- ±20%, widens to ±35%, then drops
+  use_renovation boolean := (p_renovation IS NOT NULL);
+  renovation_filters text[] := CASE
+    WHEN p_renovation = 'Euroreparație' THEN ARRAY['Euroreparație', 'Design individual']
+    WHEN p_renovation = 'Reparație cosmetică' THEN ARRAY['Reparație cosmetică']
+    WHEN p_renovation = 'Fără reparație' THEN ARRAY[
+      'Fără reparație',
+      'Construcție nefinisată',
+      'Are nevoie de reparație',
+      'Variantă sură',
+      'Dat în exploatare'
+    ]
+    WHEN p_renovation IS NOT NULL THEN ARRAY[p_renovation]
+    ELSE NULL
+  END;
+  use_building_type boolean := (p_building_type IS NOT NULL);
+  use_district boolean := (p_district IS NOT NULL);
+
+  -- District coefficient fallback
+  district_coeff numeric;
+  city_median_ppm numeric;
+  district_median_ppm numeric;
+  used_district_coeff boolean := false;
+
+  -- Price calculations
+  estimated_ppm numeric;
+  fast_sale numeric;
+  market_rate numeric;
+  premium numeric;
+
+  -- District comparison
+  district_comparison jsonb;
+  relevant_listings jsonb;
+
+BEGIN
+
+  -- ============================================================
+  -- Step 1: Progressive comparable search
+  -- ============================================================
+  LOOP
+    SELECT
+      count(*)                                                        AS total,
+      count(last_seen_at)                                              AS observed_count,
+      min(last_seen_at)                                                AS observed_from,
+      max(last_seen_at)                                                AS observed_to,
+      avg(price_per_m2)                                               AS avg_ppm,
+      percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)      AS median_ppm,
+      min(price_per_m2)                                               AS min_ppm,
+      max(price_per_m2)                                               AS max_ppm,
+      avg(price_amount)                                               AS avg_price,
+      min(price_amount)                                               AS min_price,
+      max(price_amount)                                               AS max_price,
+      percentile_cont(0.5) WITHIN GROUP (ORDER BY price_amount)       AS median_price,
+      percentile_cont(0.25) WITHIN GROUP (ORDER BY price_amount)      AS p25_price,
+      percentile_cont(0.75) WITHIN GROUP (ORDER BY price_amount)      AS p75_price,
+      percentile_cont(0.10) WITHIN GROUP (ORDER BY price_per_m2)     AS p10_ppm,
+      percentile_cont(0.25) WITHIN GROUP (ORDER BY price_per_m2)     AS p25_ppm,
+      percentile_cont(0.75) WITHIN GROUP (ORDER BY price_per_m2)     AS p75_ppm,
+      percentile_cont(0.90) WITHIN GROUP (ORDER BY price_per_m2)     AS p90_ppm
+    INTO base_stats
+    FROM listing
+    WHERE is_active = true
+      AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
+      AND price_amount IS NOT NULL AND price_amount > 0
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
+      AND (NOT use_district OR district = p_district)
+      AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
+      AND (NOT use_building_type OR building_type = p_building_type)
+      AND (NOT use_renovation OR renovation = ANY(renovation_filters))
+      AND (NOT use_floor OR (
+        CASE
+          WHEN wants_first_floor OR wants_last_floor THEN
+            (
+              (wants_first_floor AND floor = 1)
+              OR (wants_last_floor AND floor IS NOT NULL AND total_floors IS NOT NULL AND floor = total_floors)
+            )
+          WHEN p_floor = 1 THEN
+            floor = 1
+          WHEN p_total_floors IS NOT NULL AND p_floor = p_total_floors THEN
+            floor = total_floors
+          ELSE
+            floor BETWEEN GREATEST(2, p_floor - 2) AND (
+              CASE WHEN p_total_floors IS NOT NULL
+                THEN LEAST(p_total_floors - 1, p_floor + 2)
+                ELSE p_floor + 2
+              END
+            )
+        END
+      ))
+      AND (NOT use_area OR area_m2 BETWEEN p_area_m2 * (1 - area_tolerance) AND p_area_m2 * (1 + area_tolerance))
+      AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories));
+
+    comparable_count := COALESCE(base_stats.total, 0);
+
+    EXIT WHEN comparable_count >= min_comparables;
+
+    -- Widen progressively (least important first)
+    IF use_floor THEN
+      use_floor := false;
+    ELSIF use_renovation THEN
+      use_renovation := false;
+    ELSIF use_building_type THEN
+      use_building_type := false;
+    ELSIF use_area AND area_tolerance < 0.30 THEN
+      area_tolerance := 0.35;
+    ELSIF use_area THEN
+      use_area := false;
+    ELSIF use_district THEN
+      use_district := false;
+    ELSE
+      EXIT;
+    END IF;
+  END LOOP;
+
+  IF comparable_count = 0 THEN
+    RETURN jsonb_build_object(
+      'error', 'insufficient_data',
+      'message', 'Not enough comparable listings found',
+      'comparable_count', 0
+    );
+  END IF;
+
+  estimated_ppm := base_stats.median_ppm;
+
+  -- ============================================================
+  -- Step 2: District coefficient fallback
+  --         If district was dropped, apply district price ratio
+  -- ============================================================
+  IF NOT use_district AND p_district IS NOT NULL THEN
+    SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)
+    INTO city_median_ppm
+    FROM listing
+    WHERE is_active = true
+      AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
+      AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories));
+
+    SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY price_per_m2)
+    INTO district_median_ppm
+    FROM listing
+    WHERE is_active = true
+      AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
+      AND district = p_district
+      AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories));
+
+    IF city_median_ppm > 0 AND district_median_ppm IS NOT NULL THEN
+      district_coeff := district_median_ppm / city_median_ppm;
+      -- Clamp to reasonable range
+      district_coeff := GREATEST(0.50, LEAST(1.60, district_coeff));
+      estimated_ppm := estimated_ppm * district_coeff;
+      used_district_coeff := true;
+    END IF;
+  END IF;
+
+  -- ============================================================
+  -- Step 3: Compute price tiers
+  -- ============================================================
+  IF has_input_area THEN
+    fast_sale   := round(((estimated_ppm * 0.90) * p_area_m2)::numeric, -2);
+    market_rate := round((estimated_ppm * p_area_m2)::numeric, -2);
+    premium     := round(((estimated_ppm * 1.08) * p_area_m2)::numeric, -2);
+  ELSE
+    market_rate := round((base_stats.median_price *
+      CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2);
+    fast_sale   := round((market_rate * 0.90)::numeric, -2);
+    premium     := round((market_rate * 1.08)::numeric, -2);
+  END IF;
+
+  -- ============================================================
+  -- Step 4: District comparison
+  --         Same filters (rooms, building_type, renovation) across
+  --         all districts in the city. Shows ≥3 listings only.
+  -- ============================================================
+  IF p_include_district_comparison THEN
+    SELECT jsonb_agg(
+      jsonb_build_object(
+        'district', d.district,
+        'median_ppm', round(d.median_ppm::numeric, 0),
+        'count', d.cnt
+      ) ORDER BY d.median_ppm DESC
+    )
+    INTO district_comparison
+    FROM (
+      SELECT
+        l.district,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY l.price_per_m2) AS median_ppm,
+        count(*) AS cnt
+      FROM listing l
+      WHERE l.is_active = true
+        AND l.price_per_m2 IS NOT NULL AND l.price_per_m2 > 0
+        AND (
+          (p_city = 'Chișinău' AND l.city = 'Chișinău' AND COALESCE(l.district, '') <> 'Durlești')
+          OR (p_city = 'Durlești' AND (l.city = 'Durlești' OR l.district = 'Durlești'))
+        )
+        AND l.district IS NOT NULL
+        AND (p_rooms_count IS NULL OR l.rooms_count = p_rooms_count)
+        AND (p_building_type IS NULL OR l.building_type = p_building_type)
+        AND (p_renovation IS NULL OR l.renovation = ANY(renovation_filters))
+        AND (p_seller_categories IS NULL OR l.attributes->>'sellerCategory' = ANY(p_seller_categories))
+      GROUP BY l.district
+      HAVING count(*) >= 3
+    ) d;
+  ELSE
+    district_comparison := '[]'::jsonb;
+  END IF;
+
+  -- ============================================================
+  -- Step 5: Random relevant listings
+  --         Uses the final widened filters from the estimate.
+  -- ============================================================
+  IF p_include_relevant_listings THEN
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'external_id', l.external_id,
+        'title', l.title,
+        'price_amount', l.price_amount,
+        'price_per_m2', l.price_per_m2,
+        'area_m2', l.area_m2,
+        'rooms_count', l.rooms_count,
+        'floor', l.floor,
+        'total_floors', l.total_floors,
+        'building_type', l.building_type,
+        'renovation', l.renovation,
+        'city', l.city,
+        'district', l.district,
+        'sector', l.sector,
+        'images_count', l.images_count
+      ) ORDER BY l.random_sort
+    ), '[]'::jsonb)
+    INTO relevant_listings
+    FROM (
+      SELECT
+        external_id,
+        title,
+        price_amount,
+        price_per_m2,
+        area_m2,
+        rooms_count,
+        floor,
+        total_floors,
+        building_type,
+        renovation,
+        city,
+        district,
+        sector,
+        images_count,
+        random() AS random_sort
+      FROM listing
+      WHERE is_active = true
+        AND price_per_m2 IS NOT NULL AND price_per_m2 > 0
+        AND price_amount IS NOT NULL AND price_amount > 0
+        AND (
+          (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+          OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+        )
+        AND (NOT use_district OR district = p_district)
+        AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
+        AND (NOT use_building_type OR building_type = p_building_type)
+        AND (NOT use_renovation OR renovation = ANY(renovation_filters))
+        AND (NOT use_floor OR (
+          CASE
+            WHEN wants_first_floor OR wants_last_floor THEN
+              (
+                (wants_first_floor AND floor = 1)
+                OR (wants_last_floor AND floor IS NOT NULL AND total_floors IS NOT NULL AND floor = total_floors)
+              )
+            WHEN p_floor = 1 THEN
+              floor = 1
+            WHEN p_total_floors IS NOT NULL AND p_floor = p_total_floors THEN
+              floor = total_floors
+            ELSE
+              floor BETWEEN GREATEST(2, p_floor - 2) AND (
+                CASE WHEN p_total_floors IS NOT NULL
+                  THEN LEAST(p_total_floors - 1, p_floor + 2)
+                  ELSE p_floor + 2
+                END
+              )
+          END
+        ))
+        AND (NOT use_area OR area_m2 BETWEEN p_area_m2 * (1 - area_tolerance) AND p_area_m2 * (1 + area_tolerance))
+        AND (p_seller_categories IS NULL OR attributes->>'sellerCategory' = ANY(p_seller_categories))
+      ORDER BY random_sort
+      LIMIT 3
+    ) l;
+  ELSE
+    relevant_listings := '[]'::jsonb;
+  END IF;
+
+  -- ============================================================
+  -- Step 6: Build result
+  -- ============================================================
+  result := jsonb_build_object(
+    'estimate', jsonb_build_object(
+      'fast_sale', fast_sale,
+      'market_rate', market_rate,
+      'premium', premium,
+      'price_per_m2', round(estimated_ppm::numeric, 2),
+      'confidence', CASE
+        WHEN comparable_count >= 20 AND use_district THEN 'high'
+        WHEN comparable_count >= 10 THEN 'medium'
+        ELSE 'low'
+      END
+    ),
+    'range', jsonb_build_object(
+      'low', CASE
+        WHEN has_input_area THEN round((base_stats.p25_ppm * p_area_m2 *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+        ELSE round((base_stats.p25_price *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+      END,
+      'high', CASE
+        WHEN has_input_area THEN round((base_stats.p75_ppm * p_area_m2 *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+        ELSE round((base_stats.p75_price *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -2)
+      END
+    ),
+    'valuation_evidence', jsonb_build_object(
+      'comparable_count', comparable_count,
+      'observed_count', base_stats.observed_count,
+      'observed_from', base_stats.observed_from,
+      'observed_to', base_stats.observed_to,
+      'district_adjustment_applied', used_district_coeff
+    ),
+    'market_stats', jsonb_build_object(
+      'comparable_count', comparable_count,
+      'avg_price', round(base_stats.avg_price::numeric, 2),
+      'avg_price_per_m2', round(base_stats.avg_ppm::numeric, 2),
+      'median_price_per_m2', round(base_stats.median_ppm::numeric, 2),
+      'min_price_per_m2', round(base_stats.min_ppm::numeric, 2),
+      'max_price_per_m2', round(base_stats.max_ppm::numeric, 2),
+      'p10_price_per_m2', round(base_stats.p10_ppm::numeric, 2),
+      'p90_price_per_m2', round(base_stats.p90_ppm::numeric, 2)
+    ),
+    'filters_used', jsonb_build_object(
+      'city', true,
+      'district', use_district,
+      'rooms_count', (p_rooms_count IS NOT NULL),
+      'building_type', use_building_type,
+      'renovation', use_renovation,
+      'floor', use_floor,
+      'first_floor', wants_first_floor,
+      'last_floor', wants_last_floor,
+      'area', use_area,
+      'area_tolerance', CASE WHEN use_area THEN area_tolerance ELSE null END
+    ),
+    'district_coefficient', CASE
+      WHEN used_district_coeff THEN jsonb_build_object(
+        'applied', true,
+        'value', round(district_coeff::numeric, 3),
+        'district_median_ppm', round(district_median_ppm::numeric, 0),
+        'city_median_ppm', round(city_median_ppm::numeric, 0)
+      )
+      ELSE jsonb_build_object('applied', false)
+    END,
+    'district_comparison', COALESCE(district_comparison, '[]'::jsonb),
+    'relevant_listings', relevant_listings,
+    'input', jsonb_build_object(
+      'city', p_city,
+      'district', p_district,
+      'rooms_count', p_rooms_count,
+      'area_m2', p_area_m2,
+      'floor', p_floor,
+      'first_floor', wants_first_floor,
+      'last_floor', wants_last_floor,
+      'total_floors', p_total_floors,
+      'building_type', p_building_type,
+      'renovation', p_renovation,
+      'bathrooms_count', p_bathrooms_count,
+      'balconies_count', p_balconies_count
+    )
+  );
+
+  RETURN result;
+END;
+$$;
+
+-- Full-price RPCs are internal to the server-side estimate API.
+REVOKE EXECUTE ON FUNCTION public.estimate_price(text, text, int, numeric, int, boolean, boolean, int, text, text, int, int, text[], boolean, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.estimate_price(text, text, int, numeric, int, boolean, boolean, int, text, text, int, int, text[], boolean, boolean) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.estimate_rent(
+  p_city text,
+  p_districts text[],
+  p_rooms_count int,
+  p_area_m2 numeric,
+  p_floor int DEFAULT NULL,
+  p_first_floor boolean DEFAULT false,
+  p_last_floor boolean DEFAULT false,
+  p_total_floors int DEFAULT NULL,
+  p_building_types text[] DEFAULT ARRAY[]::text[],
+  p_renovation text DEFAULT NULL,
+  p_bathrooms_count int DEFAULT NULL,
+  p_balconies_count int DEFAULT NULL,
+  p_include_district_comparison boolean DEFAULT true,
+  p_include_relevant_listings boolean DEFAULT true
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  result jsonb;
+  base_stats record;
+  comparable_count int;
+  min_comparables int := 5;
+  selected_districts text[] := ARRAY[]::text[];
+  selected_building_types text[] := ARRAY[]::text[];
+  primary_district text := NULL;
+
+  wants_first_floor boolean := COALESCE(p_first_floor, false);
+  wants_last_floor boolean := COALESCE(p_last_floor, false);
+  use_floor boolean := (p_floor IS NOT NULL OR wants_first_floor OR wants_last_floor);
+  has_input_area boolean := (p_area_m2 IS NOT NULL AND p_area_m2 > 0);
+  use_area boolean := has_input_area;
+  area_tolerance numeric := 0.20;
+  use_renovation boolean := (p_renovation IS NOT NULL);
+  renovation_filters text[] := CASE
+    WHEN p_renovation = 'Euroreparație' THEN ARRAY['Euroreparație', 'Design individual']
+    WHEN p_renovation = 'Reparație cosmetică' THEN ARRAY['Reparație cosmetică']
+    WHEN p_renovation = 'Fără reparație' THEN ARRAY[
+      'Fără reparație',
+      'Construcție nefinisată',
+      'Are nevoie de reparație',
+      'Variantă sură',
+      'Dat în exploatare'
+    ]
+    WHEN p_renovation IS NOT NULL THEN ARRAY[p_renovation]
+    ELSE NULL
+  END;
+  use_building_type boolean := false;
+  use_district boolean := false;
+
+  district_coeff numeric;
+  city_median_ppm numeric;
+  district_median_ppm numeric;
+  used_district_coeff boolean := false;
+
+  estimated_ppm numeric;
+  low_rent numeric;
+  market_rent numeric;
+  high_rent numeric;
+
+  district_comparison jsonb;
+  rent_level_listings jsonb;
+  relevant_listings jsonb;
+BEGIN
+  selected_districts := COALESCE(
+    ARRAY(SELECT DISTINCT trim(d) FROM unnest(p_districts) AS d WHERE trim(d) <> ''),
+    ARRAY[]::text[]
+  );
+  selected_building_types := COALESCE(
+    ARRAY(SELECT DISTINCT trim(bt) FROM unnest(p_building_types) AS bt WHERE trim(bt) <> ''),
+    ARRAY[]::text[]
+  );
+  primary_district := selected_districts[1];
+  use_district := array_length(selected_districts, 1) IS NOT NULL;
+  use_building_type := array_length(selected_building_types, 1) IS NOT NULL;
+
+  LOOP
+    SELECT
+      count(*)                                                        AS total,
+      count(last_seen_at)                                              AS observed_count,
+      min(last_seen_at)                                                AS observed_from,
+      max(last_seen_at)                                                AS observed_to,
+      avg(COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))) AS avg_ppm,
+      percentile_cont(0.5) WITHIN GROUP (
+        ORDER BY COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))
+      )                                                              AS median_ppm,
+      min(COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))) AS min_ppm,
+      max(COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))) AS max_ppm,
+      avg(price_amount)                                               AS avg_price,
+      min(price_amount)                                               AS min_price,
+      max(price_amount)                                               AS max_price,
+      percentile_cont(0.5) WITHIN GROUP (ORDER BY price_amount)       AS median_price,
+      percentile_cont(0.25) WITHIN GROUP (ORDER BY price_amount)      AS p25_price,
+      percentile_cont(0.75) WITHIN GROUP (ORDER BY price_amount)      AS p75_price,
+      percentile_cont(0.10) WITHIN GROUP (
+        ORDER BY COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))
+      )                                                              AS p10_ppm,
+      percentile_cont(0.25) WITHIN GROUP (
+        ORDER BY COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))
+      )                                                              AS p25_ppm,
+      percentile_cont(0.75) WITHIN GROUP (
+        ORDER BY COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))
+      )                                                              AS p75_ppm,
+      percentile_cont(0.90) WITHIN GROUP (
+        ORDER BY COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))
+      )                                                              AS p90_ppm
+    INTO base_stats
+    FROM listing_rent
+    WHERE is_active = true
+      AND price_amount IS NOT NULL AND price_amount > 0
+      AND COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0)) > 0
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
+      AND (NOT use_district OR district = ANY(selected_districts))
+      AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
+      AND (NOT use_building_type OR building_type = ANY(selected_building_types))
+      AND (NOT use_renovation OR renovation = ANY(renovation_filters) OR renovation IS NULL OR trim(renovation) = '')
+      AND (NOT use_floor OR (
+        CASE
+          WHEN wants_first_floor OR wants_last_floor THEN
+            (
+              (wants_first_floor AND floor = 1)
+              OR (wants_last_floor AND floor IS NOT NULL AND total_floors IS NOT NULL AND floor = total_floors)
+            )
+          WHEN p_floor = 1 THEN
+            floor = 1
+          WHEN p_total_floors IS NOT NULL AND p_floor = p_total_floors THEN
+            floor = total_floors
+          ELSE
+            floor BETWEEN GREATEST(2, p_floor - 2) AND (
+              CASE WHEN p_total_floors IS NOT NULL
+                THEN LEAST(p_total_floors - 1, p_floor + 2)
+                ELSE p_floor + 2
+              END
+            )
+        END
+      ))
+      AND (NOT use_area OR area_m2 BETWEEN p_area_m2 * (1 - area_tolerance) AND p_area_m2 * (1 + area_tolerance));
+
+    comparable_count := COALESCE(base_stats.total, 0);
+
+    EXIT WHEN comparable_count >= min_comparables;
+
+    IF use_floor THEN
+      use_floor := false;
+    ELSIF use_renovation THEN
+      use_renovation := false;
+    ELSIF use_building_type THEN
+      use_building_type := false;
+    ELSIF use_area AND area_tolerance < 0.30 THEN
+      area_tolerance := 0.35;
+    ELSIF use_area THEN
+      use_area := false;
+    ELSE
+      EXIT;
+    END IF;
+  END LOOP;
+
+  IF comparable_count = 0 THEN
+    RETURN jsonb_build_object(
+      'error', 'insufficient_data',
+      'message', 'Not enough comparable rent listings found',
+      'comparable_count', 0
+    );
+  END IF;
+
+  estimated_ppm := base_stats.median_ppm;
+
+  IF NOT use_district AND primary_district IS NOT NULL AND array_length(selected_districts, 1) = 1 THEN
+    SELECT percentile_cont(0.5) WITHIN GROUP (
+      ORDER BY COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))
+    )
+    INTO city_median_ppm
+    FROM listing_rent
+    WHERE is_active = true
+      AND price_amount IS NOT NULL AND price_amount > 0
+      AND COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0)) > 0
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      );
+
+    SELECT percentile_cont(0.5) WITHIN GROUP (
+      ORDER BY COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0))
+    )
+    INTO district_median_ppm
+    FROM listing_rent
+    WHERE is_active = true
+      AND price_amount IS NOT NULL AND price_amount > 0
+      AND COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0)) > 0
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
+      AND district = primary_district;
+
+    IF city_median_ppm > 0 AND district_median_ppm IS NOT NULL THEN
+      district_coeff := district_median_ppm / city_median_ppm;
+      district_coeff := GREATEST(0.50, LEAST(1.60, district_coeff));
+      estimated_ppm := estimated_ppm * district_coeff;
+      used_district_coeff := true;
+    END IF;
+  END IF;
+
+  IF has_input_area THEN
+    market_rent := round((estimated_ppm * p_area_m2)::numeric, -1);
+  ELSE
+    market_rent := round((base_stats.median_price *
+      CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -1);
+  END IF;
+
+  WITH matched_listings AS (
+    SELECT
+      external_id,
+      title,
+      price_amount,
+      COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0)) AS price_per_m2,
+      area_m2,
+      rooms_count,
+      floor,
+      total_floors,
+      building_type,
+      renovation,
+      city,
+      district,
+      sector,
+      images_count
+    FROM listing_rent
+    WHERE is_active = true
+      AND price_amount IS NOT NULL AND price_amount > 0
+      AND COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0)) > 0
+      AND (
+        (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+        OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+      )
+      AND (NOT use_district OR district = ANY(selected_districts))
+      AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
+      AND (NOT use_building_type OR building_type = ANY(selected_building_types))
+      AND (NOT use_renovation OR renovation = ANY(renovation_filters) OR renovation IS NULL OR trim(renovation) = '')
+      AND (NOT use_floor OR (
+        CASE
+          WHEN wants_first_floor OR wants_last_floor THEN
+            (
+              (wants_first_floor AND floor = 1)
+              OR (wants_last_floor AND floor IS NOT NULL AND total_floors IS NOT NULL AND floor = total_floors)
+            )
+          WHEN p_floor = 1 THEN
+            floor = 1
+          WHEN p_total_floors IS NOT NULL AND p_floor = p_total_floors THEN
+            floor = total_floors
+          ELSE
+            floor BETWEEN GREATEST(2, p_floor - 2) AND (
+              CASE WHEN p_total_floors IS NOT NULL
+                THEN LEAST(p_total_floors - 1, p_floor + 2)
+                ELSE p_floor + 2
+              END
+            )
+        END
+      ))
+      AND (NOT use_area OR area_m2 BETWEEN p_area_m2 * (1 - area_tolerance) AND p_area_m2 * (1 + area_tolerance))
+  ),
+  boundary_listings AS (
+    SELECT 'low' AS level, ml.*
+    FROM matched_listings ml
+    ORDER BY ml.price_amount ASC, ml.external_id ASC
+    LIMIT 1
+  ),
+  high_boundary_listing AS (
+    SELECT 'high' AS level, ml.*
+    FROM matched_listings ml
+    ORDER BY ml.price_amount DESC, ml.external_id ASC
+    LIMIT 1
+  ),
+  combined_boundary_listings AS (
+    SELECT * FROM boundary_listings
+    UNION ALL
+    SELECT * FROM high_boundary_listing
+  )
+  SELECT
+    min(price_amount) FILTER (WHERE level = 'low'),
+    max(price_amount) FILTER (WHERE level = 'high'),
+    jsonb_build_object(
+      'low', COALESCE(
+        (SELECT jsonb_build_object(
+          'external_id', c.external_id,
+          'title', c.title,
+          'price_amount', c.price_amount,
+          'price_per_m2', c.price_per_m2,
+          'area_m2', c.area_m2,
+          'rooms_count', c.rooms_count,
+          'floor', c.floor,
+          'total_floors', c.total_floors,
+          'building_type', c.building_type,
+          'renovation', c.renovation,
+          'city', c.city,
+          'district', c.district,
+          'sector', c.sector,
+          'images_count', c.images_count
+        ) FROM combined_boundary_listings c WHERE c.level = 'low' LIMIT 1),
+        'null'::jsonb
+      ),
+      'high', COALESCE(
+        (SELECT jsonb_build_object(
+          'external_id', c.external_id,
+          'title', c.title,
+          'price_amount', c.price_amount,
+          'price_per_m2', c.price_per_m2,
+          'area_m2', c.area_m2,
+          'rooms_count', c.rooms_count,
+          'floor', c.floor,
+          'total_floors', c.total_floors,
+          'building_type', c.building_type,
+          'renovation', c.renovation,
+          'city', c.city,
+          'district', c.district,
+          'sector', c.sector,
+          'images_count', c.images_count
+        ) FROM combined_boundary_listings c WHERE c.level = 'high' LIMIT 1),
+        'null'::jsonb
+      )
+    )
+  INTO low_rent, high_rent, rent_level_listings
+  FROM combined_boundary_listings;
+
+  IF p_include_district_comparison THEN
+    SELECT jsonb_agg(
+      jsonb_build_object(
+        'district', d.district,
+        'median_price', round(d.median_price::numeric, 2),
+        'count', d.cnt
+      ) ORDER BY d.median_price DESC
+    )
+    INTO district_comparison
+    FROM (
+      SELECT
+        l.district,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY l.price_amount) AS median_price,
+        count(*) AS cnt
+      FROM listing_rent l
+      WHERE l.is_active = true
+        AND l.price_amount IS NOT NULL AND l.price_amount > 0
+        AND COALESCE(l.price_per_m2, l.price_amount / NULLIF(l.area_m2, 0)) > 0
+        AND (
+          (p_city = 'Chișinău' AND l.city = 'Chișinău' AND COALESCE(l.district, '') <> 'Durlești')
+          OR (p_city = 'Durlești' AND (l.city = 'Durlești' OR l.district = 'Durlești'))
+        )
+        AND l.district IS NOT NULL
+        AND (p_rooms_count IS NULL OR l.rooms_count = p_rooms_count)
+        AND (array_length(selected_building_types, 1) IS NULL OR l.building_type = ANY(selected_building_types))
+        AND (p_renovation IS NULL OR l.renovation = ANY(renovation_filters) OR l.renovation IS NULL OR trim(l.renovation) = '')
+      GROUP BY l.district
+      HAVING count(*) >= 3
+    ) d;
+  ELSE
+    district_comparison := '[]'::jsonb;
+  END IF;
+
+  IF p_include_relevant_listings THEN
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'external_id', l.external_id,
+        'title', l.title,
+        'price_amount', l.price_amount,
+        'price_per_m2', l.price_per_m2,
+        'area_m2', l.area_m2,
+        'rooms_count', l.rooms_count,
+        'floor', l.floor,
+        'total_floors', l.total_floors,
+        'building_type', l.building_type,
+        'renovation', l.renovation,
+        'city', l.city,
+        'district', l.district,
+        'sector', l.sector,
+        'images_count', l.images_count
+      ) ORDER BY l.random_sort
+    ), '[]'::jsonb)
+    INTO relevant_listings
+    FROM (
+      SELECT
+        external_id,
+        title,
+        price_amount,
+        COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0)) AS price_per_m2,
+        area_m2,
+        rooms_count,
+        floor,
+        total_floors,
+        building_type,
+        renovation,
+        city,
+        district,
+        sector,
+        images_count,
+        random() AS random_sort
+      FROM listing_rent
+      WHERE is_active = true
+        AND price_amount IS NOT NULL AND price_amount > 0
+        AND COALESCE(price_per_m2, price_amount / NULLIF(area_m2, 0)) > 0
+        AND (
+          (p_city = 'Chișinău' AND city = 'Chișinău' AND COALESCE(district, '') <> 'Durlești')
+          OR (p_city = 'Durlești' AND (city = 'Durlești' OR district = 'Durlești'))
+        )
+        AND (NOT use_district OR district = ANY(selected_districts))
+        AND (p_rooms_count IS NULL OR rooms_count = p_rooms_count)
+        AND (NOT use_building_type OR building_type = ANY(selected_building_types))
+        AND (NOT use_renovation OR renovation = ANY(renovation_filters) OR renovation IS NULL OR trim(renovation) = '')
+        AND (NOT use_floor OR (
+          CASE
+            WHEN wants_first_floor OR wants_last_floor THEN
+              (
+                (wants_first_floor AND floor = 1)
+                OR (wants_last_floor AND floor IS NOT NULL AND total_floors IS NOT NULL AND floor = total_floors)
+              )
+            WHEN p_floor = 1 THEN
+              floor = 1
+            WHEN p_total_floors IS NOT NULL AND p_floor = p_total_floors THEN
+              floor = total_floors
+            ELSE
+              floor BETWEEN GREATEST(2, p_floor - 2) AND (
+                CASE WHEN p_total_floors IS NOT NULL
+                  THEN LEAST(p_total_floors - 1, p_floor + 2)
+                  ELSE p_floor + 2
+                END
+              )
+            END
+        ))
+        AND (NOT use_area OR area_m2 BETWEEN p_area_m2 * (1 - area_tolerance) AND p_area_m2 * (1 + area_tolerance))
+      ORDER BY random_sort
+      LIMIT 3
+    ) l;
+  ELSE
+    relevant_listings := '[]'::jsonb;
+  END IF;
+
+  result := jsonb_build_object(
+    'estimate_type', 'rent',
+    'estimate', jsonb_build_object(
+      'low', low_rent,
+      'market_rate', market_rent,
+      'high', high_rent,
+      'price_per_m2', round(estimated_ppm::numeric, 2),
+      'period', 'monthly',
+      'confidence', CASE
+        WHEN comparable_count >= 20 AND use_district THEN 'high'
+        WHEN comparable_count >= 10 THEN 'medium'
+        ELSE 'low'
+      END
+    ),
+    'range', jsonb_build_object(
+      'low', CASE
+        WHEN has_input_area THEN round((base_stats.p25_ppm * p_area_m2 *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -1)
+        ELSE round((base_stats.p25_price *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -1)
+      END,
+      'high', CASE
+        WHEN has_input_area THEN round((base_stats.p75_ppm * p_area_m2 *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -1)
+        ELSE round((base_stats.p75_price *
+          CASE WHEN used_district_coeff THEN district_coeff ELSE 1 END)::numeric, -1)
+      END
+    ),
+    'valuation_evidence', jsonb_build_object(
+      'comparable_count', comparable_count,
+      'observed_count', base_stats.observed_count,
+      'observed_from', base_stats.observed_from,
+      'observed_to', base_stats.observed_to,
+      'district_adjustment_applied', used_district_coeff
+    ),
+    'market_stats', jsonb_build_object(
+      'comparable_count', comparable_count,
+      'avg_price', round(base_stats.avg_price::numeric, 2),
+      'avg_price_per_m2', round(base_stats.avg_ppm::numeric, 2),
+      'median_price_per_m2', round(base_stats.median_ppm::numeric, 2),
+      'min_price_per_m2', round(base_stats.min_ppm::numeric, 2),
+      'max_price_per_m2', round(base_stats.max_ppm::numeric, 2),
+      'p10_price_per_m2', round(base_stats.p10_ppm::numeric, 2),
+      'p90_price_per_m2', round(base_stats.p90_ppm::numeric, 2)
+    ),
+    'filters_used', jsonb_build_object(
+      'city', true,
+      'district', use_district,
+      'districts', use_district,
+      'rooms_count', (p_rooms_count IS NOT NULL),
+      'building_type', use_building_type,
+      'renovation', use_renovation,
+      'floor', use_floor,
+      'first_floor', wants_first_floor,
+      'last_floor', wants_last_floor,
+      'area', use_area,
+      'area_tolerance', CASE WHEN use_area THEN area_tolerance ELSE null END
+    ),
+    'district_coefficient', CASE
+      WHEN used_district_coeff THEN jsonb_build_object(
+        'applied', true,
+        'value', round(district_coeff::numeric, 3),
+        'district_median_ppm', round(district_median_ppm::numeric, 2),
+        'city_median_ppm', round(city_median_ppm::numeric, 2)
+      )
+      ELSE jsonb_build_object('applied', false)
+    END,
+    'district_comparison', COALESCE(district_comparison, '[]'::jsonb),
+    'rent_level_listings', COALESCE(rent_level_listings, jsonb_build_object('low', null, 'high', null)),
+    'relevant_listings', relevant_listings,
+    'input', jsonb_build_object(
+      'city', p_city,
+      'district', primary_district,
+      'districts', selected_districts,
+      'rooms_count', p_rooms_count,
+      'area_m2', p_area_m2,
+      'floor', p_floor,
+      'first_floor', wants_first_floor,
+      'last_floor', wants_last_floor,
+      'total_floors', p_total_floors,
+      'building_type', selected_building_types[1],
+      'building_types', selected_building_types,
+      'renovation', p_renovation,
+      'bathrooms_count', p_bathrooms_count,
+      'balconies_count', p_balconies_count
+    )
+  );
+
+  RETURN result;
+END;
+$$;
+
+-- Full-price RPCs are internal to the server-side estimate API.
+REVOKE EXECUTE ON FUNCTION public.estimate_rent(text, text[], int, numeric, int, boolean, boolean, int, text[], text, int, int, boolean, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.estimate_rent(text, text[], int, numeric, int, boolean, boolean, int, text[], text, int, int, boolean, boolean) TO service_role;

@@ -254,7 +254,7 @@ const MIN_MARKET_TREND_POINTS = 2;
 const ESTIMATE_CACHE_TTL_MS = 30 * 60 * 1000;
 const ESTIMATE_CACHE_TTL_SECONDS = 30 * 60;
 const ESTIMATE_CACHE_MAX_ENTRIES = 250;
-const ESTIMATE_CACHE_PREFIX = "catdai:estimate:v1:";
+const ESTIMATE_CACHE_PREFIX = "catdai:estimate:v2:";
 const FULL_EVALUATION_FEATURE_KEY = "sale_estimate";
 const LISTING_ANALYSIS_FEATURE_KEY = "listing_analysis";
 
@@ -892,7 +892,7 @@ function buildEstimatePreview(payload, { hideMarketEstimate = false, showMarketT
       },
       market_stats: {
         ...estData.market_stats,
-        comparable_count: null,
+        comparable_count: estData.market_stats?.comparable_count ?? null,
         avg_price: null,
         avg_price_per_m2: null,
         median_price_per_m2: null,

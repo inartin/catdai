@@ -9,6 +9,7 @@ Implemented, depends on external parser and Supabase snapshots.
 - Exact-address coverage is partial. A read-only sale-listing check on 2026-10-24 found `address_text` and `attributes.sourceStreet` on 19,595 of 78,441 rows; imported structured street/house values live in `attributes.sourceStreet` and `attributes.sourceBuildingNumber`. Older/unmatched rows still require parsed/cached 999.md addresses. Listing coordinates may be absent, so nearby distances cannot be inferred from house numbers.
 - `/anunt` reads `listing_price_history` through `/api/listing-price-history` to show analyzed-listing total-price changes when available.
 - Parser/importer code is outside this app repo. Its daily cleanup deletes price-history rows for deleted sale/rent listings; inactive listing rows can retain a last asking price without a retained change history.
+- Valuation evidence aggregates `last_seen_at` over the exact final comparable sample. These are collector observation dates, not publication/update dates. A 2026-10-31 read-only check found `last_seen_at` populated for all 14,403 eligible active sale listings in the supported cities, but no `source_created_at` or `source_updated_at`; do not describe these listings as recently published.
 
 ## Cadastru result card
 

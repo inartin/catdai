@@ -65,7 +65,7 @@ export default function AdminCadastruPage() {
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Cadastru</h1>
-          <p className="mt-1 text-sm text-gray-500">Your stored property data, organized by building.</p>
+          <p className="mt-1 text-sm text-gray-500">Stored property data across all cities.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {stats?.available && <span className="text-xs text-gray-500">Updated {new Date(stats.updatedAt).toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" })}</span>}
@@ -88,13 +88,13 @@ export default function AdminCadastruPage() {
       ) : stats?.available ? (
         <div className="space-y-6" aria-busy={loading}>
           <section aria-label="Stored property totals" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <StatCard label="Full cadastral records" value={stats.fullData} detail="Unique numbers with full cadastral data" accent />
+            <StatCard label="Stored properties" value={stats.total} detail="Unique cadastral numbers" accent />
             <StatCard label="Apartment buildings" value={stats.buildings} detail="Verified blocks" />
-            <StatCard label="Apartments" value={stats.apartments.total}
-              detail={`${fmtNum(stats.apartments.linked)} linked to shared buildings`} />
+            <StatCard label="Apartments / units" value={stats.apartments.total}
+              detail={`${fmtNum(stats.apartments.linked)} linked to buildings`} />
             <StatCard label="Units with details" value={stats.apartments.details}
-              detail={`${fmtNum(stats.apartments.references)} references still awaiting details`} />
-            <StatCard label="Other properties" value={stats.other} detail="Land, other buildings and unclassified records" />
+              detail={`${fmtNum(stats.apartments.references)} awaiting details`} />
+            <StatCard label="Other properties" value={stats.other} detail="Land, buildings and other records" />
           </section>
 
           <section aria-labelledby="building-coverage-heading" className="overflow-hidden rounded-xl border border-gray-200 bg-white">
@@ -171,17 +171,17 @@ export default function AdminCadastruPage() {
       <section aria-labelledby="city-heading" aria-busy={citiesLoading} className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 p-5 sm:px-6">
           <div><h2 id="city-heading" className="text-lg font-semibold text-gray-900">Stored data by city</h2>
-            <p className="mt-1 text-xs text-gray-500">Select a city to see stored properties and search counts.</p></div>
+            <p className="mt-1 text-xs text-gray-500">Select a city to view properties.</p></div>
           {!cityStats?.available && <button type="button" onClick={() => loadCities(!!cityStats)} disabled={citiesLoading}
             className="cursor-pointer rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-primary/40 hover:text-primary disabled:cursor-default disabled:text-gray-400">
             {citiesLoading ? "Loading cities…" : cityStats ? "Retry" : "Load cities"}
           </button>}
-          {cityStats?.available && stats?.available && <p className="text-sm text-gray-500"><span className="font-semibold tabular-nums text-gray-900">{fmtNum(stats.total)}</span> unique cadastral numbers overall</p>}
+          {cityStats?.available && stats?.available && <p className="text-sm text-gray-500"><span className="font-semibold tabular-nums text-gray-900">{fmtNum(stats.total)}</span> total stored</p>}
         </div>
         {cityStats?.available ? <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500"><tr>
-              {[["City", "text-left"], ["Apartment buildings", "text-right"], ["Apartments", "text-right"], ["Other properties", "text-right"]].map(([label, align]) =>
+              {[["City", "text-left"], ["Apartment buildings", "text-right"], ["Apartments / units", "text-right"], ["Other properties", "text-right"]].map(([label, align]) =>
                 <th key={label} scope="col" className={`whitespace-nowrap px-5 py-3 font-medium ${align}`}>{label}</th>)}
             </tr></thead>
             <tbody className="divide-y divide-gray-100">

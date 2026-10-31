@@ -6,7 +6,7 @@ import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 import { validMapGeometry } from "@/lib/cadastru-map";
 
 export function apartmentBuildingNumber(number) {
-  return String(number || "").match(/^(\d{7}\.\d{3}\.\d{2})\.\d{3,4}$/)?.[1] || null;
+  return String(number || "").match(/^(\d{7}\.\d{1,4}\.\d{2})\.\d{3,4}$/)?.[1] || null;
 }
 
 export function isApartmentBlock(building) {
@@ -21,7 +21,7 @@ function entryFromRow(row) {
 }
 
 export async function getSharedBuilding(number) {
-  if (!/^\d{7}\.\d{3}\.\d{2}$/.test(number || "")) return null;
+  if (!/^\d{7}\.\d{1,4}\.\d{2}$/.test(number || "")) return null;
   const cached = await readCadastruCache("building", number, { allowExpired: true });
   if (cached) return cached;
   if (!shouldPersistRuntimeData()) return null;
@@ -44,7 +44,7 @@ export async function getSharedBuildingByAddress(address) {
 }
 
 export async function storeSharedBuilding(number, building, options = {}) {
-  if (!/^\d{7}\.\d{3}\.\d{2}$/.test(number || "") || !shouldPersistRuntimeData()) return null;
+  if (!/^\d{7}\.\d{1,4}\.\d{2}$/.test(number || "") || !shouldPersistRuntimeData()) return null;
   if (!isApartmentBlock(building) && (building?.classifier || !await getSharedBuilding(number))) return null;
   const input = nearbyAddressFromCadastru({ building, request_address: options.address });
   const fetchedAt = options.fetchedAt || new Date().toISOString();

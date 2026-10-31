@@ -1,3 +1,4 @@
+import { withLearnedAddress, checkLearnedAddress, learnConfirmedAddress } from "@/lib/cadastru-learned-addresses";
 import { withStatisticsContext } from "@/lib/statistics-context";
 import { withCadastruOutcome } from "@/lib/cadastru-outcome";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
@@ -136,7 +137,7 @@ function validateAddressFields({ street, houseNumber, apartmentNumber }) {
   return { valid: true };
 }
 
-async function handlePost(request) {
+async function handlePost(request, { learned } = {}) {
   const ip = getClientIp(request);
   const { allowed, remaining, retryAfter } = limiter.check(ip);
 
@@ -221,6 +222,7 @@ async function handlePost(request) {
     ? readSuggestionRecoveryToken(body.suggestion_recovery_token, suggestionAddress) : null;
   const recoverSuggestion = async (payload, lookupSource) => {
     if (!payload?.cadastral_number && !payload?.lands?.length && !payload?.buildings?.length) return;
+    await learnConfirmedAddress(recovery, { ...suggestionAddress, street: resolution.street }, payload);
     await recordSuggestionRecovery(recovery, {
       address: { ...suggestionAddress, resolvedAddress: lookupAddress }, lookupSource,
     });
@@ -231,8 +233,10 @@ async function handlePost(request) {
     const alternateRoadTypes = roadTypeSuggestions();
     const suggestions = alternateRoadTypes.length ? []
       : suggestStreets({ city, roadType, street, excludeStreet: resolution.street });
-    const token = shouldTrackCadastruSearch && process.env.NODE_ENV !== "development"
-      ? createSuggestionRecoveryToken(failedUsageEventId, suggestionAddress, suggestions) : null;
+    const offered = alternateRoadTypes.length ? alternateRoadTypes.map(value => ({...suggestionAddress,
+      street:value.street, roadType:normalizeRoadType(value.road_type)})) : suggestions;
+    const token = shouldTrackCadastruSearch
+      ? createSuggestionRecoveryToken(failedUsageEventId, suggestionAddress, offered, {allowLearning:true}) : null;
     return { suggestions, ...(alternateRoadTypes.length ? { road_type_suggestions: alternateRoadTypes } : {}),
       ...(token ? { suggestion_recovery_token: token } : {}) };
   };
@@ -248,10 +252,13 @@ async function handlePost(request) {
     const expectedRoadType = roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : roadType === "sos" ? "sos" : "strada";
     const offered = error.addressSuggestions || error.address_suggestions;
     const suggestions = (Array.isArray(offered) ? offered : []).filter((value) => {
-      if (!value || value.road_type !== expectedRoadType || value.street !== resolution.street ||
+      if (!value || !["strada", "bulevard", "str-la", "sos"].includes(value.road_type) ||
+        typeof value.street !== "string" || !value.street.trim() || value.street.length > STREET_MAX_LENGTH ||
         typeof value.house_number !== "string" || value.house_number.length > HOUSE_NUMBER_MAX_LENGTH ||
         !HOUSE_NUMBER_PATTERN.test(value.house_number)) return false;
-      const withoutApartment = apartmentNumber && value.city === city && value.house_number === houseNumber
+      const sameStreet = value.road_type === expectedRoadType && value.street === resolution.street;
+      const streetCorrection = value.city === city && value.house_number === houseNumber && !sameStreet;
+      const withoutApartment = sameStreet && apartmentNumber && value.city === city && value.house_number === houseNumber
         && value.apartment_number === undefined;
       const alternativeAddress = (value.city === city && value.house_number.startsWith(`${houseNumber}/`)) ||
         (city === "Chișinău" && value.city !== city && CADASTRU_SUPPORTED_CITIES.includes(value.city) && value.house_number === houseNumber);
@@ -259,15 +266,15 @@ async function handlePost(request) {
         ? typeof value.apartment_number === "string" && APARTMENT_NUMBER_PATTERN.test(value.apartment_number)
           && Number(value.apartment_number) === Number(apartmentNumber)
         : !value.apartment_number;
-      return withoutApartment || (alternativeAddress && sameApartment);
+      return withoutApartment || ((streetCorrection || (sameStreet && alternativeAddress)) && sameApartment);
     }).slice(0, 3).map(({ city, road_type, street, house_number, apartment_number }) =>
       ({ city, road_type, street, house_number, ...(apartment_number ? { apartment_number } : {}) }));
     if (!suggestions.length) return null;
-    const token = shouldTrackCadastruSearch && process.env.NODE_ENV !== "development"
+    const token = shouldTrackCadastruSearch
       ? createSuggestionRecoveryToken(failedUsageEventId, suggestionAddress, suggestions.map((value) => ({
           city: value.city, roadType: normalizeRoadType(value.road_type), street: value.street,
           houseNumber: value.house_number, apartmentNumber: value.apartment_number ? String(Number(value.apartment_number)) : "",
-        }))) : null;
+        })), {allowLearning:true}) : null;
     return NextResponse.json({ error: "address_confirmation_required", address_suggestions: suggestions,
       ...(token ? { suggestion_recovery_token: token } : {}),
       message: "Could not confirm the requested address. Please confirm a registry-matched alternative." }, { status: 422 });
@@ -346,6 +353,7 @@ async function handlePost(request) {
   const shouldRefreshStoredDistrict = Boolean(stored && city === "Chișinău" && apartmentNumber &&
     !stored.payload?.district && !stored.payload?.form_fields?.district && !stored.payload?.district_lookup_checked);
   const respondWithStored = async () => {
+    await checkLearnedAddress(learned, stored.payload);
     const payload = withResolution(withCadastruFreshness(stored));
     const payloadResultType = classifyAddressPayload(payload);
     const evaluationToken = await recordAddressSearch(payload, "cache",
@@ -391,6 +399,16 @@ async function handlePost(request) {
       userId: access.user_id || null,
       ...getCadastruLookupTracking(body),
     });
+    await checkLearnedAddress(learned, lookupResult);
+    const parsedTarget = lookupResult?.parsed_input;
+    if (!learned && parsedTarget?.city === city && parsedTarget.houseNumber === houseNumber
+      && String(parsedTarget.apartment || "") === apartmentNumber) {
+      const targetRoad = {Strada:"str", Bulevardul:"bd", Stradela:"str-la", Soseaua:"sos"}[parsedTarget.roadType];
+      // Only a successful worker's exact result can teach its own automatic resolution.
+      if (targetRoad) await learnConfirmedAddress({address:suggestionAddress}, {
+        city, roadType:targetRoad, street:parsedTarget.streetName, houseNumber, apartmentNumber,
+      }, lookupResult);
+    }
     let payload = withResolution(verifiedAlternative || { ...lookupResult, district_lookup_checked: true });
     payload = await persistCadastruAddressResult(payload, {
       requestAddress: rawAddress,
@@ -409,7 +427,12 @@ async function handlePost(request) {
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
-    if (error?.code === "credit_authorization_failed") throw error;
+    if (["credit_authorization_failed", "learned_address_unverified"].includes(error?.code)) throw error;
+    // A learned target must not succeed with an unconfirmed building fallback.
+    // Let the outer retry resume the original address before those fallback paths.
+    if (learned) return NextResponse.json({error:error?.code || "upstream_failed"}, {
+      status:[400,401,403,404,429].includes(error?.status) ? error.status : 503,
+    });
     if (shouldRefreshStoredDistrict) return respondWithStored();
     if (!skipCache && apartmentNumber && ![400, 401, 403, 422].includes(error?.status)) {
       const stale = await getCadastruRecordByAddress(lookupAddress, { structuredAddress, allowExpired: true, requireUnitDetails: true });
@@ -506,7 +529,7 @@ async function handlePost(request) {
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
-    if (error?.code === "credit_authorization_failed") throw error;
+    if (["credit_authorization_failed", "learned_address_unverified"].includes(error?.code)) throw error;
     console.error("[cadastru/address] lookup failed:", {
       message: error?.message || String(error),
       address: rawAddress,
@@ -541,4 +564,4 @@ async function handlePost(request) {
   }
 }
 
-export const POST = withStatisticsContext(withCadastruOutcome(handlePost));
+export const POST = withStatisticsContext(withCadastruOutcome(withLearnedAddress(handlePost)));

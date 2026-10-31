@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 const digits = (value) => String(value || "").replace(/\D/g, "");
+const isApartmentNumber = value => /^\d{7}\.\d{1,4}\.\d{2}\.\d{3,4}$/.test(String(value || '')) || /^\d{15,16}$/.test(digits(value));
 const fresh = (expiry, now) => Number.isFinite(Date.parse(expiry)) && Date.parse(expiry) > now;
 function originKey(input) {
   const normalized = Object.fromEntries(Object.keys(input).sort().map((key) => [key,
@@ -23,7 +24,7 @@ export function summarizeCadastruCities({ records, buildings }, now = Date.now()
   for (const row of records) {
     const number = digits(row.cadastral_number);
     if (buildingIds.has(number)) continue;
-    cityRow(row.city)[/^\d{15,16}$/.test(number) ? "apartments" : "other"]++;
+    cityRow(row.city)[isApartmentNumber(row.cadastral_number) ? "apartments" : "other"]++;
   }
   for (const building of buildings) {
     cityRow(building.lookup_input?.city || linkedCities.get(building.cadastral_number)).buildings++;
@@ -45,7 +46,7 @@ export function summarizeCadastruStorage({ records, buildings, addresses, nearby
   for (const row of records) {
     const number = digits(row.cadastral_number);
     if (buildingIds.has(number)) continue; // The same building can also have a registry record.
-    if (/^\d{15,16}$/.test(number)) {
+    if (isApartmentNumber(row.cadastral_number)) {
       apartments.total++;
       if (buildingIds.has(digits(row.shared_building_number))) apartments.linked++;
       const details = !row.unit_list_entry && (["full_data", "apartment_only"].includes(row.result_type)

@@ -13,9 +13,9 @@ function signature(value) {
   return crypto.createHmac("sha256", signingKey()).update("cadastru-suggestion-recovery:v1\n").update(value).digest("base64url");
 }
 
-export function createSuggestionRecoveryToken(eventId, address, suggestions) {
-  if (!eventId || !suggestions.length || !signingKey()) return null;
-  const value = Buffer.from(JSON.stringify({ eventId, address, suggestions, expires: Date.now() + TOKEN_TTL_MS })).toString("base64url");
+export function createSuggestionRecoveryToken(eventId, address, suggestions, { allowLearning = false } = {}) {
+  if ((!eventId && !allowLearning) || !suggestions.length || !signingKey()) return null;
+  const value = Buffer.from(JSON.stringify({ eventId, allowLearning, address, suggestions, expires: Date.now() + TOKEN_TTL_MS })).toString("base64url");
   return `${value}.${signature(value)}`;
 }
 
@@ -28,7 +28,7 @@ export function readSuggestionRecoveryToken(token, address) {
     const actual = Buffer.from(supplied);
     if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
     const data = JSON.parse(Buffer.from(value, "base64url").toString());
-    if (!data.eventId || data.expires < Date.now() || !Array.isArray(data.suggestions)) return null;
+    if ((!data.eventId && !data.allowLearning) || data.expires < Date.now() || !Array.isArray(data.suggestions)) return null;
     const confirmedAddress = data.suggestions.some((suggestion) => suggestion && typeof suggestion === "object" &&
       ["city", "roadType", "street", "houseNumber", "apartmentNumber"].every((key) => suggestion[key] === address[key]));
     if (!confirmedAddress) {
@@ -44,7 +44,7 @@ export function readSuggestionRecoveryToken(token, address) {
 }
 
 export async function recordSuggestionRecovery(recovery, { address, lookupSource }) {
-  if (!recovery || process.env.NODE_ENV === "development" || !shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
+  if (!recovery?.eventId || process.env.NODE_ENV === "development" || !shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
   try {
     const { error } = await supabaseAdmin.from("external_api_usage_events")
       .update({ suggestion_recovery: {

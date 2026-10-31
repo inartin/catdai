@@ -62,6 +62,10 @@ const noBuildings=summarizeCadastruStorage({...source,buildings:[],addresses:[]}
 assert.equal(noBuildings.storedDatasets.transport.saved,1,'datasets remain visible with no cadastral buildings');
 assert.equal(noBuildings.coverage.transport.total,0);
 
+const regionalStats=summarizeCadastruStorage({records:[{cadastral_number:'0300206.46.01.016',city:'Bălți',result_type:'full_data'}],buildings:[],addresses:[],nearby:[],transport:[],reports:[]});
+assert.equal(regionalStats.apartments.total,1,'regional unit identifiers with short parcel segments count as apartments');
+assert.equal(regionalStats.byCity[0].apartments,1);
+
 let reads=0,fail=false,rpcFail=false;
 const selections=[];
 const calls=[];

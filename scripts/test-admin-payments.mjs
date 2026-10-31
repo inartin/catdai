@@ -14,7 +14,8 @@ let orders = [];
 let checkoutEvents = [];
 let failingPage = null;
 const queries = [];
-const user = { id: "buyer", email: "buyer@example.com", user_metadata: { full_name: "Buyer" } };
+const user = { id: "buyer", email: "buyer@example.com", user_metadata: { full_name: "Buyer", catdai_is_admin: true } };
+const admin = { id: "admin", app_metadata: { catdai_is_admin: true } };
 const json = (data, { status = 200 } = {}) => Response.json(data, { status });
 const mocks = {
   "next/server": { NextResponse: { json } },
@@ -26,7 +27,7 @@ const mocks = {
   "@/lib/supabase-admin": {
     supabaseAdmin: {
       rpc: async () => ({ data: [], error: null }),
-      auth: { admin: { listUsers: async () => ({ data: { users: [user] } }) } },
+      auth: { admin: { listUsers: async () => ({ data: { users: [user, admin] } }) } },
       from(table) {
         assert.notEqual(table, "reporting_feature_credit_balances", "Payments never depend on remaining credits");
         const query = { table, filters: [], orderBy: [], from: 0, to: Infinity };
@@ -98,6 +99,9 @@ orders = [
   payment("legacy", { provider: "paddle", environment: "legacy" }),
   payment("yesterday", { paid_at: "2026-10-17T20:59:59Z" }),
   payment("sandbox", { environment: "sandbox" }),
+  payment("admin-maib", { user_id: admin.id }),
+  payment("admin-paddle", { user_id: admin.id, provider: "paddle", environment: "legacy" }),
+  payment("admin-partial", { user_id: admin.id, status: "partially_refunded", refunded_minor: 500 }),
   ...["pending", "registered", "failed", "refunded", "chargeback", "canceled", "expired"].map((status) => payment(status, { status })),
 ];
 let response = await (await get("period=day&fresh=1")).json();
@@ -112,6 +116,10 @@ assert.equal(response.payments.orders.find((row) => row.id === "partial").refund
 assert.equal(response.payments.orders.find((row) => row.id === "deleted-user").email, null);
 assert.equal(response.periodSince, "2026-10-17T21:00:00.000Z", "Today starts at Chișinău midnight");
 assert.equal((await (await get()).json()).payments.total, 6, "All time includes older payments");
+assert.ok(response.payments.orders.every((row) => row.user_id !== admin.id), "Admin purchases are excluded from the dashboard list as well as its count");
+admin.app_metadata.catdai_is_admin = false;
+assert.equal((await (await get()).json()).payments.total, 9, "Unmarking an admin restores their existing purchases on refresh");
+admin.app_metadata.catdai_is_admin = true;
 for (const period of ["week", "month"]) {
   assert.equal((await (await get(`period=${period}&fresh=1`)).json()).payments.total, 6);
 }

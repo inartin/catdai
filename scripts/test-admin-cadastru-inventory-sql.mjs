@@ -69,6 +69,12 @@ try {
   const { prosecdef, proconfig } = (await db.query("select prosecdef,proconfig from pg_proc where oid = 'public.admin_cadastru_inventory_stats(text)'::regprocedure")).rows[0];
   assert.equal(prosecdef, false, 'the aggregate does not bypass row security');
   assert(proconfig.includes('statement_timeout=30s'), 'only the aggregate has a cold-read timeout allowance');
+  const regionalMigration=await fs.readFile('supabase/migrations/20261031174629_collector_nationwide_user_seeds.sql','utf8');
+  await db.exec(regionalMigration.slice(regionalMigration.lastIndexOf('do $migration$')));
+  const beforeRegional=await read('all');
+  await db.query("insert into cadastru_records(cadastral_number,city,result_type) values ('0300206.46.01.016','Bălți','full_data')");
+  const afterRegional=await read('all');
+  assert.equal(afterRegional.apartments.total,beforeRegional.apartments.total+1,'regional parcel width does not hide collected apartments');
   console.log('Inventory SQL: count parity, references, city fallback, expiry, empty inventory, over 1,000 rows and service-only access passed.');
 } finally {
   await db.close();

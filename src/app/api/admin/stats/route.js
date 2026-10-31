@@ -791,7 +791,8 @@ export async function GET(request) {
     ...externalApiUsageEvents,
     rows: attachUserNames(correlatedExternalApiEvents, usersById),
   };
-  const paymentUserIds = [...new Set(paymentSummary.orders.map((row) => row.user_id).filter(Boolean))];
+  const paymentOrders = paymentSummary.orders.filter((row) => authUsersById.get(row.user_id)?.app_metadata?.catdai_is_admin !== true);
+  const paymentUserIds = [...new Set(paymentOrders.map((row) => row.user_id).filter(Boolean))];
   const paymentVisitors = new Map();
   if (paymentUserIds.length) {
     const { data } = await supabaseAdmin.from("user_activity").select("user_id, visitor").in("user_id", paymentUserIds);
@@ -799,7 +800,8 @@ export async function GET(request) {
   }
   const payments = {
     ...paymentSummary,
-    orders: paymentSummary.orders.map((item) => {
+    total: paymentSummary.available ? paymentOrders.length : null,
+    orders: paymentOrders.map((item) => {
       const user = authUsersById.get(item.user_id);
       return {
         ...item,

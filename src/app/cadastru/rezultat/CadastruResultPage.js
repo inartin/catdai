@@ -681,7 +681,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
       ...(correction?.house_number ? { house_number: correction.house_number } : {}),
       ...(correction?.road_type ? { road_type: correction.road_type } : {}),
       ...(!isHistoryAddress ? { search_context: "cadastru" } : {}),
-      ...(((typeof suggestion === "string" && state.didYouMean) || (correction && state.confirmationRequired))
+      ...(((typeof suggestion === "string" && state.didYouMean) || (correction && (state.confirmationRequired || correction.road_type)))
         && state.suggestionRecoveryToken ? { suggestion_recovery_token: state.suggestionRecoveryToken } : {}),
     };
     try {

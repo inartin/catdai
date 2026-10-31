@@ -185,5 +185,12 @@ assert.deepEqual(clone(mappedAddress.lands), [parcel]);
 await buildings.storeSharedBuilding(secondParent, { registry: { map_geometry: footprint } });
 assert.deepEqual(clone((await buildings.getBuildingFallback({ number: `${secondParent}.099` })).building.map_geometry), footprint,
   "older registry-only footprints remain available to apartment results");
+// Regional parcels retain their official width in shared building reads/writes.
+const regionalMigration=await fs.readFile('supabase/migrations/20261031174629_collector_nationwide_user_seeds.sql','utf8');
+await db.exec(regionalMigration.slice(regionalMigration.indexOf('alter table public.cadastru_buildings drop constraint'),regionalMigration.indexOf('-- Retain the installed')));
+const regionalNumber='0300206.46.01';
+assert.equal(buildings.apartmentBuildingNumber(regionalNumber+'.016'),regionalNumber);
+await buildings.storeSharedBuilding(regionalNumber,{classifier:'Bloc cu apartamente',address:'mun. Bălți, str. Ștefan cel Mare 6/1',total_floors:5});
+assert.equal((await buildings.getSharedBuilding(regionalNumber)).number,regionalNumber);
 await db.close();
 console.log("Building regressions passed: SQL migration, atomic field merges, shared records/cache, aliases, partial refresh, bundle identity, non-block compatibility and permissions.");

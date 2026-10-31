@@ -87,7 +87,7 @@ export default function AdminCollectorStatus({ refreshKey = 0 }) {
           <div className="rounded-lg border border-gray-100 p-4">
             <p className="text-xs font-medium text-gray-500">{result.state === "running" ? "Currently collecting" : "Collector activity"}</p>
             <p className="mt-1 text-sm font-medium text-gray-900">{result.state === "running" ? result.current?.address || "Checking the queue…" : result.state === "stopped" ? "Collector is stopped" : "Current activity unavailable"}</p>
-            {result.current && <div className="mt-3 flex flex-wrap gap-2">{Object.entries(labels).map(([key, label]) => <span key={key} className={`rounded px-2 py-1 text-xs ${result.current.categories[key] === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-gray-50 text-gray-500"}`}>{result.current.categories[key] === "complete" ? "✅" : "⏳"} {label}</span>)}</div>}
+            {result.current && <div className="mt-3 flex flex-wrap gap-2">{Object.entries(labels).filter(([key]) => result.current.categories[key] !== "not_applicable").map(([key, label]) => <span key={key} className={`rounded px-2 py-1 text-xs ${result.current.categories[key] === "complete" ? "bg-emerald-50 text-emerald-700" : "bg-gray-50 text-gray-500"}`}>{result.current.categories[key] === "complete" ? "✅" : "⏳"} {label}</span>)}</div>}
             {result.lastEvent && <p className="mt-2 break-words text-xs leading-5 text-gray-500">Last activity: {result.lastEvent}</p>}
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{Object.entries(labels).map(([key, label]) => <div key={key} className="text-sm">

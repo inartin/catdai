@@ -108,6 +108,7 @@ Applied after RPC in `/api/estimate`.
 - Does not adjust raw `range` or `market_stats`.
 
 ## Related Files
+- Unlocked sale/rent results offer `Use in simulator`, importing the market estimate and available evidence into the browser-local [buy/rent simulator](buy-rent-simulator.md). No additional API call or credit is consumed by the import.
 - `src/app/estimeaza/page.js`
 - `src/app/evaluare/page.js`
 - `src/app/anunt/page.js`

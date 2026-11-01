@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Hero from "@/components/Hero";
 import CategoryCards from "@/components/CategoryCards";
+import LandingBuyRent from "@/components/LandingBuyRent";
 import LandingCadastruCard from "@/components/LandingCadastruCard";
 import HowItWorks from "@/components/HowItWorks";
 import LandingUsageStats from "@/components/LandingUsageStats";
@@ -273,6 +274,7 @@ export default function HomeContent({ prices }) {
           <LinkAnalyzer showFeaturePapers />
         </div>
       </section>
+      <LandingBuyRent />
       <LandingUsageStats />
       <HowItWorks />
       <ExampleResults />

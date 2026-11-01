@@ -13,6 +13,7 @@ Romanian and Russian UI; English is available for Cadastru search/results/shared
 - Proxy rewrites localized paths to the base route, except localized FAQ pages.
 
 ## UI
+- The buy/rent simulator supports RO/RU/EN UI and server metadata at localized `/cumparare-sau-chirie` routes. Its domain copy lives in `src/lib/buy-rent-copy.js`; English estimation links explicitly use the Romanian estimator.
 - Desktop Navbar shows only the current language by default. Clicking it expands the other languages horizontally to its left; selection, outside click, focus leaving the selector, or Escape collapses it. The mobile menu always shows all available language buttons in one row, highlighting the current language. RO/RU are available throughout, plus EN on Cadastru search, result and compact-report routes. Switching preserves the query and fragment and navigates the document so rewritten route layouts refresh SEO metadata.
 - `document.documentElement.lang` follows selected language.
 - Use the normal ASCII dash `-` in authored RO/RU/EN copy, email subjects/bodies, metadata and empty-value placeholders.

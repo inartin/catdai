@@ -232,6 +232,7 @@ export default function Navbar() {
   const cadastruHref = `/${lang}/cadastru`;
   const isCadastruPath = pathname === "/cadastru" || /^\/(ro|ru|en)\/cadastru\/?$/.test(pathname);
   const isCadastruRoute = /^\/(?:(?:ro|ru|en)\/)?(?:cadastru(?:\/|$)|c\/)/.test(pathname);
+  const isBuyRentRoute = /^\/(?:(?:ro|ru|en)\/)?cumparare-sau-chirie\/?$/.test(pathname);
   const isCalculatorPath = pathname === "/calculator";
   const isPricingPath = pathname === "/pricing";
 
@@ -250,7 +251,7 @@ export default function Navbar() {
     if (/^\/(ro|ru)\/faq\/?$/.test(pathname)) {
       const target = `/${nextLang}/faq`;
       if (pathname !== target) router.replace(target);
-    } else if (isCadastruRoute) {
+    } else if (isCadastruRoute || isBuyRentRoute) {
       const basePath = pathname.replace(/^\/(ro|ru|en)(?=\/)/, "");
       const target = `/${nextLang}${basePath}${window.location.search}${window.location.hash}`;
       // These URLs rewrite to one route. A document navigation also refreshes
@@ -459,7 +460,7 @@ export default function Navbar() {
             onClick={handleNotificationToggle}
             t={t}
           />
-          <LanguageSelector lang={lang} includeEnglish={isCadastruRoute} onChange={handleLangChange} label={t("nav.langAriaLabel")} />
+          <LanguageSelector lang={lang} includeEnglish={isCadastruRoute || isBuyRentRoute} onChange={handleLangChange} label={t("nav.langAriaLabel")} />
         </div>
 
       <div ref={mobileMenuRef} className="flex items-center gap-2 md:hidden">
@@ -538,7 +539,7 @@ export default function Navbar() {
                     {t("nav.langAriaLabel")}
                   </p>
                   <div role="group" aria-label={t("nav.langAriaLabel")} className="flex gap-1 rounded-lg bg-white p-0.5">
-                    {(isCadastruRoute ? ["ro", "ru", "en"] : ["ro", "ru"]).map((language) => (
+                    {((isCadastruRoute || isBuyRentRoute) ? ["ro", "ru", "en"] : ["ro", "ru"]).map((language) => (
                       <button
                         key={language}
                         type="button"

@@ -4,6 +4,7 @@
 Implemented.
 
 ## Public Pages
+- `/ro/cumparare-sau-chirie`, `/ru/cumparare-sau-chirie`, `/en/cumparare-sau-chirie`: free housing-cost calculator for rent versus buying, rent-budget affordability and renovating an owned home to move in. See [simulator](buy-rent-simulator.md).
 - `/` landing page with hero, categories, how it works, examples, and alerts teaser.
 - Landing page ends with a compact product FAQ preview focused on calculation logic, input data, and seller-type price differences, plus a link to the full FAQ page.
 - Landing example-results section is titled `Cum arată o estimare` and uses a subtitle about real CatDai-generated result examples.
@@ -19,6 +20,7 @@ Implemented.
 - The full Chișinău market card is clickable and opens a scrollable popup with separate four-month new-build and secondary-market charts for Chișinău sectors available in the `/estimeaza` form; sectors whose request fails or has no usable trend data are hidden. Landing and popup trends exclude snapshots before 1 July 2026.
 - Each popup open is recorded through a deferred browser-idle beacon and atomically increments the current Chișinău calendar-day counter, so analytics do not block the popup or district-chart loading.
 - Landing places the 999.md link analyzer below the Cadastru section on both desktop and mobile.
+- Immediately after the analyzer, `LandingBuyRent` introduces the housing calculator in a separate warm cream band. A receipt illustration shows €500 monthly rent over 20 years (€120,000), explicitly assuming constant rent and no additional costs, followed by the question of buying with the same monthly budget. RO/RU/EN copy and a localized simulator CTA; stacked layout on mobile.
 - Landing 999.md link analyzer shows flat white paper-style feature tabs with custom line icons dropping from under the analyzer for price analysis, similar-listing comparison, duplicate checks, and price history.
 - Landing shows an all-time usage-stat card between the product scope/link analyzer and `How it works`, using the same white surface, `rounded-2xl`, emerald border, and standard landing shadow as the existing market card.
 - Landing `How it works` intro says users can see whether the price is below market, near market, or too high.

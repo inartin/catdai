@@ -13,6 +13,9 @@ const INDEXABLE_STATIC_PATHS = [
   "/ro/cadastru",
   "/ru/cadastru",
   "/en/cadastru",
+  "/ro/cumparare-sau-chirie",
+  "/ru/cumparare-sau-chirie",
+  "/en/cumparare-sau-chirie",
   "/pricing",
   "/verifica-anunt",
   "/noutati",
@@ -34,8 +37,8 @@ export default async function sitemap() {
   const entries = INDEXABLE_STATIC_PATHS.map((path) => ({
     url: `${siteUrl}${path}`,
     lastModified: new Date(),
-    ...(/^\/(ro|ru|en)\/cadastru$/.test(path) ? {
-      alternates: { languages: Object.fromEntries(Object.entries(cadastruLanguageAlternates())
+    ...(/^\/(ro|ru|en)\/(cadastru|cumparare-sau-chirie)$/.test(path) ? {
+      alternates: { languages: Object.fromEntries(Object.entries(cadastruLanguageAlternates(path.replace(/^\/(ro|ru|en)/, "")))
         .map(([language, url]) => [language, `${siteUrl}${url}`])) },
     } : {}),
   }));

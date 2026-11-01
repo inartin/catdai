@@ -118,6 +118,9 @@ export default function Footer({ checkout = false }) {
     <footer className="bg-section-bg border-t border-gray-100 mt-8">
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-sm text-gray-500">
+          <Link href={`/${lang}/cumparare-sau-chirie`} className="text-sm text-gray-500 hover:text-primary transition-colors">
+            {t("nav.buyRent")}
+          </Link>
           <Link href="/about" className="hover:text-foreground transition-colors">
             {t("nav.about")}
           </Link>

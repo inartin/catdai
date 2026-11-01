@@ -1,0 +1,168 @@
+.page { background: #f6f8f4; color: #233b32; padding: 48px 24px 64px; }
+.hero { max-width: 900px; margin: 0 auto 36px; text-align: center; }
+.hero h1 { font-size: clamp(32px, 4.5vw, 48px); line-height: 1.15; letter-spacing: -.04em; font-weight: 650; }
+.intro { margin: 16px auto 0; color: #617066; font-size: 19px; line-height: 1.6; }
+.workspace { max-width: 1200px; margin: auto; display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 24px; align-items: start; }
+.controls, .output { display: grid; gap: 18px; min-width: 0; }
+.card { background: white; border: 1px solid #e0e6dc; border-radius: 18px; padding: 26px; min-width: 0; }
+.card h2 { font-size: 21px; font-weight: 650; line-height: 1.4; }
+.page :is(button, a, input, summary):focus-visible { outline: 3px solid #92bfa6; outline-offset: 4px; }
+.mode { display: flex; gap: 4px; background: #edf0e9; border-radius: 10px; padding: 4px; margin: 20px 0; }
+.mode button { flex: 1; border-radius: 7px; padding: 12px 8px; font-size: 14px; font-weight: 550; cursor: pointer; }
+.mode button[aria-pressed='true'] { background: white; box-shadow: 0 1px 5px #203c3210; }
+.example { color: #6e796b; font-size: 14px; line-height: 1.6; margin-bottom: 22px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 16px; }
+.field { min-width: 0; display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; }
+.field label { display: block; font-size: 15px; font-weight: 550; margin-bottom: 9px; min-height: 42px; line-height: 1.4; }
+.inputWrap { display: flex; align-items: center; border: 1px solid #d6dfd2; border-radius: 9px; background: #fdfefc; }
+.inputWrap:focus-within { border-color: #5e957b; box-shadow: 0 0 0 2px #dcebdd; }
+.inputWrap input { flex: 1; width: 0; min-width: 0; border: 0; outline: 0; padding: 13px 6px 13px 12px; font-size: 21px; color: #203f31; font-weight: 600; font-variant-numeric: tabular-nums; appearance: textfield; }
+.inputWrap input::-webkit-inner-spin-button { appearance: none; }
+.inputWrap:has(input[aria-invalid='true']) { border-color: #bc6c56; }
+.inputWrap span { flex-shrink: 0; white-space: nowrap; padding-right: 10px; color: #768171; font-size: 13px; }
+.field small { display: block; font-size: 14px; color: #72806d; margin-top: 8px; line-height: 1.5; }
+.field .verified { color: #26745c; }
+.horizon { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 24px; margin-top: 26px; border-top: 1px solid #e5eadf; }
+.horizon label { font-size: 16px; font-weight: 550; }
+.horizon strong { font-size: 26px; white-space: nowrap; }
+.horizon small { font-size: 16px; font-weight: 400; }
+.range { width: 100%; margin-top: 20px; accent-color: #397458; cursor: pointer; }
+.rangeEnds { display: flex; justify-content: space-between; color: #72806d; font-size: 14px; margin-top: 8px; }
+.comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+.buyOption, .rentOption { padding: 20px; border-radius: 12px; }
+.buyOption { background: #edf4eb; }
+.rentOption { background: #eff2fa; }
+.comparison h3 { font-size: 17px; font-weight: 600; }
+.amount { display: block; font-size: clamp(25px, 2.7vw, 35px); font-weight: 650; letter-spacing: -.04em; margin: 12px 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.amount span { font-size: 15px; font-weight: 400; letter-spacing: 0; white-space: nowrap; }
+.comparison p { font-size: 15px; line-height: 1.65; color: #647164; }
+.savingsNote { margin-top: 20px; font-size: 16px; line-height: 1.7; }
+.answer { margin-top: 24px; padding: 20px 0 0; border-top: 1px solid #e2e8dc; }
+.answer strong { font-size: 21px; font-weight: 600; line-height: 1.5; display: block; }
+.answer p { margin-top: 12px; font-size: 14px; line-height: 1.6; color: #6d7c67; }
+.advanced summary, .sourceDetails summary, .graphDetails > summary { display: flex; justify-content: space-between; gap: 12px; cursor: pointer; font-weight: 550; font-size: 16px; }
+.advanced[open] summary { padding-bottom: 20px; border-bottom: 1px solid #edf0e9; }
+.advanced[open] summary > span { transform: rotate(45deg); }
+.advanced h3 { font-size: 18px; font-weight: 600; margin: 24px 0 18px; }
+.hint, .sourceDetails p { font-size: 15px; line-height: 1.7; color: #6e7a68; margin-top: 18px; }
+.provenance { display: grid; gap: 5px; font-size: 14px; margin-top: 18px; padding-top: 14px; border-top: 1px solid #dfe6da; }
+.reset { font-size: 14px; color: #72806d; text-decoration: underline; text-underline-offset: 4px; cursor: pointer; justify-self: start; margin-left: 8px; }
+.breakdown { margin-top: 24px; padding-top: 20px; border-top: 1px solid #e2e8dc; }
+.breakdown summary, .tableDetails summary { font-size: 15px; cursor: pointer; }
+.breakdown h3 { font-size: 17px; margin-top: 24px; font-weight: 600; }
+.breakdown dl > div { display: flex; justify-content: space-between; gap: 18px; margin-top: 12px; font-size: 15px; }
+.breakdown dd { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.breakdown p { font-size: 15px; line-height: 1.7; margin-top: 14px; color: #647164; }
+.legend { display: flex; gap: 20px; flex-wrap: wrap; font-size: 15px; margin-top: 22px; }
+.buyText { color: #26745c; }
+.rentText { color: #526bb2; }
+.chart { display: block; width: 100%; height: auto; margin: 15px 0; overflow: visible; }
+.chartReadout { display: grid; gap: 8px; font-size: 15px; background: #f6f8f3; border-radius: 8px; padding: 16px; }
+.chartSlider { display: flex; align-items: center; gap: 18px; font-size: 15px; margin: 20px 0; }
+.chartSlider input { width: 100%; accent-color: #547765; cursor: pointer; }
+.tableScroll { overflow-x: auto; margin-top: 20px; }
+.tableScroll table { width: 100%; border-collapse: collapse; font-size: 14px; white-space: nowrap; }
+.tableScroll :is(th, td) { text-align: right; padding: 12px 8px; border-bottom: 1px solid #edf0e9; font-variant-numeric: tabular-nums; }
+.tableScroll th:first-child { text-align: left; }
+.estimatePanel { margin: 20px 0; padding-bottom: 20px; border-bottom: 1px solid #d8e5ce; }
+.estimatePanel p { font-size: 15px; line-height: 1.7; color: #637765; margin: 14px 0; }
+.estimateLinks { display: grid; gap: 12px; }
+.estimateLinks a { padding: 12px 16px; border-radius: 9px; font-size: 15px; font-weight: 550; border: 1px solid #d9e4d1; }
+.error { padding: 22px; border: 1px solid #d9ab98; border-radius: 14px; font-size: 16px; color: #8c4933; }
+.method { max-width: 1200px; margin: 36px auto 0; border-top: 1px solid #dde4d7; padding-top: 26px; }
+.method summary { cursor: pointer; font-size: 17px; font-weight: 550; }
+.method p { max-width: 850px; font-size: 16px; line-height: 1.8; color: #647164; margin-top: 20px; }
+.method a { text-decoration: underline; }
+.faq { max-width: 1200px; margin: 36px auto 0; }
+.faq h2 { font-size: 23px; font-weight: 600; margin-bottom: 16px; }
+.faq details { border-bottom: 1px solid #dde4d7; padding: 20px 0; }
+.faq summary { font-size: 17px; font-weight: 500; cursor: pointer; }
+.faq p { max-width: 850px; font-size: 16px; color: #647164; line-height: 1.8; margin-top: 16px; }
+@media (max-width: 950px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); max-width: 700px; }
+  .method, .faq { max-width: 700px; }
+}
+@media (max-width: 540px) {
+  .page { padding: 32px 14px 48px; }
+  .intro { font-size: 17px; }
+  .card { padding: 22px 18px; }
+  .card h2 { font-size: 20px; }
+  .comparison { grid-template-columns: 1fr; }
+  .buyOption, .rentOption { padding: 18px; }
+  .amount { font-size: 32px; }
+  .fields { gap: 20px 12px; }
+  .inputWrap input { font-size: 18px; padding-left: 10px; }
+  .inputWrap span { font-size: 13px; padding-right: 8px; }
+  .field label { min-height: 42px; }
+}
+.chooser { max-width: 1200px; margin: 0 auto 30px; }
+.chooser h2 { font-size: 18px; font-weight: 600; margin-bottom: 14px; }
+.scenarioButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.scenarioButtons button { text-align: left; border: 1px solid #d8e1d1; background: white; padding: 22px; border-radius: 12px; font-size: 18px; font-weight: 550; line-height: 1.5; cursor: pointer; }
+.scenarioButtons button[aria-pressed='true'] { color: #24553c; background: #e7f0e1; border-color: #71976a; }
+.repairButton { margin-top: 18px; font-size: 15px; color: #61705b; cursor: pointer; text-align: left; }
+.repairButton[aria-pressed='true'] { font-weight: 650; color: #24553c; text-decoration: underline; text-underline-offset: 5px; }
+.extraFields { margin-top: 24px; }
+.numbers { margin-top: 20px; }
+.numbers > div { display: flex; justify-content: space-between; gap: 18px; padding: 10px 0; border-bottom: 1px solid #dce4d666; font-size: 15px; line-height: 1.5; }
+.numbers dd { font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 550; }
+.numbers dt { color: #63715e; }
+.comparison .numbers > div { flex-direction: column; gap: 3px; }
+.upfront { margin-top: 20px; border-top: 1px solid #e0e6dc; padding-top: 18px; font-size: 17px; }
+.budgetAmount { font-size: clamp(36px, 5vw, 54px); display: block; margin-top: 22px; font-weight: 650; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.termOptions { display: grid; gap: 12px; margin-top: 20px; }
+.termOptions button { cursor: pointer; padding: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; text-align: left; border: 1px solid #dce4d6; border-radius: 10px; }
+.termOptions button[aria-pressed='true'] { background: #edf4e8; border-color: #71976a; }
+.termOptions strong { font-size: 18px; grid-row: span 2; }
+.termOptions b { font-size: 24px; grid-column: 2; overflow-wrap: anywhere; }
+.termOptions span { font-size: 14px; color: #63715e; }
+.termOptions span:last-child { grid-column: 1 / -1; }
+.recovery { font-size: 26px; line-height: 1.5; color: #2f6647; font-weight: 600; margin-top: 20px; }
+.estimatePanel summary { cursor: pointer; font-size: 15px; line-height: 1.6; }
+.estimateLinks { margin-top: 16px; }
+@media (max-width: 950px) { .chooser { max-width: 700px; } }
+@media (max-width: 540px) { .scenarioButtons { grid-template-columns: 1fr; } .scenarioButtons button { padding: 18px; font-size: 17px; } }
+.paymentBars { margin-top: 28px; }
+.paymentRow + .paymentRow { margin-top: 30px; }
+.barHeading { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; margin-bottom: 12px; }
+.barHeading h3 { font-size: 17px; font-weight: 550; }
+.barHeading strong { font-size: clamp(24px, 3vw, 32px); font-weight: 650; letter-spacing: -.035em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.barTrack { height: 28px; width: 100%; background: #f1f3ee; border-radius: 7px; display: flex; overflow: hidden; }
+.barTrack span { height: 100%; flex-shrink: 0; }
+.barLegend { display: flex; flex-wrap: wrap; gap: 12px 22px; margin-top: 14px; }
+.barLegend > div { font-size: 14px; line-height: 1.6; }
+.barLegend dt { display: flex; gap: 7px; align-items: center; color: #66715f; }
+.barLegend i { height: 9px; width: 9px; border-radius: 2px; flex-shrink: 0; }
+.barLegend dd { padding-left: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.paymentDifference { padding-top: 20px; margin-top: 22px; border-top: 1px solid #e3e8dd; font-size: 17px; font-weight: 550; }
+.barNote { margin-top: 8px; font-size: 14px; line-height: 1.6; color: #64715f; }
+.endComparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.ownershipPanel, .rentalPanel { border-radius: 14px; padding: 22px 18px; text-align: center; }
+.ownershipPanel { background: #edf4eb; }
+.rentalPanel { background: #eff2fa; }
+.homeSymbol { width: 60px; height: 60px; padding: 6px; margin: 0 auto 12px; color: #34765a; }
+.rentalPanel .homeSymbol { color: #7489c4; }
+.endComparison h3 { font-size: 18px; font-weight: 600; line-height: 1.5; }
+.progressHeading { display: flex; justify-content: space-between; gap: 8px; margin-top: 24px; font-size: 14px; text-align: left; }
+.loanProgress { height: 10px; background: #d6e1cf; border-radius: 6px; overflow: hidden; margin-top: 8px; }
+.loanProgress > span { background: #34765a; height: 100%; display: block; }
+.debtLabel { margin-top: 22px; font-size: 14px; color: #64715f; }
+.debtAmount { display: block; font-size: clamp(24px, 2.8vw, 32px); font-weight: 650; letter-spacing: -.03em; margin: 4px 0 8px; overflow-wrap: anywhere; }
+.endCaption { font-size: 14px; line-height: 1.6; color: #64715f; }
+.rentalStatus { border-top: 1px dashed #c8d2e8; margin-top: 24px; padding-top: 20px; color: #627393; }
+.rentalStatus > span { display: block; font-size: 34px; opacity: .5; }
+.rentalStatus p { font-size: 16px; line-height: 1.6; margin-top: 10px; }
+.noLoan { padding: 30px 0; color: #34765a; }
+.noLoan span { font-size: 36px; }
+.noLoan p { margin-top: 8px; font-size: 16px; }
+@media (max-width: 540px) {
+  .barHeading { flex-wrap: wrap; gap: 5px 14px; }
+  .barHeading strong { font-size: 28px; }
+  .endComparison { gap: 10px; }
+  .ownershipPanel, .rentalPanel { padding: 18px 12px; }
+  .endComparison h3 { font-size: 16px; min-height: 48px; }
+  .progressHeading { flex-direction: column; gap: 3px; }
+  .rentalStatus p { font-size: 14px; }
+}
+
+.inputHeading { margin-bottom: 22px; }

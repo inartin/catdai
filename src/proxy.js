@@ -66,10 +66,10 @@ export async function proxy(request) {
     return NextResponse.redirect(url);
   }
 
-  // English is available for Cadastru and payment routes during this rollout.
+  // English is available for Cadastru, the buy/rent simulator and payment routes.
   const langMatch = pathname.match(/^\/(ro|ru|en)(\/.*)?$/);
   if (langMatch) {
-    if (langMatch[1] === "en" && !/^\/(?:cadastru(?:\/|$)|c\/|payment(?:\/|$))/.test(langMatch[2] || "/")) {
+    if (langMatch[1] === "en" && !/^\/(?:cadastru(?:\/|$)|cumparare-sau-chirie(?:\/|$)|c\/|payment(?:\/|$))/.test(langMatch[2] || "/")) {
       return NextResponse.next();
     }
     const requestHeaders = new Headers(request.headers);

@@ -10,6 +10,7 @@ import FeaturePricingAction from "@/components/FeaturePricingAction";
 import ListingAlertConfigurator from "@/components/ListingAlertConfigurator";
 import Tooltip from "@/components/Tooltip";
 import ValuationPdfDialog from "@/components/ValuationPdfDialog";
+import BuyRentEstimateAction from "@/components/BuyRentEstimateAction";
 import ValuationEvidenceSummary from "@/components/ValuationEvidenceSummary";
 import CadastralDataCard from "@/components/CadastralDataCard";
 import InfoCallout from "@/components/InfoCallout";
@@ -1827,6 +1828,8 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         </div>
       )}
 
+      {!compactLayout && <BuyRentEstimateAction data={data} />}
+
       {!isPaid && freeMonthlyLimitReached && (
         <p className="text-sm text-gray-600 px-1">
           {t("result.freeMonthlyLimitReachedLine")}
@@ -2422,6 +2425,8 @@ export default function EstimateResult({ data, onReset, onCompare, onClose, onLi
         onAuthRequired={handlePdfAuthRequired}
         onClose={() => setIsPdfDialogOpen(false)}
       />
+
+      {!compactLayout && <BuyRentEstimateAction data={data} />}
 
       {/* Property summary header */}
       <div className={`${compactLayout ? "" : "order-1"} rounded-2xl border border-gray-100 bg-white shadow-sm p-6 sm:p-8`}>

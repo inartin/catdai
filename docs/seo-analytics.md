@@ -63,6 +63,38 @@ Implemented.
 - Admin exclusion affects future statistics only. Operational favorites, shares and alerts store a creation-time `collect_statistics` flag; statistics queries use eligible rows while profile/favorite/share/alert functionality still uses all rows. Migration `20261019132539_admin_statistics_exclusion.sql` gives existing records the default `true`; no historical events are deleted or reclassified. Explicit news upvotes remain a user action, not passive view tracking.
 - Cadastru shared-report clicks and unique opens are tracked separately from new searches, using `cadastru_share_events` and the report's verified originating search ID. The signed-in sharer's own opens are excluded; visitor/admin suppression is applied at event time and the report's creation-time eligibility is retained. Logged-out opens require a signed browser cookie returned to the server; no IP addresses or raw fingerprints are stored. Details and rollout: [Cadastru sharing](favorites-sharing.md#cadastru-reports).
 
+## Payment ecommerce (MAIB)
+
+The MAIB funnel uses the existing `NEXT_PUBLIC_GA_ID` Google tag. Custom events:
+
+| Event | Trigger |
+| --- | --- |
+| `paid_offer_viewed` | A paid offer is visible (desktop/mobile variants are observed separately). |
+| `checkout_button_clicked` | A feature or pricing checkout button is clicked. |
+| `maib_pay_button_clicked` | Valid receipt email/Terms submission, after the buyer session is ready. |
+| `sent_to_maib` | A bank checkout URL is available and the browser starts redirecting. |
+| `returned_from_maib` | An authenticated status response matches a bank handoff recorded in this tab within 24 hours. |
+| `checkout_error` | Guest session or checkout request failure; never a claim about bank settlement. |
+| `payment_failed`, `payment_cancelled` | Backend-confirmed final MAIB outcomes. Pending, unknown and expired orders are not classified as failed. |
+
+Standard `begin_checkout` fires once per checkout mount with a valid product; `purchase` and `refund` are backend-only. One ecommerce item represents the bought bundle, including custom single-use quantities. Purchases use immutable server order amounts/titles and the order UUID as `transaction_id`. Refund events contain only the newly refunded amount and the same transaction ID; partial refunds do not imply that a whole item was returned. MAIB field-level interactions remain outside the site's visibility. Paddle servicing is unchanged.
+
+Browser collection requires production mode, `catdai.md`/`www.catdai.md`, the configured GA4 ID and granted cookie consent. Offers and checkout starts also respond to consent granted after rendering. Only consented GA-generated client/session IDs are attached to new production orders; absent IDs never block checkout. Server validation retains only bounded IDs and server-resolved buyer type/origin. Event payloads exclude receipt email, auth tokens, property searches and checkout query parameters. Events explicitly target GA4, leaving Google Ads conversion configuration separate.
+
+Migration `20261102141624_ga4_payment_events.sql` adds nullable order context and a service-only, RLS-protected `ga4_payment_events` outbox. A trigger queues verified outcomes in the payment transaction; unique order/event keys prevent callback/poll duplicates and refund totals produce deltas. There is no historical backfill. The existing MAIB worker independently delivers the queue when `NODE_ENV=production`, `MAIB_ENVIRONMENT=production` and server-only `GA4_API_SECRET` are configured. Missing settings disable delivery. Restart the worker after deployment/config changes.
+
+Purchases retry transient/uncertain delivery using their transaction ID. Uncertain refund delivery or an expired non-purchase sender lease becomes `unknown` for manual inspection instead of risking duplicated refunds. Explicit transient HTTP errors retry with backoff; other rejections require configuration review. Events older than Google's 72-hour window are skipped. `sent` means Google acknowledged receipt, not proof that it accepted the payload into reports. Validate payloads through `/debug/mp/collect` before rollout. Session attribution also depends on Google's session/time limits.
+
+GA4 property setup:
+- Use the existing Catdai web stream (`G-XD91H28TR6`); create a Measurement Protocol API secret and store it only in the worker's environment as `GA4_API_SECRET`.
+- Create Event-scoped custom definitions: **Checkout origin** → `checkout_origin`, **Payment provider** → `payment_provider`, **Buyer type** → `buyer_type`, **Checkout error reason** → `checkout_error_reason`. Standard item/revenue fields need no custom definitions.
+- List `checkout.maib.md` as an unwanted referral. Keep `purchase` as a key event; clicks remain funnel steps.
+- Create a Funnel Exploration: `checkout_button_clicked` → `begin_checkout` → `maib_pay_button_clicked` → `sent_to_maib` → `purchase`, allowing intervening events. `returned_from_maib` is diagnostic and is not required for purchase completion. Standard checkout reports expecting on-site card/shipping entry do not represent this hosted checkout; use the custom funnel.
+
+Checks: `pnpm exec node --experimental-vm-modules scripts/test-ga4-payments.mjs`, the MAIB continue/result and guest checkout suites, and `pnpm build`. Google DebugView/Realtime and a real consented production payment are separate rollout checks. Existing internal payment statistics retain their event names and reporting behavior.
+
+Rollout on 2 November 2026: the outbox migration was applied to the shared Catdai database and verified (RLS enabled, client roles denied table/function access, invoker functions, no historical events). The four custom dimensions and **CatDai - MAIB payment funnel** exploration were saved in GA4. With owner approval, Google's User Data Collection Acknowledgement was accepted and the **CatDai payments** API secret was created. `GA4_API_SECRET` is stored in ignored `.env.local` files locally and on production `aws2` (`0600`); no value is stored in code or documentation. Google's strict `/debug/mp/collect` validation returned no messages for purchase, partial refund, confirmed failure and cancellation payloads; debug requests do not populate reports or verify secret authentication. The production worker still has the previous code, so application/worker deployment and a real consented payment remain required. The embedded Google tag settings panel loaded blank, so MAIB referral exclusion could not yet be saved.
+
 ## Related Files
 - `src/app/layout.js`
 - `src/app/sitemap.js`

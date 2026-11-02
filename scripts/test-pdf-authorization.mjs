@@ -155,6 +155,7 @@ const pricing = await load('src/components/FeaturePricingAction.js', {
   'react-dom': { createPortal: node => node },
   '@/lib/feature-purchase-content': { FEATURE_PURCHASE_CONTENT },
   '@/components/FeaturePurchaseBenefits': { default: noop },
+  '@/components/PaymentOfferTracker': { default: noop },
   'next/link': { default: 'Link' },
   '@/components/usePaymentProvider': { default: () => 'maib' },
   '@/lib/maib/products.mjs': { maibProduct },
@@ -162,6 +163,7 @@ const pricing = await load('src/components/FeaturePricingAction.js', {
   '@/context/LanguageContext': { useTranslation: () => ({ lang, t: (key, args = {}) =>
     Object.entries(args).reduce((value, [name, replacement]) => value.replaceAll(`{${name}}`, replacement), messages[lang][key] || key) }) },
   '@/lib/tracking': { trackPaymentCheckoutEvent: noop },
+  '@/lib/ga4-payment-client': { trackPaymentAnalytics: noop },
   '@/lib/payment-urls.mjs': { featureCheckoutUrl: value => value },
 });
 function text(node) {

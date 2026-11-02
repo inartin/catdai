@@ -33,6 +33,8 @@ import { ensureCadastruLookupId, getCadastruSearchSessionId } from "@/lib/cadast
 import { recordCadastruShareOpen } from "@/lib/cadastru-share-tracking";
 import { cadastruMapLocation } from "@/lib/cadastru-map";
 import { featureCheckoutUrl } from "@/lib/payment-urls.mjs";
+import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
+import PaymentOfferTracker from "@/components/PaymentOfferTracker";
 
 const roadTypes = [
   { value: "strada", label: "cadastru.roadTypeStreet", fullLabel: "cadastru.roadTypeStreetFull" },
@@ -532,6 +534,8 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
     : Number(process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499);
   const unlockPriceLabel = `${new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD").format(unlockPriceMdl)} MDL`;
   const startCheckout = () => {
+    if (paymentProvider === 'maib') trackPaymentAnalytics('checkout_button_clicked', checkoutProductKey,
+      { buyer_type: session?.user && !session.user.is_anonymous ? 'account' : 'guest', language: lang });
     const current = new URL(window.location.href);
     const path = getCadastruFavoritePath({ lang, cadastralNumber, cadastral: state.data,
       addressRequest: pendingAddressRequest, savedAddress });
@@ -1346,6 +1350,8 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
 
           {state.data && (
             <div ref={cadastralCardRef} className="overflow-visible bg-gray-50 p-1">
+              {canUnlock && paymentProvider === 'maib' && <PaymentOfferTracker productKey={checkoutProductKey}
+                buyerType={session?.user && !session.user.is_anonymous ? 'account' : 'guest'} language={lang} />}
               <CadastralDataCard
                 cadastral={state.data}
                 locked={isLockedPreview}

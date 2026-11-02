@@ -70,6 +70,7 @@ async function page(lang, initialStatus, options = {}) {
     '@/lib/maib/result.mjs': paymentResult,
     '@/lib/feature-purchase-content': { FEATURE_PURCHASE_CONTENT },
     '@/lib/tracking': { trackPaymentCheckoutEvent: noop },
+    '@/lib/ga4-payment-client': { trackPaymentAnalytics: noop, capturePaymentAnalytics: async () => null },
     '@/lib/payment-urls.mjs': { paymentAppLink: path => path },
   };
   const context = vm.createContext({

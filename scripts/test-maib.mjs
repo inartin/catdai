@@ -1,5 +1,6 @@
 import { sharedPaidCreditBalance, sharedFreeMonthlyCredit } from "../src/lib/shared-credit-balance.mjs";
 import * as guestCheckout from '../src/lib/guest-checkout.mjs';
+import { verifiedAnalyticsContext } from '../src/lib/ga4-payment.mjs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -239,6 +240,7 @@ const create=await loadRoute('src/app/api/payments/maib/create/route.js',{
   '@/lib/payment-provider':{getPaymentProvider},'@/lib/maib/products.mjs':{maibProduct,maibOrderQuantity},
   '@/lib/maib/purchase.mjs':{MAIB_TERMS_VERSION,receiptEmail,maibProductTitle},
   '@/lib/maib/cadastru-delivery':{buildMaibCadastruDelivery:async input=>{deliveryInput=input;return deliverySnapshot;}},
+  '@/lib/ga4-payment.mjs':{verifiedAnalyticsContext},
   '@/lib/maib/client.mjs':{...client,maibRequest:async(path,{body})=>{bankPayload=body;bankCreates++;assert.equal(body.amount,expectedBankAmount);assert.equal(body.currency,'MDL');return {checkoutId,checkoutUrl:`https://checkout-sandbox.maib.md/${checkoutId}`};}},
   '@/lib/maib/service.mjs':{checked:async query=>(await query).data,publicOrder:x=>x},
   '@/lib/maib/http':{UUID:uuid,requestUser:async()=>createUser,paymentOrigin:http.paymentOrigin,paymentError:()=>Response.json({},{status:502})},
@@ -262,6 +264,8 @@ assert.equal(insertSnapshot.terms_version,MAIB_TERMS_VERSION);assert.ok(Date.par
 assert.equal(insertSnapshot.product_title,maibProductTitle('standard_pack','ru'));
 const publicSnapshot=service.publicOrder({...insertSnapshot,paid_at:'2026-10-05T12:00:00Z'});
 assert.equal(publicSnapshot.paid_at,'2026-10-05T12:00:00Z');assert.equal(publicSnapshot.quantity,1);
+assert.equal(insertSnapshot.ga4_context,null,'Sandbox orders cannot acquire production analytics attribution');
+assert.equal(publicSnapshot.ga4_context,undefined,'Payment responses never expose browser analytics identifiers');
 assert.deepEqual(publicSnapshot.grants,insertSnapshot.grants);assert.equal(publicSnapshot.receipt_email,undefined);
 deliverySnapshot={payload:{apartment:{area_m2:52}},search_label:'server-authored'};
 assert.equal((await create.POST(createRequest({...purchaseBody,return_to:'/en/cadastru/rezultat?cadastral_number=0100106.131',cadastru_delivery:{payload:{injected:true}}}))).status,200);

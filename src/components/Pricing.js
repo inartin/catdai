@@ -8,6 +8,8 @@ import { useTranslation } from "@/context/LanguageContext";
 import CloseIcon from "@/components/icons/CloseIcon";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
+import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
+import PaymentOfferTracker from "@/components/PaymentOfferTracker";
 
 const MAX_CUSTOM_REQUEST_LENGTH = 500;
 const MAX_CUSTOM_REQUEST_BODY_LENGTH = 340;
@@ -114,7 +116,7 @@ function buildPendingCheckoutUrl(productKey, lang) {
   return url.toString();
 }
 
-function PriceCard({ plan, featured = false, active = false, checkoutState, onCheckout }) {
+function PriceCard({ plan, featured = false, active = false, checkoutState, onCheckout, analytics }) {
   const { t } = useTranslation();
   const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false);
   const priceLabel = plan.price === 0 ? plan.priceLabel : formatPrice(plan.price);
@@ -150,6 +152,7 @@ function PriceCard({ plan, featured = false, active = false, checkoutState, onCh
           : "border border-gray-200 shadow-sm hover:shadow-md"
       }`}
     >
+      {plan.productKey && analytics && <PaymentOfferTracker productKey={plan.productKey} {...analytics} />}
       {active ? (
         <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3.5 py-1 text-xs font-bold text-white shadow-sm">
           {t("pricing.activePlan")}
@@ -563,6 +566,8 @@ export default function Pricing({
   const activePlan = plans.find((plan) => plan.key === activePlanKey) || null;
 
   const startCheckout = (productKey) => {
+    if (provider === 'maib') trackPaymentAnalytics('checkout_button_clicked', productKey,
+      { checkout_source: 'pricing', buyer_type: session?.user && !session.user.is_anonymous ? 'account' : 'guest', language: lang });
     setCheckoutState({ status: "redirecting", productKey, message: "" });
     window.location.href = buildPendingCheckoutUrl(productKey, lang);
   };
@@ -594,6 +599,8 @@ export default function Pricing({
               active={plan.key === activePlanKey}
               checkoutState={checkoutState}
               onCheckout={startCheckout}
+              analytics={provider === 'maib' ? { checkoutSource: 'pricing',
+                buyerType: session?.user && !session.user.is_anonymous ? 'account' : 'guest', language: lang } : null}
             />
           ))}
         </div>

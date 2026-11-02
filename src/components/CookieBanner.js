@@ -26,6 +26,7 @@ export default function CookieBanner() {
         ad_personalization: "granted",
       });
     }
+    window.dispatchEvent(new Event('catdai:analytics-consent'));
   };
 
   const handleDecline = () => {

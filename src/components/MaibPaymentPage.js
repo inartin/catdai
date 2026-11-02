@@ -11,6 +11,7 @@ import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '@/lib/maib/p
 import { MAIB_FINAL_STATUSES, maibResultContext } from '@/lib/maib/result.mjs';
 import MaibPaymentResultCard from '@/components/MaibPaymentResultCard';
 import { trackPaymentCheckoutEvent } from '@/lib/tracking';
+import { capturePaymentAnalytics, trackPaymentAnalytics } from '@/lib/ga4-payment-client';
 import { paymentAppLink } from '@/lib/payment-urls.mjs';
 import LockIcon from '@/components/icons/LockIcon';
 import FeaturePurchaseBenefits from '@/components/FeaturePurchaseBenefits';
@@ -29,6 +30,8 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
   const [accepted, setAccepted] = useState(false);
   const [emailInput, setEmailInput] = useState(null);
   const tracked = useRef(false);
+  const analyticsTracked = useRef(false);
+  const returnTracked = useRef(false);
   const inFlight = useRef(false);
   const pricingCheckout = params?.get('checkout_source') === 'pricing';
   const guestAllowed = allowsGuestCheckout({ checkout_source: params?.get('checkout_source'), return_to: params?.get('return_to') });
@@ -40,6 +43,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
   }, [params, lang, setLang]);
   const quantity = params?.has('quantity') ? Number(params.get('quantity')) : 1;
   const product = maibProduct(result ? order?.product_key : params?.get('product_key'), result ? 1 : quantity);
+  const productKey = product?.key;
   const email = emailInput ?? receiptEmail(user?.email) ?? '';
   const grants = order?.grants || product?.grants || {};
   useEffect(() => {
@@ -54,6 +58,18 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
     trackPaymentCheckoutEvent('checkout_page_opened', { accessToken: session?.access_token, provider: 'maib', product_key: params.get('product_key') });
   }, [loading, params, result, session?.access_token]);
   useEffect(() => {
+    if (result || loading || !productKey) return;
+    const track = () => {
+      if (!analyticsTracked.current) analyticsTracked.current = trackPaymentAnalytics('begin_checkout', productKey, {
+        quantity, sandbox, checkout_source: params?.get('checkout_source'), language: lang,
+        buyer_type: user && !isGuest ? 'account' : 'guest',
+      });
+    };
+    track();
+    window.addEventListener('catdai:analytics-consent', track);
+    return () => window.removeEventListener('catdai:analytics-consent', track);
+  }, [result, loading, productKey, quantity, params, lang, user, isGuest, sandbox]);
+  useEffect(() => {
     if (!result || !params || !session?.access_token) return;
     let stopped = false;
     let timer;
@@ -66,6 +82,19 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
         const data = await response.json();
         if (!response.ok) throw new Error('status');
         if (stopped) return;
+        if (!returnTracked.current && data.product_key) {
+          returnTracked.current = true;
+          try {
+            const key = `catdai:maib:redirect:${data.order_id}`;
+            const redirectedAt = Number(sessionStorage.getItem(key));
+            if (redirectedAt > 0 && Date.now() - redirectedAt < 86400_000) {
+              trackPaymentAnalytics('returned_from_maib', data.product_key, { quantity: data.quantity, sandbox,
+                checkout_source: maibResultContext(data).autoReturnTo ? undefined : 'pricing',
+                buyer_type: isGuest ? 'guest' : 'account', language: data.language });
+              sessionStorage.removeItem(key);
+            }
+          } catch { /* Optional analytics never blocks status or navigation. */ }
+        }
         setOrder(data); setError(data.verification_pending && !MAIB_FINAL_STATUSES.includes(data.status) ? t('maib.statusError') : '');
         if (MAIB_FINAL_STATUSES.includes(data.status)) {
           try { sessionStorage.removeItem(`catdai:maib:request:${user.id}:${data.product_key}${data.quantity > 1 ? `:${data.quantity}` : ''}`); }
@@ -82,7 +111,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
     }
     poll();
     return () => { stopped = true; clearTimeout(timer); controller.abort(); };
-  }, [result, params, session?.access_token, user?.id, isGuest, refresh, t]);
+  }, [result, params, session?.access_token, user?.id, isGuest, refresh, t, sandbox]);
   async function start(event) {
     event.preventDefault();
     if (inFlight.current || !product || (!session?.access_token && !guestAllowed) || !accepted || !receiptEmail(email)) return;
@@ -97,16 +126,29 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
       }
       const payer = paymentSession.user || user;
       trackPaymentCheckoutEvent('maib_continue_clicked', { accessToken: paymentSession.access_token, provider: 'maib', product_key: product.key });
+      trackPaymentAnalytics('maib_pay_button_clicked', product.key, { quantity: product.quantity, sandbox,
+        checkout_source: params.get('checkout_source'), buyer_type: payer?.is_anonymous ? 'guest' : 'account', language: lang });
+      const ga4Context = await capturePaymentAnalytics(sandbox);
       const key = `catdai:maib:request:${payer.id}:${product.key}${product.quantity > 1 ? `:${product.quantity}` : ''}`;
       const requestKey = sessionStorage.getItem(key) || crypto.randomUUID();
       sessionStorage.setItem(key, requestKey);
-      const response = await fetch('/api/payments/maib/create', { method: 'POST', headers: { Authorization: `Bearer ${paymentSession.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ product_key: product.key, quantity: product.quantity, lang, checkout_source: params.get('checkout_source'), return_to: params.get('return_to'), request_key: requestKey, terms_accepted: accepted, terms_version: MAIB_TERMS_VERSION, receipt_email: receiptEmail(email) }) });
+      const response = await fetch('/api/payments/maib/create', { method: 'POST', headers: { Authorization: `Bearer ${paymentSession.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ product_key: product.key, quantity: product.quantity, lang, checkout_source: params.get('checkout_source'), return_to: params.get('return_to'), request_key: requestKey, terms_accepted: accepted, terms_version: MAIB_TERMS_VERSION, receipt_email: receiptEmail(email), ga4_context: ga4Context }) });
       const data = await response.json();
       if (!response.ok) throw new Error('checkout');
       trackPaymentCheckoutEvent('checkout_order_created', { accessToken: paymentSession.access_token, provider: 'maib', order_id: data.order_id, product_key: product.key });
-      if (data.checkout?.url) window.location.assign(data.checkout.url);
+      if (data.checkout?.url) {
+        trackPaymentAnalytics('sent_to_maib', product.key, { quantity: product.quantity, sandbox,
+          checkout_source: params.get('checkout_source'), buyer_type: payer?.is_anonymous ? 'guest' : 'account', language: lang });
+        try { sessionStorage.setItem(`catdai:maib:redirect:${data.order_id}`, String(Date.now())); } catch {}
+        window.location.assign(data.checkout.url);
+      }
       else window.location.assign(paymentAppLink(`/payment/maib/success?order_id=${encodeURIComponent(data.order_id)}&lang=${lang}`));
-    } catch { setError(t(guestSessionFailed ? 'payment.guestUnavailable' : 'maib.checkoutError')); setBusy(false); inFlight.current = false; }
+    } catch {
+      trackPaymentAnalytics('checkout_error', product.key, { quantity: product.quantity, sandbox,
+        checkout_source: params.get('checkout_source'), buyer_type: isGuest ? 'guest' : 'account', language: lang,
+        error_reason: guestSessionFailed ? 'guest_session_unavailable' : 'checkout_request_failed' });
+      setError(t(guestSessionFailed ? 'payment.guestUnavailable' : 'maib.checkoutError')); setBusy(false); inFlight.current = false;
+    }
   }
   // The result destination comes only from the authenticated server order.
   const amount = `${((order?.amount_minor ?? product?.amount_minor ?? 0) / 100).toLocaleString(lang === 'en' ? 'en-GB' : lang === 'ru' ? 'ru-MD' : 'ro-MD')} ${order?.currency_code || product?.currency_code || 'MDL'}`;

@@ -7,10 +7,12 @@ import usePaymentProvider from "@/components/usePaymentProvider";
 import { maibProduct } from "@/lib/maib/products.mjs";
 import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
+import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
+import PaymentOfferTracker from "@/components/PaymentOfferTracker";
 
 export default function PricingPackages() {
   const { t, lang } = useTranslation();
-  const { session, loading: authLoading } = useAuth();
+  const { session, user, isGuest, loading: authLoading } = useAuth();
   const provider = usePaymentProvider();
   const trackedRef = useRef(false);
   useEffect(() => {
@@ -28,6 +30,8 @@ export default function PricingPackages() {
   ];
 
   const startCheckout = (productKey) => {
+    trackPaymentAnalytics('checkout_button_clicked', productKey, { checkout_source: 'pricing',
+      buyer_type: user && !isGuest ? 'account' : 'guest', language: lang });
     const url = new URL("/payment/maib/checkout", paymentSiteOrigin(window.location.origin));
     url.searchParams.set("product_key", productKey);
     url.searchParams.set("checkout_source", "pricing");
@@ -53,6 +57,8 @@ export default function PricingPackages() {
             });
             return (
               <article key={key} className={`flex flex-col rounded-2xl border bg-white p-6 sm:p-7 ${recommended ? "border-primary shadow-sm ring-1 ring-primary/10" : "border-gray-200"}`}>
+                {provider === 'maib' && <PaymentOfferTracker productKey={productKey} checkoutSource="pricing"
+                  buyerType={user && !isGuest ? 'account' : 'guest'} language={lang} />}
                 <p className={`text-sm font-semibold ${recommended ? "text-primary" : "text-gray-500"}`}>{t(`pricing.shared.${key}.label`)}</p>
                 <h2 className="mt-7 text-3xl font-bold tracking-tight text-gray-950">{t(`pricing.shared.${key}.uses`)}</h2>
                 <p className="mt-6 text-2xl font-semibold tracking-tight text-gray-900">{product.amount_mdl} <span className="text-base font-medium text-gray-500">MDL</span></p>

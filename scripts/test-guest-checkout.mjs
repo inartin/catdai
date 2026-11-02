@@ -192,8 +192,9 @@ async function paymentHarness(query,result=false,provider='maib') {
     '@/lib/guest-checkout.mjs':guestCheckout,'@/lib/maib/products.mjs':{maibProduct},'@/lib/maib/purchase.mjs':purchase,
     '@/lib/maib/result.mjs':paymentResult,
     '@/lib/feature-purchase-content':{FEATURE_PURCHASE_CONTENT},'@/lib/tracking':{trackPaymentCheckoutEvent:noop},
+    '@/lib/ga4-payment-client':{trackPaymentAnalytics:noop,capturePaymentAnalytics:async()=>null},
     '@/lib/payment-urls.mjs':{paymentAppLink:path=>path,paymentSiteOrigin:()=> 'https://catdai.test'},
-  },{window:{location:{search:query,replace:url=>redirects.push(url),assign:url=>redirects.push(url)}},crypto,
+  },{window:{addEventListener:noop,removeEventListener:noop,location:{search:query,replace:url=>redirects.push(url),assign:url=>redirects.push(url)}},crypto,
     sessionStorage:{getItem:key=>requestStorage.get(key),setItem:(key,value)=>requestStorage.set(key,value),removeItem:key=>clearedRequests.push(key)},setTimeout:fn=>{timers.push(fn);return 1;},clearTimeout:noop,
     fetch:async(url,options)=>{fetches.push({url,options});return Response.json(options?.method==='POST'?{order_id:'order',checkout:{url:'https://checkout-sandbox.maib.md/test'}}:{order_id:'order',product_key:'sale_estimate_single',status,grants:{sale_estimate:1},return_to:'/evaluare?city=Chisinau'});},
   });

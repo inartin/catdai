@@ -9,6 +9,7 @@ import { checked, publicOrder } from '@/lib/maib/service.mjs';
 import { UUID, requestUser, paymentOrigin, paymentError } from '@/lib/maib/http';
 import { allowsGuestCheckout } from '@/lib/guest-checkout.mjs';
 import { buildMaibCadastruDelivery } from '@/lib/maib/cadastru-delivery';
+import { verifiedAnalyticsContext } from '@/lib/ga4-payment.mjs';
 const limiter = rateLimit({ interval: 60_000, limit: 10 });
 export async function POST(request) {
   if (getPaymentProvider() !== 'maib') return NextResponse.json({ error: 'MAIB checkout is inactive.' }, { status: 409 });
@@ -42,6 +43,11 @@ export async function POST(request) {
       product_title: maibProductTitle(product.key, lang, product.quantity, body.checkout_source), receipt_email: email,
       terms_version: MAIB_TERMS_VERSION, terms_accepted_at: new Date().toISOString(),
       return_to: returnTo, cadastru_delivery: cadastruDelivery,
+      ga4_context: verifiedAnalyticsContext(body.ga4_context, {
+        user, productKey: product.key, checkoutSource: body.checkout_source,
+        measurementId: process.env.NEXT_PUBLIC_GA_ID,
+        production: process.env.NODE_ENV === 'production' && environment() === 'production',
+      }),
       next_check_at: new Date(Date.now() + 60_000).toISOString(),
     }).select('*').single());
     const origin = paymentOrigin();

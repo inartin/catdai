@@ -11,6 +11,8 @@ import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import { featureCheckoutUrl } from "@/lib/payment-urls.mjs";
 import FeaturePurchaseBenefits from "@/components/FeaturePurchaseBenefits";
 import { FEATURE_PURCHASE_CONTENT } from "@/lib/feature-purchase-content";
+import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
+import PaymentOfferTracker from "@/components/PaymentOfferTracker";
 
 function formatMdl(value, lang, currencyLabel = lang === "en" ? "MDL" : "lei") {
   const amount = Number(value);
@@ -34,7 +36,7 @@ function PurchaseFeatureChecklist({ translationKeys }) {
   );
 }
 
-function MobilePurchaseDrawer({ title, price, children, onCheckout, disabled, pending }) {
+function MobilePurchaseDrawer({ title, price, children, onCheckout, disabled, pending, analytics }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -53,6 +55,7 @@ function MobilePurchaseDrawer({ title, price, children, onCheckout, disabled, pe
           }}
           className="fixed inset-x-0 bottom-0 z-40 rounded-t-2xl border border-primary bg-white px-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-4 shadow-[0_-4px_24px_rgba(0,0,0,0.1)] ring-1 ring-primary/10 lg:hidden"
         >
+          <PaymentOfferTracker {...analytics} />
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -103,7 +106,7 @@ export default function FeaturePricingAction({
   mobileDock = false,
 }) {
   const { t, lang } = useTranslation();
-  const { session, loading: authLoading } = useAuth();
+  const { session, user, isGuest, loading: authLoading } = useAuth();
   const provider = usePaymentProvider();
   const [status, setStatus] = useState("idle");
 
@@ -145,6 +148,8 @@ export default function FeaturePricingAction({
   if (!offer?.product_key) return null;
 
   const startCheckout = () => {
+    if (provider === 'maib') trackPaymentAnalytics('checkout_button_clicked', packageOffer.product_key,
+      { buyer_type: user && !isGuest ? 'account' : 'guest', language: lang });
     setStatus("redirecting");
     onCheckoutStart?.();
     window.location.href = featureCheckoutUrl(packageOffer.product_key, lang, window.location.href);
@@ -179,6 +184,8 @@ export default function FeaturePricingAction({
     </Link>
   );
   const useMobileDock = mobileDock && !isPaywallOffer;
+  const analytics = { productKey: provider === 'maib' ? selectedProductKey : null,
+    buyerType: user && !isGuest ? 'account' : 'guest', language: lang };
   const checkoutPending = status === "loading" || status === "redirecting";
   const checkoutButton = (
     <button
@@ -202,12 +209,13 @@ export default function FeaturePricingAction({
   );
 
   if (variant === "inline") {
-    return <div className={className}>{checkoutButton}</div>;
+    return <div className={className}><PaymentOfferTracker {...analytics} />{checkoutButton}</div>;
   }
 
   return (
     <>
     <div className={`${useMobileDock ? "hidden lg:block" : ""} ${isPaywallOffer ? "" : "rounded-2xl border border-primary bg-white p-4 shadow-sm ring-1 ring-primary/10"} ${className}`}>
+      <PaymentOfferTracker {...analytics} />
       {isPaywallOffer ? (
         <>
           <h2 className="px-4 text-center text-2xl font-bold tracking-tight text-gray-950">
@@ -234,6 +242,7 @@ export default function FeaturePricingAction({
     </div>
     {useMobileDock && (
       <MobilePurchaseDrawer
+        analytics={analytics}
         title={isEvaluationProduct ? t("result.mobilePurchaseTitle") : offerTitle}
         price={isEvaluationProduct ? formatMdl(packageOffer.price_mdl, lang, "MDL") : null}
         onCheckout={startCheckout}

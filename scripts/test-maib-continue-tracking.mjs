@@ -16,6 +16,7 @@ const state = {
   session: { access_token: 'token' }, user: { id: 'buyer' }, accepted: true, guestAllowed: false,
   email: 'buyer@example.com', lang: 'ro', params: new URLSearchParams({ checkout_source: 'pricing' }),
   receiptEmail, MAIB_TERMS_VERSION, crypto: { randomUUID: () => 'request' },
+  trackPaymentAnalytics() {}, capturePaymentAnalytics: async () => null, isGuest: false, sandbox: false,
   sessionStorage: { getItem: () => 'request', setItem() {} },
   setBusy() {}, setError() {}, t: (key) => key,
   trackPaymentCheckoutEvent: (event, metadata) => events.push({ event, metadata }),

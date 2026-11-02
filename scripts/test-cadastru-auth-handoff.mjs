@@ -60,6 +60,7 @@ async function harness(file, path, stored = {}, lang = 'ro') {
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'next/link': { default: noop },
     'next/navigation': { useRouter: () => router, useSearchParams: () => new URL(browser.location.href).searchParams },
     '@/context/LanguageContext': { useTranslation: () => ({ lang, t }) },
     '@/context/AuthContext': { useAuth: () => ({ isAuthenticated: Boolean(authSession) && !authSession?.user?.is_anonymous, loading: false,
@@ -341,6 +342,42 @@ for (const type of ['number', 'address']) {
     assert.equal(timeout.timers.size, 0, `${type}: leaving the page cancels the scheduled retry`);
   }
 }
+
+// A partial-result retry bypasses snapshots and clears the notice only on recovery.
+for (const lang of ['ro', 'ru']) {
+  for (const outcome of ['complete', 'partial', 'unavailable']) {
+    const lookupId = crypto.randomUUID();
+    const partial = { cadastral_number: number, registry_unavailable: true, partial: true,
+      lands: [{ cadastral_number: '0100104.003', area_m2: 692 }] };
+    const complete = { cadastral_number: number,
+      lands: [{ ...partial.lands[0], ownership_type: 'Privată' }] };
+    const recover = await harness(pageFile,
+      `/${lang}/cadastru/rezultat?source=number&cadastral_number=${number}&lookup_id=${lookupId}`, {}, lang);
+    recover.login(); recover.render();
+    await recover.finish(partial);
+    const card = () => walk(recover.render()).find((node) => node.props && 'registryRetrying' in node.props);
+    assert.equal(recover.timers.size, 0, 'partial results do not retry automatically');
+    assert.equal(typeof card().props.onRegistryRetry, 'function');
+    card().props.onRegistryRetry(); recover.render();
+    assert.equal(recover.requests.at(-1).body.skip_cache, true, 'registry retry requests fresh source data');
+    assert.equal(recover.requests.at(-1).body.lookup_id, lookupId, 'registry retry retains search identity');
+    if (outcome === 'unavailable') await recover.finish({ error: 'service_unavailable' }, 503);
+    else await recover.finish(outcome === 'complete' ? complete : partial);
+    const finished = card();
+    assert.equal(finished.props.registryRetrying, false);
+    if (outcome === 'complete') {
+      assert.equal(finished.props.cadastral, complete);
+      assert.equal(finished.props.cadastral.registry_unavailable, undefined, 'recovery removes the notice');
+      assert.equal(finished.props.onRegistryRetry, undefined, 'recovery removes the retry action');
+    } else {
+      assert.equal(finished.props.cadastral, partial, 'remaining outages preserve available data');
+      assert.equal(typeof finished.props.onRegistryRetry, 'function', 'remaining outages can be retried');
+    }
+    assert.equal(recover.timers.size, 0);
+    recover.unmount();
+  }
+}
+console.log('Registry retry passed: RO/RU recovery clears outage state, partial/failed retries preserve available results.');
 
 // Real form handlers: two intentional submissions of identical input get new IDs.
 const form = await harness('src/components/CadastruSearchForm.js', '/ro/cadastru');

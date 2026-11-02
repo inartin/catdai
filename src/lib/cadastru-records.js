@@ -557,7 +557,11 @@ export async function persistCadastruRecord(payload, options = {}) {
       const incoming = Object.fromEntries(Object.entries(row.apartment_data).filter(([, value]) => value != null && value !== ""));
       const retained = Object.keys(existing?.apartment_data || {}).some((key) => !(key in incoming));
       row.apartment_data = { ...existing?.apartment_data, ...incoming };
-      row.raw_payload = { ...existing?.raw_payload, ...row.raw_payload, apartment: row.apartment_data };
+      // Retain property facts, but take temporary result flags from the new lookup.
+      const previousPayload = { ...existing?.raw_payload };
+      delete previousPayload.registry_unavailable;
+      delete previousPayload.partial;
+      row.raw_payload = { ...previousPayload, ...row.raw_payload, apartment: row.apartment_data };
       if (hasDetailedPayload({ apartment: row.apartment_data })) delete row.raw_payload.unit_list_entry;
       row.apartment_area_m2 = normalizeNumber(row.apartment_data.area_m2);
       row.apartment_floor = normalizeInteger(row.apartment_data.floor);

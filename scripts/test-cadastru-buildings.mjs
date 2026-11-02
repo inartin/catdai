@@ -105,6 +105,20 @@ assert.equal(await records.getCadastruRecordByNumber("0100106.131.01.062", { req
 assert.equal(await records.getCadastruRecordByAddress(`${building.address}, ap 62`, { requireUnitDetails: true }), null);
 await records.persistCadastruRecord({ cadastral_number: number, apartment: { address: apartment.address, area_m2: null }, partial: true }, { officialFetch: true });
 assert.equal((await records.getCadastruRecordByNumber(number)).payload.apartment.area_m2, 41.9, "partial refresh preserves known apartment fields");
+const recoveredNumber = `${parent}.098`;
+await records.persistCadastruRecord({ cadastral_number: recoveredNumber, building,
+  apartment: { address: `${building.address}, ap 98`, floor: "4" }, partial: true, registry_unavailable: true }, { officialFetch: true });
+assert.equal((await records.getCadastruRecordByNumber(recoveredNumber)).payload.registry_unavailable, true);
+await records.persistCadastruRecord({ cadastral_number: recoveredNumber, building,
+  apartment: { address: `${building.address}, ap 98`, area_m2: 58, ownership_type: "Privată" } }, { officialFetch: true });
+const recovered = (await records.getCadastruRecordByNumber(recoveredNumber)).payload;
+assert.equal(recovered.apartment.ownership_type, "Privată");
+assert.equal(recovered.apartment.floor, "4", "recovery preserves previously fetched apartment fields");
+assert.equal(recovered.registry_unavailable, undefined, "successful registry recovery clears the old outage marker during apartment merges");
+assert.equal(recovered.partial, undefined, "successful recovery clears the old partial marker");
+cache.clear();
+assert.equal((await records.getCadastruRecordByNumber(recoveredNumber)).payload.registry_unavailable, undefined,
+  "DB reloads cannot restore the stale outage notice");
 await records.persistCadastruRecord({ cadastral_number: "0100106.333.01.001", building: { classifier: "Casă individuală", total_floors: "2" }, apartment: { area_m2: 120 } }, { officialFetch: true });
 assert.equal((await db.query("select shared_building_number from cadastru_records where cadastral_number='0100106.333.01.001'")).rows[0].shared_building_number, null);
 assert.equal((await records.getCadastruRecordByNumber("0100106.333.01.001")).payload.building.total_floors, "2");

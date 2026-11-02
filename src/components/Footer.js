@@ -117,33 +117,34 @@ export default function Footer({ checkout = false }) {
   return (
     <footer className="bg-section-bg border-t border-gray-100 mt-8">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-sm text-gray-500">
-          <Link href={`/${lang}/cumparare-sau-chirie`} className="text-sm text-gray-500 hover:text-primary transition-colors">
-            {t("nav.buyRent")}
-          </Link>
-          <Link href="/about" className="hover:text-foreground transition-colors">
-            {t("nav.about")}
-          </Link>
-          <Link href="/noutati" className="hover:text-foreground transition-colors">
-            {t("nav.news")}
-          </Link>
-          {/* <Link href="#" className="hover:text-foreground transition-colors">
-            {t("nav.forAgents")}
-          </Link> */}
-          <Link href="/terms" className="hover:text-foreground transition-colors">
-            {t("footer.terms")}
-          </Link>
-          <Link href="/privacy" className="hover:text-foreground transition-colors">
-            {t("footer.privacy")}
-          </Link>
-          <Link href="/refund" className="hover:text-foreground transition-colors">
-            {t("footer.refund")}
-          </Link>
-          <Link href={faqHref} className="hover:text-foreground transition-colors">
-            {t("footer.faq")}
-          </Link>
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 items-start gap-x-6 gap-y-4 text-left text-sm text-gray-500 sm:flex sm:flex-wrap sm:items-center sm:justify-center sm:gap-y-2">
+          <div className="flex flex-col sm:contents [&>a]:flex [&>a]:min-h-11 [&>a]:items-center">
+            <Link href={`/${lang}/cumparare-sau-chirie`} className="hover:text-primary transition-colors">
+              {t("nav.buyRent")}
+            </Link>
+            <Link href="/about" className="hover:text-foreground transition-colors">
+              {t("nav.about")}
+            </Link>
+            <Link href="/noutati" className="hover:text-foreground transition-colors">
+              {t("nav.news")}
+            </Link>
+            <Link href={faqHref} className="hover:text-foreground transition-colors">
+              {t("footer.faq")}
+            </Link>
+          </div>
+          <div className="flex flex-col sm:contents [&>a]:flex [&>a]:min-h-11 [&>a]:items-center">
+            <Link href="/terms" className="hover:text-foreground transition-colors">
+              {t("footer.terms")}
+            </Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">
+              {t("footer.privacy")}
+            </Link>
+            <Link href="/refund" className="hover:text-foreground transition-colors">
+              {t("footer.refund")}
+            </Link>
+          </div>
 
-          <div className="flex items-center gap-3 text-gray-400">
+          <div className="col-span-full flex min-h-11 items-center justify-center gap-3 text-gray-400">
             {socialLinks.map((s) => (
               <Link
                 key={s.label}

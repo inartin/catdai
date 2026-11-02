@@ -191,6 +191,8 @@
   "cadastru.sharedMetaTitle": "Cadastral data",
   "cadastru.sharedMetaDescription": "Cadastral data report for this address",
   "cadastru.backToSearch": "Back to search",
+  "cadastru.newSearchTitle": "Want to check another address?",
+  "cadastru.newSearch": "Start a new search",
   "cadastru.saveImage": "Save",
   "cadastru.savingImage": "Saving...",
   "cadastru.valuationCta": "Estimate apartment value",

@@ -467,6 +467,8 @@
   "cadastru.sharedMetaTitle": "Date cadastrale",
   "cadastru.sharedMetaDescription": "Raport cu date cadastrale pentru această adresă",
   "cadastru.backToSearch": "Înapoi la căutare",
+  "cadastru.newSearchTitle": "Vrei să verifici o altă adresă?",
+  "cadastru.newSearch": "Începe o nouă căutare",
   "cadastru.saveImage": "Salvează",
   "cadastru.savingImage": "Se salvează...",
   "cadastru.valuationCta": "Evaluează apartamentul",

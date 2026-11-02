@@ -49,6 +49,7 @@ Implemented.
 - Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, localized Cadastru link, Calculator link to `/calculator`, Prețuri link to `/pricing` placed right after Calculator, login/profile link, language switcher, and an always-visible notification button.
 - The notification button opens a right sidebar for authenticated users, stays visible but disabled while auth is loading or anonymous, loads the user's active `user_notifications` rows, formats dates with full capitalized month names, marks unread rows as read when the sidebar closes, and archives rows when cleared.
 - Shared footer. Its `Noutăți` link routes to `/noutati`; footer legal links include Terms, Privacy, and Refund; Telegram remains only as the social icon link. Footer displays Visa/Mastercard plus the official MAIB bank logo and adjacent MIA logo when MAIB is selected, or Paddle when Paddle is selected, from `public/brands`; Paynet is not shown because it is not used.
+- Footer links use two left-aligned groups on mobile from 360px: navigation (including FAQ) on the left and legal links on the right, with Telegram centered below. Narrower screens stack the groups; from 640px, links form a centered wrapping row. Navigation and legal links retain at least 44px of touch height.
 - Cookie banner is global.
 - PWA manifest and app icons are present.
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -1414,6 +1415,23 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
               </button>
             )}
           </CadastruListingsCard>
+          {state.data && (
+            <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 text-center sm:p-8">
+              <h2 className="text-xl font-bold text-gray-950 sm:text-2xl">
+                {t("cadastru.newSearchTitle")}
+              </h2>
+              <Link
+                href={`/${lang}/cadastru`}
+                className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-primary-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:w-auto"
+              >
+                <svg aria-hidden="true" className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-4-4" />
+                </svg>
+                {t("cadastru.newSearch")}
+              </Link>
+            </div>
+          )}
           {(state.data || secondaryAvailable) && (
             <p className="mt-6 text-center text-xs text-gray-500">
               <a href="https://ipcbi.gov.md" className="underline">ipcbi.gov.md</a> · © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a> · © <a href="https://map.md/" className="underline">map.md</a>{protectedMap ? " · © Google" : null}

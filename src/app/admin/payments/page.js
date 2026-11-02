@@ -30,7 +30,7 @@ function Stat({ label, value, detail, currency, timeframe, accent = false }) {
 }
 
 export default function PaymentsPage() {
-  const [period, setPeriod] = useState("all");
+  const [period, setPeriod] = useState("month");
   const [currency, setCurrency] = useState("");
   const [page, setPage] = useState(1);
   const [requestOptions, setRequestOptions] = useState({ fresh: false });

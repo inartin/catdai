@@ -467,6 +467,8 @@
   "cadastru.sharedMetaTitle": "Кадастровые данные",
   "cadastru.sharedMetaDescription": "Отчёт с кадастровыми данными по этому адресу",
   "cadastru.backToSearch": "Назад к поиску",
+  "cadastru.newSearchTitle": "Хотите проверить другой адрес?",
+  "cadastru.newSearch": "Начать новый поиск",
   "cadastru.saveImage": "Сохранить",
   "cadastru.savingImage": "Сохранение...",
   "cadastru.valuationCta": "Оценить квартиру",

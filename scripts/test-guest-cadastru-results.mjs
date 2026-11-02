@@ -64,7 +64,7 @@ const mocks = {
   '@/lib/rate-limit': { rateLimit: () => ({ check: () => ({ allowed: true, remaining: 10 }) }) },
   '@/lib/validation': validation,
   '@/lib/cadastru-street-suggestions': { suggestRoadTypes: () => [], suggestStreets: () => [] },
-  '@/lib/cadastru-suggestion-recovery': { createSuggestionRecoveryToken: () => null, readSuggestionRecoveryToken: () => null, recordSuggestionRecovery: async () => {} },
+  '@/lib/cadastru-suggestion-recovery': { createSuggestionRecoveryToken: () => null, readSuggestionRecoveryToken: () => null, recordSuggestionSelection: async () => {}, recordSuggestionRecovery: async () => {} },
   '@/lib/cadastru-streets/street-resolver': { inspectStreetAddress: () => ({ status: 'clean' }), resolveStreet: args => ({ street: args.street, status: 'exact' }) },
   '@/lib/cadastru-external-api': { fetchExternalCadastruAddressData: async () => { throw Error('Unexpected worker lookup'); }, fetchExternalCadastralData: async () => { throw Error('Unexpected worker lookup'); } },
   '@/lib/cadastru-address-search': { findCadastralByAddress: async () => null, getVerifiedAddressAlternative: () => null, fetchCadastruDetailData: async () => null },

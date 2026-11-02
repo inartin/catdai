@@ -47,6 +47,7 @@ const mocks = {
         const builder = {
           select(columns, options) { Object.assign(query, { columns, options }); return builder; },
           gte(column, value) { query.filters.push([column, value]); return builder; },
+          lt(column, value) { query.filters.push([column, value]); return builder; },
           is() { return builder; },
           in() { return builder; },
           eq() { return builder; },
@@ -63,6 +64,11 @@ const mocks = {
   },
 };
 const context = vm.createContext({ console: { error() {} }, Date: FixedDate });
+const periods = new vm.SourceTextModule(await fs.readFile("src/lib/admin-periods.js", "utf8"), { context });
+await periods.link(() => { throw new Error("Unexpected period dependency"); });
+await periods.evaluate();
+mocks["@/lib/admin-periods"] = periods.namespace;
+mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
 const route = new vm.SourceTextModule(await fs.readFile("src/app/api/admin/stats/route.js", "utf8"), { context });
 await route.link((id) => {
   const mock = mocks[id];
@@ -86,13 +92,17 @@ assert.equal(response.totalUsers, 4, "Total users includes every registration");
 assert.deepEqual(JSON.parse(JSON.stringify(activityQueries.at(-1))), {
   p_since: "2026-10-17T21:00:00.000Z",
 }, "Aggregate every visitor with the selected local-midnight cutoff");
-for (const period of ["week", "month", "all"]) {
+for (const period of ["week", "month", "previous_month", "all"]) {
   response = await (await get(`period=${period}&fresh=1`)).json();
   assert.equal(response.activeUsers, 6);
   assert.equal(response.newUsers, period === "all" ? 4 : 2);
   assert.equal(response.oldUsers, period === "all" ? 0 : 1);
   assert.equal(response.totalUsers, 4);
 }
+await get("period=previous_month&fresh=1");
+assert.deepEqual(JSON.parse(JSON.stringify(activityQueries.at(-1))), {
+  p_since: "2026-08-31T21:00:00.000Z", p_until: "2026-09-30T21:00:00.000Z",
+}, "Previous month sends both boundaries to the active-user RPC");
 activityError = { message: "Activity read failed" };
 assert.equal((await (await get()).json()).activeUsers, null, "Read failure cannot appear as zero");
 assert.equal((await (await get()).json()).newUsers, null);
@@ -120,4 +130,10 @@ now = Date.parse("2026-10-18T20:59:59Z");
 await get("period=day");
 now += 2000;
 assert.equal((await (await get("period=day")).json()).periodSince, "2026-10-18T21:00:00.000Z", "Cached Today counts reset across local midnight");
+now = Date.parse("2026-10-31T21:59:30Z");
+await get("period=month");
+await get("period=previous_month");
+now += 60000;
+assert.equal((await (await get("period=month")).json()).periodSince, "2026-10-31T22:00:00.000Z");
+assert.equal((await (await get("period=previous_month")).json()).periodSince, "2026-09-30T21:00:00.000Z");
 console.log("Admin user stats checks passed.");

@@ -84,6 +84,54 @@ try {
   assert.equal((await stats()).active_users, 5, "A member on another browser still counts once");
   await db.query("select public.record_visitor_activity($1, $2)", [id(22), id(4)]);
   assert.equal((await stats()).active_users, 5, "Aggregation excludes an admin even if a row exists");
+  // Bounded calendar periods retain historical events after latest-visit rows advance.
+  await db.exec(`
+    create table external_api_usage_daily (usage_date date, service text, status text, count bigint);
+    alter table external_api_usage_events add column service text, add column status text;
+  `);
+  const journeySql = await fs.readFile("supabase/migrations/20261020093634_cadastru_search_journeys.sql", "utf8");
+  await db.exec(journeySql.slice(journeySql.indexOf("create function public.admin_external_api_usage_since")));
+  await db.exec(await fs.readFile("supabase/migrations/20261102124827_admin_calendar_month_periods.sql", "utf8"));
+  await db.query(`insert into auth.users (id, created_at) values
+    ($1, '2039-01-01'), ($2, '2040-10-15'), ($3, '2040-10-31 22:00:00+00')`, [id(31), id(32), id(33)]);
+  await db.query(`insert into visitor_activity (device_id, user_id, last_seen_at) values
+    ($1, $2, '2040-11-05'), ($3, $4, '2040-11-05')`, [id(41), id(31), id(43), id(33)]);
+  for (const [userId, deviceId, visitor, date, duplicate] of [
+    [id(31), id(41), {}, "2040-10-10", null],
+    [id(31), id(42), {}, "2040-10-11", null],
+    [id(33), id(43), {}, "2040-10-31 22:00:00+00", null],
+    [id(4), id(44), {}, "2040-10-10", null],
+    [null, id(45), { device_type: "Bot" }, "2040-10-10", null],
+    [null, id(46), {}, "2040-10-10", 99],
+    [null, id(47), {}, "2040-10-10", null],
+  ]) {
+    await db.query(`insert into cadastru_search_events (user_id, visitor, created_at, duplicate_of)
+      values ($1, $2, $3, $4)`, [userId, JSON.stringify({ ...visitor, device_id: deviceId }), date, duplicate]);
+  }
+  const bounds = ["2040-09-30 21:00:00+00", "2040-10-31 22:00:00+00"];
+  assert.deepEqual((await db.query("select * from admin_active_user_stats($1, $2)", bounds)).rows[0],
+    { active_users: 3, new_registered_users: 1, old_registered_users: 1 },
+    "Historical visits count once; later registrations, bots, admins and duplicates are excluded");
+  await db.exec(`insert into external_api_usage_daily values
+    ('2040-09-30', 'cadastru_number', 'success', 2),
+    ('2040-10-01', 'cadastru_number', 'success', 2),
+    ('2040-10-15', 'cadastru_number', 'success', 5),
+    ('2040-10-31', 'cadastru_number', 'success', 2),
+    ('2040-11-01', 'cadastru_number', 'success', 4);
+    insert into external_api_usage_events (created_at, service, status) values
+    ('2040-09-30 20:59:59+00', 'cadastru_number', 'success'),
+    ('2040-09-30 21:00:00+00', 'cadastru_number', 'success'),
+    ('2040-10-31 21:59:59+00', 'cadastru_number', 'success'),
+    ('2040-10-31 22:00:00+00', 'cadastru_number', 'success');`);
+  assert.equal(Number((await db.query("select count from admin_external_api_usage_since($1, $2)", bounds)).rows[0].count), 9,
+    "Both partial UTC boundary days are exact, with aggregate-only full days retained");
+  for (const role of ["anon", "authenticated"]) {
+    await db.exec(`set role ${role}`);
+    await assert.rejects(db.query("select * from admin_active_user_stats($1, $2)", bounds), /permission denied/);
+    await assert.rejects(db.query("select * from admin_external_api_usage_since($1, $2)", bounds), /permission denied/);
+    await db.exec("reset role");
+  }
+  console.log("Calendar-month database checks passed: exact bounds, historical activity, aggregates and permissions.");
   console.log("Active visitor database checks passed: backfill, deduplication, periods, guests, exclusions, throttling and permissions.");
 } finally {
   await db.close();

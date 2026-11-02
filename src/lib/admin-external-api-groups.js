@@ -90,6 +90,7 @@ export function groupExternalApiEvents(events, statusFilter = "all", cachedSearc
     groups.get(id).cachedSearch = search;
   }
 
+  const suggestionEvents = events.filter((event) => event.suggestion_recovery);
   return [...groups.values()].map((group) => {
     const events = [...group.events].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
     const primary = events.find((event) => event.service === "cadastru_address")
@@ -98,9 +99,32 @@ export function groupExternalApiEvents(events, statusFilter = "all", cachedSearc
         request_payload: { address: group.cachedSearch.search_address, cadastral_number: group.cachedSearch.cadastral_number },
       };
     const search = group.cachedSearch;
+    const lookupId = search?.lookup_id || primary.response_headers?.["x-catdai-lookup-id"];
+    const actor = search || primary;
+    const suggestionEvent = suggestionEvents.filter((event) => {
+      if (actor.user_id && event.user_id && actor.user_id !== event.user_id) return false;
+      if (actor.visitor?.device_id && event.visitor?.device_id
+        && actor.visitor.device_id !== event.visitor.device_id) return false;
+      return group.events.includes(event) || (lookupId && event.suggestion_recovery.retry_lookup_id === lookupId);
+    }).sort((a, b) => Boolean(b.suggestion_recovery.recovered_at) - Boolean(a.suggestion_recovery.recovered_at))[0];
+    const suggestionActivity = suggestionEvent ? { ...suggestionEvent.suggestion_recovery,
+      role: group.events.includes(suggestionEvent) ? "original" : "retry",
+      original_address: suggestionEvent.response_headers?.["x-catdai-lookup-query"] || null } : search?.suggestion_activity;
+    const mainEvents = events.filter((event) => ["cadastru_address", "cadastru_number"].includes(event.service));
+    const recovered = suggestionActivity?.role === "original" && suggestionActivity.recovered_at;
+    const failed = mainEvents.some((event) => event.status === "failure");
+    const successful = mainEvents.some((event) => event.status === "success");
+    const cachedResult = search?.result_type && !["error", "no_data"].includes(search.result_type);
+    const outcome = recovered || (failed && ((successful && mainEvents.at(-1)?.status === "success") || cachedResult)) ? "recovered"
+      : failed || search?.result_type === "error" ? "failure"
+        : search?.result_type === "no_data" ? "no_data"
+          : successful || cachedResult ? "success"
+            : events.some((event) => event.status === "failure") ? "other_errors" : "success";
     return {
       ...group,
       events,
+      outcome,
+      suggestion_activity: suggestionActivity || null,
       service: primary.service,
       query: (search && (search.search_type === "address" ? search.search_address : search.cadastral_number))
         || primary.response_headers?.["x-catdai-lookup-query"] || eventQuery(primary),

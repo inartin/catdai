@@ -217,3 +217,26 @@ tree = render(ExternalApiEventTable, { rows: [main], expandedExternalApiEventId:
 assert.equal(nodes(tree, (node) => node.type === "td" && node.props.colSpan === 10).length, 1);
 assert.equal(nodes(tree, (node) => node.type === "button").length, 1, "The External API table retains its delete action");
 console.log("Admin Cadastru search details passed: UUID/legacy matching, ambiguity, auth, pagination, errors, row interaction and shared API details.");
+
+function visibleText(node) {
+  if (node == null || typeof node === 'boolean') return '';
+  if (Array.isArray(node)) return node.map(visibleText).join(' ');
+  if (typeof node !== 'object') return String(node);
+  return visibleText(typeof node.type === 'function' ? node.type(node.props) : node.props?.children);
+}
+const selectedActivity = { role: 'original', clicked_at: '2026-11-02T08:23:00Z',
+  resolved_address: 'Bălți, str Tudor Vladimirescu 6 ap 16' };
+const selectedProps = { ...props, rows: [{ ...search, result_type: 'no_data', suggestion_activity: selectedActivity }] };
+tree = render(CadastruSearchTable, selectedProps, []);
+assert(visibleText(tree).includes('Suggestion selected'));
+assert(visibleText(tree).includes(selectedActivity.resolved_address));
+assert(!visibleText(tree).includes('Recovered'));
+const recoveredActivity = { ...selectedActivity, recovered_at: '2026-11-02T08:23:01Z' };
+tree = render(CadastruSearchTable, { ...props, rows: [{ ...selectedProps.rows[0], suggestion_activity: recoveredActivity }] }, []);
+assert(visibleText(tree).includes('Recovered with suggestion'));
+assert(/Original:\s+No result/.test(visibleText(tree)), 'original search status remains explicit');
+assert.equal(nodes(tree, node => node.type === CadastruSearchDetails).length, 0, 'activity is visible without opening details');
+tree = render(CadastruSearchTable, { ...props, rows: [{ ...search, suggestion_activity: { ...recoveredActivity, role: 'retry' } }] }, []);
+assert(visibleText(tree).includes('From suggestion'));
+assert(!visibleText(tree).includes('Original:'), 'the successful retry keeps its own result status');
+console.log('Collapsed Cadastru suggestion activity passed: selection, recovery, full address, retry origin and original status.');

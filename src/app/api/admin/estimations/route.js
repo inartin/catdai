@@ -1,3 +1,4 @@
+import { adminPeriod, applyAdminPeriod } from "@/lib/admin-periods";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
@@ -7,12 +8,6 @@ const LIST_LIMIT = 200;
 const CACHE_TTL_MS = 60 * 1000;
 const ESTIMATE_COLUMNS = "id, user_id, device_id, visitor, city, district, rooms_count, area_m2, building_type, renovation, floor, total_floors, bathrooms_count, balconies_count, estimated_price, price_per_m2, created_at";
 const ESTIMATE_COLUMNS_WITH_TYPE = `${ESTIMATE_COLUMNS}, estimate_type`;
-const PERIODS = {
-  day: 24 * 60 * 60 * 1000,
-  week: 7 * 24 * 60 * 60 * 1000,
-  month: 30 * 24 * 60 * 60 * 1000,
-  all: null,
-};
 let cache = new Map();
 
 function isMissingSchemaError(error) {
@@ -52,14 +47,6 @@ function applyEstimateTypeFilter(query, type) {
   if (type === "rent") return query.eq("estimate_type", "rent");
   if (type === "sale") return query.neq("estimate_type", "rent");
   return query;
-}
-
-function parsePeriod(value) {
-  return Object.prototype.hasOwnProperty.call(PERIODS, value) ? value : "all";
-}
-
-function applySince(query, since) {
-  return since ? query.gte("created_at", since) : query;
 }
 
 function normalizedSearch(params) {
@@ -170,13 +157,14 @@ function buildFavoriteSet(rows) {
   return set;
 }
 
-async function fetchEstimateRows(type, since) {
+async function fetchEstimateRows(type, range) {
   const typedQuery = applyEstimateTypeFilter(
-    applySince(
+    applyAdminPeriod(
       supabaseAdmin
         .from("estimate_log")
         .select(ESTIMATE_COLUMNS_WITH_TYPE),
-      since
+      "created_at",
+      range
     )
       .order("created_at", { ascending: false })
       .limit(LIST_LIMIT),
@@ -194,7 +182,7 @@ async function fetchEstimateRows(type, since) {
     return { data: [], error: null };
   }
 
-  return applySince(supabaseAdmin.from("estimate_log").select(ESTIMATE_COLUMNS), since)
+  return applyAdminPeriod(supabaseAdmin.from("estimate_log").select(ESTIMATE_COLUMNS), "created_at", range)
     .order("created_at", { ascending: false })
     .limit(LIST_LIMIT);
 }
@@ -205,17 +193,18 @@ export async function GET(request) {
 
   const requestedType = request.nextUrl.searchParams.get("type");
   const type = requestedType === "rent" ? "rent" : requestedType === "all" ? "all" : "sale";
-  const period = parsePeriod(request.nextUrl.searchParams.get("period"));
-  const since = PERIODS[period] ? new Date(Date.now() - PERIODS[period]).toISOString() : null;
+  const range = adminPeriod(request.nextUrl.searchParams.get("period"));
+  const { period } = range;
   const cacheKey = `${type}:${period}`;
   const cached = cache.get(cacheKey);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS
+      && (["week", "all"].includes(period) || cached.since === range.since)) {
     return NextResponse.json(cached.data);
   }
 
   try {
     const [estimateRes, users, sharedRows, favoriteRows] = await Promise.all([
-      fetchEstimateRows(type, since),
+      fetchEstimateRows(type, range),
       listAllUsers(),
       fetchSharedLinks(),
       fetchFavorites(),
@@ -260,7 +249,7 @@ export async function GET(request) {
     });
 
     const data = { estimations, type, period };
-    cache.set(cacheKey, { data, ts: Date.now() });
+    cache.set(cacheKey, { data, ts: Date.now(), since: range.since });
     return NextResponse.json(data);
   } catch (err) {
     console.error("Failed to load admin estimations:", err);

@@ -8,6 +8,9 @@ import { createRequire } from "node:module";
 
 const context = vm.createContext({ console, Date, URL, AbortSignal, crypto,
   process: { env: { CADASTRU_EXTERNAL_API_BASE_URL: "https://worker.test", CADASTRU_EXTERNAL_API_SECRET: "test-secret" } } });
+const periods = new vm.SourceTextModule(await fs.readFile("src/lib/admin-periods.js", "utf8"), { context });
+await periods.link(() => { throw new Error("Unexpected period dependency"); });
+await periods.evaluate();
 const recorded = [];
 let mode = "success";
 context.fetch = async (url, options) => {
@@ -19,6 +22,7 @@ context.fetch = async (url, options) => {
     : { error: "service_unavailable", message: "offline" }, { status: mode === "success" ? 200 : 503 });
 };
 const mocks = {
+  "@/lib/admin-periods": periods.namespace,
   "@/lib/visitor-browser": { getDeviceId: () => null },
   "node:crypto": { default: crypto },
   "@/lib/external-api-usage": {
@@ -172,6 +176,7 @@ const jsx = (type, props) => ({ type, props });
 const uiContext = vm.createContext({ console, Date, URLSearchParams,
   window: { confirm: () => { confirmations++; return false; } } });
 const uiMocks = {
+  "@/lib/admin-periods": periods.namespace,
   "@/components/admin/AdminUserCell": { default: ({ row, name }) => name || row.user_name || row.user_id || "Anonymous", VisitorTags: () => null },
   react: { Fragment: "Fragment", useCallback: (fn) => fn, useEffect: noop,
     useState: (initial) => {
@@ -241,7 +246,7 @@ tree = render();
 rows = nodes(tree, (node) => node.type === "tr" && node.props.role === "button");
 assert.equal(rows.length, 1, "older logs display one combined search row in the table");
 assert(textOf(tree).includes("Cadastru search (older logs)"));
-assert(textOf(tree).includes("With failures"), "secondary failure keeps the warning badge");
+assert(textOf(tree).includes("Successful"), "a successful primary stays successful despite secondary errors");
 assert(/2\s+successful\s+·\s+0\s+failed\s+·\s+1 other errors/.test(textOf(tree)),
   "secondary errors stay visible without increasing failed counts");
 rows[0].props.onClick();
@@ -336,16 +341,17 @@ mocks["@/lib/supabase-admin"] = { supabaseAdmin: { from(table) {
 } } };
 mocks["@/lib/admin-auth"] = { requireAdminApiAuth: () => null };
 mocks["@/lib/admin-cadastru-favorites"] = { loadCadastruFavorites: async (rows) => rows };
+mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
 mocks["@/lib/cadastru-share-statistics"] = { loadCadastruShareStatistics: async (rows) => rows };
 mocks["next/server"] = { NextResponse: {} };
 const { buildExternalApiUsageStats, fetchCadastruSearchEvents } = await load("src/app/api/admin/stats/route.js",
   "\nexport { buildExternalApiUsageStats, fetchCadastruSearchEvents };");
 const since = "2026-10-21T21:00:00Z";
-assert.equal((await fetchCadastruSearchEvents(since))[0].lookup_id, cachedSearch.lookup_id);
+assert.equal((await fetchCadastruSearchEvents({ since }))[0].lookup_id, cachedSearch.lookup_id);
 assert.deepEqual(searchQueries[0].since, ["created_at", since], "cache history uses the selected period");
 assert(searchQueries[0].columns.includes("lookup_id"));
 legacySearchSchema = true;
-assert.equal((await fetchCadastruSearchEvents(since)).length, 1, "older schema still supplies cached searches");
+assert.equal((await fetchCadastruSearchEvents({ since })).length, 1, "older schema still supplies cached searches");
 assert(!searchQueries.at(-1).columns.includes("lookup_id"));
 const daily = [
   { service: "cadastru_address", status: "success", count: 300 },
@@ -376,3 +382,41 @@ assert.equal(buildExternalApiUsageStats([], { available: true, rows: [] },
   Array.from({ length: 205 }, (_, id) => ({ ...cachedSearch, id }))).cachedSearches.length, 200,
   "the response bounds cached history independently of worker logs");
 console.log("Cached stats query passed: search IDs, selected period, old schema fallback and unchanged API counters.");
+
+const correctedAddress = 'Bălți, str Tudor Vladimirescu 6 ap 16';
+const suggestionRetryId = crypto.randomUUID();
+const recoveredEvent = { ...recorded[0], status: 'failure', suggestion_recovery: {
+  clicked_at: '2026-11-02T08:23:00Z', recovered_at: '2026-11-02T08:23:01Z',
+  resolved_address: correctedAddress, retry_lookup_id: suggestionRetryId, lookup_source: 'cache',
+} };
+const suggestionRetryEvent = { ...recorded[0], id: 999, created_at: '2026-11-02T08:23:01Z',
+  response_headers: { ...recorded[0].response_headers, 'x-catdai-lookup-id': suggestionRetryId } };
+const suggestionGroups = groupExternalApiEvents([recoveredEvent, suggestionRetryEvent]);
+assert.equal(suggestionGroups.find(g => g.events.includes(recoveredEvent)).outcome, 'recovered');
+assert.equal(suggestionGroups.find(g => g.events.includes(suggestionRetryEvent)).suggestion_activity.role, 'retry');
+assert.equal(groupExternalApiEvents([recoveredEvent], 'failure').length, 1, 'raw worker failure filter retains recovered attempts');
+assert.equal(groupExternalApiEvents(legacyCalls)[0].outcome, 'success', 'secondary errors do not make the primary fail');
+const copiedRetry = { ...suggestionRetryEvent, visitor: { device_id: 'other-browser' } };
+const isolated = groupExternalApiEvents([{ ...recoveredEvent, visitor: { device_id: 'original-browser' } }, copiedRetry]);
+assert.equal(isolated.find(g => g.events.includes(copiedRetry)).suggestion_activity, null, 'copied lookup IDs do not borrow click activity');
+slots[2] = { ...slots[2], externalApiUsage: { total: 2, events: [recoveredEvent, suggestionRetryEvent], byService: {} } };
+tree = render();
+rows = nodes(tree, node => node.type === 'tr' && node.props.role === 'button');
+assert.equal(rows.length, 2);
+assert(textOf(tree).includes('Recovered with suggestion') && textOf(tree).includes('From suggestion'));
+assert(textOf(tree).includes(correctedAddress), 'collapsed groups display the full correction, including house and apartment');
+const selectedEvent = { ...recoveredEvent, suggestion_recovery: { ...recoveredEvent.suggestion_recovery, recovered_at: undefined } };
+slots[2] = { ...slots[2], externalApiUsage: { total: 1, events: [selectedEvent], byService: {} } };
+tree = render();
+assert(textOf(tree).includes('Suggestion selected'));
+assert(textOf(tree).includes('No successful retry recorded'));
+assert(!textOf(tree).includes('Recovered with suggestion'), 'selection alone never claims recovery');
+console.log('Collapsed API suggestion activity passed: recovery, selection, retry origin, full address and browser isolation.');
+
+const lateFailure = { ...recoveredEvent, suggestion_recovery: undefined, id: 1000,
+  created_at: '2026-11-02T08:24:00Z' };
+const earlierSuccess = { ...lateFailure, id: 1001, status: 'success', created_at: '2026-11-02T08:23:00Z' };
+assert.equal(groupExternalApiEvents([earlierSuccess, lateFailure])[0].outcome, 'failure',
+  'an earlier success cannot hide a later failed primary');
+assert.equal(groupExternalApiEvents([{ ...lateFailure, created_at: '2026-11-02T08:22:00Z' }, earlierSuccess])[0].outcome, 'recovered',
+  'a later successful primary recovers the same lookup');

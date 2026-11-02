@@ -3,9 +3,10 @@ import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { loadCadastruFavorites } from "@/lib/admin-cadastru-favorites";
 import { loadCadastruShareStatistics } from "@/lib/cadastru-share-statistics";
+import { loadCadastruSuggestionActivity } from "@/lib/admin-cadastru-suggestion-activity";
 
 const PAGE_SIZE = 50;
-const SEARCH_COLUMNS = "id, search_type, user_id, visitor, district, cadastral_number, search_address, result_type, valuation_clicked_at, valuation_completed_at, created_at";
+const SEARCH_COLUMNS = "id, search_type, user_id, visitor, district, cadastral_number, search_address, result_type, lookup_id, valuation_clicked_at, valuation_completed_at, created_at";
 
 export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
@@ -33,7 +34,8 @@ export async function GET(request) {
   }
 
   try {
-    const searches = await loadCadastruShareStatistics(await loadCadastruFavorites((data || []).slice(0, PAGE_SIZE)));
+    const searches = await loadCadastruSuggestionActivity(
+      await loadCadastruShareStatistics(await loadCadastruFavorites((data || []).slice(0, PAGE_SIZE))));
     return NextResponse.json({ searches, hasMore: (data || []).length > PAGE_SIZE });
   } catch (error) {
     console.error("[admin-cadastru-searches] statistics read failed:", error.message);

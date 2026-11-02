@@ -26,6 +26,11 @@ const mocks = {
   },
 };
 const context = vm.createContext({ console: { error() {} }, Date });
+const periods = new vm.SourceTextModule(await fs.readFile("src/lib/admin-periods.js", "utf8"), { context });
+await periods.link(() => { throw new Error("Unexpected period dependency"); });
+await periods.evaluate();
+mocks["@/lib/admin-periods"] = periods.namespace;
+mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
 const route = new vm.SourceTextModule(await fs.readFile("src/app/api/admin/stats/route.js", "utf8"), { context });
 await route.link((id) => {
   const mock = mocks[id];

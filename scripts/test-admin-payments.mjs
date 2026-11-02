@@ -39,7 +39,7 @@ const mocks = {
           let data = table === "payment_checkout_events" ? [...checkoutEvents]
             : orders.filter((row) => row.provider === "paddle" || row.environment === "production");
           for (const [op, column, value] of query.filters) {
-            data = data.filter((row) => op === "in" ? value.includes(row[column]) : row[column] && Date.parse(row[column]) >= Date.parse(value));
+            data = data.filter((row) => op === "in" ? value.includes(row[column]) : row[column] && (op === "lt" ? Date.parse(row[column]) < Date.parse(value) : Date.parse(row[column]) >= Date.parse(value)));
           }
           data.sort((a, b) => {
             for (const [column, { ascending, nullsFirst }] of query.orderBy) {
@@ -57,6 +57,7 @@ const mocks = {
           eq() { return builder; },
           is() { return builder; },
           in(column, value) { query.filters.push(["in", column, Array.from(value)]); return builder; },
+          lt(column, value) { query.filters.push(["lt", column, value]); return builder; },
           gte(column, value) { query.filters.push(["gte", column, value]); return builder; },
           order(column, options) { query.orderBy.push([column, options]); return builder; },
           range(from, to) { Object.assign(query, { from, to }); return builder; },
@@ -68,6 +69,11 @@ const mocks = {
   },
 };
 const context = vm.createContext({ console: { error() {} }, Date: FixedDate });
+const periods = new vm.SourceTextModule(await fs.readFile("src/lib/admin-periods.js", "utf8"), { context });
+await periods.link(() => { throw new Error("Unexpected period dependency"); });
+await periods.evaluate();
+mocks["@/lib/admin-periods"] = periods.namespace;
+mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
 const route = new vm.SourceTextModule(await fs.readFile("src/app/api/admin/stats/route.js", "utf8"), { context });
 await route.link((id) => {
   const mock = mocks[id];
@@ -124,6 +130,12 @@ for (const period of ["week", "month"]) {
   assert.equal((await (await get(`period=${period}&fresh=1`)).json()).payments.total, 6);
 }
 
+orders.push(payment("previous-month-start", { paid_at: "2026-08-31T21:00:00.000Z" }));
+orders.push(payment("previous-month-end", { paid_at: "2026-09-30T20:59:59.999Z" }));
+orders.push(payment("too-old", { paid_at: "2026-08-31T20:59:59.999Z" }));
+response = await (await get("period=previous_month&fresh=1")).json();
+assert.equal(response.payments.total, 2);
+assert.equal(response.periodUntil, "2026-09-30T21:00:00.000Z");
 orders = Array.from({ length: 1001 }, (_, id) => payment(String(id).padStart(4, "0")));
 response = await (await get()).json();
 assert.equal(response.payments.total, 1001, "Payments beyond the API page limit are counted and listed");

@@ -9,13 +9,14 @@ const READ_SIZE = 1000;
 const CACHE_TTL_SECONDS = 20 * 60;
 const headers = { "Cache-Control": "private, no-store" };
 
-async function readPayments(since) {
+async function readPayments(since, until) {
   const rows = [];
   for (let from = 0; ; from += READ_SIZE) {
     let query = supabaseAdmin.from("reporting_payment_orders")
       .select("id,provider,user_id,product_key,status,amount_minor,currency_code,refunded_minor,paid_at,transaction_id")
       .in("status", CONFIRMED_PAYMENT_STATUSES).not("paid_at", "is", null);
     if (since) query = query.gte("paid_at", since);
+    if (until) query = query.lt("paid_at", until);
     const { data, error } = await query.order("paid_at", { ascending: false })
       .order("id", { ascending: false }).order("provider", { ascending: false })
       .range(from, from + READ_SIZE - 1);
@@ -62,19 +63,19 @@ export async function GET(request) {
   const unauthorized = requireAdminApiAuth(request);
   if (unauthorized) return unauthorized;
   const params = request.nextUrl.searchParams;
-  const { period, since } = paymentPeriod(params.get("period"));
+  const { period, since, until } = paymentPeriod(params.get("period"));
   const pageValue = params.get("page") || "1";
   const requestedCurrency = params.get("currency");
   if (!/^[1-9]\d{0,5}$/.test(pageValue) || (requestedCurrency && !/^[A-Z]{3}$/.test(requestedCurrency))) {
     return NextResponse.json({ error: "Invalid payment filters" }, { status: 400, headers });
   }
-  const cacheKey = `catdai:admin-payments:v1:${period}:${period === "day" ? since : "rolling"}:${requestedCurrency || "default"}:${pageValue}`;
+  const cacheKey = `catdai:admin-payments:v2:${period}:${period === "week" || period === "all" ? "rolling" : since}:${requestedCurrency || "default"}:${pageValue}`;
   try {
     if (params.get("fresh") !== "1") {
       const cached = await getSharedCache(cacheKey);
       if (cached?.value) return NextResponse.json(cached.value, { headers });
     }
-    const [payments, users] = await Promise.all([readPayments(since), paymentUsers()]);
+    const [payments, users] = await Promise.all([readPayments(since, until), paymentUsers()]);
     const rows = payments.filter((row) => users.get(row.user_id)?.app_metadata?.catdai_is_admin !== true);
     const currencies = [...new Set(rows.map((row) => row.currency_code))].sort();
     const currency = requestedCurrency || (currencies.includes("MDL") ? "MDL" : currencies[0]) || "MDL";
@@ -84,7 +85,7 @@ export async function GET(request) {
     const page = Math.min(Number(pageValue), pageCount);
     const orders = await paymentDetails(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), users);
     const payload = {
-      period, since, currency, currencies, totals, products, orders, page, pageCount, pageSize: PAGE_SIZE,
+      period, since, until, currency, currencies, totals, products, orders, page, pageCount, pageSize: PAGE_SIZE,
       updatedAt: new Date().toISOString(),
     };
     await setSharedCache(cacheKey, payload, CACHE_TTL_SECONDS);

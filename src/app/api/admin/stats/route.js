@@ -1,8 +1,10 @@
+import { adminPeriod, applyAdminPeriod, chisinauDateKey } from "@/lib/admin-periods";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { NextResponse } from "next/server";
 import { loadCadastruFavorites } from "@/lib/admin-cadastru-favorites";
 import { loadCadastruShareStatistics } from "@/lib/cadastru-share-statistics";
+import { loadCadastruSuggestionActivity } from "@/lib/admin-cadastru-suggestion-activity";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -14,15 +16,15 @@ const PERIODS = {
   "30d": 30 * 24 * 60 * 60 * 1000,
 };
 const DASHBOARD_PERIODS = {
-  day: { label: "Today", ms: PERIODS["24h"] },
-  week: { label: "Last week", ms: PERIODS["7d"] },
-  month: { label: "Last month", ms: PERIODS["30d"] },
-  all: { label: "All time", ms: null },
+  day: { label: "Today" },
+  week: { label: "Last week" },
+  month: { label: "This month" },
+  previous_month: { label: "Previous month" },
+  all: { label: "All time" },
 };
 const MARKET_TRENDS_PERIOD_DAYS = {
   day: 1,
   week: 7,
-  month: 30,
 };
 
 async function fetchAllRows(buildQuery) {
@@ -38,33 +40,8 @@ async function fetchAllRows(buildQuery) {
   return all;
 }
 
-function parseDashboardPeriod(value) {
-  return DASHBOARD_PERIODS[value] ? value : "all";
-}
-
-function applySince(query, column, since) {
-  return since ? query.gte(column, since) : query;
-}
-
-function getChisinauMidnight(now = new Date()) {
-  const formatter = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Europe/Chisinau",
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
-  });
-  const localTime = (date) => {
-    const p = Object.fromEntries(formatter.formatToParts(date).map(({ type, value }) => [type, value]));
-    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
-  };
-  const localDate = new Date(localTime(now));
-  const midnight = Date.UTC(localDate.getUTCFullYear(), localDate.getUTCMonth(), localDate.getUTCDate());
-  let start = midnight;
-  // Resolve the offset at midnight itself, including days when daylight saving changes.
-  for (let i = 0; i < 2; i++) start += midnight - localTime(new Date(start));
-  return new Date(start).toISOString();
-}
-
-function getMarketTrendsPeriodStart(period) {
+function getMarketTrendsPeriodStart(period, range) {
+  if (period === "month" || period === "previous_month") return chisinauDateKey(range.since);
   const days = MARKET_TRENDS_PERIOD_DAYS[period];
   if (!days) return null;
 
@@ -103,8 +80,8 @@ async function listAllUsers() {
   return users;
 }
 
-async function fetchActiveUserStats(since) {
-  const { data, error } = await supabaseAdmin.rpc("admin_active_user_stats", { p_since: since });
+async function fetchActiveUserStats(range) {
+  const { data, error } = await supabaseAdmin.rpc("admin_active_user_stats", { p_since: range.since, ...(range.until ? { p_until: range.until } : {}) });
   if (error) throw new Error(`Active users query failed: ${error.message}`);
   const row = data?.[0];
   if (!row) throw new Error("Missing active user statistics");
@@ -135,9 +112,9 @@ function buildUserNameMap(users) {
   return new Map((users || []).map((user) => [user.id, userDisplayName(user)]));
 }
 
-async function fetchTelegramAlerts(since) {
+async function fetchTelegramAlerts(range) {
   return fetchAllRows(() =>
-    applySince(
+    applyAdminPeriod(
       supabaseAdmin
         .from("user_listing_alerts")
         .select(
@@ -146,7 +123,7 @@ async function fetchTelegramAlerts(since) {
         .eq("telegram_enabled", true)
         .eq("collect_statistics", true),
       "created_at",
-      since
+      range
     ).order("created_at", { ascending: false })
   );
 }
@@ -157,13 +134,13 @@ function isMissingEstimateTypeError(error) {
   return (code === "PGRST204" || code === "42703") && message.includes("estimate_type");
 }
 
-async function fetchEstimationCounts(since) {
-  const totalRes = await applySince(
+async function fetchEstimationCounts(range) {
+  const totalRes = await applyAdminPeriod(
     supabaseAdmin
       .from("estimate_log")
       .select("*", { count: "exact", head: true }),
     "created_at",
-    since
+    range
   );
 
   if (totalRes.error) {
@@ -171,13 +148,13 @@ async function fetchEstimationCounts(since) {
   }
 
   const total = totalRes.count || 0;
-  const rentRes = await applySince(
+  const rentRes = await applyAdminPeriod(
     supabaseAdmin
       .from("estimate_log")
       .select("*", { count: "exact", head: true })
       .eq("estimate_type", "rent"),
     "created_at",
-    since
+    range
   );
 
   if (rentRes.error) {
@@ -227,14 +204,14 @@ function isMissingCadastruColumnError(error) {
   );
 }
 
-async function fetchCadastruRows(columns, defaults = {}, since) {
+async function fetchCadastruRows(columns, defaults = {}, range) {
   const buildTypedQuery = (columns) => () =>
-    applySince(
+    applyAdminPeriod(
       supabaseAdmin
         .from("cadastru_search_events")
         .select(columns).is("duplicate_of", null),
       "created_at",
-      since
+      range
     ).order("created_at", { ascending: false });
 
   const firstPage = await buildTypedQuery(columns)().range(0, PAGE - 1);
@@ -248,7 +225,7 @@ async function fetchCadastruRows(columns, defaults = {}, since) {
   return { error: firstPage.error };
 }
 
-async function fetchCadastruSearchEvents(since) {
+async function fetchCadastruSearchEvents(range) {
   const columnAttempts = [
     {
       columns: "id, search_type, user_id, visitor, district, cadastral_number, search_address, result_type, lookup_source, lookup_id, valuation_clicked_at, valuation_completed_at, created_at",
@@ -285,7 +262,7 @@ async function fetchCadastruSearchEvents(since) {
   ];
 
   for (const attempt of columnAttempts) {
-    const result = await fetchCadastruRows(attempt.columns, attempt.defaults, since);
+    const result = await fetchCadastruRows(attempt.columns, attempt.defaults, range);
     if (!result.error) return result.rows;
     if (!isMissingCadastruColumnError(result.error)) return [];
   }
@@ -335,16 +312,16 @@ function attachUserNames(rows, usersById) {
   }));
 }
 
-async function fetchListingLinkAnalysisEvents(since) {
+async function fetchListingLinkAnalysisEvents(range) {
   const buildQuery = () =>
-    applySince(
+    applyAdminPeriod(
       supabaseAdmin
         .from("listing_link_analysis_events")
         .select(
           "id, status, error_code, user_id, visitor, external_id, listing_url, city, district, rooms_count, listing_price, listing_currency, created_at"
         ),
       "created_at",
-      since
+      range
     ).order("created_at", { ascending: false });
 
   const firstPage = await buildQuery().range(0, PAGE - 1);
@@ -377,16 +354,16 @@ function buildListingLinkAnalysisStats(rows, cutoffs) {
   };
 }
 
-async function fetchCalculatorUsageEvents(since) {
+async function fetchCalculatorUsageEvents(range) {
   const buildQuery = () =>
-    applySince(
+    applyAdminPeriod(
       supabaseAdmin
         .from("calculator_usage_events")
         .select(
           "id, user_id, visitor, device_id, session_id, city, district, rooms_count, area_m2, building_type, renovation, apartment_price, additional_investments, total_investment, include_rent_tax, estimated_monthly_rent, annual_gross_yield_pct, effective_yield_pct, payback_years, created_at"
         ),
       "created_at",
-      since
+      range
     ).order("created_at", { ascending: false });
 
   const firstPage = await buildQuery().range(0, PAGE - 1);
@@ -431,24 +408,24 @@ function buildCalculatorUsageStats(rows, cutoffs) {
   };
 }
 
-async function fetchExternalApiUsageRows(since) {
-  const { data, error } = await supabaseAdmin.rpc("admin_external_api_usage_since", { p_since: since });
+async function fetchExternalApiUsageRows(range) {
+  const { data, error } = await supabaseAdmin.rpc("admin_external_api_usage_since", { p_since: range.since, ...(range.until ? { p_until: range.until } : {}) });
   if (error) throw new Error(`external_api_usage query failed: ${error.message}`);
   return data || [];
 }
 
-async function fetchExternalApiUsageEvents(since) {
+async function fetchExternalApiUsageEvents(range) {
   const baseColumns = "id, visitor, service, status, endpoint, request_payload, response_payload, response_headers, error_code, error_message, http_status, duration_ms, created_at";
   const fetchEvents = (includeUserId, includeRecovery) => {
     let cols = baseColumns;
     if (includeUserId) cols += ", user_id";
     if (includeRecovery) cols += ", suggestion_recovery";
-    return applySince(
+    return applyAdminPeriod(
       supabaseAdmin
         .from("external_api_usage_events")
         .select(cols),
       "created_at",
-      since
+      range
     )
       .order("created_at", { ascending: false })
       .range(0, 199);
@@ -549,14 +526,14 @@ function isMissingRuntimeTableError(error) {
   return code === "42P01" || code === "42703" || code === "PGRST204" || code === "PGRST205" || message.includes("schema cache");
 }
 
-async function fetchPaymentCheckoutEvents(since) {
+async function fetchPaymentCheckoutEvents(range) {
   const buildQuery = () =>
-    applySince(
+    applyAdminPeriod(
       supabaseAdmin
         .from("payment_checkout_events")
         .select("id, event_type, user_id, visitor, device_id, session_id, order_id, product_key, source_product_key, path, created_at"),
       "created_at",
-      since
+      range
     ).order("created_at", { ascending: false });
 
   const firstPage = await buildQuery().range(0, PAGE - 1);
@@ -569,12 +546,13 @@ async function fetchPaymentCheckoutEvents(since) {
   throw new Error(`payment_checkout_events query failed: ${firstPage.error.message}`);
 }
 
-async function fetchMarketTrendsPopupStats(sinceDate) {
+async function fetchMarketTrendsPopupStats(sinceDate, untilDate) {
   let query = supabaseAdmin
     .from("market_trends_popup_daily")
     .select("open_count");
 
   if (sinceDate) query = query.gte("event_date", sinceDate);
+  if (untilDate) query = query.lt("event_date", untilDate);
 
   const response = await query;
 
@@ -630,16 +608,16 @@ function buildPaymentCheckoutStats(rows, cutoffs) {
   };
 }
 
-async function fetchPaymentSummary(since) {
+async function fetchPaymentSummary(range) {
   const orders = [];
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await applySince(
+    const { data, error } = await applyAdminPeriod(
       supabaseAdmin
         .from("reporting_payment_orders")
         .select("id, provider, user_id, product_key, status, amount_minor, currency_code, refunded_minor, paid_at, created_at")
         .in("status", ["paid", "partially_refunded"]),
       "paid_at",
-      since
+      range
     )
       .order("paid_at", { ascending: false, nullsFirst: false })
       .order("id", { ascending: false })
@@ -692,15 +670,14 @@ export async function GET(request) {
   if (unauthorized) return unauthorized;
 
   const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
-  const period = parseDashboardPeriod(request.nextUrl.searchParams.get("period"));
+  const periodRange = adminPeriod(request.nextUrl.searchParams.get("period"));
+  const { period, since: periodSince, until: periodUntil } = periodRange;
   const periodConfig = DASHBOARD_PERIODS[period];
-  const periodSince = period === "day" ? getChisinauMidnight()
-    : periodConfig.ms ? new Date(Date.now() - periodConfig.ms).toISOString() : null;
-  const marketTrendsSinceDate = getMarketTrendsPeriodStart(period);
+  const marketTrendsSinceDate = getMarketTrendsPeriodStart(period, periodRange);
   const cacheKey = period;
 
   if (!bypassCache && cache[cacheKey] && Date.now() - cache[cacheKey].ts < CACHE_TTL_MS
-      && (period !== "day" || cache[cacheKey].data.periodSince === periodSince)) {
+      && (["week", "all"].includes(period) || cache[cacheKey].data.periodSince === periodSince)) {
     return NextResponse.json(cache[cacheKey].data);
   }
 
@@ -713,39 +690,39 @@ export async function GET(request) {
   try {
     dataResults = await Promise.all([
       listAllUsers(),
-      fetchEstimationCounts(periodSince),
-      applySince(
+      fetchEstimationCounts(periodRange),
+      applyAdminPeriod(
         supabaseAdmin.from("shared_links").select("*", { count: "exact", head: true }).eq("collect_statistics", true),
         "created_at",
-        periodSince
+        periodRange
       ),
-      applySince(
+      applyAdminPeriod(
         supabaseAdmin.from("user_favorites").select("*", { count: "exact", head: true }).eq("collect_statistics", true),
         "created_at",
-        periodSince
+        periodRange
       ),
-      fetchTelegramAlerts(periodSince),
+      fetchTelegramAlerts(periodRange),
       fetchAllRows(() =>
-        applySince(
+        applyAdminPeriod(
           supabaseAdmin
             .from("pdf_generation_events")
             .select("id, user_id, visitor, device_id, session_id, estimate_log_id, included_cadastral, created_at"),
           "created_at",
-          periodSince
+          periodRange
         ).order("created_at", { ascending: false })
       ),
-      fetchCadastruSearchEvents(periodSince),
-      fetchListingLinkAnalysisEvents(periodSince),
-      fetchCalculatorUsageEvents(periodSince),
-      fetchExternalApiUsageRows(periodSince),
-      fetchExternalApiUsageEvents(periodSince),
-      fetchPaymentCheckoutEvents(periodSince),
-      fetchMarketTrendsPopupStats(marketTrendsSinceDate),
-      fetchPaymentSummary(periodSince).catch((error) => {
+      fetchCadastruSearchEvents(periodRange),
+      fetchListingLinkAnalysisEvents(periodRange),
+      fetchCalculatorUsageEvents(periodRange),
+      fetchExternalApiUsageRows(periodRange),
+      fetchExternalApiUsageEvents(periodRange),
+      fetchPaymentCheckoutEvents(periodRange),
+      fetchMarketTrendsPopupStats(marketTrendsSinceDate, periodUntil ? chisinauDateKey(periodUntil) : null),
+      fetchPaymentSummary(periodRange).catch((error) => {
         console.error("Failed to load payment stats:", error.message);
         return { available: false, total: null, orders: [] };
       }),
-      fetchActiveUserStats(periodSince).catch((error) => {
+      fetchActiveUserStats(periodRange).catch((error) => {
         console.error("Failed to load active users:", error.message);
         return { activeUsers: null, newUsers: null, oldUsers: null };
       }),
@@ -776,7 +753,8 @@ export async function GET(request) {
   const authUsersById = new Map(users.map((user) => [user.id, user]));
   let cadastruSearches;
   try {
-    const searchesWithFavorites = await loadCadastruShareStatistics(await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50)));
+    const searchesWithFavorites = await loadCadastruSuggestionActivity(
+      await loadCadastruShareStatistics(await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50))));
     cadastruSearches = buildCadastruSearchStats(attachUserNames(cadastruSearchEvents, usersById), cutoffs);
     cadastruSearches.recent = attachUserNames(searchesWithFavorites, usersById);
   } catch (error) {
@@ -816,6 +794,7 @@ export async function GET(request) {
     period,
     periodLabel: periodConfig.label,
     periodSince,
+    periodUntil,
     ...activeUserStats,
     totalUsers: users.length,
     totalEstimations: estimationCounts.sale || 0,

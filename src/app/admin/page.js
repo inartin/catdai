@@ -1,5 +1,7 @@
 "use client";
 
+import { ADMIN_PERIOD_OPTIONS } from "@/lib/admin-periods";
+
 import AdminUserCell, { VisitorTags } from "@/components/admin/AdminUserCell";
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
@@ -110,12 +112,7 @@ const PAYMENT_STATUS_LABELS_RO = {
   failed: "Eșuat",
 };
 
-const DASHBOARD_PERIOD_OPTIONS = [
-  { key: "day", label: "1 day" },
-  { key: "week", label: "7 days" },
-  { key: "month", label: "1 month" },
-  { key: "all", label: "All time" },
-];
+const DASHBOARD_PERIOD_OPTIONS = ADMIN_PERIOD_OPTIONS;
 
 const EXTERNAL_API_STATUS_FILTERS = [
   { key: "all", label: "All" },
@@ -260,7 +257,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
           <th className="px-4 py-3 text-right">HTTP</th>
           <th className="px-4 py-3 text-right">Duration</th>
           <th className="px-4 py-3">Result</th>
-          <th className="px-4 py-3">Suggestion recovery</th>
+          <th className="px-4 py-3">Suggestion</th>
           <th className="px-4 py-3">User</th>
           {canDelete && <th className="px-4 py-3 text-right">Actions</th>}
         </tr>
@@ -315,12 +312,7 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                   {row.error_message || row.error_code || (row.response_payload ? "Response received" : "Completed")}
                 </td>
                 <td className="px-4 py-3">
-                  {row.suggestion_recovery ? (
-                    <div className="min-w-40">
-                      <span className="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">Recovered with suggestion</span>
-                      <p className="mt-1 text-xs text-gray-600">{row.suggestion_recovery.suggested_street}</p>
-                    </div>
-                  ) : <span className="text-gray-400">-</span>}
+                  {row.suggestion_recovery ? <SuggestionActivity activity={row.suggestion_recovery} /> : <span className="text-gray-400">-</span>}
                 </td>
                 <td className="px-4 py-3 text-gray-600 break-all">
                   <AdminUserCell row={row} />
@@ -397,9 +389,10 @@ function ExternalApiEventTable({ rows, expandedExternalApiEventId, setExpandedEx
                       )}
                       {row.suggestion_recovery && (
                         <div className="min-w-0 lg:col-span-2">
-                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Successful suggestion retry</p>
+                          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{row.suggestion_recovery.recovered_at ? "Successful suggestion retry" : "Suggestion selected"}</p>
                           <p className="mt-1 text-sm text-gray-800">{row.suggestion_recovery.resolved_address}</p>
-                          <p className="mt-1 text-xs text-gray-500">{fmtDateTime(row.suggestion_recovery.recovered_at)} · Source: {row.suggestion_recovery.lookup_source || "-"}</p>
+                          {row.suggestion_recovery.clicked_at && <p className="mt-1 text-xs text-gray-500">Selected: {fmtDateTime(row.suggestion_recovery.clicked_at)}</p>}
+                          {row.suggestion_recovery.recovered_at && <p className="mt-1 text-xs text-gray-500">Recovered: {fmtDateTime(row.suggestion_recovery.recovered_at)} · Source: {row.suggestion_recovery.lookup_source || "-"}</p>}
                         </div>
                       )}
                     </div>
@@ -684,6 +677,21 @@ function StatCard({ label, value, detail, onClick, active = false }) {
   return <div className={cardClasses}>{inner}</div>;
 }
 
+function SuggestionActivity({ activity }) {
+  if (!activity) return null;
+  const recovered = Boolean(activity.recovered_at);
+  const label = activity.role === "retry" ? "From suggestion"
+    : recovered ? "Recovered with suggestion" : "Suggestion selected";
+  return (
+    <div className="mt-1 space-y-1 text-xs">
+      <span className={`inline-flex rounded-full px-2 py-0.5 font-medium ${recovered ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>{label}</span>
+      <p className="break-words text-gray-600">{activity.resolved_address || activity.suggested_street}</p>
+      {activity.role === "retry" && activity.original_address && <p className="break-words text-gray-500">Original: {activity.original_address}</p>}
+      {!recovered && <p className="text-gray-500">No successful retry recorded</p>}
+    </div>
+  );
+}
+
 function CadastruSearchDetails({ row, userName }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -720,6 +728,7 @@ function CadastruSearchDetails({ row, userName }) {
         <div className="min-w-0 space-y-2 text-sm text-gray-700 [overflow-wrap:anywhere]">
           <h4 className="font-semibold text-gray-900">Search details</h4>
           <p>Result type: {search.result_type || "Not recorded"}</p>
+          <SuggestionActivity activity={row.suggestion_activity} />
           <p>Returned value: {search.result_value || "Not recorded"}</p>
           <p>Lookup source: {search.lookup_source === "cache" ? "Cached" : search.lookup_source === "api" ? "External API" : search.lookup_source === "local" ? "Local fallback" : "Not recorded"}</p>
         </div>
@@ -778,6 +787,8 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
         <tbody className="divide-y divide-gray-100">
           {rows.map((row) => {
             const isExpanded = expandedSearchId === row.id;
+            const recovered = row.suggestion_activity?.role === "original" && row.suggestion_activity.recovered_at;
+            const originalStatus = row.result_type === "error" ? "Failed" : row.result_type === "no_data" ? "No result" : "Success";
             const toggleExpanded = () => setExpandedSearchId(isExpanded ? null : row.id);
             return (
               <Fragment key={row.id}>
@@ -798,17 +809,21 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
                   </td>
                   <td className="px-4 py-3">
                     {row.result_type ? (
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${row.result_type === "error" ? "bg-red-50 text-red-700" : row.result_type === "no_data"
+                      <div>
+                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${recovered ? "bg-green-50 text-green-700" : row.result_type === "error" ? "bg-red-50 text-red-700" : row.result_type === "no_data"
                         ? "bg-gray-100 text-gray-600"
                         : "bg-green-50 text-green-700"}`}>
-                        {row.result_type === "error" ? "Failed" : row.result_type === "no_data" ? "No result" : "Success"}
-                      </span>
+                          {recovered ? "Recovered" : originalStatus}
+                        </span>
+                        {recovered && <p className="mt-1 text-xs text-gray-500">Original: {originalStatus}</p>}
+                      </div>
                     ) : "-"}
                   </td>
                   <td className="max-w-xs break-words px-4 py-3 text-gray-600">
                     {row.search_type === "address"
                       ? row.search_address || row.cadastral_number || "-"
                       : row.cadastral_number || "-"}
+                    <SuggestionActivity activity={row.suggestion_activity} />
                   </td>
                   <td className="px-4 py-3 text-gray-600">
                     {row.district || "-"}
@@ -2146,11 +2161,12 @@ function DashboardContent() {
                                   <p className="mt-1 text-xs text-gray-500">
                                     {group.linked || group.cachedSearch ? "Cadastru search" : group.inferred ? "Cadastru search (older logs)" : "Individual API log"}
                                   </p>
+                                  <SuggestionActivity activity={group.suggestion_activity} />
                                 </td>
                                 <td className="break-words px-4 py-3 text-gray-600">{[group.cachedSearch && "Cached", fmtExternalApiNodes(group.events)].filter(Boolean).join(", ")}</td>
                                 <td className="px-4 py-3">
-                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${group.mainFailure || group.cachedSearch?.result_type === "error" ? "bg-red-50 text-red-700" : group.failure ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
-                                    {group.mainFailure || group.cachedSearch?.result_type === "error" ? "Failed" : group.failure ? "With failures" : group.cachedSearch?.result_type === "no_data" ? "No result" : "Successful"}
+                                  <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${group.outcome === "failure" ? "bg-red-50 text-red-700" : group.outcome === "other_errors" ? "bg-amber-50 text-amber-700" : group.outcome === "no_data" ? "bg-gray-100 text-gray-600" : "bg-green-50 text-green-700"}`}>
+                                    {({ recovered: "Recovered", failure: "Failed", other_errors: "With failures", no_data: "No result", success: "Successful" })[group.outcome]}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-600">

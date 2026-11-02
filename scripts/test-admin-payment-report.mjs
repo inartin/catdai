@@ -23,15 +23,18 @@ const buyer = { id: "buyer", email: "buyer@example.com", user_metadata: { full_n
 const admin = { id: "admin", app_metadata: { catdai_is_admin: true } };
 let users = [buyer, { id: "guest", is_anonymous: true }, admin];
 const context = vm.createContext({ console: { error() {} }, Date: FixedDate });
+const periods = new vm.SourceTextModule(await fs.readFile("src/lib/admin-periods.js", "utf8"), { context });
+await periods.link(() => { throw new Error("Unexpected period dependency"); });
+await periods.evaluate();
 const helper = new vm.SourceTextModule(await fs.readFile("src/lib/admin-payments.js", "utf8"), { context });
-await helper.link(() => { throw new Error("Unexpected helper dependency"); });
+await helper.link((id) => { assert.equal(id, "./admin-periods"); return periods; });
 await helper.evaluate();
 const { paymentPeriod } = helper.namespace;
 assert.equal(paymentPeriod("day").since, "2026-10-30T22:00:00.000Z");
 assert.equal(paymentPeriod("day", new Date("2026-10-25T12:00:00Z")).since, "2026-10-24T21:00:00.000Z", "Autumn clock change uses the offset at midnight");
 assert.equal(paymentPeriod("day", new Date("2026-03-29T12:00:00Z")).since, "2026-03-28T22:00:00.000Z", "Spring clock change uses the offset at midnight");
 assert.equal(paymentPeriod("week").since, "2026-10-24T10:00:00.000Z");
-assert.equal(paymentPeriod("month").since, "2026-10-01T10:00:00.000Z");
+assert.equal(paymentPeriod("month").since, "2026-09-30T21:00:00.000Z");
 assert.equal(paymentPeriod("__proto__").period, "all");
 
 const mocks = {
@@ -65,6 +68,7 @@ const mocks = {
         select() { return query; },
         in(key, values) { filters.push((row) => values.includes(row[key])); return query; },
         not(key, operator, value) { assert.equal(operator, "is"); filters.push((row) => row[key] !== value); return query; },
+        lt(key, value) { filters.push((row) => row[key] < value); return query; },
         gte(key, value) { filters.push((row) => row[key] >= value); return query; },
         order(key) { sort.push(key); return query; },
         range(from, to) { start = from; end = to; return query; },
@@ -240,4 +244,22 @@ orders.push(payment("after-midnight", { paid_at: "2026-10-31T22:00:00Z" }));
 report = await (await get("period=day", false)).json();
 assert.equal(report.totals.count, 1, "Today changes at local midnight even before cache expiry");
 assert.equal(report.orders[0].id, "after-midnight");
+orders = [
+  payment("before-month", { paid_at: "2026-09-30T20:59:59.999Z" }),
+  payment("start-month", { paid_at: "2026-09-30T21:00:00.000Z" }),
+  payment("end-month", { paid_at: "2026-10-31T21:59:59.999Z" }),
+  payment("next-month", { paid_at: "2026-10-31T22:00:00.000Z" }),
+];
+report = await (await get("period=previous_month")).json();
+assert.deepEqual(report.orders.map((row) => row.id), ["end-month", "start-month"], "Previous month includes its start and excludes this month's start");
+assert.equal(report.until, "2026-10-31T22:00:00.000Z");
+// Cache entries must roll over with the calendar even within the 20-minute TTL.
+now = Date.parse("2026-11-30T21:59:30Z");
+await get("period=month", false);
+await get("period=previous_month", false);
+const beforeMonthChange = reads;
+now += 60000;
+await get("period=month", false);
+await get("period=previous_month", false);
+assert.ok(reads >= beforeMonthChange + 2, "Both month caches roll over at Chișinău midnight");
 console.log("Admin payment report checks passed.");

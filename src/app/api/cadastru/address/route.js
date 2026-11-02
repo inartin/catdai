@@ -4,7 +4,7 @@ import { withCadastruOutcome } from "@/lib/cadastru-outcome";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
 import { cadastruPaidHistoryMetadata } from "@/lib/cadastru-paid-history";
 import { suggestRoadTypes, suggestStreets } from "@/lib/cadastru-street-suggestions";
-import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSuggestionRecovery } from "@/lib/cadastru-suggestion-recovery";
+import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSuggestionSelection, recordSuggestionRecovery } from "@/lib/cadastru-suggestion-recovery";
 import { resolveStreet, inspectStreetAddress } from "@/lib/cadastru-streets/street-resolver";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
@@ -220,6 +220,10 @@ async function handlePost(request, { learned } = {}) {
   const suggestionAddress = { city, roadType, street, houseNumber, apartmentNumber };
   const recovery = shouldTrackCadastruSearch
     ? readSuggestionRecoveryToken(body.suggestion_recovery_token, suggestionAddress) : null;
+  await recordSuggestionSelection(recovery, {
+    address: { ...suggestionAddress, resolvedAddress: lookupAddress },
+    lookupId: getCadastruLookupTracking(body).lookupId,
+  });
   const recoverSuggestion = async (payload, lookupSource) => {
     if (!payload?.cadastral_number && !payload?.lands?.length && !payload?.buildings?.length) return;
     await learnConfirmedAddress(recovery, { ...suggestionAddress, street: resolution.street }, payload);

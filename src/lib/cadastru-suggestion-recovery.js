@@ -43,20 +43,36 @@ export function readSuggestionRecoveryToken(token, address) {
   }
 }
 
+export async function recordSuggestionSelection(recovery, { address, lookupId }) {
+  if (!recovery) return;
+  recovery.selection = {
+    clicked_at: new Date().toISOString(),
+    retry_lookup_id: lookupId || null,
+    suggested_street: address.street,
+    resolved_address: address.resolvedAddress,
+  };
+  await recordSuggestionActivity(recovery, recovery.selection, "suggestion_recovery");
+}
+
 export async function recordSuggestionRecovery(recovery, { address, lookupSource }) {
+  await recordSuggestionActivity(recovery, {
+    ...recovery?.selection,
+    recovered_at: new Date().toISOString(),
+    suggested_street: address.street,
+    resolved_address: address.resolvedAddress,
+    lookup_source: lookupSource,
+  }, "suggestion_recovery->>recovered_at");
+}
+
+async function recordSuggestionActivity(recovery, activity, emptyField) {
   if (!recovery?.eventId || process.env.NODE_ENV === "development" || !shouldCollectStatistics() || !shouldPersistRuntimeData()) return;
   try {
     const { error } = await supabaseAdmin.from("external_api_usage_events")
-      .update({ suggestion_recovery: {
-        recovered_at: new Date().toISOString(),
-        suggested_street: address.street,
-        resolved_address: address.resolvedAddress,
-        lookup_source: lookupSource,
-      } })
+      .update({ suggestion_recovery: activity })
       .eq("id", recovery.eventId)
       .eq("service", "cadastru_address")
       .eq("status", "failure")
-      .is("suggestion_recovery", null);
+      .is(emptyField, null);
     if (error && !["42P01", "42703", "PGRST204", "PGRST205"].includes(String(error.code))) {
       console.error("[cadastru-suggestion-recovery] update failed:", error.message);
     }

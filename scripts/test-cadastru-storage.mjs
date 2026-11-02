@@ -27,7 +27,7 @@ const supabaseAdmin = {
         const pattern = new RegExp(`^${value.replace(/\./g, "\\.").replace(/_/g, ".").replace(/%/g, ".*")}$`);
         filters.push((row) => pattern.test(row[key])); return query;
       },
-      is(key, value) { filters.push((row) => (row[key] ?? null) === value); return query; },
+      is(key, value) { filters.push((row) => ((key.includes("->>") ? row[key.split("->>")[0]]?.[key.split("->>")[1]] : row[key]) ?? null) === value); return query; },
       limit(value) { limit = value; return query; },
       insert(value) { operation = "insert"; values = value; return query; },
       update(value) { operation = "update"; values = value; return query; },
@@ -364,7 +364,8 @@ console.log('Unconfirmed-unit route passed: only exact parent address accepted, 
   const selected = { ...withoutApartmentFields, apartment_number: undefined,
     suggestion_recovery_token: failedPayload.suggestion_recovery_token };
   assert.equal((await trackedRoute.POST(request(selected))).status, 503);
-  assert.equal(event.suggestion_recovery, undefined, 'a click whose lookup fails is not recovered');
+  assert(event.suggestion_recovery.clicked_at);
+  assert.equal(event.suggestion_recovery.recovered_at, undefined, 'a click whose lookup fails is not recovered');
   retrySucceeds = true;
   assert.equal((await trackedRoute.POST(request(selected))).status, 200);
   assert.equal(event.status, 'failure', 'the original failure remains in the admin Failed filter');
@@ -775,14 +776,16 @@ const createFailure = async () => {
   assert.equal(event.request_payload.apartment_number, "7", "failed worker logs retain the submitted apartment number");
   return { failure, event };
 };
-const retryBody = (failure) => ({ ...baltiRequest, street: failure.suggestions[0], suggestion_recovery_token: failure.suggestion_recovery_token });
+const retryLookupId = crypto.randomUUID();
+const retryBody = (failure) => ({ ...baltiRequest, lookup_id: retryLookupId, street: failure.suggestions[0], suggestion_recovery_token: failure.suggestion_recovery_token });
 let failed = await createFailure();
 const buildingFailure = await recoveryRoute.POST(request({ ...baltiRequest, apartment_number: "" }));
 assert.equal(buildingFailure.status, 404);
 assert.equal(Object.hasOwn(tables.external_api_usage_events.at(-1).request_payload, "apartment_number"), false, "building-only failures omit an apartment that was not entered");
 let retry = await recoveryRoute.POST(request(retryBody(failed.failure)));
 assert.equal(retry.status, 404);
-assert.equal(failed.event.suggestion_recovery, undefined, "a clicked suggestion that fails is not recovery");
+assert(failed.event.suggestion_recovery.clicked_at, "failed suggestion retries still record the selection");
+assert.equal(failed.event.suggestion_recovery.recovered_at, undefined, "a clicked suggestion that fails is not recovery");
 workerMissing = false;
 hasCredit = false;
 retry = await recoveryRoute.POST(request(retryBody(failed.failure)));
@@ -791,6 +794,8 @@ assert.equal((await retry.json()).full_access, false, "masked previews still cou
 assert.equal(failed.event.status, "failure", "recovered rows remain in the Failed filter");
 assert.equal(failed.event.suggestion_recovery.suggested_street, "Alexandr Radișcev");
 assert.equal(failed.event.suggestion_recovery.lookup_source, "api");
+assert.equal(failed.event.suggestion_recovery.retry_lookup_id, retryLookupId);
+assert(failed.event.suggestion_recovery.clicked_at);
 const firstRecovery = clone(failed.event.suggestion_recovery);
 await recoveryRoute.POST(request(retryBody(failed.failure)));
 assert.deepEqual(failed.event.suggestion_recovery, firstRecovery, "first successful retry is retained");
@@ -808,7 +813,8 @@ workerUnavailable = true;
 backupHasResult = true;
 retry = await recoveryRoute.POST(request(retryBody(failed.failure)));
 assert.equal(retry.status, 503, "worker outage never invokes the retained local backup");
-assert.equal(failed.event.suggestion_recovery, undefined);
+assert(failed.event.suggestion_recovery.clicked_at);
+assert.equal(failed.event.suggestion_recovery.recovered_at, undefined);
 workerUnavailable = false;
 backupHasResult = false;
 

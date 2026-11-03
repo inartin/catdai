@@ -89,6 +89,7 @@ assert.equal(response.activeUsers, 5, "Total includes anonymous visitors and reg
 assert.equal(response.newUsers, 1, "New registrations use local midnight");
 assert.equal(response.oldUsers, 1, "Returning registered users are shown separately");
 assert.equal(response.totalUsers, 4, "Total users includes every registration");
+assert.equal("dailyActiveUsers" in response, false, "Chart data loads independently of dashboard statistics");
 assert.deepEqual(JSON.parse(JSON.stringify(activityQueries.at(-1))), {
   p_since: "2026-10-17T21:00:00.000Z",
 }, "Aggregate every visitor with the selected local-midnight cutoff");

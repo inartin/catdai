@@ -20,7 +20,7 @@ function roadKey(value) {
   if (/^(bd|bul|bulevard|bulevardul|бульвар|бул|проспект|пр)$/.test(key)) return "bd";
   if (/^(str|strada|улица|ул)$/.test(key)) return "str";
   if (/^(str-la|stradela|strădela|переулок)$/.test(key)) return "str-la";
-  if (/^(sos|șoseaua|şoseaua|soseaua|шоссе)$/.test(key)) return "sos";
+  if (/^(sos|șos|şos|șoseaua|şoseaua|soseaua|шоссе)$/.test(key)) return "sos";
   return key;
 }
 
@@ -123,7 +123,7 @@ export const resolveStreet = createStreetResolver([
 
 export function inspectStreetAddress({ city, roadType, street, houseNumber }) {
   const unchanged = { status: "unchanged", street };
-  const leadingMarker = String(street || "").trim().match(/^(?:stradela|strădela|str-la|переулок|strada|str|bulevardul|bulevard|bd|bul)(?=[.,\s])/iu)?.[0];
+  const leadingMarker = String(street || "").trim().match(/^(?:stradela|strădela|str-la|переулок|strada|str|bulevardul|bulevard|bd|bul|улица|ул|бульвар|бул|проспект|пр|[șşs]oseaua|[șşs]os|шоссе)(?=[.,\s])/iu)?.[0];
   if (leadingMarker && roadKey(leadingMarker) !== roadKey(roadType)) {
     return { status: "road_type_conflict", street };
   }
@@ -133,11 +133,11 @@ export function inspectStreetAddress({ city, roadType, street, houseNumber }) {
   // Check complete names first: dates and numbered streets must retain their digits.
   if (resolveStreet({ city, roadType, street, exactOnly: true }).status !== "unresolved") return unchanged;
   let candidate = String(street || "").trim().replace(/[.,;]+$/, "").trim();
-  const house = candidate.match(/(?:^|[\s,;])(?:nr\.?\s*)?(\d{1,4}(?:\s*\/\s*(?:\d{1,4}|[a-z]))?)$/i);
+  const house = candidate.match(/(?:^|[\s,;])(?:nr\.?\s*)?(\d{1,4}(?:[a-z]|\s*\/\s*(?:\d{1,4}|[a-z]))?)$/i);
   const embeddedHouseNumber = house?.[1].replace(/\s+/g, "").toUpperCase();
   if (house) candidate = candidate.slice(0, house.index).trim();
   const markers = { str: "strada|str|улица|ул", bd: "bulevardul|bulevard|bd|bul|бульвар|бул|проспект|пр",
-    "str-la": "stradela|strădela|str-la|переулок" }[roadKey(roadType)];
+    "str-la": "stradela|strădela|str-la|переулок", sos: "[șşs]oseaua|[șşs]os|шоссе" }[roadKey(roadType)];
   if (!markers) return unchanged;
   candidate = candidate.replace(new RegExp(`^(?:${markers})(?:[.,]\\s*|\\s+)`, "iu"), "")
     .replace(new RegExp(`[,;\\s]+(?:${markers})\\.?$`, "iu"), "")

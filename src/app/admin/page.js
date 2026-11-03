@@ -11,6 +11,7 @@ import AdminUserCredits from "@/components/AdminUserCredits";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 import AdminWorkerStatus from "@/components/admin/AdminWorkerStatus";
 import AdminOnlineUsers from "@/components/admin/AdminOnlineUsers";
+import AdminActiveUsersChart from "@/components/admin/AdminActiveUsersChart";
 
 function fmtNum(n) {
   if (n == null) return "-";
@@ -936,6 +937,7 @@ function DashboardContent() {
   const [dashboardPeriod, setDashboardPeriod] = useState("day");
   const [error, setError] = useState(null);
   const [showUsersList, setShowUsersList] = useState(false);
+  const [activeUsersTab, setActiveUsersTab] = useState("chart");
   const [showPaymentsList, setShowPaymentsList] = useState(false);
   const [users, setUsers] = useState([]);
   const [lastVisitSort, setLastVisitSort] = useState(null);
@@ -1083,7 +1085,7 @@ function DashboardContent() {
   const toggleUsersList = () => {
     const next = !showUsersList;
     setShowUsersList(next);
-    if (next && users.length === 0 && !usersLoading) {
+    if (next && activeUsersTab === "users" && users.length === 0 && !usersLoading) {
       loadUsers();
     }
   };
@@ -1682,18 +1684,69 @@ function DashboardContent() {
           </div>
         )}
         {showUsersList && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">Registered Users</h3>
-              <button
-                type="button"
-                onClick={loadUsers}
-                disabled={usersLoading}
-                className="text-xs text-primary hover:underline disabled:text-gray-400 disabled:no-underline"
-              >
-                {usersLoading ? "Loading..." : "Refresh"}
-              </button>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden dark:border-slate-800 dark:bg-slate-900">
+            <div className="px-5 py-3.5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3 dark:border-slate-800">
+              <div className="flex items-center gap-1.5 bg-gray-100/90 p-1 rounded-lg dark:bg-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setActiveUsersTab("chart")}
+                  className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                    activeUsersTab === "chart"
+                      ? "bg-white text-gray-900 shadow-2xs dark:bg-slate-700 dark:text-slate-100"
+                      : "text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-200"
+                  }`}
+                >
+                  📊 Daily Activity Chart
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveUsersTab("users");
+                    if (users.length === 0 && !usersLoading) {
+                      loadUsers();
+                    }
+                  }}
+                  className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                    activeUsersTab === "users"
+                      ? "bg-white text-gray-900 shadow-2xs dark:bg-slate-700 dark:text-slate-100"
+                      : "text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-200"
+                  }`}
+                >
+                  👥 Registered Users {users.length > 0 ? `(${fmtNum(users.length)})` : ""}
+                </button>
+              </div>
+
+              {activeUsersTab === "users" ? (
+                <button
+                  type="button"
+                  onClick={loadUsers}
+                  disabled={usersLoading}
+                  className="text-xs text-primary hover:underline disabled:text-gray-400 disabled:no-underline cursor-pointer"
+                >
+                  {usersLoading ? "Loading..." : "Refresh"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveUsersTab("users");
+                    if (users.length === 0 && !usersLoading) {
+                      loadUsers();
+                    }
+                  }}
+                  className="text-xs text-primary hover:underline cursor-pointer"
+                >
+                  View registered users list →
+                </button>
+              )}
             </div>
+
+            {activeUsersTab === "chart" && (
+              <AdminActiveUsersChart initialPeriod={dashboardPeriod} />
+            )}
+
+            {activeUsersTab === "users" && (
+              <>
 
             {usersError ? (
               <div className="px-5 py-8 text-center">
@@ -1819,6 +1872,8 @@ function DashboardContent() {
                   </tbody>
                 </table>
               </div>
+            )}
+              </>
             )}
           </div>
         )}

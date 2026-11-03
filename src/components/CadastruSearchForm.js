@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import CadastruAddressPicker from "@/components/CadastruAddressPicker";
 import CadastruLocalityInput from "@/components/CadastruLocalityInput";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
 import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
@@ -16,9 +17,6 @@ const roadTypes = [
   { value: "bulevard", label: "cadastru.roadTypeBoulevardFull" },
   { value: "sos", label: "cadastru.roadTypeHighwayFull" },
 ];
-const STREET_MAX_LENGTH = 80;
-const HOUSE_NUMBER_MAX_LENGTH = 10;
-const APARTMENT_NUMBER_MAX_LENGTH = 4;
 const DRAFT_STORAGE_KEY = "catdai:cadastru-search-draft:v1";
 const ADDRESS_PREVIEW_STORAGE_KEY = "catdai:cadastru-address-result-preview:v1";
 const ADDRESS_LOOKUP_REQUEST_STORAGE_KEY = "catdai:cadastru-address-lookup-request:v1";
@@ -70,14 +68,6 @@ function clearAddressLookupRequest() {
   }
 }
 
-function onlyHouseNumberChars(value) {
-  return value.replace(/[^\da-z/]/gi, "").toUpperCase().slice(0, HOUSE_NUMBER_MAX_LENGTH);
-}
-
-function onlyDigits(value, maxLength) {
-  return value.replace(/\D/g, "").slice(0, maxLength);
-}
-
 export default function CadastruSearchForm({
   className = "",
   quickSearchPlacement = "bottom",
@@ -98,6 +88,7 @@ export default function CadastruSearchForm({
     houseNumber: "",
     apartmentNumber: "",
   });
+  const [addressReady, setAddressReady] = useState(false);
   const [cadastralNumber, setCadastralNumber] = useState("");
   const [draftReady, setDraftReady] = useState(false);
   const [loadingSearch, setLoadingSearch] = useState(null);
@@ -143,7 +134,7 @@ export default function CadastruSearchForm({
   };
 
   const submitAddressSearch = () => {
-    if (!addressForm.city || requireAuth()) return;
+    if (!addressForm.city || !addressReady || !addressForm.street.trim() || !addressForm.houseNumber || requireAuth()) return;
     clearAddressResultPreview();
     const requestBody = {
       city: addressForm.city,
@@ -253,7 +244,7 @@ export default function CadastruSearchForm({
       />
 
       <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10">
-        <form className="space-y-6" onSubmit={(event) => event.preventDefault()}>
+        <form autoComplete="off" className="space-y-6" onSubmit={(event) => event.preventDefault()}>
           {quickSearchPlacement === "top" && quickSearchBlock}
 
           <div>
@@ -265,85 +256,17 @@ export default function CadastruSearchForm({
             </p>
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_180px]">
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-700">
-                {lang === "en" ? "Locality" : lang === "ru" ? "Населённый пункт" : "Localitate"}
-              </span>
-              <CadastruLocalityInput value={addressForm.city} lang={lang} onChange={(value) => setAddressField("city", value)} />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-700">
-                {t("cadastru.roadType")}
-              </span>
-              <select
-                value={addressForm.roadType}
-                onChange={(event) => setAddressField("roadType", event.target.value)}
-                className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base font-medium text-gray-900 outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary-light"
-              >
-                {roadTypes.map((roadType) => (
-                  <option key={roadType.value} value={roadType.value}>
-                    {t(roadType.label)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_160px_160px]">
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-700">
-                {t("cadastru.street")}
-              </span>
-              <input
-                type="text"
-                maxLength={STREET_MAX_LENGTH}
-                value={addressForm.street}
-                onChange={(event) => setAddressField("street", event.target.value)}
-                placeholder={t("cadastru.streetPlaceholder")}
-                className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-700">
-                {t("cadastru.houseNumber")}
-              </span>
-              <input
-                type="text"
-                inputMode="text"
-                pattern="\d{1,4}(?:/(?:\d{1,4}|[A-Za-z]))?"
-                maxLength={HOUSE_NUMBER_MAX_LENGTH}
-                value={addressForm.houseNumber}
-                onChange={(event) => setAddressField("houseNumber", onlyHouseNumberChars(event.target.value))}
-                placeholder="ex. 18/2, 22/D"
-                className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-semibold text-gray-700">
-                {t("cadastru.apartmentNumber")}
-              </span>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="\d{1,4}"
-                maxLength={APARTMENT_NUMBER_MAX_LENGTH}
-                value={addressForm.apartmentNumber}
-                onChange={(event) => setAddressField("apartmentNumber", onlyDigits(event.target.value, APARTMENT_NUMBER_MAX_LENGTH))}
-                placeholder={t("cadastru.apartmentPlaceholder")}
-                className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light"
-              />
-            </label>
-          </div>
+          <label className="block">
+            <span className="text-sm font-semibold text-gray-700">{lang === "en" ? "Locality" : lang === "ru" ? "Населённый пункт" : "Localitate"}</span>
+            <CadastruLocalityInput value={addressForm.city} lang={lang} onChange={(value) => setAddressField("city", value)} />
+          </label>
+          <CadastruAddressPicker value={addressForm} onChange={setAddressForm} onReady={setAddressReady} lang={lang} t={t} />
 
           <div className="pt-2">
             <button
               type="button"
               onClick={() => submitAddressSearch()}
-              disabled={authLoading || !addressForm.city}
+              disabled={authLoading || !addressForm.city || !addressReady || !addressForm.street.trim() || !addressForm.houseNumber}
               className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-800 sm:w-auto"
             >
               {t("cadastru.searchButton")}
@@ -352,6 +275,7 @@ export default function CadastruSearchForm({
 
           {quickSearchPlacement === "bottom" && quickSearchBlock}
         </form>
+        <p className="mt-4 text-xs text-gray-400"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a> · <a href="https://map.md/" target="_blank" rel="noreferrer">© map.md</a></p>
       </div>
     </div>
   );

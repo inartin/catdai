@@ -32,7 +32,7 @@ const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 const STREET_MAX_LENGTH = 80;
 const HOUSE_NUMBER_MAX_LENGTH = 10;
 const APARTMENT_NUMBER_MAX_LENGTH = 4;
-const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/(?:\d{1,4}|[a-z]))?$/i;
+const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z]))?$/i;
 const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 const MAX_APARTMENT_NUMBER = 9999;
 

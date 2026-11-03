@@ -1,0 +1,10 @@
+import vm from 'node:vm';import fs from 'node:fs/promises';import assert from 'node:assert/strict';import crypto from 'node:crypto';
+let calls=[],mode='success';
+const context=vm.createContext({process:{env:{CADASTRU_EXTERNAL_API_BASE_URL:'https://old.example',CADASTRU_EXTERNAL_API_SECRET:'test'}},URL,AbortSignal,console,fetch:async url=>{calls.push(url);if(mode==='auth')return Response.json({ok:false,error:'unauthorized'},{status:401});return url.includes('old.example')?Response.json({ok:false,error:'not_found'},{status:404}):Response.json({ok:true,data:{numbers:['45A','45/A']}});}});
+const mocks={'node:crypto':{default:crypto},'@/lib/api-workers':{getApiWorkerEndpoints:path=>[{url:'https://old.example'+path},{url:'https://new.example'+path}],isApiWorkerResponse:()=>true,withApiWorkerFallback:()=>{throw Error('Must not use property fallback for suggestions');}},'@/lib/external-api-usage':{getExternalApiDiagnosticHeaders:()=>({}),trackExternalApiUsage:()=>{}}};
+const m=new vm.SourceTextModule(await fs.readFile('src/lib/cadastru-external-api.js','utf8'),{context});
+await m.link(name=>{const values=mocks[name];assert(values);return new vm.SyntheticModule(Object.keys(values),function(){for(const [k,v]of Object.entries(values))this.setExport(k,v);},{context});});await m.evaluate();
+assert.equal(JSON.stringify((await m.namespace.fetchExternalHouseSuggestions({street:'Test'})).numbers),JSON.stringify(['45A','45/A']));assert.equal(calls.length,2);
+calls=[];await m.namespace.fetchExternalStreetSuggestions({city:'Stăuceni',query:'luceafarul'});assert.equal(calls.length,2);assert(calls.every(url=>url.endsWith('/v1/cadastru/street-suggestions')));
+calls=[];mode='auth';await assert.rejects(m.namespace.fetchExternalHouseSuggestions({street:'Test'}),e=>e.status===401);assert.equal(calls.length,1);
+console.log('Suggestion workers: missing-route fallback and authentication stop passed.');

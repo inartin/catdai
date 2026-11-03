@@ -8,6 +8,7 @@ const db = new PGlite();
 const id = (n) => `${String(n).padStart(8, "0")}-1111-4111-8111-111111111111`;
 try {
   await db.exec(`
+    set timezone = 'UTC';
     create role anon; create role authenticated; create role service_role bypassrls;
     create schema auth;
     create table auth.users (
@@ -131,6 +132,46 @@ try {
     await assert.rejects(db.query("select * from admin_external_api_usage_since($1, $2)", bounds), /permission denied/);
     await db.exec("reset role");
   }
+  await db.exec(await fs.readFile("supabase/migrations/20261102185351_admin_active_users_chart.sql", "utf8"));
+  const chart = async (since = bounds[0], until = bounds[1], hourly = false) =>
+    (await db.query("select public.admin_active_users_chart($1, $2, $3) as chart", [since, until, hourly])).rows[0].chart;
+  let result = await chart();
+  assert.equal(result.activeUsers, 3, "Period totals count distinct people across all daily buckets");
+  assert.equal(result.newUsers, 1);
+  assert.equal(result.oldUsers, 1);
+  assert.equal(result.dailyActiveUsers.length, 31, "Missing calendar days are filled with zeroes");
+  assert.deepEqual(result.dailyActiveUsers.find((p) => p.date === "2040-10-10"), {
+    date: "2040-10-10", activeUsers: 2, newUsers: 0, oldUsers: 1, anonymousUsers: 1,
+  }, "Daily aggregation excludes bots, admins and duplicate searches");
+  assert.equal(result.dailyActiveUsers.find((p) => p.date === "2040-10-15").newUsers, 1, "Registration itself is activity");
+  const hourly = await chart("2040-10-09 21:00:00+00", "2040-10-10 21:00:00+00", true);
+  assert.equal(hourly.dailyActiveUsers.length, 24);
+  assert.equal(hourly.dailyActiveUsers[3].activeUsers, 2, "UTC timestamps use the Chișinău hour");
+  assert.equal(hourly.dailyActiveUsers[0].date, "00:00");
+  assert.equal(hourly.dailyActiveUsers[23].date, "23:00");
+  // Login on a later day deduplicates the period total while each day keeps its own identities.
+  await db.query(`insert into payment_checkout_events (user_id, device_id, created_at) values
+    (null, $1, '2040-10-10 20:30+00'), ($2, $1, '2040-10-11 00:30+00'),
+    ($3, $4, '2040-10-10 10:00+00')`, [id(80), id(31), id(5), id(81)]);
+  result = await chart();
+  assert.equal(result.activeUsers, 4, "Guest accounts count as anonymous; login across days does not double-count the period");
+  assert.equal(result.dailyActiveUsers.find((p) => p.date === "2040-10-10").anonymousUsers, 3);
+  await db.query(`insert into payment_checkout_events (device_id, created_at)
+    select lpad(n::text, 8, '0') || '-1111-4111-8111-111111111111', '2040-10-10 10:00+00'::timestamptz
+    from generate_series(10000, 11104) n`);
+  assert.equal((await chart()).activeUsers, 1109, "Aggregation is not truncated at the REST 1000-row page limit");
+  const empty = await chart("2100-01-01", "2100-01-02", true);
+  assert.equal(empty.activeUsers, 0);
+  assert(empty.dailyActiveUsers.every((p) => p.activeUsers === 0));
+  for (const role of ["anon", "authenticated"]) {
+    await db.exec(`set role ${role}`);
+    await assert.rejects(chart(), /permission denied/);
+    await db.exec("reset role");
+  }
+  await db.exec("set role service_role");
+  assert.equal((await chart()).activeUsers, 1109, "Only service-role callers may read chart aggregates");
+  await db.exec("reset role");
+  console.log("Active-user chart SQL checks passed: buckets, bounds, identities, guests, full reads and service-only permissions.");
   console.log("Calendar-month database checks passed: exact bounds, historical activity, aggregates and permissions.");
   console.log("Active visitor database checks passed: backfill, deduplication, periods, guests, exclusions, throttling and permissions.");
 } finally {

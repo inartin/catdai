@@ -21,6 +21,7 @@ Backend prepared and active when Redis is reachable.
 - `POST /api/cadastru/public-transport`: key prefix `catdai:cadastru:public-transport:v1:`, 30d TTL for complete transport responses per resolved origin, backed by `cadastru_public_transport`.
 - `GET /api/admin/ad-tracking`: key prefix `catdai:admin-ad-tracking:v1`, 10m TTL per source, journey limit, and offset; `fresh=1` bypasses the cache.
 - `GET /api/admin/payments`: key prefix `catdai:admin-payments:v2:`, 20m TTL per period/currency/page; Today and both calendar-month filters include their Chișinău start boundary so cached reports roll over with the calendar. Admin auth runs before cache reads. Only successful reports are stored; Refresh/Retry use `fresh=1` to replace the cached report. Browser/proxy responses remain `private, no-store`.
+- `GET /api/admin/active-users`: key prefix `catdai:admin-active-users:v1:`, five-minute TTL per chart period and local calendar boundary. Only complete aggregates are cached, after admin authentication. The open chart also reuses loaded periods in memory until the report is five minutes old or Chișinău midnight passes. Chart Refresh/Retry use `fresh=1` and replace both cached copies. Browser/proxy responses remain `private, no-store`.
 - `POST /api/admin/auth`: key prefix `catdai:admin-login:v1:`, 15m TTL per client IP for failed-login throttling. Production admin login requires Redis and fails closed if it is unavailable.
 
 ## Live Presence

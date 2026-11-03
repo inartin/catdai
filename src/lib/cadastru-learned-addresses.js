@@ -13,7 +13,7 @@ export function learnedAddress(value) {
   const street = clean(value.street);
   const houseNumber = clean(value.houseNumber || value.house_number).replace(/\s*\/\s*/g, "/").toUpperCase();
   const unit = clean(value.apartmentNumber || value.apartment_number);
-  if (!city || !roadType || !street || street.length > 80 || !/^\d{1,4}(?:\/(?:\d{1,4}|[A-Z]))?$/.test(houseNumber)
+  if (!city || !roadType || !street || street.length > 80 || !/^\d{1,4}(?:[A-Z]|\/(?:\d{1,4}|[A-Z]))?$/.test(houseNumber)
     || (unit && (!/^\d{1,4}$/.test(unit) || Number(unit) < 1))) return null;
   return {city, roadType, street, houseNumber, apartmentNumber:unit ? String(Number(unit)) : ""};
 }

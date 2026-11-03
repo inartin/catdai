@@ -204,3 +204,27 @@ export async function fetchExternalMunicipalReportsData(location, options = {}) 
     { ...options, timeoutMs: 70_000, preserveWorkerError: true }
   );
 }
+
+async function fetchExternalAddressSuggestions(path, fields) {
+  const base = process.env.CADASTRU_EXTERNAL_API_BASE_URL || process.env.CADASTRU_EXTERNAL_ADDRESS_API_URL || process.env.CADASTRU_EXTERNAL_API_URL;
+  const url = base ? new URL(path, base).toString() : undefined;
+  const workers = getApiWorkerEndpoints(path, url);
+  if (!workers.length) throw externalError('House suggestions are not configured');
+  for (const [index, worker] of workers.entries()) {
+    try {
+      return await fetchSignedExternalCadastruAttempt(worker.url, fields, 'cadastru', { trackUsage: false, timeoutMs: 9000 });
+    } catch (error) {
+      // A missing suggestion route means an older worker, not a missing property.
+      // Never apply this exception to cadastral/property lookups or auth failures.
+      if (error.status !== 404 || index === workers.length - 1) throw error;
+    }
+  }
+}
+
+export function fetchExternalHouseSuggestions(fields) {
+  return fetchExternalAddressSuggestions('/v1/cadastru/house-suggestions', fields);
+}
+
+export function fetchExternalStreetSuggestions(fields) {
+  return fetchExternalAddressSuggestions('/v1/cadastru/street-suggestions', fields);
+}

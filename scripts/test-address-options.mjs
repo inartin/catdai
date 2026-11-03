@@ -1,0 +1,40 @@
+import vm from 'node:vm';import fs from 'node:fs/promises';import path from 'node:path';import assert from 'node:assert/strict';
+const root=path.resolve('src/lib');const context=vm.createContext({console});const modules=new Map();
+async function load(file){if(modules.has(file))return modules.get(file);let source=await fs.readFile(file,'utf8');let m;
+if(file.endsWith('.json'))m=new vm.SyntheticModule(['default'],function(){this.setExport('default',JSON.parse(source));},{context,identifier:file});
+else m=new vm.SourceTextModule(source,{context,identifier:file});modules.set(file,m);await m.link(async(spec,parent)=>{let target=path.resolve(path.dirname(parent.identifier),spec);if(!path.extname(target))target+='.js';return load(target);});return m;}
+const m=await load(root+'/cadastru-address-options.js');await m.evaluate();const search=m.namespace.streetOptions;
+assert(search('Chișinău','strada dacia').some(s=>s.street==='Dacia'&&s.road_type==='bulevard'));
+assert(search('Chișinău','Dacia 15/1').some(s=>s.house_number==='15/1'));
+assert(search('Chișinău','31 August 1989').some(s=>s.street==='31 August 1989'&&!s.house_number));
+assert.equal(search('Nonexistent','Dacia').length,0);
+console.log('Street options: locality scope, prefix cleanup, pasted house and numbered street preservation passed.');
+
+const createLookup=m.namespace.createStreetOptionLookup;
+const cache=new Map();let calls=0,mode='success';
+const read=async key=>cache.has(key)?{value:cache.get(key)}:null;
+const write=async (key,value,ttl)=>{cache.set(key,value);assert(ttl>0);};
+const fetchStreets=async ({city,query})=>{calls++;await Promise.resolve();
+ if(mode==='failure')throw Error('unavailable');
+ if(mode==='wrong-city')return {city:'Ungheni',streets:[{street:'Luceafărul',road_type:'strada'}]};
+ if(mode==='empty')return {city,streets:[]};
+ return {city,streets:[{street:'Luceafărul',road_type:'strada'}, {street:'Luceafărul',road_type:'invalid'}]};};
+const lookup=createLookup({read,write,fetchStreets});
+assert.equal(search('Stăuceni','luceafarul').length,0,'this street is absent from the OSM catalogue');
+const [missing,same]=await Promise.all([lookup('Stăuceni','luceafarul'),lookup('Stăuceni','luceafarul')]);
+assert.equal(calls,1);assert.equal(missing[0].street,'Luceafărul');assert.equal(same.length,1);assert.equal(missing[0].road_type,'strada');
+await lookup('Stăuceni','luceafarul');assert.equal(calls,1,'shared cache avoids repeat provider calls');
+await lookup('Chișinău','Dacia');assert.equal(calls,1,'existing catalogue streets stay local');
+cache.clear();mode='wrong-city';assert.equal((await lookup('Stăuceni','luceafarul')).length,0);assert.equal(cache.size,0);
+mode='failure';assert.equal((await lookup('Stăuceni','luceafarul')).length,0);assert.equal(cache.size,0,'outages are never cached');
+mode='empty';assert.equal((await lookup('Stăuceni','missing-street')).length,0);assert.equal(cache.size,1);
+console.log('Street fallback: missing OSM street, type/locality validation, cache coalescing and outage handling passed.');
+
+const prefetched=await load(root+'/prefetched-house-numbers.js');await prefetched.evaluate();
+const getNumbers=prefetched.namespace.getPrefetchedHouseNumbers;
+const dacia=getNumbers({city:'Chișinău',road_type:'bulevard',street:'Dacia'});
+assert(dacia?.numbers.length>0);assert(Number.isFinite(dacia.fetchedAt));
+assert.equal(getNumbers({city:'Stăuceni',road_type:'bulevard',street:'Dacia'}),null);
+assert.equal(getNumbers({city:'Chișinău',road_type:'strada',street:'Dacia'}),null);
+assert.equal(search('Chișinău','Dacia').filter(row=>row.street==='Dacia'&&row.road_type==='bulevard').length,1,'prefetched and dictionary rows must deduplicate');
+console.log('Prefetched catalogue: locality/type isolation, house inventory and street deduplication passed.');

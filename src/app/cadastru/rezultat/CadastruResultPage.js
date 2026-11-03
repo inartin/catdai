@@ -43,7 +43,7 @@ const roadTypes = [
   { value: "sos", label: "cadastru.roadTypeHighway", fullLabel: "cadastru.roadTypeHighwayFull" },
 ];
 const STREET_MAX_LENGTH = 80;
-const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:\/(?:\d{1,4}|[a-z]))?$/i;
+const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z]))?$/i;
 const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 
 const inFlightCadastralLookups = new Map();

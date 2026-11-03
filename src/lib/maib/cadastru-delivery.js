@@ -27,7 +27,7 @@ export async function buildMaibCadastruDelivery({ productKey, returnTo, checkout
     const road = address.road_type === 'bulevard' ? 'bd' : address.road_type === 'str-la' ? 'str-la' : address.road_type === 'sos' ? 'sos' : 'str';
     const street = clean(address.street), house = clean(address.house_number).replace(/\s*\/\s*/g, '/').toUpperCase();
     const apartmentInput = clean(address.apartment_number);
-    if (street.length > 80 || !/^\d{1,4}(?:\/(?:\d{1,4}|[a-z]))?$/i.test(house)
+    if (street.length > 80 || !/^\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z]))?$/i.test(house)
       || (apartmentInput && (!/^\d{1,4}$/.test(apartmentInput) || Number(apartmentInput) < 1))) return null;
     const apartment = apartmentInput ? String(Number(apartmentInput)) : '';
     const inspected = inspectStreetAddress({ city, roadType: road, street, houseNumber: house });

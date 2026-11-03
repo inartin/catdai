@@ -38,3 +38,18 @@ assert.equal(getNumbers({city:'Stăuceni',road_type:'bulevard',street:'Dacia'}),
 assert.equal(getNumbers({city:'Chișinău',road_type:'strada',street:'Dacia'}),null);
 assert.equal(search('Chișinău','Dacia').filter(row=>row.street==='Dacia'&&row.road_type==='bulevard').length,1,'prefetched and dictionary rows must deduplicate');
 console.log('Prefetched catalogue: locality/type isolation, house inventory and street deduplication passed.');
+
+const resolveTyped=m.namespace.resolveTypedStreet;
+const autofilled=resolveTyped('Decebal',search('Chișinău','Decebal'));
+assert.equal(autofilled.status,'exact');assert.equal(autofilled.address.road_type,'bulevard');assert.equal(autofilled.address.street,'Decebal');
+const unlisted=resolveTyped('Strada Completely Unknown',[]);assert.equal(unlisted.status,'unresolved');assert.equal(unlisted.address.street,'Completely Unknown');assert.equal(unlisted.address.road_type,'strada');
+assert.equal(resolveTyped('șos. Unknown Road',[]).address.road_type,'sos');
+assert.equal(resolveTyped('Unknown Road bd.',[]).address.road_type,'bulevard');
+const ambiguous=[{street:'Example',road_type:'strada',rank:0},{street:'Example',road_type:'str-la',rank:0}];
+assert.equal(resolveTyped('Example',ambiguous).status,'ambiguous');
+assert.equal(resolveTyped('str-la Example',ambiguous).address.road_type,'str-la');
+assert.equal(resolveTyped('str. Decebal',search('Chișinău','Decebal')).address.road_type,'strada','an explicit type is never silently changed');
+assert.equal(resolveTyped('Decebal 63',search('Chișinău','Decebal 63')).address.street,'Decebal 63','embedded numbers remain available for server conflict validation');
+const numbered=resolveTyped('31 August 1989',search('Chișinău','31 August 1989'));assert(numbered.status==='ambiguous'?numbered.choices.every(row=>row.street==='31 August 1989'):numbered.address.street==='31 August 1989','numbered street names remain complete even when the road type is ambiguous');
+assert.equal(resolveTyped('Deceb',search('Chișinău','Deceb')).status,'unresolved','a partial name must not silently select the first suggestion');
+console.log('Manual street resolution: browser history input, unlisted streets, explicit types, ambiguity and house-conflict preservation passed.');

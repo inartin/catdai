@@ -412,6 +412,8 @@
   "payment.featurePdfSections": "Optional seller and cadastral sections, when data is available",
   "payment.featurePdfQr": "QR code linking to the valuation, if selected",
   "payment.showAllPackages": "View all packages",
+  "payment.cadastruMoreChecks": "Need more checks?",
+  "payment.cadastruSaveMore": "Save up to 75%",
   "payment.checkoutLoading": "Opening checkout...",
   "payment.checkoutContextRequired": "Return to your property result or the pricing page to continue payment.",
   "payment.checkoutError": "We could not start the payment. Try again.",

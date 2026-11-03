@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { parseStreetInput } from "@/lib/cadastru-street-input";
 import CadastruAddressPicker from "@/components/CadastruAddressPicker";
 import CadastruLocalityInput from "@/components/CadastruLocalityInput";
 import AuthRequiredModal from "@/components/AuthRequiredModal";
@@ -93,6 +94,9 @@ export default function CadastruSearchForm({
   const [draftReady, setDraftReady] = useState(false);
   const [loadingSearch, setLoadingSearch] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [streetChoices,setStreetChoices] = useState([]);
+  const pendingSearch=useRef(null);
+  useEffect(() => () => pendingSearch.current?.abort(), []);
 
   useEffect(() => {
     const savedDraft = readSavedDraft();
@@ -130,11 +134,17 @@ export default function CadastruSearchForm({
   };
 
   const setAddressField = (field, value) => {
+    if(field === "city") {setAddressReady(false);setStreetChoices([]);}
     setAddressForm((current) => ({ ...current, [field]: value }));
   };
 
-  const submitAddressSearch = () => {
-    if (!addressForm.city || !addressReady || !addressForm.street.trim() || !addressForm.houseNumber || requireAuth()) return;
+  const updateAddressForm = next => {
+    if(next.city!==addressForm.city || next.street!==addressForm.street || next.roadType!==addressForm.roadType)setAddressReady(false);
+    setStreetChoices([]);setAddressForm(next);
+  };
+
+  const submitAddressSearch = async () => {
+    if (authLoading || !addressForm.city || !addressForm.street.trim() || !addressForm.houseNumber || requireAuth()) return;
     clearAddressResultPreview();
     const requestBody = {
       city: addressForm.city,
@@ -146,7 +156,27 @@ export default function CadastruSearchForm({
       lookup_id: crypto.randomUUID(),
       ...(skipCache ? { skip_cache: true } : {}),
     };
+    pendingSearch.current?.abort();
+    const controller=new AbortController();pendingSearch.current=controller;
     setLoadingSearch({ address: requestBody });
+    if(!addressReady) {
+      const parsed=parseStreetInput(addressForm.street);
+      requestBody.street=parsed.street;requestBody.road_type=parsed.road_type||'strada';
+      try {
+        const response=await fetch(`/api/cadastru/address-options?${new URLSearchParams({city:addressForm.city,q:addressForm.street,resolve:'1'})}`, {signal:AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])});
+        if(response.ok) {
+          const result=await response.json();
+          if(controller.signal.aborted)return;
+          if(result.status==='ambiguous' && result.choices?.length) {
+            setStreetChoices(result.choices);setLoadingSearch(null);return;
+          }
+          if(result.address?.street && roadTypes.some(type=>type.value===result.address.road_type)) {
+            requestBody.street=result.address.street;requestBody.road_type=result.address.road_type;
+          }
+        }
+      } catch { /* The ordinary exact lookup still accepts manual addresses. */ }
+    }
+    if(controller.signal.aborted)return;
     onSearchStart?.({ address: requestBody });
     writeAddressLookupRequest(requestBody);
     const params = new URLSearchParams({
@@ -260,13 +290,13 @@ export default function CadastruSearchForm({
             <span className="text-sm font-semibold text-gray-700">{lang === "en" ? "Locality" : lang === "ru" ? "Населённый пункт" : "Localitate"}</span>
             <CadastruLocalityInput value={addressForm.city} lang={lang} onChange={(value) => setAddressField("city", value)} />
           </label>
-          <CadastruAddressPicker value={addressForm} onChange={setAddressForm} onReady={setAddressReady} lang={lang} t={t} />
+          <CadastruAddressPicker value={addressForm} onChange={updateAddressForm} onReady={setAddressReady} forcedOptions={streetChoices} lang={lang} t={t} />
 
           <div className="pt-2">
             <button
               type="button"
               onClick={() => submitAddressSearch()}
-              disabled={authLoading || !addressForm.city || !addressReady || !addressForm.street.trim() || !addressForm.houseNumber}
+              disabled={authLoading || !addressForm.city || !addressForm.street.trim() || !addressForm.houseNumber}
               className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-800 sm:w-auto"
             >
               {t("cadastru.searchButton")}

@@ -1,5 +1,5 @@
 import { NextResponse, after } from 'next/server';
-import { createStreetOptionLookup } from '@/lib/cadastru-address-options';
+import { createStreetOptionLookup, resolveTypedStreet } from '@/lib/cadastru-address-options';
 import { resolveSupportedCity } from '@/lib/cadastru-streets/supported-cities';
 import { getSharedCache, setSharedCache } from '@/lib/cache';
 import { fetchExternalHouseSuggestions, fetchExternalStreetSuggestions } from '@/lib/cadastru-external-api';
@@ -19,8 +19,9 @@ export async function GET(request) {
   const params = new URL(request.url).searchParams;
   const city = resolveSupportedCity(params.get('city'));
   const q = (params.get('q') || '').trim();
-  if (!city || q.length < 2 || q.length > 80) return NextResponse.json({error:'invalid_query'}, {status:400});
+  if (!city || q.length < (params.get('resolve') === '1' ? 1 : 2) || q.length > 80) return NextResponse.json({error:'invalid_query'}, {status:400});
   const options = await lookupStreets(city,q);
+  if (params.get('resolve') === '1') return NextResponse.json(resolveTypedStreet(q,options), {headers:{'Cache-Control':'no-store'}});
   if (params.get('houses') === '1') {
     const chosen = options.find(row => row.street === q && row.road_type === params.get('road_type'));
     if (!chosen) return NextResponse.json({error:'invalid_street'}, {status:400});

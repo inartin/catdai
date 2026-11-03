@@ -28,6 +28,7 @@ export default function PricingPackages() {
     { key: "ten", productKey: "credits_10" },
     { key: "fifty", productKey: "credits_50" },
   ];
+  const standardUnitPrice = maibProduct("cadastru_lookup_single").amount_mdl;
 
   const startCheckout = (productKey) => {
     trackPaymentAnalytics('checkout_button_clicked', productKey, { checkout_source: 'pricing',
@@ -51,6 +52,7 @@ export default function PricingPackages() {
             const product = maibProduct(productKey);
             const uses = Object.values(product.grants).reduce((sum, count) => sum + count, 0);
             const recommended = key === "single";
+            const savingsPercent = Math.round(100 - (product.amount_mdl * 100) / (uses * standardUnitPrice));
             const locale = lang === "ru" ? "ru-MD" : "ro-MD";
             const unitPrice = (product.amount_mdl / uses).toLocaleString(locale, {
               minimumFractionDigits: uses === 1 ? 0 : 2, maximumFractionDigits: 2,
@@ -62,6 +64,11 @@ export default function PricingPackages() {
                 <p className={`text-sm font-semibold ${recommended ? "text-primary" : "text-gray-500"}`}>{t(`pricing.shared.${key}.label`)}</p>
                 <h2 className="mt-7 text-3xl font-bold tracking-tight text-gray-950">{t(`pricing.shared.${key}.uses`)}</h2>
                 <p className="mt-6 text-2xl font-semibold tracking-tight text-gray-900">{product.amount_mdl} <span className="text-base font-medium text-gray-500">MDL</span></p>
+                <p className={`mt-2 text-sm ${uses === 1 ? "text-gray-500" : "text-primary"}`}>
+                  {uses === 1
+                    ? t("pricing.sharedStandardPrice")
+                    : t("pricing.sharedSavingsPerUse", { percent: savingsPercent })}
+                </p>
                 <p className="mt-2 text-sm text-gray-500">{t("pricing.sharedUnitPrice", { price: unitPrice })}</p>
                 {provider === "maib" && (
                   <button type="button" onClick={() => startCheckout(productKey)}

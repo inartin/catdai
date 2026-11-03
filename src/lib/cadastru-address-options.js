@@ -1,3 +1,4 @@
+import { parseStreetInput } from './cadastru-street-input';
 import snapshot from './cadastru-streets/data/streets.json';
 import prefetched from './cadastru-streets/data/chisinau-addresses.json';
 import corrections from './cadastru-streets/data/street-corrections.json';
@@ -71,4 +72,20 @@ export function createStreetOptionLookup({ read, write, fetchStreets }) {
       return [];
     } catch { return []; }
   };
+}
+
+
+export function resolveTypedStreet(query, options) {
+  const parsed=parseStreetInput(query);
+  const name=normalizeStreetName(parsed.street);
+  const exact=options.filter(option=>(!parsed.road_type || parsed.road_type===option.road_type)
+    && (option.rank===0 || normalizeStreetName(option.street)===name));
+  if(exact.length>1)return {status:'ambiguous',choices:exact};
+  if(exact.length===1) {
+    const option=exact[0];
+    // Keep embedded houses for the existing API conflict checks, rather than
+    // overwriting the user's separate house field during street resolution.
+    return {status:'exact',address:{street:option.street+(option.house_number?` ${option.house_number}`:''),road_type:option.road_type}};
+  }
+  return {status:'unresolved',address:{street:parsed.street,road_type:parsed.road_type||'strada'}};
 }

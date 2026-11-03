@@ -344,8 +344,8 @@ mocks["@/lib/admin-cadastru-favorites"] = { loadCadastruFavorites: async (rows) 
 mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
 mocks["@/lib/cadastru-share-statistics"] = { loadCadastruShareStatistics: async (rows) => rows };
 mocks["next/server"] = { NextResponse: {} };
-const { buildExternalApiUsageStats, fetchCadastruSearchEvents } = await load("src/app/api/admin/stats/route.js",
-  "\nexport { buildExternalApiUsageStats, fetchCadastruSearchEvents };");
+const { buildExternalApiUsageStats, fetchCadastruSearchEvents, buildCadastruSearchStats } = await load("src/app/api/admin/stats/route.js",
+  "\nexport { buildExternalApiUsageStats, fetchCadastruSearchEvents, buildCadastruSearchStats };");
 const since = "2026-10-21T21:00:00Z";
 assert.equal((await fetchCadastruSearchEvents({ since }))[0].lookup_id, cachedSearch.lookup_id);
 assert.deepEqual(searchQueries[0].since, ["created_at", since], "cache history uses the selected period");
@@ -382,6 +382,28 @@ assert.equal(buildExternalApiUsageStats([], { available: true, rows: [] },
   Array.from({ length: 205 }, (_, id) => ({ ...cachedSearch, id }))).cachedSearches.length, 200,
   "the response bounds cached history independently of worker logs");
 console.log("Cached stats query passed: search IDs, selected period, old schema fallback and unchanged API counters.");
+
+const propertyCounts = buildCadastruSearchStats([
+  { search_type: "address", search_request: { apartment_number: "12" }, result_type: "error" },
+  { search_type: "address", search_address: "Chișinău, str. Test 10, ap. 5", result_type: "land_only" },
+  { search_type: "address", cadastral_number: "0100201.999.01.0101", lookup_source: "cache" },
+  { search_type: "number", cadastral_number: "010020199901101", result_type: "no_data" },
+  { search_type: "number", cadastral_number: "1014203.418", lookup_source: "cache" },
+  { search_type: "number", cadastral_number: "1014203418", result_type: "error" },
+  { search_type: "address", result_type: "land_only" },
+  { search_type: "address", result_type: "apartment_only" },
+  { search_type: "address", result_type: "no_data" },
+  { search_type: "number", cadastral_number: "0100201.999.01", result_type: "land_only" },
+], {}).byPropertyType;
+assert.equal(propertyCounts.apartment.total, 4, "explicit apartment requests include failed attempts and cached journeys");
+assert.equal(propertyCounts.apartment.address, 3);
+assert.equal(propertyCounts.apartment.number, 1);
+assert.equal(propertyCounts.land.total, 3, "parcel numbers and land-only address results identify land searches");
+assert.equal(propertyCounts.land.address, 1);
+assert.equal(propertyCounts.land.number, 2);
+assert.equal(propertyCounts.land.total + propertyCounts.apartment.total, 7,
+  "building-only and untyped searches are not guessed; apartment requests never become land fallbacks");
+console.log("Property search counts passed: request intent, legacy labels, parcel/unit numbers, cache, failures and unknown types.");
 
 const correctedAddress = 'Bălți, str Tudor Vladimirescu 6 ap 16';
 const suggestionRetryId = crypto.randomUUID();

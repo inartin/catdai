@@ -228,6 +228,10 @@ async function fetchCadastruRows(columns, defaults = {}, range) {
 async function fetchCadastruSearchEvents(range) {
   const columnAttempts = [
     {
+      columns: "id, search_type, user_id, visitor, district, cadastral_number, search_address, search_request, result_type, lookup_source, lookup_id, valuation_clicked_at, valuation_completed_at, created_at",
+      defaults: {},
+    },
+    {
       columns: "id, search_type, user_id, visitor, district, cadastral_number, search_address, result_type, lookup_source, lookup_id, valuation_clicked_at, valuation_completed_at, created_at",
       defaults: {},
     },
@@ -284,6 +288,24 @@ function buildCadastruSearchStats(rows, cutoffs) {
     address: rows.filter((row) => row.search_type === "address").length,
     number: rows.filter((row) => row.search_type === "number").length,
   };
+  const byPropertyType = {
+    apartment: { total: 0, address: 0, number: 0 },
+    land: { total: 0, address: 0, number: 0 },
+  };
+  for (const row of rows) {
+    const number = String(row.cadastral_number || "").trim();
+    const apartmentRequest = row.search_type === "address" && (
+      String(row.search_request?.apartment_number || "").trim()
+      || /(?:^|[\s,])(?:ap|apt|apartament)\.?\s*\d{1,4}\s*$/iu.test(row.search_address || "")
+    );
+    const apartmentNumber = /^(?:\d{15,16}|\d{5,7}\.\d{1,4}\.\d{2}\.\d{3,4}|\d{7,12}\.\d{2}\.\d{3,4})$/.test(number);
+    const landNumber = /^(?:\d{8,11}|\d{7}\.\d{1,4})$/.test(number);
+    const type = apartmentRequest || apartmentNumber ? "apartment"
+      : landNumber || (row.search_type === "address" && row.result_type === "land_only") ? "land" : null;
+    if (!type || !["address", "number"].includes(row.search_type)) continue;
+    byPropertyType[type].total++;
+    byPropertyType[type][row.search_type]++;
+  }
 
   return {
     total: rows.length,
@@ -292,6 +314,7 @@ function buildCadastruSearchStats(rows, cutoffs) {
     address: byType.address,
     number: byType.number,
     byType,
+    byPropertyType,
     byResultType: countByValue(rows, "result_type"),
     byLookupSource: countByValue(rows, "lookup_source"),
     byDistrict: countByValue(rows, "district"),
@@ -455,6 +478,35 @@ async function fetchExternalApiUsageEvents(range) {
   throw new Error(`external_api_usage_events query failed: ${response.error.message}`);
 }
 
+async function fetchExternalApiResponseTimes(range) {
+  const durations = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await applyAdminPeriod(
+      supabaseAdmin.from("external_api_usage_events").select("duration_ms").gte("duration_ms", 0),
+      "created_at", range
+    ).order("id", { ascending: true }).range(from, from + PAGE - 1);
+    if (error) {
+      if (isMissingRuntimeTableError(error)) return null;
+      throw new Error(`external API response times query failed: ${error.message}`);
+    }
+    if (!Array.isArray(data)) throw new Error("Missing external API response times");
+    for (const row of data) {
+      if (Number.isFinite(row.duration_ms) && row.duration_ms >= 0) durations.push(row.duration_ms);
+    }
+    if (data.length < PAGE) break;
+  }
+  durations.sort((a, b) => a - b);
+  const count = durations.length;
+  const middle = Math.floor(count / 2);
+  return {
+    count,
+    averageMs: count ? durations.reduce((sum, duration) => sum + duration, 0) / count : null,
+    medianMs: count ? (count % 2 ? durations[middle] : (durations[middle - 1] + durations[middle]) / 2) : null,
+    minMs: count ? durations[0] : null,
+    maxMs: count ? durations[count - 1] : null,
+  };
+}
+
 function correlateExternalApiUsers(events, { cadastruSearchEvents = [], listingLinkAnalysisEvents = [] }) {
   if (!Array.isArray(events) || events.length === 0) return [];
   return events.map((event) => {
@@ -489,7 +541,7 @@ function correlateExternalApiUsers(events, { cadastruSearchEvents = [], listingL
   });
 }
 
-function buildExternalApiUsageStats(rows, events, searches = []) {
+function buildExternalApiUsageStats(rows, events, searches = [], responseTime = null) {
   const emptyService = () => ({ success: 0, failure: 0, total: 0 });
   const byService = {
     "999_listing": emptyService(),
@@ -517,6 +569,7 @@ function buildExternalApiUsageStats(rows, events, searches = []) {
     detailsAvailable: events.available,
     events: events.rows,
     cachedSearches: searches.filter((search) => search.lookup_source === "cache").slice(0, 200),
+    responseTime,
   };
 }
 
@@ -726,6 +779,7 @@ export async function GET(request) {
         console.error("Failed to load active users:", error.message);
         return { activeUsers: null, newUsers: null, oldUsers: null };
       }),
+      fetchExternalApiResponseTimes(periodRange),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -748,6 +802,7 @@ export async function GET(request) {
     marketTrendsPopup,
     paymentSummary,
     activeUserStats,
+    externalApiResponseTimes,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
@@ -811,7 +866,7 @@ export async function GET(request) {
     listingLinkAnalyses: buildListingLinkAnalysisStats(attachUserNames(listingLinkAnalysisEvents, usersById), cutoffs),
     calculatorUsage: buildCalculatorUsageStats(attachUserNames(calculatorUsageEvents, usersById), cutoffs),
     externalApiUsage: buildExternalApiUsageStats(externalApiUsageRows, externalApiEventsWithUsers,
-      attachUserNames(cadastruSearchEvents, usersById)),
+      attachUserNames(cadastruSearchEvents, usersById), externalApiResponseTimes),
     paymentCheckout: buildPaymentCheckoutStats(attachUserNames(paymentCheckoutEvents, usersById), cutoffs),
     marketTrendsPopup,
     payments,

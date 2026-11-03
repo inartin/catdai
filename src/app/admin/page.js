@@ -199,6 +199,73 @@ function fmtExternalApiUsageSummary(usage) {
   return `999 ${fmtNum(listing999)} / cadastru ${fmtNum(cadastru)} / nearby ${fmtNum(nearby)} · ${fmtNum(usage.failure)} failed`;
 }
 
+function ApiUsagePieChart({ cached, apiCalls }) {
+  const total = cached + apiCalls;
+  const cachedPercent = total ? cached / total * 100 : 0;
+  const items = [
+    { label: "Cached searches", count: cached, percent: cachedPercent, color: "#10b981" },
+    { label: "API calls", count: apiCalls, percent: total ? 100 - cachedPercent : 0, color: "#3b82f6" },
+  ];
+
+  return (
+    <div className="min-w-0">
+      <h4 className="text-sm font-semibold text-gray-900">Cached vs API calls</h4>
+      <div className="mt-4 flex flex-col items-start gap-5 sm:flex-row sm:items-center">
+        {total > 0 ? (
+          <div
+            role="img"
+            aria-label={`Cached searches: ${fmtNum(cached)} (${fmtPct(cachedPercent)}). API calls: ${fmtNum(apiCalls)} (${fmtPct(100 - cachedPercent)}).`}
+            className="h-28 w-28 shrink-0 rounded-full"
+            style={{ background: `conic-gradient(#10b981 0% ${cachedPercent}%, #3b82f6 ${cachedPercent}% 100%)` }}
+          />
+        ) : (
+          <p className="text-sm text-gray-400">No usage in this period</p>
+        )}
+        <dl className="w-full space-y-3 sm:w-64">
+          {items.map((item) => (
+            <div key={item.label} className="flex items-center justify-between gap-4 text-sm">
+              <dt className="flex items-center gap-2 text-gray-600">
+                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+                {item.label}
+              </dt>
+              <dd className="whitespace-nowrap font-medium tabular-nums text-gray-900">
+                {fmtNum(item.count)} <span className="font-normal text-gray-500">({fmtPct(item.percent)})</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </div>
+  );
+}
+
+function ApiResponseTimeStats({ stats, periodLabel }) {
+  const metrics = [
+    ["Average", stats?.averageMs],
+    ["Median", stats?.medianMs],
+    ["Fastest", stats?.minMs],
+    ["Slowest", stats?.maxMs],
+  ];
+  const formatDuration = (duration) => duration == null ? "—" : duration < 1000
+    ? `${fmtNum(duration)} ms`
+    : `${(duration / 1000).toLocaleString("ro-RO", { maximumFractionDigits: 1 })} s`;
+
+  return (
+    <div className="min-w-0">
+      <h4 className="text-sm font-semibold text-gray-900">Response time</h4>
+      <p className="mt-1 text-xs text-gray-500">{periodLabel} · {stats ? `${fmtNum(stats.count)} timed calls` : "Unavailable"}</p>
+      <dl className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 xl:grid-cols-2">
+        {metrics.map(([label, duration]) => (
+          <div key={label}>
+            <dt className="text-xs text-gray-500">{label}</dt>
+            <dd className="mt-1 text-lg font-semibold tabular-nums text-gray-900">{formatDuration(duration)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function fmtPaymentAmount(amountMinor, currencyCode) {
   if (amountMinor == null) return "-";
   return new Intl.NumberFormat("ro-RO", {
@@ -2098,7 +2165,6 @@ function DashboardContent() {
                   {s.externalApiUsage?.otherFailure > 0 && ` · ${fmtNum(s.externalApiUsage.otherFailure)} other errors`}
                 </p>
                 <p className="mt-1 text-xs text-gray-500">Failed counts and the Failed filter include only Cadastru address and number lookup failures.</p>
-                <p className="mt-1 text-xs text-gray-500">Cached searches are included below and do not add API calls.</p>
               </div>
               <div className="inline-flex w-full rounded-lg border border-gray-200 bg-white p-1 sm:w-auto">
                 {EXTERNAL_API_STATUS_FILTERS.map((option) => (
@@ -2121,6 +2187,14 @@ function DashboardContent() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-6 border-b border-gray-100 px-5 py-4 xl:grid-cols-2">
+              <ApiUsagePieChart
+                cached={s.cadastruSearches?.byLookupSource?.cache || 0}
+                apiCalls={s.externalApiUsage?.total || 0}
+              />
+              <ApiResponseTimeStats stats={s.externalApiUsage?.responseTime} periodLabel={s.periodLabel} />
+            </div>
+
             {externalApiStatusFilter === "all" && (
               <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-5 py-3">
                 <button
@@ -2138,7 +2212,7 @@ function DashboardContent() {
               <p role="alert" className="px-5 py-3 text-sm text-red-600">{externalApiDeleteError}</p>
             )}
 
-            {!s.externalApiUsage?.total && externalApiEvents.length === 0 && cachedSearches.length === 0 ? (
+            {!s.externalApiUsage?.total && externalApiEvents.length === 0 && cachedSearches.length === 0 && !s.cadastruSearches?.total ? (
               <div className="px-5 py-8 text-center text-gray-400">No external API calls or cached searches found</div>
             ) : (
               <>
@@ -2154,6 +2228,16 @@ function DashboardContent() {
                       </p>
                     </div>
                   ))}
+                  {[["apartment", "Apartment searches"], ["land", "Land searches"]].map(([type, label]) => {
+                    const item = s.cadastruSearches?.byPropertyType?.[type];
+                    return (
+                      <div key={type} className="border-t border-gray-100 px-5 py-4 sm:odd:border-r xl:border-r xl:last:border-r-0">
+                        <p title="Identified searches, including cached results" className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+                        <p className="mt-1 text-lg font-semibold text-gray-900">{fmtNum(item?.total)}</p>
+                        <p className="mt-1 text-xs text-gray-500">{fmtNum(item?.address)} address · {fmtNum(item?.number)} number · incl. cached</p>
+                      </div>
+                    );
+                  })}
                 </div>
                 {externalApiGroups.length === 0 ? (
                   <div className="px-5 py-8 text-center text-gray-400">

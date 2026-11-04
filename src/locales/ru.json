@@ -1,4 +1,8 @@
 {
+  "cadastru.tryWithoutApartmentTitle": "Отдельный поиск здания или участка",
+  "cadastru.tryWithoutApartmentDescription": "Можно попробовать тот же адрес без номера квартиры. Это новый поиск; наличие данных о здании или участке пока не подтверждено.",
+  "cadastru.tryWithoutApartment": "Попробовать без квартиры",
+  "cadastru.apartmentNoMatchDescription": "Поиск завершён без точного совпадения для указанной квартиры. Это не означает, что квартира не существует.",
   "landing.buyRentEyebrow": "ВАШ ПЛАН НА ЖИЛЬЁ",
   "landing.buyRentTitle": "Аренда сегодня. А через 20 лет?",
   "landing.buyRentDescription": "Сравните аренду с платежом по кредиту и узнайте, какое жильё доступно с вашим бюджетом.",

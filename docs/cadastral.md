@@ -257,3 +257,11 @@ Network failures, lookup timeouts, gateway 5xx responses and unusable 2xx respon
 Run `pnpm exec node --experimental-vm-modules scripts/test-api-worker-fallbacks.mjs` and `pnpm exec node --experimental-vm-modules scripts/test-admin-worker-status.mjs` for isolated failover and health checks.
 
 Snapshot refresh policy and migration/deployment details: see [Cadastru cache](cache.md#cadastru-cache). Refresh/scheduling checks: `pnpm exec node --experimental-vm-modules scripts/test-cadastru-refresh.mjs`.
+
+### Address failure and apartment recovery UX
+
+- Verified building/land alternative (`422 address_confirmation_required`): show the existing confirmation card and “Vezi clădirea și terenul”. Remove the apartment only after selection; keep verified-suggestion recovery tracking.
+- Completed apartment search with no exact match (`404 not_found`): say the apartment was not identified, without claiming it does not exist. Keep address editing and any returned suggestions.
+- Provider outage/network failure: retain “Nu am putut verifica adresa”, submitted address, check-address and retry actions when no exact-house secondary result exists. With house-level secondary data, retain the cadastral-unavailable message and those data; secondary results do not verify cadastral identity. Never describe an outage as a completed no-match search.
+- After automatic retries finish, an apartment search with a no-match or outage and no suggestions may show a separate neutral “Încearcă fără apartament” card. It explicitly describes a new search with unconfirmed data availability, not a verified alternative. Clicking preserves city, street, road type and full house number, removes only the apartment, creates a new lookup ID and carries no suggestion-recovery token. The original failure remains visible until that explicit action.
+- Hide this optional attempt during loading/retrying, for successful/retained results, number/shared searches, building-only searches, validation/auth/rate-limit errors and whenever a suggestion card is present. Its result follows the ordinary building-search success/no-match/outage UX. Copy is localized in RO/RU/EN.

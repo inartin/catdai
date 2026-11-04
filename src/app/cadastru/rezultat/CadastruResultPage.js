@@ -675,13 +675,13 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
   const secondaryAvailable = Boolean(state.data || state.fallbackAddress);
   const reportsAvailable = municipalReportsAvailableForCadastru(state.data || { request_address: state.fallbackAddress });
 
-  const retryAddressSearch = (suggestion) => {
+  const retryAddressSearch = (suggestion, { omitApartment = false } = {}) => {
     const original = pendingAddressRequest || savedAddress || readAddressLookupRequest();
     if (!original) return;
     const address = { ...original };
     delete address.suggestion_recovery_token;
     const correction = typeof suggestion === "object" ? suggestion : null;
-    if (correction && state.confirmationRequired && !correction.apartment_number) delete address.apartment_number;
+    if (omitApartment || (correction && state.confirmationRequired && !correction.apartment_number)) delete address.apartment_number;
     const body = {
       ...address,
       lookup_id: crypto.randomUUID(),
@@ -692,7 +692,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
       ...(correction?.road_type ? { road_type: correction.road_type } : {}),
       ...(!isHistoryAddress ? { search_context: "cadastru" } : {}),
       ...(((typeof suggestion === "string" && state.didYouMean) || (correction && (state.confirmationRequired || correction.road_type)))
-        && state.suggestionRecoveryToken ? { suggestion_recovery_token: state.suggestionRecoveryToken } : {}),
+        && !omitApartment && state.suggestionRecoveryToken ? { suggestion_recovery_token: state.suggestionRecoveryToken } : {}),
     };
     try {
       sessionStorage.setItem(ADDRESS_LOOKUP_REQUEST_STORAGE_KEY, JSON.stringify(body));
@@ -1191,6 +1191,10 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
     })),
   ];
   const hasSuggestions = suggestionChoices.length > 0;
+  const submittedAddress = pendingAddressRequest || savedAddress || readAddressLookupRequest(searchLookupId);
+  const canTryWithoutApartment = Boolean(submittedAddress?.apartment_number && !cadastralNumber && !shareSlug
+    && !state.data && !state.loading && !state.retrying && !hasSuggestions
+    && (state.didYouMean || state.fallbackAddress));
   const singleVerifiedAddress = state.confirmationRequired && state.addressCorrections?.length === 1
     ? state.addressCorrections[0] : null;
   const withoutApartment = singleVerifiedAddress && state.requestedApartmentNumber && !singleVerifiedAddress.apartment_number;
@@ -1351,10 +1355,15 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                   <p className="mt-2 font-normal">{t("cadastru.addressUnverifiedDescription")}</p>
                   <p className="mt-2 font-normal">{t("cadastru.addressUnverifiedHint")}</p>
                 </>
+              ) : state.didYouMean && submittedAddress?.apartment_number ? (
+                <>
+                  <h2 className="text-lg font-semibold">{t("cadastru.apartmentNotIdentified", { apartment: submittedAddress.apartment_number })}</h2>
+                  <p className="mt-2 font-normal">{t("cadastru.apartmentNoMatchDescription")}</p>
+                </>
               ) : <p>{state.error || t("cadastru.lookupError")}</p>}
-              {!state.retrying && (addressUnverified || state.retry) && (
+              {!state.retrying && (addressUnverified || state.didYouMean || state.retry) && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {addressUnverified && <button type="button"
+                  {(addressUnverified || state.didYouMean) && <button type="button"
                     className="cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-2 text-sm hover:bg-red-50"
                     onClick={editAddress}>
                     {t("cadastru.verifyAddress")}
@@ -1370,6 +1379,19 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                   </button>}
                 </div>
               )}
+            </div>
+          )}
+
+          {canTryWithoutApartment && (
+            <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-6 text-gray-950">
+              <h2 className="text-base font-semibold">{t("cadastru.tryWithoutApartmentTitle")}</h2>
+              <p className="mt-2 text-sm text-gray-600">{t("cadastru.tryWithoutApartmentDescription")}</p>
+              <button type="button" data-cadastru-building-attempt
+                className="mt-4 min-h-11 cursor-pointer rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={authLoading}
+                onClick={() => retryAddressSearch(null, { omitApartment: true })}>
+                {t("cadastru.tryWithoutApartment")}
+              </button>
             </div>
           )}
 

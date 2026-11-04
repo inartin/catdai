@@ -12,6 +12,7 @@ import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 import AdminWorkerStatus from "@/components/admin/AdminWorkerStatus";
 import AdminOnlineUsers from "@/components/admin/AdminOnlineUsers";
 import AdminActiveUsersChart from "@/components/admin/AdminActiveUsersChart";
+import AdminUserPayments from "@/components/admin/AdminUserPayments";
 
 function fmtNum(n) {
   if (n == null) return "-";
@@ -1867,9 +1868,7 @@ function DashboardContent() {
                             <VisitorTags visitor={u.visitor} />
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${userPackageClassName(u)}`}>
-                              {fmtUserPackage(u.packageKey)}
-                            </span>
+                            <AdminUserPayments summary={u.paymentSummary} onClick={() => setSelectedUser(u)} />
                           </td>
                           <td className="px-4 py-3 text-gray-600">
                             {u.email ? (

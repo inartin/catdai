@@ -1,4 +1,8 @@
 {
+  "cadastru.tryWithoutApartmentTitle": "Search separately for the building or land",
+  "cadastru.tryWithoutApartmentDescription": "You can try the same address without the apartment number. This is a new search; availability of building or land data has not been confirmed.",
+  "cadastru.tryWithoutApartment": "Try without apartment",
+  "cadastru.apartmentNoMatchDescription": "The search completed without an exact match for the submitted apartment. This does not confirm that the apartment does not exist.",
   "landing.buyRentEyebrow": "YOUR HOUSING PLAN",
   "landing.buyRentTitle": "Renting today. What about in 20 years?",
   "landing.buyRentDescription": "Compare rent with mortgage payments and find out what home could fit your budget.",

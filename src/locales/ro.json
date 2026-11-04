@@ -1,4 +1,8 @@
 {
+  "cadastru.tryWithoutApartmentTitle": "Caută separat clădirea sau terenul",
+  "cadastru.tryWithoutApartmentDescription": "Poți încerca aceeași adresă fără numărul apartamentului. Este o căutare nouă; disponibilitatea datelor pentru clădire sau teren nu este confirmată.",
+  "cadastru.tryWithoutApartment": "Încearcă fără apartament",
+  "cadastru.apartmentNoMatchDescription": "Căutarea s-a încheiat fără o potrivire exactă pentru apartamentul introdus. Acest rezultat nu confirmă că apartamentul nu există.",
   "landing.buyRentEyebrow": "PLANUL TĂU DE LOCUIT",
   "landing.buyRentTitle": "Chirie azi. Dar peste 20 de ani?",
   "landing.buyRentDescription": "Compară chiria cu rata unui credit și află ce locuință îți permite bugetul tău.",

@@ -9,8 +9,10 @@ import { PAYMENT_FEATURE_KEYS } from "@/lib/payment-products";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 60 * 1000;
-const CACHE_VERSION = 15;
+const CACHE_VERSION = 16;
 const PACKAGE_PRODUCT_KEYS = new Set(["standard_pack", "pro_pack", "extra_pack"]);
+const PURCHASE_STATUSES = new Set(["paid", "partially_refunded", "refund_pending", "refunded", "chargeback"]);
+const FAILED_PAYMENT_STATUSES = new Set(["failed", "payment_failed", "canceled", "expired", "checkout_closed"]);
 let cache = { data: null, ts: 0 };
 
 function isMissingSchemaError(error) {
@@ -86,23 +88,22 @@ async function fetchActivityRows() {
   return rows;
 }
 
-async function fetchPaidPackageRows() {
+async function fetchPaymentRows() {
   let rows = [];
   let from = 0;
 
   while (true) {
     const { data, error } = await supabaseAdmin
-      .from("payment_orders_all")
-      .select("user_id, product_key, paid_at, created_at")
-      .in("status", ["paid", "partially_refunded"])
-      .in("product_key", Array.from(PACKAGE_PRODUCT_KEYS))
+      .from("reporting_payment_orders")
+      .select("user_id, product_key, status, paid_at, created_at")
       .not("user_id", "is", null)
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .order("provider", { ascending: false })
       .range(from, from + PAGE - 1);
 
     if (error) {
-      if (isMissingSchemaError(error)) return [];
-      throw new Error(`payment_orders_all package query failed: ${error.message}`);
+      throw new Error(`reporting_payment_orders query failed: ${error.message}`);
     }
 
     if (!data || data.length === 0) break;
@@ -250,7 +251,7 @@ function toLatestPackageMap(rows) {
   for (const row of rows || []) {
     const id = row?.user_id;
     const productKey = row?.product_key;
-    if (!id || !PACKAGE_PRODUCT_KEYS.has(productKey)) continue;
+    if (!id || !PACKAGE_PRODUCT_KEYS.has(productKey) || !["paid", "partially_refunded"].includes(row.status)) continue;
 
     const rowTs = Date.parse(row.paid_at || row.created_at);
     if (Number.isNaN(rowTs)) continue;
@@ -266,6 +267,29 @@ function toLatestPackageMap(rows) {
     }
   }
 
+  return map;
+}
+
+function toPaymentSummaryMap(rows) {
+  const map = new Map();
+  for (const row of rows) {
+    if (!row.user_id) continue;
+    if (!map.has(row.user_id)) {
+      map.set(row.user_id, { total: 0, paid: 0, failed: 0, pending: 0, products: [] });
+    }
+    const summary = map.get(row.user_id);
+    summary.total++;
+    if (PURCHASE_STATUSES.has(row.status)) {
+      summary.paid++;
+      const product = summary.products.find((item) => item.key === row.product_key);
+      if (product) product.count++;
+      else summary.products.push({ key: row.product_key, count: 1 });
+    } else if (FAILED_PAYMENT_STATUSES.has(row.status)) {
+      summary.failed++;
+    } else {
+      summary.pending++;
+    }
+  }
   return map;
 }
 
@@ -312,7 +336,7 @@ export async function GET(request) {
   }
 
   try {
-    const [users, estimationRows, sharedRows, favoriteRows, activityRows, cadastruSearchRows, calculatorUsageRows, pdfReportRows, listingLinkRows, packageRows, creditRows, freeMonthlyUsageRows] = await Promise.all([
+    const [users, estimationRows, sharedRows, favoriteRows, activityRows, cadastruSearchRows, calculatorUsageRows, pdfReportRows, listingLinkRows, paymentRows, creditRows, freeMonthlyUsageRows] = await Promise.all([
       listAllUsers(),
       fetchUserIdRows("estimate_log", "user_id"),
       fetchUserIdRows("shared_links", "sharer_user_id"),
@@ -322,7 +346,7 @@ export async function GET(request) {
       fetchUserIdRows("calculator_usage_events", "user_id"),
       fetchUserIdRows("pdf_generation_events", "user_id"),
       fetchUserIdRows("listing_link_analysis_events", "user_id"),
-      fetchPaidPackageRows(),
+      fetchPaymentRows(),
       fetchFeatureCreditRows(),
       fetchRetainedFreeCreditRows(),
     ]);
@@ -335,7 +359,8 @@ export async function GET(request) {
     const calculatorUsageByUser = toCountMap(calculatorUsageRows, "user_id");
     const pdfReportsByUser = toCountMap(pdfReportRows, "user_id");
     const listingLinksByUser = toCountMap(listingLinkRows, "user_id");
-    const packageByUser = toLatestPackageMap(packageRows);
+    const packageByUser = toLatestPackageMap(paymentRows);
+    const paymentsByUser = toPaymentSummaryMap(paymentRows);
     const creditsByUser = groupRowsByUser(creditRows);
     const freeMonthlyUsageByUser = groupRowsByUser(freeMonthlyUsageRows);
 
@@ -361,6 +386,7 @@ export async function GET(request) {
           packageKey,
           packageSource: adminPackageKey ? "admin" : paidPackage ? "paid" : "free",
           packagePaidAt: paidPackage?.paidAt || null,
+          paymentSummary: paymentsByUser.get(user.id) || null,
           credits: normalizeCreditRows(userCredits),
           sharedCredits: sharedPaidCreditBalance(userCredits),
           freeMonthlyCredit: sharedFreeMonthlyCredit(freeMonthlyUsageByUser.get(user.id) || []),

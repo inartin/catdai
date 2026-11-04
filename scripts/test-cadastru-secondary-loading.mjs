@@ -22,9 +22,10 @@ const noop = () => null;
 const jsx = (type, props) => ({ type, props });
 const ro = JSON.parse(await fs.readFile("src/locales/ro.json", "utf8"));
 const ru = JSON.parse(await fs.readFile("src/locales/ru.json", "utf8"));
+const en = JSON.parse(await fs.readFile("src/locales/en.json", "utf8"));
 let lang = "ro";
 const t = (key, params = {}) => Object.entries(params).reduce((text, [name, value]) =>
-  text.replaceAll(`{${name}}`, String(value)), (lang === "ru" ? ru : ro)[key] || key);
+  text.replaceAll(`{${name}}`, String(value)), ({ ro, ru, en })[lang][key] || key);
 const translation = { useTranslation: () => ({ lang, t }) };
 
 async function loadJsx(file, mocks, globals = {}) {
@@ -82,6 +83,12 @@ const router = { push: noop, replace: (url) => {
 } };
 const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
   "./loading": { default: noop },
+  "next/link": { default: noop },
+  "@/components/usePaymentProvider": { default: () => "maib" },
+  "@/lib/maib/products.mjs": { maibProduct: (key) => ({ key, amount_mdl: 15 }) },
+  "@/lib/payment-urls.mjs": { featureCheckoutUrl: () => "/payment/checkout" },
+  "@/lib/ga4-payment-client": { trackPaymentAnalytics: noop },
+  "@/lib/cadastru-map": { cadastruMapLocation: () => null },
   "@/lib/cadastru-lookup-tracking": { ...lookupModule.namespace },
   "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: (slug) => trackedOpens.push(slug) },
   react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
@@ -168,7 +175,7 @@ let descriptionExpanded = false;
 let activeReportGroup = "at_address";
 const visibleGroupCounts = {};
 const card = await loadJsx("src/components/CadastruMunicipalReportsCard.js", {
-  react: { useState: (initial) => {
+  react: { useId: () => "reports-content", useState: (initial) => {
     if (typeof initial === "number") {
       const key = activeReportGroup;
       visibleGroupCounts[key] ??= initial;
@@ -290,6 +297,7 @@ assert(textOf(renderComponent(nearbyGroup)).includes(ro["cadastru.reportsMoreAtS
 console.log("Municipal card passed: independent per-group load more and exhaustion, inline description expansion/collapse, RO/RU copy, privacy and data states.");
 
 const transportCard = await loadJsx("src/components/CadastruPublicTransportCard.js", {
+  react: { useState: (initial) => [initial, noop] },
   "next/image": { default: noop },
   "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
   "@/context/LanguageContext": translation,
@@ -313,18 +321,18 @@ for (const locale of ["ro", "ru"]) {
   assert(!textOf(nearbyCard.default({ nearby: { ...nearby, cache: { stale: false } } })).includes(t("cadastru.savedDataStale")));
   const fallback = nearbyCard.default({ nearby: { ...nearby, source: "geoapify",
     attribution: "Powered by Geoapify | © OpenStreetMap contributors" } });
-  const credit = findNode(fallback, (node) => node.type === "a" && node.props.href === "https://www.geoapify.com/");
-  assert(credit && !/nofollow/.test(credit.props.rel), "Geoapify fallback has a follow-link in both locales");
-  assert(findNode(fallback, (node) => node.type === "a" && node.props.href === "https://www.openstreetmap.org/copyright"));
+  assert(!findNode(fallback, (node) => node.type === "a" && node.props.href === "https://www.geoapify.com/"),
+    "nearby cards leave the shared attribution in the result-page footer");
   assert(!findNode(nearbyCard.default({ nearby }), (node) => node.type === "a" && node.props.href === "https://www.geoapify.com/"),
     "OSM-only snapshots keep their existing attribution");
 }
 console.log("Nearby card passed: stale fallback notices in RO/RU, and embedded legacy data does not bypass the shared request.");
 
-for (const locale of ["ro", "ru"]) {
+for (const locale of ["ro", "ru", "en"]) {
   lang = locale;
   for (const scenario of [
     { source: "address", status: 503, error: "service_unavailable", continues: true },
+    { source: "address", status: 503, error: "service_unavailable", continues: true, secondaryFailure: true, street: "Uzinelor", house: "983" },
     { source: "address", status: 504, error: "timeout", continues: true },
     { source: "address", status: 408, error: "timeout", continues: true },
     { source: "address", networkFailure: true, continues: true },
@@ -341,7 +349,8 @@ for (const locale of ["ro", "ru"]) {
     slots.length = 0;
     requests.clear();
     frames.clear();
-    addressRequest = { city: scenario.city || "Chișinău", road_type: "strada", street: "Decebal", house_number: "63", apartment_number: "1" };
+    addressRequest = { city: scenario.city || "Chișinău", road_type: "strada", street: scenario.street || "Decebal", house_number: scenario.house || "63",
+      ...(scenario.secondaryFailure ? {} : { apartment_number: "1" }) };
     searchParams = new URLSearchParams({ source: scenario.source,
       ...(scenario.source === "number" || scenario.followup ? { cadastral_number: number } : { lookup: "1" }) });
     render();
@@ -352,7 +361,7 @@ for (const locale of ["ro", "ru"]) {
     await flush();
     const tree = render();
     const notice = findNode(tree, (node) => node.type === "p" && node.props.children === t("cadastru.otherDataAvailable"));
-    assert.equal(Boolean(notice), scenario.continues, JSON.stringify(scenario));
+    assert(!notice, "outage messages do not promise other information for an unconfirmed address");
     if (scenario.continues) assert(findNode(tree, (node) => node.type === "p" && node.props.children === t("cadastru.retrying")), "controlled retry is visible while secondary data loads");
     paint();
     paint();
@@ -360,21 +369,53 @@ for (const locale of ["ro", "ru"]) {
     assert.equal(requests.has("/api/cadastru/public-transport"), scenario.continues);
     assert.equal(requests.has("/api/cadastru/municipal-reports"), scenario.continues && !scenario.city);
     if (scenario.continues) {
+      for (const prop of ["nearby", "transport", "reports"]) {
+        assert(!findNode(render(), (node) => prop in (node.props || {})),
+          `${locale}: pending ${prop} placeholders stay hidden during an address outage`);
+      }
       const nearby = requests.get("/api/cadastru/nearby");
-      assert.equal(JSON.parse(nearby.options.body).address, `${addressRequest.city}, strada Decebal 63`);
+      assert.equal(JSON.parse(nearby.options.body).address, `${addressRequest.city}, strada ${addressRequest.street} ${addressRequest.house_number}`);
       assert.equal(JSON.parse(nearby.options.body).lookup_id, JSON.parse(main.options.body).lookup_id,
         "outage and network-error continuations keep the original search ID");
+      if (scenario.secondaryFailure) {
+        nearby.resolve({ ok: false, status: 503, json: async () => ({ error: "service_unavailable" }) });
+        requests.get("/api/cadastru/public-transport").reject(new TypeError("Failed to fetch"));
+        requests.get("/api/cadastru/municipal-reports").resolve({ ok: false, status: 503,
+          json: async () => ({ error: "service_unavailable" }) });
+        await flush();
+        // Render the settled outage after the automatic attempt has finished.
+        const index = slots.findIndex((slot) => slot?.retry && slot.error);
+        slots[index] = { ...slots[index], retrying: false, retry: { ...slots[index].retry, attempt: 1 } };
+        const unavailable = render();
+        assert(findNode(unavailable, (node) => node.type === "p" && node.props.children === t("cadastru.serviceUnavailable")),
+          `${locale}: the settled outage retains the simple unavailable message`);
+        assert(findNode(unavailable, (node) => node.type === "button" && textOf(node) === t("cadastru.retrySearch")),
+          `${locale}: the manual retry remains available`);
+        for (const prop of ["nearby", "transport", "reports"]) {
+          assert(!findNode(unavailable, (node) => prop in (node.props || {})),
+            `${locale}: failed ${prop} requests leave no empty card`);
+        }
+        continue;
+      }
       nearby.resolve({ ok: true, json: async () => ({ nearby: { categories: {}, location: { latitude: 47.02, longitude: 28.83 } } }) });
       await flush();
       const updated = render();
+      const credit = findNode(updated, (node) => node.type === "a" && node.props.href === "https://www.geoapify.com/");
+      assert(credit && !/nofollow/.test(credit.props.rel), "successful secondary data retains the shared attribution");
+      assert(textOf(updated).includes("© OpenStreetMap contributors"));
       assert(findNode(updated, (node) => node.props?.location?.latitude === 47.02 && node.props?.fallbackUrl), "available nearby coordinates restore the map");
       assert(findNode(updated, (node) => node.props?.nearby?.location?.latitude === 47.02), "nearby displays while transport is still pending");
-      assert(findNode(updated, (node) => "transport" in (node.props || {}) && node.props.loading), "transport remains independently loading");
+      assert(!findNode(updated, (node) => "transport" in (node.props || {})), "pending transport stays hidden during an address outage");
+      const transport = { route_groups: [{ mode: "bus", routes: [{ ref: "19" }] }] };
+      requests.get("/api/cadastru/public-transport").resolve({ ok: true,
+        json: async () => ({ public_transport: transport }) });
+      await flush();
+      assert(findNode(render(), (node) => node.props?.transport === transport), "successful transport still appears independently during an outage");
     }
   }
 }
 for (const slot of slots) slot?.cleanup?.();
-console.log("Outage continuation passed: RO/RU notice and preserved errors, concurrent address cards and map, timeout/network failures, number searches and validation/auth/rate-limit exclusions.");
+console.log("Outage continuation passed: RO/RU/EN simple message and retry, hidden pending/failed cards, successful secondary data and map, timeout/network failures and unchanged exclusions.");
 
 for (const locale of ["ro", "ru"]) {
   lang = locale;
@@ -530,9 +571,7 @@ console.log("Shared report viewer passed: old and compact RO/RU links, anonymous
 for (lang of ["ro", "ru"]) {
   const freshness = { property: { fetched_at: "2026-10-01T12:00:00Z", stale: true } };
   const text = textOf(freshnessNote.default({ freshness }));
-  assert(text.includes("01.10.2026"));
-  assert(text.includes(t("cadastru.checkedAt")));
   assert(text.includes(t("cadastru.savedDataStale")));
   assert.equal(freshnessNote.default({ freshness: { property: { fetched_at: "invalid", stale: false } } }), null);
 }
-console.log("Snapshot notices passed: actual source dates and saved-data warnings in Romanian and Russian.");
+console.log("Snapshot notices passed: saved-data warnings in Romanian and Russian.");

@@ -578,6 +578,8 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
   const nearbyNumber = cadastralNumber || (!state.data?.locked_sections?.cadastral_number ? state.data?.cadastral_number : "") || "";
   const nearbyKey = `${shareSlug}|${nearbyAddress || nearbyNumber}|${isAuthenticated ? "authenticated" : "anonymous"}|${skipCache}|${state.fallbackAddress ? "address-fallback" : "result"}`;
   const nearbyData = nearbyState.key === nearbyKey ? nearbyState.data : null;
+  const transportData = transportState.key === nearbyKey ? transportState.data : null;
+  const reportsData = reportsState.key === nearbyKey ? reportsState.data : null;
   const mapLocation = [
     state.data?.map_location,
     ...(state.fallbackAddress ? [nearbyData?.location] : []),
@@ -1296,7 +1298,6 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                   <p>{state.retrying ? t("cadastru.retrying") : suggestionDescription}</p>
                   {suggestedAddress && <p className="break-words font-semibold">{suggestedAddress}</p>}
                   {suggestionNote && <p className="text-gray-600">{suggestionNote}</p>}
-                  {state.fallbackAddress && <p className="text-gray-600">{t("cadastru.otherDataAvailable")}</p>}
                 </div>
               </div>
               <div className="mt-5 space-y-3 sm:mt-6">
@@ -1342,9 +1343,6 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                 }}>
                 {t("cadastru.retrySearch")}
               </button>}
-              {state.fallbackAddress && <p className="mt-2 font-normal text-gray-700">
-                {t("cadastru.otherDataAvailable")}
-              </p>}
             </div>
           )}
 
@@ -1370,23 +1368,23 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
             </div>
           )}
           {state.fallbackAddress && map}
-          {secondaryAvailable && (
+          {secondaryAvailable && (!state.fallbackAddress || nearbyData) && (
             <CadastruNearbyCard
               nearby={nearbyData}
               loading={nearbySearchAvailable && (nearbyState.key !== nearbyKey || nearbyState.loading)}
               unavailable={!nearbySearchAvailable || (nearbyState.key === nearbyKey && nearbyState.error)}
             />
           )}
-          {secondaryAvailable && (
+          {secondaryAvailable && (!state.fallbackAddress || transportData) && (
             <CadastruPublicTransportCard
-              transport={transportState.key === nearbyKey ? transportState.data : null}
+              transport={transportData}
               loading={nearbySearchAvailable && (transportState.key !== nearbyKey || transportState.loading)}
               unavailable={!nearbySearchAvailable || (transportState.key === nearbyKey && transportState.error)}
             />
           )}
-          {secondaryAvailable && reportsAvailable && (
+          {secondaryAvailable && reportsAvailable && (!state.fallbackAddress || reportsData) && (
             <CadastruMunicipalReportsCard
-              reports={reportsState.key === nearbyKey ? reportsState.data : null}
+              reports={reportsData}
               loading={nearbySearchAvailable && (reportsState.key !== nearbyKey || reportsState.loading)}
               unavailable={!nearbySearchAvailable || (reportsState.key === nearbyKey && reportsState.error)}
             />

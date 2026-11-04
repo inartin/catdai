@@ -756,7 +756,7 @@
   "payment.checkoutSignIn": "Autentifică-te",
   "payment.guestUnavailable": "Nu am putut porni sesiunea de oaspete. Încearcă din nou.",
   "payment.guestCreateAccount": "Creează un cont",
-  "payment.guestCreateAccountNotice": "Rezultatul tău este deblocat. Creează un cont pentru a păstra achizițiile și a le accesa de pe alte dispozitive.",
+  "payment.guestCreateAccountNotice": "Rezultatul tău este deblocat. Creează un cont pentru a păstra achizițiile",
   "payment.guestLater": "Mai târziu",
   "payment.guestLinkError": "Achizițiile tale de oaspete sunt păstrate, dar nu au putut fi asociate contului. Încearcă din nou.",
   "payment.secureLabel": "Plată securizată",

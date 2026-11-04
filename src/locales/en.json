@@ -435,7 +435,7 @@
   "payment.checkoutSignIn": "Sign in",
   "payment.guestUnavailable": "We could not start a guest session. Try again.",
   "payment.guestCreateAccount": "Create an account",
-  "payment.guestCreateAccountNotice": "Your result is unlocked. Create an account to keep your purchases and access them on other devices.",
+  "payment.guestCreateAccountNotice": "Your result is unlocked. Create an account to keep your purchases",
   "payment.guestLater": "Later",
   "payment.guestLinkError": "Your guest purchases are saved, but could not be linked to your account. Try again.",
   "payment.secureLabel": "Secure payment",

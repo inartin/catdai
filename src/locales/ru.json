@@ -756,7 +756,7 @@
   "payment.checkoutSignIn": "Войти",
   "payment.guestUnavailable": "Не удалось начать гостевой сеанс. Попробуйте снова.",
   "payment.guestCreateAccount": "Создать аккаунт",
-  "payment.guestCreateAccountNotice": "Ваш результат открыт. Создайте аккаунт, чтобы сохранить покупки и открывать их на других устройствах.",
+  "payment.guestCreateAccountNotice": "Ваш результат открыт. Создайте аккаунт, чтобы сохранить покупки",
   "payment.guestLater": "Позже",
   "payment.guestLinkError": "Ваши гостевые покупки сохранены, но их не удалось связать с аккаунтом. Попробуйте снова.",
   "payment.secureLabel": "Безопасная оплата",

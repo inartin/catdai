@@ -168,19 +168,21 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
         </Link>
       </div>
     </header>
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-10">
+    <main className={`mx-auto w-full max-w-3xl flex-1 px-6 ${result ? 'py-10' : 'pb-10 pt-4 sm:pt-10'}`}>
       {result ? loading || !params ? <p role="status">{t('payment.statusCheckingTitle')}</p> : !session ? <section className="rounded-2xl border border-gray-200 bg-white p-6">
         <h1 className="mb-5 text-xl font-semibold">{t('payment.statusLoginRequired')}</h1><AuthOptions />
       </section> : <MaibPaymentResultCard order={order} checking={checking} error={error} lang={lang} t={t} onRefresh={() => setRefresh(value => value + 1)} sandbox={sandbox} /> : <>
-      {backToResultPath && <Link href={paymentAppLink(backToResultPath)} className="mb-5 inline-flex items-center gap-2 rounded text-sm font-medium text-emerald-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="m12 19-7-7 7-7M5 12h14" /></svg>
-        {t('payment.checkoutBackToResult')}
-      </Link>}
-      <div className="flex items-center gap-3">
-        {isContextualCheckout && <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700"><LockIcon size={20} /></span>}
-        <h1 className="text-3xl font-bold">{t('payment.checkoutTitle')}</h1>
+      <div className="grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-x-2 sm:block">
+        {backToResultPath && <Link href={paymentAppLink(backToResultPath)} className="col-start-1 row-start-1 inline-flex items-center gap-2 rounded text-sm font-medium text-emerald-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700 max-sm:h-11 max-sm:w-11 max-sm:justify-center max-sm:gap-0 max-sm:rounded-xl max-sm:text-gray-600 max-sm:hover:bg-gray-100 sm:mb-5 sm:hover:underline">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 sm:h-4 sm:w-4" aria-hidden="true"><path d="m12 19-7-7 7-7M5 12h14" /></svg>
+          <span className="sr-only sm:not-sr-only">{t('payment.checkoutBackToResult')}</span>
+        </Link>}
+        <div className="contents sm:flex sm:items-center sm:gap-3">
+          {isContextualCheckout && <span className="col-start-3 row-start-1 inline-flex h-11 w-11 shrink-0 items-center justify-center text-emerald-700 sm:h-10 sm:w-10 sm:rounded-xl sm:border sm:border-emerald-200 sm:bg-emerald-50"><LockIcon size={20} /></span>}
+          <h1 className="col-start-2 row-start-1 text-center text-xl font-bold leading-tight sm:text-left sm:text-3xl sm:leading-9">{t('payment.checkoutTitle')}</h1>
+        </div>
       </div>
-      <section className={`mt-6 bg-white p-6 shadow-sm ${isContextualCheckout ? 'rounded-2xl border-2 border-emerald-200' : 'rounded-xl border border-gray-200'}`}>
+      <section className={`mt-4 bg-white p-6 shadow-sm sm:mt-6 ${isContextualCheckout ? 'rounded-2xl border-2 border-emerald-200' : 'rounded-xl border border-gray-200'}`}>
         {product && <>
           <div className="mb-4 flex justify-between gap-4">
             <div className="min-w-0">

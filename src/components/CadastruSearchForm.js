@@ -94,7 +94,6 @@ export default function CadastruSearchForm({
   const [draftReady, setDraftReady] = useState(false);
   const [loadingSearch, setLoadingSearch] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [streetChoices,setStreetChoices] = useState([]);
   const pendingSearch=useRef(null);
   useEffect(() => () => pendingSearch.current?.abort(), []);
 
@@ -134,13 +133,13 @@ export default function CadastruSearchForm({
   };
 
   const setAddressField = (field, value) => {
-    if(field === "city") {setAddressReady(false);setStreetChoices([]);}
+    if(field === "city") setAddressReady(false);
     setAddressForm((current) => ({ ...current, [field]: value }));
   };
 
   const updateAddressForm = next => {
     if(next.city!==addressForm.city || next.street!==addressForm.street || next.roadType!==addressForm.roadType)setAddressReady(false);
-    setStreetChoices([]);setAddressForm(next);
+    setAddressForm(next);
   };
 
   const submitAddressSearch = async () => {
@@ -161,16 +160,14 @@ export default function CadastruSearchForm({
     setLoadingSearch({ address: requestBody });
     if(!addressReady) {
       const parsed=parseStreetInput(addressForm.street);
-      requestBody.street=parsed.street;requestBody.road_type=parsed.road_type||'strada';
+      requestBody.street=parsed.street;requestBody.road_type=parsed.road_type||addressForm.roadType;
       try {
         const response=await fetch(`/api/cadastru/address-options?${new URLSearchParams({city:addressForm.city,q:addressForm.street,resolve:'1'})}`, {signal:AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])});
         if(response.ok) {
           const result=await response.json();
           if(controller.signal.aborted)return;
-          if(result.status==='ambiguous' && result.choices?.length) {
-            setStreetChoices(result.choices);setLoadingSearch(null);return;
-          }
-          if(result.address?.street && roadTypes.some(type=>type.value===result.address.road_type)) {
+          // Suggestions may refine a unique match, but never block a manual search.
+          if(result.status==='exact' && result.address?.street && roadTypes.some(type=>type.value===result.address.road_type)) {
             requestBody.street=result.address.street;requestBody.road_type=result.address.road_type;
           }
         }
@@ -290,7 +287,7 @@ export default function CadastruSearchForm({
             <span className="text-sm font-semibold text-gray-700">{lang === "en" ? "Locality" : lang === "ru" ? "Населённый пункт" : "Localitate"}</span>
             <CadastruLocalityInput value={addressForm.city} lang={lang} onChange={(value) => setAddressField("city", value)} />
           </label>
-          <CadastruAddressPicker value={addressForm} onChange={updateAddressForm} onReady={setAddressReady} forcedOptions={streetChoices} lang={lang} t={t} />
+          <CadastruAddressPicker value={addressForm} onChange={updateAddressForm} onReady={setAddressReady} lang={lang} t={t} />
 
           <div className="pt-2">
             <button

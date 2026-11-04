@@ -75,7 +75,7 @@ assert.deepEqual(mapped.raw_payload.lands[0].map_geometry,shape);
 assert.equal(mapped.field_fetched_at.total_floors,current.field_fetched_at.total_floors,'existing building fields retain their source dates');
 console.log('Collector SQL: atomic ingestion, preserved partial fields/age, idempotence, seeds and permissions passed.');
 // Nationwide seeds preserve building identity and exclude unsuccessful/automated inputs.
-await db.exec(`create table cadastru_search_events(search_type text, duplicate_of bigint, result_type text, result_value text, search_request jsonb, search_address text);`);
+await db.exec(`create table cadastru_search_events(id bigserial primary key, search_type text, duplicate_of bigint, result_type text, result_value text, search_request jsonb, search_address text);`);
 await db.exec(await fs.readFile('supabase/migrations/20261031174629_collector_nationwide_user_seeds.sql','utf8'));
 const regionalInput={city:'Bălți',road_type:'strada',street:'Ștefan cel Mare',house_number:'6/1'};
 const regionalNumber='0300206.46.01';
@@ -85,8 +85,8 @@ await regionalIngest(regional);
 assert.equal((await db.query('select cadastral_number from cadastru_buildings where cadastral_number=$1',[regionalNumber])).rows[0].cadastral_number,regionalNumber,'regional identity is never padded');
 await assert.rejects(regionalIngest({...regional,apartments:[{...regional.apartments[0],cadastral_number:'0300206.47.01.016'}]}),/parent mismatch/);
 await db.query("insert into listing(city,address_text) values ('Bălți','Bălți, str. Ștefan cel Mare 6/1, ap. 16')");
-await db.query("insert into cadastru_search_events values ('address',null,'full_data','0300206.46.01.016',$1,'Bălți, str. Ștefan cel Mare 6/1, ap. 16')",[{...regionalInput,apartment_number:'16'}]);
-await db.query("insert into cadastru_search_events values ('address',null,'no_data',null,$1,'Missing 2'),('address',null,'error','number',$1,'Failed 3'),('address',4,'full_data','number',$1,'Duplicate 4')",[regionalInput]);
+await db.query("insert into cadastru_search_events(search_type,duplicate_of,result_type,result_value,search_request,search_address) values ('address',null,'full_data','0300206.46.01.016',$1,'Bălți, str. Ștefan cel Mare 6/1, ap. 16')",[{...regionalInput,apartment_number:'16'}]);
+await db.query("insert into cadastru_search_events(search_type,duplicate_of,result_type,result_value,search_request,search_address) values ('address',null,'no_data',null,$1,'Missing 2'),('address',null,'error','number',$1,'Failed 3'),('address',4,'full_data','number',$1,'Duplicate 4')",[regionalInput]);
 await db.query('update cadastru_records set lookup_count=1 where cadastral_number=$1',[regionalNumber+'.016']);
 const national=(await db.query('select * from cadastru_collection_seeds(0,1000)')).rows;
 const search=national.filter(s=>s.source==='search');assert.equal(search.length,1);
@@ -95,4 +95,38 @@ assert(national.some(s=>s.source==='listing'&&s.address_text.startsWith('Bălți
 const used=national.filter(s=>s.source==='lookup');assert.equal(used.length,1);assert.equal(used[0].building_number,regionalNumber);
 for(const role of ['anon','authenticated'])assert.equal((await db.query(`select has_function_privilege('${role}','public.cadastru_collection_seeds(integer,integer)','execute') as allowed`)).rows[0].allowed,false);
 console.log('Nationwide collector SQL: successful history, used official records, apartment stripping, regional units, exact parents and service-only grants passed.');
+
+// Cursor discovery returns the same candidates without re-sorting all sources per page.
+await db.exec(await fs.readFile('supabase/migrations/20261103171632_collector_seed_cursor_paging.sql','utf8'));
+await db.exec("insert into listing_rent(city,address_text) values ('Chișinău','Chișinău, bd Decebal 63'),('Durlești','Durlești, str Independenței 12/A');");
+await db.query(`insert into cadastru_search_events(id,search_type,result_type,result_value,search_request,search_address)
+ values (9007199254740993,'address','full_data','number',$1,'Bălți, str. Ștefan cel Mare 6/1, ap. 16'),
+        (9007199254740994,'address','land_only','number',$1,'Bălți, str. Ștefan cel Mare 6/1')`,[regionalInput]);
+const expected=(await db.query('select * from cadastru_collection_seeds(0,1000)')).rows;
+const found=[], searchCursors=[];
+for(const source of ['building','nearby','transport','reports','search','lookup','listing']) {
+ let cursor=null, requests=0;
+ for(;;) {
+  assert(++requests<100,'cursor must advance to the end of each source');
+  const page=(await db.query('select * from cadastru_collection_seed_page($1,$2,1)',[source,cursor])).rows;
+  if(!page.length)break;
+  assert.equal(page.length,1);
+  const {seed_cursor,...seed}=page[0];
+  assert.equal(seed.source,source);
+  assert.equal(typeof seed_cursor,'string');
+  assert.notEqual(seed_cursor,cursor);
+  if(source==='search')searchCursors.push(seed_cursor);
+  cursor=seed_cursor;found.push(seed);
+ }
+}
+const ordered=rows=>rows.map(row=>JSON.stringify(row)).sort();
+assert.deepEqual(ordered(found),ordered(expected),'all original sources, filters, apartment stripping and listing counts survive paging');
+assert.deepEqual(searchCursors,['1','9007199254740993','9007199254740994'],'bigint cursors retain exact precision and numeric order');
+assert.equal(found.find(seed=>seed.source==='listing'&&seed.address_text==='Chișinău, bd Decebal 63').listing_count,3,'sale/rent duplicates aggregate before paging');
+for(const role of ['anon','authenticated','service_role']) {
+ const {allowed}=(await db.query(`select has_function_privilege('${role}','public.cadastru_collection_seed_page(text,text,integer)','execute') as allowed`)).rows[0];
+ assert.equal(allowed,role==='service_role');
+}
+console.log('Cursor collector SQL: complete source pagination, exact bigint cursors, preserved filters/counts and service-only permissions passed.');
+
 await db.close();

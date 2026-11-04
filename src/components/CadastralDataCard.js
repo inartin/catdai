@@ -61,6 +61,11 @@ export default function CadastralDataCard({
       cadastral.building?.gas ||
       cadastral.building?.electricity
   );
+  // Optional registry enrichment can fail after the property was found.
+  // An echoed search number alone does not establish a usable result.
+  const hasPropertyResult = lands.some((property) => property?.cadastral_number)
+    || addressBuildings.some((property) => property?.cadastral_number)
+    || Boolean(cadastral.cadastral_number && (displayAddress || hasApartmentDetails || hasBuildingDetails));
   const hasFullDetails = (hasApartmentDetails && hasBuildingDetails) || hasAddressProperties;
   const widthClass = hasFullDetails || forceDesktopLayout ? "w-full" : "mx-auto w-full max-w-xl";
   const detailsGridClass = hasFullDetails || forceDesktopLayout
@@ -296,7 +301,7 @@ export default function CadastralDataCard({
             </button>
           </div>
         ) : null}
-        {cadastral.registry_unavailable ? (
+        {cadastral.registry_unavailable && !hasPropertyResult ? (
           <div role="status" className="mt-4 rounded-xl bg-sky-50 p-4 text-sm text-sky-950">
             <p>{t("cadastru.registryUnavailablePartial")}</p>
             {onRegistryRetry ? <button type="button" disabled={registryRetrying}

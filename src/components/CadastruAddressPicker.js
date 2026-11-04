@@ -7,7 +7,7 @@ const text = {
 };
 const suggestionKey = (city,street) => JSON.stringify([city,street.trim().toLowerCase()]);
 const inputClass = 'mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary-light';
-export default function CadastruAddressPicker({ value, onChange, onReady, lang, t, forcedOptions }) {
+export default function CadastruAddressPicker({ value, onChange, onReady, lang, t }) {
   const copy = text[lang] || text.ro;
   const [options,setOptions] = useState([]);
   const [selected,setSelected] = useState(null);
@@ -65,10 +65,6 @@ export default function CadastruAddressPicker({ value, onChange, onReady, lang, 
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   },[selected,value.city,manual]);
-  useEffect(() => {
-    if(!forcedOptions?.length)return;
-    suggestions.current.controller?.abort();setOptions(forcedOptions);setActive(0);setOpen(true);inputRef.current?.focus();
-  },[forcedOptions]);
   function choose(option) {
     suggestions.current.controller?.abort();
     setSelected({...option, label: option.house_number ? option.label.slice(0,-option.house_number.length).trim() : option.label, city:value.city}); setOptions([]); setManual(false); setOpen(false); inputRef.current?.blur();

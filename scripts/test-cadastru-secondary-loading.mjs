@@ -61,6 +61,8 @@ const frames = new Map();
 let nextFrame = 0;
 const requests = new Map();
 const trackedOpens = [];
+const drafts = new Map();
+let pushedUrl = "";
 const useState = (initial) => {
   const index = cursor++;
   if (!(index in slots)) slots[index] = typeof initial === "function" ? initial() : initial;
@@ -78,7 +80,7 @@ const number = "0100106.131.01.097";
 let searchParams = new URLSearchParams({ cadastral_number: number });
 let addressRequest = null;
 let authSession = null;
-const router = { push: noop, replace: (url) => {
+const router = { push: (url) => { pushedUrl = url; }, replace: (url) => {
   searchParams = new URLSearchParams(url.split("?")[1]);
 } };
 const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
@@ -104,7 +106,8 @@ const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
       ...(skipCache ? { skipcache: "true" } : {}) }) },
   "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: (data) => data?.form_fields?.city === "Chișinău" || data?.request_address?.startsWith("Chișinău,"), validMunicipalReportsResult: (data) => data?.summary?.total >= 0 },
 }, {
-  window: {}, localStorage: { removeItem: noop },
+  window: {}, localStorage: { getItem: (key) => drafts.get(key) || null,
+    setItem: (key, value) => drafts.set(key, value), removeItem: (key) => drafts.delete(key) },
   sessionStorage: { getItem: (key) => key.includes("lookup-request") && addressRequest ? JSON.stringify(addressRequest) : null },
   requestAnimationFrame: (callback) => { const id = ++nextFrame; frames.set(id, callback); return id; },
   cancelAnimationFrame: (id) => frames.delete(id),
@@ -127,6 +130,12 @@ function paint() {
   queued.forEach((callback) => callback());
 }
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+function settledOutage() {
+  const index = slots.findIndex((slot) => slot?.retry && slot.error);
+  assert(index >= 0, "an outage retains its retry state");
+  slots[index] = { ...slots[index], retrying: false, retry: { ...slots[index].retry, attempt: 1 } };
+  return render();
+}
 render();
 assert.equal(requests.size, 1, "only the main request starts before a result exists");
 requests.get("/api/cadastral").resolve({ ok: true, json: async () => ({ cadastral_number: number, form_fields: { city: "Chișinău" }, nearby: { categories: { schools: { places: [] } } } }) });
@@ -333,6 +342,9 @@ for (const locale of ["ro", "ru", "en"]) {
   for (const scenario of [
     { source: "address", status: 503, error: "service_unavailable", continues: true },
     { source: "address", status: 503, error: "service_unavailable", continues: true, secondaryFailure: true, street: "Uzinelor", house: "983" },
+    { source: "address", status: 503, error: "service_unavailable", continues: true, redacted: true },
+    { source: "address", status: 503, error: "service_unavailable", continues: true, secondaryFailure: true, transportScope: "nearby" },
+    { source: "address", status: 503, error: "service_unavailable", continues: true, secondaryFailure: true, transportScope: "locality" },
     { source: "address", status: 504, error: "timeout", continues: true },
     { source: "address", status: 408, error: "timeout", continues: true },
     { source: "address", networkFailure: true, continues: true },
@@ -379,32 +391,52 @@ for (const locale of ["ro", "ru", "en"]) {
         "outage and network-error continuations keep the original search ID");
       if (scenario.secondaryFailure) {
         nearby.resolve({ ok: false, status: 503, json: async () => ({ error: "service_unavailable" }) });
-        requests.get("/api/cadastru/public-transport").reject(new TypeError("Failed to fetch"));
+        if (scenario.transportScope) requests.get("/api/cadastru/public-transport").resolve({ ok: true,
+          json: async () => ({ public_transport: { scope: scenario.transportScope, route_groups: [] } }) });
+        else requests.get("/api/cadastru/public-transport").reject(new TypeError("Failed to fetch"));
         requests.get("/api/cadastru/municipal-reports").resolve({ ok: false, status: 503,
           json: async () => ({ error: "service_unavailable" }) });
         await flush();
-        // Render the settled outage after the automatic attempt has finished.
-        const index = slots.findIndex((slot) => slot?.retry && slot.error);
-        slots[index] = { ...slots[index], retrying: false, retry: { ...slots[index].retry, attempt: 1 } };
-        const unavailable = render();
-        assert(findNode(unavailable, (node) => node.type === "p" && node.props.children === t("cadastru.serviceUnavailable")),
-          `${locale}: the settled outage retains the simple unavailable message`);
+        const unavailable = settledOutage();
+        const unverified = scenario.transportScope !== "nearby";
+        assert.equal(Boolean(findNode(unavailable, (node) => node.type === "h2" && node.props.children === t("cadastru.addressUnverifiedTitle"))),
+          unverified, `${locale}: city-wide routes do not confirm the submitted house`);
+        if (unverified) {
+          for (const key of ["addressUnverifiedTitle", "addressUnverifiedDescription", "addressUnverifiedHint", "verifyAddress"]) {
+            assert(!t(`cadastru.${key}`).startsWith("cadastru."), `${locale}: ${key} is localized`);
+            assert(textOf(unavailable).includes(t(`cadastru.${key}`)));
+          }
+          const edit = findNode(unavailable, (node) => node.type === "button" && textOf(node) === t("cadastru.verifyAddress"));
+          edit.props.onClick();
+          assert.equal(pushedUrl, `/${locale}/cadastru`);
+          const draft = JSON.parse(drafts.get("catdai:cadastru-search-draft:v1"));
+          assert.equal(draft.addressForm.city, addressRequest.city);
+          assert.equal(draft.addressForm.roadType, addressRequest.road_type);
+          assert.equal(draft.addressForm.street, addressRequest.street);
+          assert.equal(draft.addressForm.houseNumber, addressRequest.house_number);
+        } else {
+          assert(textOf(unavailable).includes(t("cadastru.serviceUnavailable")), `${locale}: an exact-house match keeps the simple outage message`);
+        }
         assert(findNode(unavailable, (node) => node.type === "button" && textOf(node) === t("cadastru.retrySearch")),
           `${locale}: the manual retry remains available`);
-        for (const prop of ["nearby", "transport", "reports"]) {
+        for (const prop of scenario.transportScope ? ["nearby", "reports"] : ["nearby", "transport", "reports"]) {
           assert(!findNode(unavailable, (node) => prop in (node.props || {})),
             `${locale}: failed ${prop} requests leave no empty card`);
         }
         continue;
       }
-      nearby.resolve({ ok: true, json: async () => ({ nearby: { categories: {}, location: { latitude: 47.02, longitude: 28.83 } } }) });
+      nearby.resolve({ ok: true, json: async () => ({ nearby: { categories: {}, ...(scenario.redacted
+        ? { map_preview: { available: true } }
+        : { location: { latitude: 47.02, longitude: 28.83, source: "mapmd" } }) } }) });
       await flush();
-      const updated = render();
+      const updated = settledOutage();
+      assert(textOf(updated).includes(t("cadastru.serviceUnavailable")), `${locale}: exact map.md matches keep the simple outage message`);
+      assert(!textOf(updated).includes(t("cadastru.addressUnverifiedTitle")), `${locale}: redacted locations still confirm the house internally`);
       const credit = findNode(updated, (node) => node.type === "a" && node.props.href === "https://www.geoapify.com/");
       assert(credit && !/nofollow/.test(credit.props.rel), "successful secondary data retains the shared attribution");
       assert(textOf(updated).includes("© OpenStreetMap contributors"));
-      assert(findNode(updated, (node) => node.props?.location?.latitude === 47.02 && node.props?.fallbackUrl), "available nearby coordinates restore the map");
-      assert(findNode(updated, (node) => node.props?.nearby?.location?.latitude === 47.02), "nearby displays while transport is still pending");
+      if (!scenario.redacted) assert(findNode(updated, (node) => node.props?.location?.latitude === 47.02 && node.props?.fallbackUrl), "available nearby coordinates restore the map");
+      assert(findNode(updated, (node) => node.props?.nearby?.categories), "nearby displays while transport is still pending");
       assert(!findNode(updated, (node) => "transport" in (node.props || {})), "pending transport stays hidden during an address outage");
       const transport = { route_groups: [{ mode: "bus", routes: [{ ref: "19" }] }] };
       requests.get("/api/cadastru/public-transport").resolve({ ok: true,
@@ -415,7 +447,7 @@ for (const locale of ["ro", "ru", "en"]) {
   }
 }
 for (const slot of slots) slot?.cleanup?.();
-console.log("Outage continuation passed: RO/RU/EN simple message and retry, hidden pending/failed cards, successful secondary data and map, timeout/network failures and unchanged exclusions.");
+console.log("Outage continuation passed: RO/RU/EN unverified-address copy, edit/retry, exact-house and redacted map.md matches, locality exclusions, and hidden failed cards.");
 
 for (const locale of ["ro", "ru"]) {
   lang = locale;

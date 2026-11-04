@@ -580,6 +580,9 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
   const nearbyData = nearbyState.key === nearbyKey ? nearbyState.data : null;
   const transportData = transportState.key === nearbyKey ? transportState.data : null;
   const reportsData = reportsState.key === nearbyKey ? reportsState.data : null;
+  // These address-keyed responses require an exact house location. City-wide routes do not.
+  const addressLocated = Boolean(nearbyData || reportsData || transportData?.scope === "nearby");
+  const addressUnverified = Boolean(state.fallbackAddress && !state.data && !addressLocated);
   const mapLocation = [
     state.data?.map_location,
     ...(state.fallbackAddress ? [nearbyData?.location] : []),
@@ -1210,7 +1213,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
     : state.roadTypeSuggestions?.length ? t("cadastru.didYouMeanRoadType")
     : state.didYouMean ? t("cadastru.didYouMean") : "";
   const editAddress = () => {
-    const address = pendingAddressRequest || savedAddress;
+    const address = pendingAddressRequest || savedAddress || readAddressLookupRequest(searchLookupId);
     if (address) {
       try {
         const draft = JSON.parse(localStorage.getItem(CADASTRU_DRAFT_STORAGE_KEY) || "null");
@@ -1333,16 +1336,31 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
 
           {!hasSuggestions && (state.error || (!cadastralNumber && !state.loading && !state.data)) && (
             <div role="status" aria-busy={state.retrying || undefined} className={`rounded-2xl border p-6 text-sm font-medium shadow-sm sm:p-8 ${state.retrying ? "border-sky-200 bg-sky-50 text-sky-900" : "border-red-100 bg-red-50 text-red-800"}`}>
-              <p>{state.retrying ? t("cadastru.retrying") : state.error || t("cadastru.lookupError")}</p>
-              {state.retry && !state.retrying && <button type="button"
-                className="mt-3 cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-2 text-sm hover:bg-red-50 disabled:cursor-not-allowed"
-                disabled={authLoading}
-                onClick={() => {
-                  setLookupRetry({ key: state.retry.key, attempt: state.retry.attempt + 1 });
-                  setState((current) => ({ ...current, retrying: true }));
-                }}>
-                {t("cadastru.retrySearch")}
-              </button>}
+              {state.retrying ? <p>{t("cadastru.retrying")}</p> : addressUnverified ? (
+                <>
+                  <h2 className="text-lg font-semibold">{t("cadastru.addressUnverifiedTitle")}</h2>
+                  <p className="mt-2 font-normal">{t("cadastru.addressUnverifiedDescription")}</p>
+                  <p className="mt-2 font-normal">{t("cadastru.addressUnverifiedHint")}</p>
+                </>
+              ) : <p>{state.error || t("cadastru.lookupError")}</p>}
+              {!state.retrying && (addressUnverified || state.retry) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {addressUnverified && <button type="button"
+                    className="cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-2 text-sm hover:bg-red-50"
+                    onClick={editAddress}>
+                    {t("cadastru.verifyAddress")}
+                  </button>}
+                  {state.retry && <button type="button"
+                    className="cursor-pointer rounded-lg border border-red-200 bg-white px-3 py-2 text-sm hover:bg-red-50 disabled:cursor-not-allowed"
+                    disabled={authLoading}
+                    onClick={() => {
+                      setLookupRetry({ key: state.retry.key, attempt: state.retry.attempt + 1 });
+                      setState((current) => ({ ...current, retrying: true }));
+                    }}>
+                    {t("cadastru.retrySearch")}
+                  </button>}
+                </div>
+              )}
             </div>
           )}
 

@@ -342,6 +342,7 @@ for (const locale of ["ro", "ru", "en"]) {
   for (const scenario of [
     { source: "address", status: 503, error: "service_unavailable", continues: true },
     { source: "address", status: 503, error: "service_unavailable", continues: true, secondaryFailure: true, street: "Uzinelor", house: "983" },
+    { source: "address", status: 503, error: "service_unavailable", continues: true, secondaryFailure: true, apartment: "42" },
     { source: "address", status: 503, error: "service_unavailable", continues: true, redacted: true },
     { source: "address", status: 503, error: "service_unavailable", continues: true, secondaryFailure: true, transportScope: "nearby" },
     { source: "address", status: 503, error: "service_unavailable", continues: true, secondaryFailure: true, transportScope: "locality" },
@@ -362,7 +363,7 @@ for (const locale of ["ro", "ru", "en"]) {
     requests.clear();
     frames.clear();
     addressRequest = { city: scenario.city || "Chișinău", road_type: "strada", street: scenario.street || "Decebal", house_number: scenario.house || "63",
-      ...(scenario.secondaryFailure ? {} : { apartment_number: "1" }) };
+      ...(scenario.apartment ? { apartment_number: scenario.apartment } : scenario.secondaryFailure ? {} : { apartment_number: "1" }) };
     searchParams = new URLSearchParams({ source: scenario.source,
       ...(scenario.source === "number" || scenario.followup ? { cadastral_number: number } : { lookup: "1" }) });
     render();
@@ -402,6 +403,9 @@ for (const locale of ["ro", "ru", "en"]) {
         assert.equal(Boolean(findNode(unavailable, (node) => node.type === "h2" && node.props.children === t("cadastru.addressUnverifiedTitle"))),
           unverified, `${locale}: city-wide routes do not confirm the submitted house`);
         if (unverified) {
+          const searchedAddress = `${addressRequest.city}, ${t("cadastru.roadTypeStreet")} ${addressRequest.street} ${addressRequest.house_number}${addressRequest.apartment_number ? `, ${t("cadastru.apartmentNumber")}: ${addressRequest.apartment_number}` : ""}`;
+          assert(findNode(unavailable, (node) => node.type === "p" && node.props.children === searchedAddress),
+            `${locale}: the unverified message keeps the full searched address, including the apartment`);
           for (const key of ["addressUnverifiedTitle", "addressUnverifiedDescription", "addressUnverifiedHint", "verifyAddress"]) {
             assert(!t(`cadastru.${key}`).startsWith("cadastru."), `${locale}: ${key} is localized`);
             assert(textOf(unavailable).includes(t(`cadastru.${key}`)));

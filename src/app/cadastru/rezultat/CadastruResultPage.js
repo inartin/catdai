@@ -1212,6 +1212,14 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
     : state.confirmationRequired ? t("cadastru.localityAlternativeConfirm")
     : state.roadTypeSuggestions?.length ? t("cadastru.didYouMeanRoadType")
     : state.didYouMean ? t("cadastru.didYouMean") : "";
+  const searchedAddress = addressUnverified
+    ? pendingAddressRequest || savedAddress || readAddressLookupRequest(searchLookupId) : null;
+  const searchedAddressLabel = searchedAddress ? [
+    searchedAddress.city,
+    [t(roadTypes.find(({ value }) => value === searchedAddress.road_type)?.label || searchedAddress.road_type),
+      searchedAddress.street, searchedAddress.house_number].filter(Boolean).join(" "),
+    searchedAddress.apartment_number ? `${t("cadastru.apartmentNumber")}: ${searchedAddress.apartment_number}` : "",
+  ].filter(Boolean).join(", ") : "";
   const editAddress = () => {
     const address = pendingAddressRequest || savedAddress || readAddressLookupRequest(searchLookupId);
     if (address) {
@@ -1339,6 +1347,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
               {state.retrying ? <p>{t("cadastru.retrying")}</p> : addressUnverified ? (
                 <>
                   <h2 className="text-lg font-semibold">{t("cadastru.addressUnverifiedTitle")}</h2>
+                  {searchedAddressLabel && <p className="mt-2 break-words font-semibold">{searchedAddressLabel}</p>}
                   <p className="mt-2 font-normal">{t("cadastru.addressUnverifiedDescription")}</p>
                   <p className="mt-2 font-normal">{t("cadastru.addressUnverifiedHint")}</p>
                 </>

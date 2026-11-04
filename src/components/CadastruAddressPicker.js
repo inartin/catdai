@@ -83,7 +83,7 @@ export default function CadastruAddressPicker({ value, onChange, onReady, lang, 
   return <div className="space-y-4">
     <div className="relative">
       <label htmlFor="address-street" className="text-sm font-semibold text-gray-700">{t('cadastru.street')}</label>
-      <input ref={inputRef} type="search" autoComplete="new-password" name="lookup-road-query" spellCheck={false} id="address-street" className={inputClass} value={value.street} maxLength={80} placeholder="Dacia, Eminescu…"
+      <input ref={inputRef} type="text" autoComplete="off" name="lookup-road-query" spellCheck={false} id="address-street" className={inputClass} value={value.street} maxLength={80} placeholder="Dacia, Eminescu…"
         role="combobox" aria-autocomplete="list" aria-expanded={open && !manual && options.length>0} aria-controls="street-options" aria-activedescendant={open && options[active] && active>=0 ? `street-option-${active}` : undefined}
         onFocus={e => {setOpen(true);setActive(0);e.target.select();}}
         onClick={() => setOpen(true)}
@@ -119,12 +119,12 @@ export default function CadastruAddressPicker({ value, onChange, onReady, lang, 
       </select></label>}
     </div>
     <div className="grid grid-cols-2 gap-4">
-      <label className="text-sm font-semibold text-gray-700">{t('cadastru.houseNumber')}<input type="search" autoComplete="new-password" name="lookup-building-query" spellCheck={false} className={inputClass} value={value.houseNumber} maxLength={10} placeholder="18/2, 45A"
+      <label className="text-sm font-semibold text-gray-700">{t('cadastru.houseNumber')}<input type="text" autoComplete="off" name="lookup-building-query" spellCheck={false} className={inputClass} value={value.houseNumber} maxLength={10} placeholder="18/2, 45A"
         onFocus={() => setNumbersOpen(true)} onClick={() => setNumbersOpen(true)}
         onBlur={e => {if (!e.relatedTarget?.closest('[data-house-suggestions]')) setNumbersOpen(false);}}
         onKeyDown={e => {if (e.key === 'Escape') setNumbersOpen(false);}}
         onChange={e => {setNumbersOpen(true);onChange({...value,houseNumber:e.target.value.replace(/[^\da-z/]/gi,'').toUpperCase()});}} /></label>
-      <label className="text-sm font-semibold text-gray-700">{t('cadastru.apartmentNumber')}<input type="search" autoComplete="new-password" name="lookup-unit-query" className={inputClass} inputMode="numeric" value={value.apartmentNumber} placeholder={t('cadastru.apartmentPlaceholder')} onChange={e => onChange({...value,apartmentNumber:e.target.value.replace(/\D/g,'').slice(0,4)})} /></label>
+      <label className="text-sm font-semibold text-gray-700">{t('cadastru.apartmentNumber')}<input type="text" autoComplete="off" name="lookup-unit-query" className={inputClass} inputMode="numeric" value={value.apartmentNumber} placeholder={t('cadastru.apartmentPlaceholder')} onChange={e => onChange({...value,apartmentNumber:e.target.value.replace(/\D/g,'').slice(0,4)})} /></label>
     </div>
     <div aria-live="polite" data-house-suggestions onBlurCapture={e => {
       if (!e.currentTarget.contains(e.relatedTarget)) setNumbersOpen(false);

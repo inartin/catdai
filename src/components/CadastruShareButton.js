@@ -56,18 +56,23 @@ export default function CadastruShareButton({ cadastralNumber, address, shareSlu
     }
   }
 
+  const actionLabel = t(sharing ? "result.sharing" : copied ? "result.linkCopied" : "cadastru.shareReport");
+
   return (
-    <div className="flex flex-col items-start gap-1 sm:items-end">
-      <button type="button" onClick={shareReport} disabled={sharing}
-        className="inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold text-primary shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60">
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div className="flex flex-col items-start gap-1 max-sm:min-w-0 sm:items-end">
+      <button type="button" onClick={shareReport} disabled={sharing} aria-label={actionLabel}
+        className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 max-sm:w-full max-sm:min-w-0">
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4.5 w-4.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           {copied ? <path d="m5 12 4 4L19 6" /> : <><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><path d="m8 6 4-4 4 4M12 2v13" /></>}
         </svg>
-        <span aria-live="polite">{t(sharing ? "result.sharing" : copied ? "result.linkCopied" : "cadastru.shareReport")}</span>
+        <span aria-live="polite" className="max-sm:min-w-0 max-sm:truncate">
+          <span className="sm:hidden">{sharing || copied ? actionLabel : t("cadastru.shareReportMobile")}</span>
+          <span className="hidden sm:inline">{actionLabel}</span>
+        </span>
       </button>
       {error && <p role="alert" className="max-w-64 text-xs text-red-700">{t("cadastru.shareError")}</p>}
       {manualUrl && <input readOnly value={manualUrl} aria-label={t("cadastru.shareReport")}
-        onFocus={(event) => event.target.select()} className="w-64 rounded-lg border border-emerald-200 bg-white p-2 text-xs" />}
+        onFocus={(event) => event.target.select()} className="w-64 rounded-lg border border-emerald-200 bg-white p-2 text-xs max-sm:w-full" />}
     </div>
   );
 }

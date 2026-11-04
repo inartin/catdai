@@ -61,7 +61,7 @@ export default function CadastruFavoriteButton({ urlPath, label, onAuthRequired 
         aria-label={actionLabel}
         aria-pressed={favorited}
         title={actionLabel}
-        className={`inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-emerald-200 bg-white shadow-sm transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 ${favorited ? "text-primary" : "text-gray-500 hover:text-primary"}`}
+        className={`inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-gray-200 bg-white shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 ${favorited ? "text-primary" : "text-gray-500 hover:text-primary"}`}
       >
         <BookmarkIcon size={22} filled={favorited} />
       </button>

@@ -383,14 +383,14 @@ function CadastruImageSaveButton({ cadastral, targetRef }) {
       type="button"
       onClick={handleSaveImage}
       disabled={isSaving}
-      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 max-sm:w-full max-sm:min-w-0"
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5 shrink-0">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
         <path d="M7 10l5 5 5-5" />
         <path d="M12 15V3" />
       </svg>
-      {isSaving ? t("cadastru.savingImage") : t("cadastru.saveImage")}
+      <span className="max-sm:min-w-0 max-sm:truncate">{isSaving ? t("cadastru.savingImage") : t("cadastru.saveImage")}</span>
     </button>
   );
 }
@@ -1250,6 +1250,9 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
     detailsLoading={Boolean(state.detailsLoading && state.data)}
   />;
 
+  const showShareAction = !isLockedPreview && Boolean(isAuthenticated || shareSlug);
+  const hasSecondaryActions = isAuthenticated || showShareAction;
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <AuthRequiredModal
@@ -1259,41 +1262,50 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
       />
       <Navbar />
       <main className="flex-1">
-        <section className="mx-auto w-full max-w-5xl px-6 pb-12 pt-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12">
-          <BackButton onClick={() => router.push(`/${lang}/cadastru`)} className="mb-6">
-            {t("cadastru.backToSearch")}
-          </BackButton>
+        <section className="mx-auto w-full max-w-5xl px-6 pb-12 pt-4 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12 max-sm:[&>aside]:max-w-none max-sm:[&>section]:mx-0">
+          <div className="mb-4 grid grid-cols-[2.75rem_minmax(0,1fr)_2.75rem] items-center gap-x-2 gap-y-3 sm:mb-6 sm:block">
+            <BackButton onClick={() => router.push(`/${lang}/cadastru`)} className="col-start-1 row-start-1 max-sm:h-11 max-sm:w-11 max-sm:justify-center max-sm:gap-0 max-sm:rounded-xl max-sm:text-gray-600 max-sm:hover:bg-gray-100 sm:mb-6">
+              <span className="sr-only sm:not-sr-only">{t("cadastru.backToSearch")}</span>
+            </BackButton>
 
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
-              {t("cadastru.resultPageTitle")}
-            </h1>
-            {state.data && (
-              <div className="flex shrink-0 flex-wrap items-start gap-2">
-                {!isLockedPreview && (isAuthenticated || shareSlug) && (
-                  <CadastruShareButton
-                    key={`${shareSlug}:${favoritePath || favoriteNumber || favoriteAddress}`}
-                    cadastralNumber={!savedAddress ? favoriteNumber : undefined}
-                    address={state.data.resolved_address || state.data.request_address || favoriteAddress}
-                    shareSlug={shareSlug}
-                    searchToken={evaluationToken}
-                  />
-                )}
-                {favoritePath && (
-                  <CadastruFavoriteButton
-                    key={`${session?.user?.id || "anonymous"}:${favoritePath}`}
-                    urlPath={favoritePath}
-                    label={favoriteLabel}
-                    onAuthRequired={() => {
-                      setAuthModalCopyKey("result.loginToFavorite");
-                      clearAuthError();
-                      setIsAuthModalOpen(true);
-                    }}
-                  />
-                )}
-                {isAuthenticated && <CadastruImageSaveButton cadastral={state.data} targetRef={exportCardRef} />}
-              </div>
-            )}
+            <div className="contents sm:flex sm:items-start sm:justify-between sm:gap-4">
+              <h1 className="col-start-2 row-start-1 text-center text-xl font-bold leading-tight tracking-tight text-gray-950 max-sm:min-w-0 sm:text-left sm:text-4xl sm:font-extrabold sm:leading-10">
+                <span className="sm:hidden">{t("cadastru.resultPageTitleMobile")}</span>
+                <span className="hidden sm:inline">{t("cadastru.resultPageTitle")}</span>
+              </h1>
+              {state.data && (
+                <div className={`gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:items-start ${hasSecondaryActions
+                  ? `col-span-3 row-start-2 grid items-start ${favoritePath ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"}`
+                  : "col-start-3 row-start-1"}`}>
+                  {hasSecondaryActions && (
+                    <div className={`grid min-w-0 items-start gap-2 max-[375px]:[&_svg]:hidden sm:contents ${showShareAction && isAuthenticated ? "grid-cols-2" : "grid-cols-1"}`}>
+                      {showShareAction && (
+                        <CadastruShareButton
+                          key={`${shareSlug}:${favoritePath || favoriteNumber || favoriteAddress}`}
+                          cadastralNumber={!savedAddress ? favoriteNumber : undefined}
+                          address={state.data.resolved_address || state.data.request_address || favoriteAddress}
+                          shareSlug={shareSlug}
+                          searchToken={evaluationToken}
+                        />
+                      )}
+                      {isAuthenticated && <CadastruImageSaveButton cadastral={state.data} targetRef={exportCardRef} />}
+                    </div>
+                  )}
+                  {favoritePath && (
+                    <CadastruFavoriteButton
+                      key={`${session?.user?.id || "anonymous"}:${favoritePath}`}
+                      urlPath={favoritePath}
+                      label={favoriteLabel}
+                      onAuthRequired={() => {
+                        setAuthModalCopyKey("result.loginToFavorite");
+                        clearAuthError();
+                        setIsAuthModalOpen(true);
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {state.data && source === "address" && originalStreet && resolvedStreet && originalStreet !== resolvedStreet && (
@@ -1398,7 +1410,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
           )}
 
           {state.data && (
-            <div ref={cadastralCardRef} className="overflow-visible bg-gray-50 p-1">
+            <div ref={cadastralCardRef} className="overflow-visible bg-gray-50 p-1 max-sm:px-0 max-sm:[&_.max-w-xl]:max-w-none">
               {canUnlock && paymentProvider === 'maib' && <PaymentOfferTracker productKey={checkoutProductKey}
                 buyerType={session?.user && !session.user.is_anonymous ? 'account' : 'guest'} language={lang} />}
               <CadastralDataCard

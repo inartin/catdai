@@ -319,10 +319,11 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const accessToken = session?.access_token;
-    if (!accessToken || session?.user?.is_anonymous) return;
+    if (!accessToken) return;
 
-    pingUserActivity(accessToken);
     trackAdSourceLogin(accessToken);
+    if (session?.user?.is_anonymous) return;
+    pingUserActivity(accessToken);
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === "visible") {

@@ -1,32 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
-import { captureAdSource, getDeviceId, getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
+import { usePathname, useSearchParams } from "next/navigation";
+import { getDeviceId, getActiveAdSource, trackAdSourceEvent } from "@/lib/tracking";
+import { getAdSourceFromParams } from "@/lib/ad-sources";
 
 function getCurrentPath() {
   return window.location.pathname + window.location.search;
 }
 
-const LANDING_SOURCE_RULES = [
-  { source: "zdg", param: "src", value: "zdg" },
-  { source: "reddit", param: "utm_source", value: "reddit" },
-  { source: "vtememd", param: "utm_source", value: "vtememd" },
-  { source: "999", param: "src", value: "999" },
-];
-
-function getLandingAdSource(params, pathname) {
-  for (const rule of LANDING_SOURCE_RULES) {
-    if (pathname !== "/" && rule.source !== "999") continue;
-    if ((params.get(rule.param) || "").toLowerCase() === rule.value) {
-      return rule.source;
-    }
-  }
-  return null;
-}
-
 export default function AdSourceTracker() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const lastTrackedPathRef = useRef(null);
 
   useEffect(() => {
@@ -36,27 +21,24 @@ export default function AdSourceTracker() {
 
     getDeviceId();
     const currentPath = getCurrentPath();
+    if (lastTrackedPathRef.current === currentPath) return;
     const params = new URLSearchParams(window.location.search);
-    const landingSource = getLandingAdSource(params, window.location.pathname);
+    const landingSource = getAdSourceFromParams(params);
 
     if (landingSource) {
-      captureAdSource(landingSource, {
-        landing_path: currentPath,
-        referrer: document.referrer || null,
-      });
+      getActiveAdSource();
       trackAdSourceEvent("source_landing_visit");
       lastTrackedPathRef.current = currentPath;
       return;
     }
 
     if (!getActiveAdSource()) return;
-    if (lastTrackedPathRef.current === currentPath) return;
 
     lastTrackedPathRef.current = currentPath;
     trackAdSourceEvent("page_view", {
       title: document.title || null,
     });
-  }, [pathname]);
+  }, [pathname, searchParams]);
 
   return null;
 }

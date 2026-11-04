@@ -4,10 +4,11 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { resolveAccessTier } from "@/lib/access-tier";
+import { AD_TRACKING_SOURCES } from "@/lib/ad-sources";
 
 const limiter = rateLimit({ interval: 60_000, limit: 120 });
 const TRACKING_SALT = process.env.TRACKING_SALT || "catdai-default-salt";
-const ALLOWED_SOURCES = new Set(["zdg", "reddit", "vtememd", "999"]);
+const ALLOWED_SOURCES = new Set(Object.keys(AD_TRACKING_SOURCES));
 const ALLOWED_EVENTS = new Set([
   "source_landing_visit",
   "page_view",
@@ -92,6 +93,7 @@ async function handlePost(request) {
 
   const access = await resolveAccessTier(request);
   if (access.user_id) row.user_id = access.user_id;
+  if (eventName === "signed_in") row.metadata.is_guest = Boolean(access.is_guest);
 
   const { error } = await supabaseAdmin.from("ad_source_events").insert(row);
   if (error) {

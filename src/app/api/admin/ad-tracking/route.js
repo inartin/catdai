@@ -1,10 +1,11 @@
-import { AD_TRACKING_SOURCES, fetchAdSourceStats } from "@/lib/admin-ad-tracking";
+import { AD_TRACKING_SOURCES, fetchAdSourceStats, fetchAdJourneyActivity } from "@/lib/admin-ad-tracking";
+import { normalizeVisitorId } from "@/lib/visitor";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { NextResponse } from "next/server";
 
 const AD_TRACKING_CACHE_TTL_SECONDS = 10 * 60;
-const AD_TRACKING_CACHE_PREFIX = "catdai:admin-ad-tracking:v3";
+const AD_TRACKING_CACHE_PREFIX = "catdai:admin-ad-tracking:v4";
 const PERIODS = {
   day: 24 * 60 * 60 * 1000,
   week: 7 * 24 * 60 * 60 * 1000,
@@ -28,6 +29,19 @@ export async function GET(request) {
   const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
   if (!Object.prototype.hasOwnProperty.call(AD_TRACKING_SOURCES, source)) {
     return NextResponse.json({ error: "Invalid ad source." }, { status: 400 });
+  }
+
+  if (request.nextUrl.searchParams.has("sessionId") || request.nextUrl.searchParams.has("deviceId")) {
+    const sessionId = normalizeVisitorId(request.nextUrl.searchParams.get("sessionId"));
+    const deviceId = normalizeVisitorId(request.nextUrl.searchParams.get("deviceId"));
+    if (!sessionId && !deviceId) return NextResponse.json({ error: "Invalid visit ID." }, { status: 400 });
+    try {
+      const events = await fetchAdJourneyActivity({ source, sessionId, deviceId, since });
+      return NextResponse.json({ events }, { headers: { "Cache-Control": "private, no-store" } });
+    } catch (error) {
+      console.error("[admin-ad-tracking] activity read failed:", error.message);
+      return NextResponse.json({ error: "Failed to load visitor activity." }, { status: 500 });
+    }
   }
 
   const cacheKey = `${AD_TRACKING_CACHE_PREFIX}:${source}:${period}:${journeyLimit || "default"}:${journeyOffset || "0"}`;

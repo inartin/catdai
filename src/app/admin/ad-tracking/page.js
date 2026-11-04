@@ -1,16 +1,13 @@
 "use client";
 
 import AdminUserCell from "@/components/admin/AdminUserCell";
+import { AD_TRACKING_SOURCES } from "@/lib/ad-sources";
+import { PAYMENT_PRODUCT_LABELS } from "@/lib/admin-payments";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const JOURNEY_PAGE_SIZE = 50;
-const AD_SOURCES = [
-  { key: "zdg", label: "ZDG", entryPath: "/?src=zdg" },
-  { key: "reddit", label: "Reddit", entryPath: "/?utm_source=reddit" },
-  { key: "vtememd", label: "vtememd", entryPath: "/?utm_source=vtememd" },
-  { key: "999", label: "999.md", entryPath: "/?src=999" },
-];
+const AD_SOURCES = ["zdg", "zdg2", "reddit", "vtememd", "999"].map((key) => ({ key, ...AD_TRACKING_SOURCES[key] }));
 const PERIOD_OPTIONS = [
   { key: "day", label: "1 day" },
   { key: "week", label: "7 days" },
@@ -51,23 +48,11 @@ const AD_EVENT_LABELS = {
   estimate_form_view: "Opened estimate form",
   estimate_submit: "Submitted estimate form",
   estimate_result_view: "Viewed estimate result",
-  signed_in: "Signed in",
-};
-
-const PAYMENT_PRODUCT_LABELS = {
-  standard_pack: "Standard package",
-  pro_pack: "Pro package",
-  extra_pack: "Extra package",
-  sale_estimate_single: "Sale estimate",
-  rent_estimate_single: "Rent estimate",
-  listing_analysis_single: "Listing analysis",
-  cadastru_lookup_single: "Cadastru lookup",
-  yield_calculator_single: "Yield calculator",
-  pdf_report_single: "PDF report",
+  signed_in: "Account attached",
 };
 
 function fmtAdEventName(eventName, sourceConfig) {
-  if (eventName === "source_landing_visit") return `Opened landing page from ${sourceConfig.label}`;
+  if (eventName === "source_landing_visit") return `Entered from ${sourceConfig.label}`;
   return AD_EVENT_LABELS[eventName] || eventName || "-";
 }
 
@@ -82,8 +67,8 @@ function fmtAdEventDetail(event, sourceConfig) {
   }
   if (event.event_name === "estimate_submit") return "Estimate form submitted";
   if (event.event_name === "landing_estimate_cta") return "Moved from landing page to estimate form";
-  if (event.event_name === "source_landing_visit") return `First visit with ${sourceConfig.entryPath}`;
-  if (event.event_name === "signed_in") return "User account attached to this visit";
+  if (event.event_name === "source_landing_visit") return `Ad entry: ${event.path || sourceConfig.entryPath}`;
+  if (event.event_name === "signed_in") return meta.is_guest ? "Guest checkout account attached to this visit" : "User account attached to this visit";
   return event.path || "-";
 }
 
@@ -95,11 +80,11 @@ function fmtUser(journey) {
 function fmtJourneySummary(journey) {
   const actions = new Set((journey.events || []).map((event) => event.event_name));
   const parts = [];
-  if (actions.has("source_landing_visit")) parts.push("opened landing");
+  if (actions.has("source_landing_visit")) parts.push("entered from ad");
   if (actions.has("landing_estimate_cta")) parts.push("clicked estimate");
   if (actions.has("estimate_submit")) parts.push("submitted estimate");
   if (actions.has("estimate_result_view")) parts.push("saw result");
-  if (actions.has("signed_in")) parts.push("signed in");
+  if (actions.has("signed_in")) parts.push(journey.user?.isGuest ? "guest checkout" : "signed in");
   if (journey.purchased) parts.push("bought");
   return parts.length > 0 ? parts.join(" · ") : `${fmtNum(journey.eventCount)} events`;
 }
@@ -143,6 +128,47 @@ function groupJourneyEvents(events = [], sourceConfig) {
   }
 
   return Array.from(groups.values()).sort((a, b) => Date.parse(a.firstAt) - Date.parse(b.firstAt));
+}
+
+function JourneyActivity({ journey, source, period }) {
+  const [events, setEvents] = useState(null);
+  const [error, setError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = new URLSearchParams({ source, period });
+    if (journey.sessionId) params.set("sessionId", journey.sessionId);
+    else if (journey.deviceId) params.set("deviceId", journey.deviceId);
+    else return;
+    fetch(`/api/admin/ad-tracking?${params}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Activity unavailable");
+        setEvents((await response.json()).events);
+      }).catch((error) => { if (error.name !== "AbortError") setError(true); });
+    return () => controller.abort();
+  }, [source, period, journey.sessionId, journey.deviceId, attempt]);
+  return <div className="mt-4 border-t border-gray-100 pt-4">
+    <h3 className="text-sm font-medium text-gray-900">Feature activity after ad entry</h3>
+    <p className="mt-1 text-xs text-gray-500">Latest 100 recorded actions after this entry, including later visits on this browser or account.</p>
+    {error ? <p className="mt-3 text-sm text-red-600">Activity unavailable. <button type="button" className="cursor-pointer underline" onClick={() => { setError(false); setAttempt((value) => value + 1); }}>Retry</button></p>
+      : !journey.sessionId && !journey.deviceId ? <p className="mt-3 text-sm text-gray-500">No browser or session ID was recorded.</p>
+        : !events ? <p className="mt-3 text-sm text-gray-500">Loading activity…</p>
+          : !events.length ? <p className="mt-3 text-sm text-gray-500">No recorded feature activity after this entry.</p>
+            : <table className="mt-3 w-full text-sm"><thead><tr className="text-left text-xs uppercase text-gray-500">
+              <th className="py-2 pr-4">Action</th><th className="py-2 pr-4">Details</th><th className="py-2 pr-4">User</th><th className="py-2">Time</th>
+            </tr></thead><tbody className="divide-y divide-gray-100">{events.map((event) => <tr key={`${event.source}:${event.id}`} className="align-top">
+              <td className="py-2 pr-4 font-medium text-gray-900">{event.label}</td>
+              <td className="min-w-56 py-2 pr-4 text-gray-600">{event.summary || "-"}</td>
+              <td className="py-2 pr-4 text-gray-600">{event.user_id ? event.user_id === journey.userId ? fmtUser(journey) : event.user_id : "Anonymous"}</td>
+              <td className="whitespace-nowrap py-2 text-gray-500">{fmtDateTime(event.created_at)}</td>
+            </tr>)}</tbody></table>}
+    {journey.purchases?.length > 0 && <div className="mt-4">
+      <h3 className="text-sm font-medium text-gray-900">Purchases after ad entry</h3>
+      <ul className="mt-2 space-y-2 text-sm text-gray-600">{journey.purchases.map((purchase) => <li key={`${purchase.provider}:${purchase.id}`}>
+        {PAYMENT_PRODUCT_LABELS[purchase.productKey] || purchase.productKey} · {(purchase.amountMinor / 100).toLocaleString("ro-RO", { minimumFractionDigits: 2 })} {purchase.currencyCode} · {purchase.provider} · {fmtDateTime(purchase.paidAt)}
+      </li>)}</ul>
+    </div>}
+  </div>;
 }
 
 export default function AdTrackingPage() {
@@ -346,8 +372,8 @@ export default function AdTrackingPage() {
             <StatCard label="Tracked Sessions" value={fmtNum(ad.uniqueSessions)} />
             <StatCard label="Tracked Devices" value={fmtNum(ad.uniqueDevices)} />
             <StatCard label="Registered Users" value={fmtNum(ad.identifiedUsers || 0)} />
-            <StatCard label="Paid Users" value={fmtNum(ad.purchasedUsers || 0)} />
-            <StatCard label="Landing Visits" value={fmtNum(adCounts.source_landing_visit || 0)} />
+            <StatCard label="Paid Users" value={ad.purchaseTrackingAvailable === false ? "Unavailable" : fmtNum(ad.purchasedUsers || 0)} />
+            <StatCard label="Ad Entries" value={fmtNum(adCounts.source_landing_visit || 0)} />
             <StatCard label="Estimate Button Clicks" value={fmtNum(adCounts.landing_estimate_cta || 0)} />
             <StatCard label="Estimate Submits" value={fmtNum(adCounts.estimate_submit || 0)} />
           </div>
@@ -379,7 +405,7 @@ export default function AdTrackingPage() {
                               : "bg-gray-100 text-gray-500"
                               }`}
                             >
-                              {journey.userId ? "Registered" : "Anonymous"}
+                              {journey.user?.isGuest ? "Guest" : journey.userId ? "Registered" : "Anonymous"}
                             </span>
                             {journey.purchased && (
                               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
@@ -408,7 +434,7 @@ export default function AdTrackingPage() {
                         onClick={() => toggleJourney(journey.key)}
                         className="mt-4 inline-flex cursor-pointer items-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 transition-colors hover:border-primary/40 hover:text-primary"
                       >
-                        {openJourneys[journey.key] ? "Hide actions" : `Show actions (${fmtNum(journey.eventCount)})`}
+                        {openJourneys[journey.key] ? "Hide actions" : "Show actions"}
                       </button>
 
                       {openJourneys[journey.key] && (
@@ -447,6 +473,7 @@ export default function AdTrackingPage() {
                             ))}
                           </tbody>
                         </table>
+                        <JourneyActivity journey={journey} source={selectedSource} period={selectedPeriod} />
                       </div>
                       )}
                     </div>

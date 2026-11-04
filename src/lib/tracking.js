@@ -1,10 +1,22 @@
 import { fetchWithStatisticsAuth } from "@/lib/statistics-client";
+import { AD_TRACKING_SOURCES, getAdSourceFromParams } from "@/lib/ad-sources";
 
 import { getDeviceId } from "@/lib/visitor-browser";
 export { getDeviceId };
 const SESSION_KEY = "catdai-session-id";
 const AD_SOURCE_KEY = "catdai-ad-source";
-const TRACKED_AD_SOURCES = new Set(["zdg", "reddit", "vtememd", "999"]);
+const AD_SOURCE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const TRACKED_AD_SOURCES = new Set(Object.keys(AD_TRACKING_SOURCES));
+
+function readAdSource(storage) {
+  try {
+    const parsed = JSON.parse(storage.getItem(AD_SOURCE_KEY) || "null");
+    const age = Date.now() - Date.parse(parsed?.captured_at);
+    return TRACKED_AD_SOURCES.has(parsed?.source) && age >= 0 && age < AD_SOURCE_MAX_AGE_MS ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export function getSessionId() {
   try {
@@ -23,13 +35,18 @@ export function captureAdSource(source, details = {}) {
   if (!TRACKED_AD_SOURCES.has(source)) return null;
 
   try {
+    const existing = readAdSource(sessionStorage);
+    if (existing?.source === source && existing.landing_path === details.landing_path) return existing;
     const payload = {
       source,
       captured_at: new Date().toISOString(),
       ...details,
     };
-    sessionStorage.setItem(AD_SOURCE_KEY, JSON.stringify(payload));
-    return payload;
+    const raw = JSON.stringify(payload);
+    let stored = false;
+    try { sessionStorage.setItem(AD_SOURCE_KEY, raw); stored = true; } catch { /* Try persistent storage too. */ }
+    try { localStorage.setItem(AD_SOURCE_KEY, raw); stored = true; } catch { /* Session tracking still works. */ }
+    return stored ? payload : null;
   } catch {
     return null;
   }
@@ -37,17 +54,24 @@ export function captureAdSource(source, details = {}) {
 
 export function getActiveAdSource() {
   try {
-    const raw = sessionStorage.getItem(AD_SOURCE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!TRACKED_AD_SOURCES.has(parsed?.source)) return null;
-    return parsed;
+    if (typeof window !== "undefined" && process.env.NODE_ENV === "development"
+      && /^\/(?:ro\/|ru\/|en\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return null;
+    // Auth and feature effects can run before the global page tracker mounts.
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/admin")) {
+      const source = getAdSourceFromParams(new URLSearchParams(window.location.search));
+      if (source) return captureAdSource(source, {
+        landing_path: window.location.pathname + window.location.search,
+        referrer: document.referrer || null,
+      });
+    }
+    return readAdSource(sessionStorage) || readAdSource(localStorage);
   } catch {
     return null;
   }
 }
 
 export function trackAdSourceEvent(eventName, metadata = {}) {
+  if (typeof window !== "undefined" && window.location.pathname.startsWith("/admin")) return;
   if (typeof window !== "undefined" && process.env.NODE_ENV === "development"
     && /^\/(?:ro\/|ru\/|en\/)?cadastru(?:\/|$)/.test(window.location.pathname)) return;
   const attribution = getActiveAdSource();

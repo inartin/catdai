@@ -1,4 +1,5 @@
 import { Geist } from "next/font/google";
+import { Suspense } from "react";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import CookieBanner from "@/components/CookieBanner";
@@ -126,7 +127,7 @@ export default function RootLayout({ children }) {
       <body className={`${geistSans.variable} antialiased`}>
         <LanguageProvider>
           <AuthProvider>
-            <AdSourceTracker />
+            <Suspense fallback={null}><AdSourceTracker /></Suspense>
             <OnlineUsersTracker />
             <GuestAccountPrompt />
             {children}

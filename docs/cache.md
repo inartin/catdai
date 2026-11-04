@@ -11,6 +11,7 @@ Backend prepared and active when Redis is reachable.
 
 ## Cached Routes
 - `GET /api/prices`: key `catdai:prices:latest:v1`, 24h TTL.
+- `GET /api/cadastru/address-catalogue?city=…`: public locality-scoped street/house suggestion data, content-derived ETag, five-minute HTTP freshness and one-day stale revalidation. The browser retains bounded catalogues and successful fallback suggestions across visits; no property, apartment or user data is included. See [street resolution](street-resolution.md#address-entry-suggestions).
 - `GET /api/market-trends`: key prefix `catdai:market-trends:v5:`, 12h TTL; separate city and district entries for 120-day trends clipped at 1 July 2026. Browser trend storage uses `catdai_market_trends_v5` to discard earlier cached chart data.
 - `POST /api/estimate`: key prefix `catdai:estimate:v1:`, 30m TTL for repeated validated estimate inputs.
 - `POST /api/estimate-rent`: key prefix `catdai:estimate-rent:v7:`, 12h TTL for repeated validated rent estimate inputs.

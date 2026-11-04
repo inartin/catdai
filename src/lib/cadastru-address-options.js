@@ -4,32 +4,38 @@ import prefetched from './cadastru-streets/data/chisinau-addresses.json';
 import corrections from './cadastru-streets/data/street-corrections.json';
 import { normalizeStreetName } from './cadastru-streets/street-resolver';
 import { resolveSupportedCity } from './cadastru-streets/supported-cities';
+import { houseSuggestionKey, matchStreetOptions } from './cadastru-street-matching';
+import { getPrefetchedHouseNumbers } from './prefetched-house-numbers';
 const types = { strada:'strada', bulevard:'bulevard', str: 'strada', bd: 'bulevard', 'str-la': 'str-la', sos: 'sos' };
 const labels = { strada:'Strada', bulevard:'Bulevardul', str: 'Strada', bd: 'Bulevardul', 'str-la': 'Stradela', sos: 'Șoseaua' };
-const entries = [...snapshot.streets, ...corrections, ...prefetched.streets.map(row=>({...row,city:prefetched.city}))].map(row => ({...row,
-  canonicalCity: resolveSupportedCity(row.city),
-  normalizedNames: [row.street, ...(row.aliases || [])].map(normalizeStreetName),
-}));
+const entriesByCity = new Map();
+for (const row of [...snapshot.streets, ...corrections, ...prefetched.streets.map(row => ({ ...row, city: prefetched.city }))]) {
+  const city = resolveSupportedCity(row.city);
+  if (!city || !types[row.road_type]) continue;
+  if (!entriesByCity.has(city)) entriesByCity.set(city, []);
+  entriesByCity.get(city).push({
+    street: row.street, road_type: types[row.road_type], label: `${labels[row.road_type]} ${row.provider_street || row.street}`,
+    normalizedNames: [...new Set([row.street, ...(row.aliases || [])].map(normalizeStreetName))],
+    ...(row.sources?.includes('mapmd') ? { source: 'mapmd' } : {}),
+  });
+}
+
 export function streetOptions(city, query) {
-  const q = normalizeStreetName(query);
-  if (q.length < 2) return [];
-  const found = new Map();
-  for (const row of entries) {
-    if (row.canonicalCity !== city || !types[row.road_type]) continue;
-    const names = row.normalizedNames;
-    if (!names.some(n => n.includes(q))) continue;
-    const key = `${types[row.road_type]}:${normalizeStreetName(row.street)}`;
-    found.set(key, { street: row.street, road_type: types[row.road_type], label: `${labels[row.road_type]} ${row.provider_street || row.street}`,
-      ...(row.sources?.includes('mapmd') ? {source:'mapmd'} : {}),
-      rank: names.includes(q) ? 0 : names.some(n => n.startsWith(q)) ? 1 : 2 });
-  }
-  if (!found.size) {
-    const pasted = query.trim().match(/^(.*?)\s+(?:nr\.?\s*)?(\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z]))?)$/i);
-    if (pasted && normalizeStreetName(pasted[1]).length >= 2) {
-      return streetOptions(city,pasted[1]).map(option => ({...option, house_number:pasted[2].toUpperCase(), label:`${option.label} ${pasted[2].toUpperCase()}`}));
+  return matchStreetOptions(entriesByCity.get(city) || [], query);
+}
+
+export function getAddressCatalogue(city) {
+  const streets = entriesByCity.get(city) || [];
+  const houses = {};
+  if (city === prefetched.city) {
+    for (const row of streets) {
+      const key = houseSuggestionKey(row);
+      if (houses[key]) continue;
+      const inventory = getPrefetchedHouseNumbers({ city, ...row });
+      if (inventory) houses[key] = { numbers: inventory.numbers, fetchedAt: inventory.fetchedAt, attribution: inventory.attribution };
     }
   }
-  return [...found.values()].sort((a,b) => a.rank-b.rank || Number(b.source==='mapmd')-Number(a.source==='mapmd') || a.label.localeCompare(b.label, 'ro')).slice(0, 12);
+  return { city, streets, houses };
 }
 
 // The OSM catalogue is partial. Missing suggestions can come from a locality-scoped

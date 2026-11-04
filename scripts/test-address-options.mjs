@@ -2,8 +2,9 @@ import vm from 'node:vm';import fs from 'node:fs/promises';import path from 'nod
 const root=path.resolve('src/lib');const context=vm.createContext({console});const modules=new Map();
 async function load(file){if(modules.has(file))return modules.get(file);let source=await fs.readFile(file,'utf8');let m;
 if(file.endsWith('.json'))m=new vm.SyntheticModule(['default'],function(){this.setExport('default',JSON.parse(source));},{context,identifier:file});
-else m=new vm.SourceTextModule(source,{context,identifier:file});modules.set(file,m);await m.link(async(spec,parent)=>{let target=path.resolve(path.dirname(parent.identifier),spec);if(!path.extname(target))target+='.js';return load(target);});return m;}
-const m=await load(root+'/cadastru-address-options.js');await m.evaluate();const search=m.namespace.streetOptions;
+else m=new vm.SourceTextModule(source,{context,identifier:file});modules.set(file,m);return m;}
+const linker=async(spec,parent)=>{let target=path.resolve(path.dirname(parent.identifier),spec);if(!path.extname(target))target+='.js';return load(target);};
+const m=await load(root+'/cadastru-address-options.js');await m.link(linker);await m.evaluate();const search=m.namespace.streetOptions;
 assert(search('Chișinău','strada dacia').some(s=>s.street==='Dacia'&&s.road_type==='bulevard'));
 assert(search('Chișinău','Dacia 15/1').some(s=>s.house_number==='15/1'));
 assert(search('Chișinău','31 August 1989').some(s=>s.street==='31 August 1989'&&!s.house_number));
@@ -38,6 +39,19 @@ assert.equal(getNumbers({city:'Stăuceni',road_type:'bulevard',street:'Dacia'}),
 assert.equal(getNumbers({city:'Chișinău',road_type:'strada',street:'Dacia'}),null);
 assert.equal(search('Chișinău','Dacia').filter(row=>row.street==='Dacia'&&row.road_type==='bulevard').length,1,'prefetched and dictionary rows must deduplicate');
 console.log('Prefetched catalogue: locality/type isolation, house inventory and street deduplication passed.');
+
+const matching=await load(root+'/cadastru-street-matching.js');
+const getCatalogue=m.namespace.getAddressCatalogue;
+const catalogue=getCatalogue('Chișinău');
+for(const query of ['strada dacia','Dacia 15/1','31 August 1989','Киевская улица','Cuza-Vodă','șos. Hîncești']) {
+ assert.deepEqual(matching.namespace.matchStreetOptions(catalogue.streets,query),search('Chișinău',query),'browser and server suggestions must match');
+}
+const catalogueDacia=catalogue.houses[matching.namespace.houseSuggestionKey({street:'Dacia',road_type:'bulevard'})];
+assert.deepEqual(catalogueDacia.numbers,dacia.numbers);
+const orhei=getCatalogue('Orhei');assert(orhei.streets.length>0);assert.equal(Object.keys(orhei.houses).length,0);
+assert.equal(getCatalogue('Nonexistent').streets.length,0);
+assert(orhei.streets.every(row=>!row.numbers&&!row.cadastral_number),'catalogues contain suggestion fields only');
+console.log('Browser catalogues: matching parity, saved house numbers, nationwide streets and locality isolation passed.');
 
 const resolveTyped=m.namespace.resolveTypedStreet;
 const autofilled=resolveTyped('Decebal',search('Chișinău','Decebal'));

@@ -13,6 +13,7 @@ import FeaturePurchaseBenefits from "@/components/FeaturePurchaseBenefits";
 import { FEATURE_PURCHASE_CONTENT } from "@/lib/feature-purchase-content";
 import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
 import PaymentOfferTracker from "@/components/PaymentOfferTracker";
+import LockIcon from "@/components/icons/LockIcon";
 
 function formatMdl(value, lang, currencyLabel = lang === "en" ? "MDL" : "lei") {
   const amount = Number(value);
@@ -36,7 +37,7 @@ function PurchaseFeatureChecklist({ translationKeys }) {
   );
 }
 
-function MobilePurchaseDrawer({ title, price, children, onCheckout, disabled, pending, analytics }) {
+function MobilePurchaseDrawer({ title, price, children, onCheckout, disabled, pending, analytics, isCadastruProduct = false }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
@@ -81,8 +82,9 @@ function MobilePurchaseDrawer({ title, price, children, onCheckout, disabled, pe
               onClick={onCheckout}
               disabled={disabled}
               aria-busy={pending}
-              className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300"
+              className={`inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-gray-300 ${isCadastruProduct ? "bg-emerald-700 hover:bg-emerald-800" : "bg-primary hover:bg-primary-dark"}`}
             >
+              {isCadastruProduct && <LockIcon size={16} strokeWidth={2.2} className="shrink-0" />}
               {t("payment.unlock")}
               {pending && <span className="sr-only"> · {t("payment.checkoutLoading")}</span>}
             </button>
@@ -248,6 +250,7 @@ export default function FeaturePricingAction({
         onCheckout={startCheckout}
         disabled={authLoading || checkoutPending}
         pending={checkoutPending}
+        isCadastruProduct={isCadastruProduct}
       >
         {isSaleEvaluationProduct ? (
           <PurchaseFeatureChecklist translationKeys={["result.mobilePurchaseMarketPrice", "result.mobilePurchaseSaleScenarios", "result.mobilePurchaseMarketAnalysis"]} />

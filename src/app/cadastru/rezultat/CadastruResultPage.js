@@ -1252,6 +1252,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
 
   const showShareAction = !isLockedPreview && Boolean(isAuthenticated || shareSlug);
   const hasSecondaryActions = isAuthenticated || showShareAction;
+  const showFavoriteAction = isAuthenticated && Boolean(favoritePath);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -1273,9 +1274,9 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                 <span className="sm:hidden">{t("cadastru.resultPageTitleMobile")}</span>
                 <span className="hidden sm:inline">{t("cadastru.resultPageTitle")}</span>
               </h1>
-              {state.data && (
+              {state.data && (hasSecondaryActions || showFavoriteAction) && (
                 <div className={`gap-2 sm:flex sm:shrink-0 sm:flex-wrap sm:items-start ${hasSecondaryActions
-                  ? `col-span-3 row-start-2 grid items-start ${favoritePath ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"}`
+                  ? `col-span-3 row-start-2 grid items-start ${showFavoriteAction ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"}`
                   : "col-start-3 row-start-1"}`}>
                   {hasSecondaryActions && (
                     <div className={`grid min-w-0 items-start gap-2 max-[375px]:[&_svg]:hidden sm:contents ${showShareAction && isAuthenticated ? "grid-cols-2" : "grid-cols-1"}`}>
@@ -1291,7 +1292,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                       {isAuthenticated && <CadastruImageSaveButton cadastral={state.data} targetRef={exportCardRef} />}
                     </div>
                   )}
-                  {favoritePath && (
+                  {showFavoriteAction && (
                     <CadastruFavoriteButton
                       key={`${session?.user?.id || "anonymous"}:${favoritePath}`}
                       urlPath={favoritePath}
@@ -1421,6 +1422,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                 }) : undefined}
                 registryRetrying={Boolean(state.retrying)}
                 showRevealButton={canUnlock}
+                hideCompactRevealButton={Boolean(canUnlock && purchaseOffer)}
                 revealButtonLabel={t("cadastru.payToUnlock")}
                 desktopRevealButtonLabel={t("cadastru.unlockCompleteCta", { price: unlockPriceLabel })}
                 desktopRevealDescription={t("cadastru.unlockCompleteDescription")}

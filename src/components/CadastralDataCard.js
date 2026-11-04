@@ -12,6 +12,7 @@ export default function CadastralDataCard({
   onLockedClick,
   forceDesktopLayout = false,
   showRevealButton = false,
+  hideCompactRevealButton = false,
   revealButtonLabel,
   desktopRevealButtonLabel,
   desktopRevealDescription,
@@ -78,7 +79,8 @@ export default function CadastralDataCard({
   const addressDetail = locality && displayAddress?.startsWith(`${locality}, `)
     ? displayAddress.slice(locality.length + 2) : displayAddress;
   const showLockedRevealButton = Boolean(showRevealButton && hasLockedDetails && onLockedClick);
-  const revealButton = showLockedRevealButton ? (
+  const showCompactRevealButton = showLockedRevealButton && !hideCompactRevealButton;
+  const revealButton = showCompactRevealButton ? (
     <button
       type="button"
       onClick={onLockedClick}
@@ -202,7 +204,7 @@ export default function CadastralDataCard({
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
               {t("cadastru.numberLabel")}
             </p>
-            <div className={showLockedRevealButton && isCadastralNumberLocked ? "relative mt-2 min-h-10" : "relative mt-1"}>
+            <div className={showCompactRevealButton && isCadastralNumberLocked ? "relative mt-2 min-h-10" : "relative mt-1"}>
               <p
                 className={`font-mono text-xl font-semibold tracking-wide text-emerald-950 ${isCadastralNumberLocked ? "select-none blur-sm cursor-pointer" : ""}`}
                 {...cadastralNumberProps}
@@ -225,7 +227,7 @@ export default function CadastralDataCard({
           </p>
         )}
 
-        {!cadastral.cadastral_number && showLockedRevealButton && (
+        {!cadastral.cadastral_number && showCompactRevealButton && (
           <div className={`flex justify-center ${desktopRevealButtonLabel ? "lg:hidden" : ""}`}>
             {revealButton}
           </div>

@@ -5,6 +5,7 @@ Implemented and active.
 
 ## Favorites
 - Authenticated users can toggle favorites from an estimate result or the standalone cadastru result page, using the same `/api/favorites` API and `user_favorites` table.
+- The standalone Cadastru result shows Favorite only to signed-in accounts; signed-out visitors and anonymous checkout sessions do not see the button on mobile or desktop.
 - Favorites store `url_path`, label, user id, and creation date.
 - Profile lists both result types under `Salvate` (RO) / `Сохранённые` (RU) and allows removal.
 - Cadastru bookmarks use a stable localized result URL with the cadastral number, or the exact address fields for multi-property and masked address results. They omit temporary preview handoffs and cache-bypass flags, so they reopen without browser session storage and apply the viewer's current access rules.

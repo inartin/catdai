@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
+import ResultReviewCard from "@/components/ResultReviewCard";
 import PropertyForm from "@/components/PropertyForm";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
@@ -310,6 +311,7 @@ function CalculatorContent() {
       return (
         <div className="mx-auto max-w-6xl px-4 py-10">
           <EstimateResult data={result} onReset={handleEdit} />
+          <ResultReviewCard usageId={result.review_usage_id} />
         </div>
       );
     }

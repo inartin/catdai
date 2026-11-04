@@ -1349,5 +1349,16 @@
   "cadastru.market.apartment": "Квартира",
   "cadastru.market.trendSince": "с {date}",
   "cadastru.market.observedDates": "Наблюдалось:",
-  "nav.menu": "Меню"
+  "nav.menu": "Меню",
+  "review.title": "Была ли информация полезной?",
+  "review.description": "Ваше мнение помогает нам улучшать Catdai.",
+  "review.dismiss": "Закрыть запрос отзыва",
+  "review.rating": "Насколько полезной была информация?",
+  "review.stars": "{count} из 5 звёзд",
+  "review.comment": "Комментарий (необязательно)",
+  "review.submit": "Отправить отзыв",
+  "review.sending": "Отправляем...",
+  "review.thanks": "Спасибо за отзыв!",
+  "review.saved": "Ваш отзыв сохранён.",
+  "review.error": "Не удалось отправить отзыв. Попробуйте ещё раз."
 }

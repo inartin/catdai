@@ -762,5 +762,16 @@
   "result.loginToContinue": "Sign in to continue",
   "result.linkCopied": "Link copied!",
   "result.loginToFavorite": "Sign in to save",
-  "result.sharing": "Generating..."
+  "result.sharing": "Generating...",
+  "review.title": "Was this information useful?",
+  "review.description": "Your feedback helps us improve Catdai.",
+  "review.dismiss": "Dismiss review request",
+  "review.rating": "How useful was the information?",
+  "review.stars": "{count} out of 5 stars",
+  "review.comment": "Comment (optional)",
+  "review.submit": "Send review",
+  "review.sending": "Sending...",
+  "review.thanks": "Thank you for your feedback!",
+  "review.saved": "Your review has been saved.",
+  "review.error": "Could not send your review. Please try again."
 }

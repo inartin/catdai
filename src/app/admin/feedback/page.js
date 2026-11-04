@@ -4,6 +4,11 @@ import AdminUserCell from "@/components/admin/AdminUserCell";
 
 import { useCallback, useEffect, useState } from "react";
 
+const REVIEW_FEATURES = {
+  sale_estimate: "Sale evaluation", rent_estimate: "Rent evaluation", listing_analysis: "Listing analysis",
+  cadastru_lookup: "Cadastru", yield_calculator: "Yield calculator", pdf_report: "PDF report",
+};
+
 function fmtDateTime(value) {
   if (!value) return "-";
   return new Date(value).toLocaleString("ro-RO", {
@@ -28,6 +33,7 @@ function imageSrc(row) {
 
 export default function AdminFeedbackPage() {
   const [items, setItems] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openImage, setOpenImage] = useState(null);
@@ -42,6 +48,7 @@ export default function AdminFeedbackPage() {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       setItems(Array.isArray(data.feedback) ? data.feedback : []);
+      setReviews(Array.isArray(data.reviews) ? data.reviews : []);
     } catch (err) {
       setError(err.message || "Failed to load feedback");
     } finally {
@@ -82,7 +89,7 @@ export default function AdminFeedbackPage() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Feedback</h1>
-          <p className="mt-1 text-sm text-gray-500">Latest registered-user beta feedback and bug reports.</p>
+          <p className="mt-1 text-sm text-gray-500">Private result reviews, beta feedback and bug reports.</p>
         </div>
         <button
           type="button"
@@ -94,7 +101,28 @@ export default function AdminFeedbackPage() {
         </button>
       </div>
 
+      <section aria-labelledby="result-reviews-title" className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-5 py-4">
+          <h2 id="result-reviews-title" className="font-semibold text-gray-900">Result reviews</h2>
+          <p className="mt-1 text-xs text-gray-500">Latest 100 ratings from unlocked paid results, including guest buyers. Visible only to admins.</p>
+        </div>
+        {error ? <p className="px-5 py-8 text-center text-sm text-red-500">Failed to load reviews</p>
+          : loading && !reviews.length ? <p className="px-5 py-8 text-center text-sm text-gray-400">Loading reviews...</p>
+            : !reviews.length ? <p className="px-5 py-8 text-center text-sm text-gray-400">No reviews yet</p>
+              : <div className="divide-y divide-gray-100">{reviews.map(row => <article key={row.id} className="px-5 py-4">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <span aria-label={`${row.rating} out of 5 stars`} className="text-xl tracking-widest text-amber-500">{"★".repeat(row.rating)}<span className="text-gray-200">{"★".repeat(5 - row.rating)}</span></span>
+                  <span className="text-xs font-medium text-gray-600">{REVIEW_FEATURES[row.feature_key] || row.feature_key}</span>
+                  <span className="text-xs text-gray-400">{fmtDateTime(row.created_at)}</span>
+                </div>
+                {row.comment ? <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">{row.comment}</p>
+                  : <p className="mt-3 text-xs text-gray-400">No comment</p>}
+                <div className="mt-3 text-xs text-gray-500"><AdminUserCell row={row} name={row.is_anonymous ? "Anonymous" : row.user_id} /></div>
+              </article>)}</div>}
+      </section>
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <h2 className="border-b border-gray-100 px-5 py-4 font-semibold text-gray-900">Feedback and bug reports</h2>
         {error ? (
           <div className="px-5 py-8 text-center">
             <p className="text-sm text-red-500 font-medium">Failed to load feedback</p>

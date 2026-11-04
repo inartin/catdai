@@ -1,7 +1,16 @@
 # Feedback Widget
 
 ## Stage
-Implemented for registered users.
+Feedback widget for registered users; private result reviews also accept anonymous checkout buyers.
+
+## Result Reviews
+- A small, dismissible card appears at the bottom of a successfully loaded paid result (Cadastru, sale/rent evaluation, listing analysis or yield calculator). Checkout, payment confirmation, locked/free results, failures and shared reports do not prompt for a review.
+- A rating from one to five stars is required. Selecting a rating reveals a comment field (optional, up to 500 characters) and an explicit send button. Submission confirms inline; there is no popup or public review display.
+- Dismissing or submitting suppresses future prompts for that user across results and devices. Browser storage also remembers the choice immediately. A guest's response continues to suppress prompts after their purchases are claimed by a registered account. Guest buyers use their existing anonymous checkout session and never need to register or supply contact details.
+- Result APIs attach `review_usage_id` only for a consumed `paid_credit` usage event. `GET /api/result-reviews?usage_id=...` returns eligibility only; `POST /api/result-reviews` validates the session, owned paid usage, stars/comment and first-response uniqueness. Browser roles cannot read or write the storage table directly.
+- `/admin/feedback` has a separate **Result reviews** section with the latest 100 submitted ratings, optional comments, feature, date and user/anonymous visitor details. Dismissals are excluded; existing feedback and bug reports retain their own section and delete action.
+- Migration `supabase/migrations/20261104192647_result_reviews.sql` was applied to the shared CatDai database on 4 November 2026. It adds private `result_reviews` storage, one response per session owner and indexes for the admin list and claimed guest lookup. RLS, browser-role access restrictions and rolled-back insert/validation checks were verified. The local filename matches the applied migration history; application deployment remains separate.
+- Verification: `pnpm exec node --experimental-vm-modules scripts/test-result-reviews.mjs`.
 
 ## User Flow
 - Authenticated users see a floating feedback button in the app shell.
@@ -27,3 +36,6 @@ Implemented for registered users.
 - `src/app/api/admin/feedback/route.js`
 - `src/components/icons/FeedbackIcon.js`
 - `db/user_feedback.sql`
+- `src/components/ResultReviewCard.js`
+- `src/lib/result-reviews.js`
+- `src/app/api/result-reviews/route.js`

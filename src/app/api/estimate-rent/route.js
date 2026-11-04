@@ -639,6 +639,7 @@ function buildRentEstimateAccessPayload(data, estimateAccess) {
       access_tier: estimateAccess.access.tier,
       full_access: true,
       access_source: estimateAccess.accessSource,
+      review_usage_id: estimateAccess.paidCreditUsage?.source === "paid_credit" ? estimateAccess.paidCreditUsage.usage_event_id : null,
       free_monthly_usage: usage
         ? {
           limit: usage.limit,
@@ -743,6 +744,7 @@ async function resolveRentResponse(request, body, params, rawData, calculatorAcc
         access_tier: calculatorAccess.access.tier,
         full_access: true,
         access_source: paidCreditUsage.source || "paid_credit",
+        review_usage_id: paidCreditUsage.source === "paid_credit" ? paidCreditUsage.usage_event_id : null,
         paid_credit_usage: {
           remaining: paidCreditUsage.remaining_uses,
         },

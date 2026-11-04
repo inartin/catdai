@@ -578,7 +578,8 @@ async function handlePost(request) {
       await persistCadastruRecord(payload, usageOptions);
     }
     const { district_lookup_checked, building_bundles, ...publicPayload } = payload;
-    const res = NextResponse.json({ ...publicPayload, cadastru_evaluation_token: evaluationToken });
+    const res = NextResponse.json({ ...publicPayload, cadastru_evaluation_token: evaluationToken,
+      review_usage_id: creditUsage.source === "paid_credit" ? creditUsage.usage_event_id : null });
     res.headers.set("X-RateLimit-Remaining", String(remaining));
     return res;
   };

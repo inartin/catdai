@@ -314,6 +314,7 @@ async function handlePost(request, { learned } = {}) {
         lookupSource,
       })
     : null;
+  let reviewUsageId = null;
   const consumeCadastruCredit = async (payload, lookupSource, evaluationToken) => {
     const idempotencyKey = payload?.cadastral_number
       ? makeCadastruNumberUsageKey(payload.cadastral_number)
@@ -340,7 +341,10 @@ async function handlePost(request, { learned } = {}) {
     } catch (cause) {
       throw Object.assign(new Error("Cadastru credit authorization failed", { cause }), { code: "credit_authorization_failed" });
     }
-    if (creditUsage.allowed) return null;
+    if (creditUsage.allowed) {
+      reviewUsageId = creditUsage.source === "paid_credit" ? creditUsage.usage_event_id : null;
+      return null;
+    }
     const response = NextResponse.json(
       {
         ...buildCadastruPreviewPayload(payload, creditUsage.reason || "no_credit", {
@@ -365,7 +369,7 @@ async function handlePost(request, { learned } = {}) {
     const creditResponse = await consumeCadastruCredit(payload, stored.lookupSource, evaluationToken);
     await recoverSuggestion(payload, "cache");
     if (creditResponse) return creditResponse;
-    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
+    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken, review_usage_id: reviewUsageId });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   };
@@ -427,7 +431,7 @@ async function handlePost(request, { learned } = {}) {
     await recoverSuggestion(payload, lookupSource);
     if (creditResponse) return creditResponse;
 
-    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
+    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken, review_usage_id: reviewUsageId });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {
@@ -445,7 +449,7 @@ async function handlePost(request, { learned } = {}) {
         const evaluationToken = await recordAddressSearch(payload, "cache", stale.resultType);
         const creditResponse = await consumeCadastruCredit(payload, stale.lookupSource, evaluationToken);
         if (creditResponse) return creditResponse;
-        return NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
+        return NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken, review_usage_id: reviewUsageId });
       }
       const partial = await getBuildingFallback({ address: lookupAddress });
       if (partial) {
@@ -529,7 +533,7 @@ async function handlePost(request, { learned } = {}) {
     await recoverSuggestion(payload, "local");
     if (creditResponse) return creditResponse;
 
-    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken });
+    const response = NextResponse.json({ ...publicPayload(payload), cadastru_evaluation_token: evaluationToken, review_usage_id: reviewUsageId });
     response.headers.set("X-RateLimit-Remaining", String(remaining));
     return response;
   } catch (error) {

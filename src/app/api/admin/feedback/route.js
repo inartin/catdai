@@ -27,7 +27,18 @@ export async function GET(request) {
     return NextResponse.json({ error: "Failed to load feedback." }, { status: 500 });
   }
 
-  return NextResponse.json({ feedback: data || [] });
+  const { data: reviews, error: reviewError } = await supabaseAdmin
+    .from("result_reviews")
+    .select("id, user_id, feature_key, is_anonymous, visitor, rating, comment, created_at")
+    .eq("status", "submitted")
+    .order("created_at", { ascending: false })
+    .limit(PAGE_SIZE);
+  if (reviewError) {
+    console.error("[admin-feedback] reviews failed:", reviewError.message);
+    return NextResponse.json({ error: "Failed to load reviews." }, { status: 500 });
+  }
+
+  return NextResponse.json({ feedback: data || [], reviews: reviews || [] }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function DELETE(request) {

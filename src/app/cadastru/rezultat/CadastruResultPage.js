@@ -1,5 +1,7 @@
 "use client";
 
+import ResultReviewCard from "@/components/ResultReviewCard";
+
 import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -1468,6 +1470,9 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
               </button>
             )}
           </CadastruListingsCard>
+          {!shareSlug && !state.loading && !isLockedPreview && !state.data?.registry_unavailable && (
+            <ResultReviewCard usageId={state.data?.review_usage_id} />
+          )}
           {state.data && (
             <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 text-center sm:p-8">
               <h2 className="text-xl font-bold text-gray-950 sm:text-2xl">

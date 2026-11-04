@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
+import ResultReviewCard from "@/components/ResultReviewCard";
 import LinkAnalyzer from "@/components/LinkAnalyzer";
 import PropertyForm from "@/components/PropertyForm";
 import CadastruSearchForm from "@/components/CadastruSearchForm";
@@ -793,6 +794,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
           </div>
         )}
       </div>
+      {!isSharedResult(result) && <ResultReviewCard usageId={result?.review_usage_id} />}
       {!isListingsMode && !isSharedResult(result) && (
         isListingAnalysisPage ? (
           <div className="mx-auto max-w-3xl">

@@ -1342,5 +1342,16 @@
   "cadastru.market.apartment": "Apartament",
   "cadastru.market.trendSince": "din {date}",
   "cadastru.market.observedDates": "Observat:",
-  "nav.menu": "Meniu"
+  "nav.menu": "Meniu",
+  "review.title": "Ți-au fost utile informațiile?",
+  "review.description": "Părerea ta ne ajută să îmbunătățim Catdai.",
+  "review.dismiss": "Închide solicitarea de recenzie",
+  "review.rating": "Cât de utile au fost informațiile?",
+  "review.stars": "{count} din 5 stele",
+  "review.comment": "Comentariu (opțional)",
+  "review.submit": "Trimite recenzia",
+  "review.sending": "Se trimite...",
+  "review.thanks": "Mulțumim pentru părere!",
+  "review.saved": "Recenzia ta a fost salvată.",
+  "review.error": "Recenzia nu a fost trimisă. Încearcă din nou."
 }

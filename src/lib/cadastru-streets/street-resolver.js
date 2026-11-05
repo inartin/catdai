@@ -41,22 +41,31 @@ function distance(a, b) {
   return rows[a.length][b.length];
 }
 
-function matchesInitials(input, name) {
+function initialsDistance(input, name) {
   const tokens = input.split(" ");
   const words = name.split(" ");
-  // Keep the final name in full, preserve word order and never shorten numbers.
-  if (tokens.length !== words.length || !/^\p{L}{2,}$/u.test(tokens.at(-1))) return false;
+  // Preserve word order/count and require a full surname rather than its initial.
+  if (tokens.length !== words.length || !/^\p{L}{2,}$/u.test(tokens.at(-1))) return Infinity;
   let expanded = false;
-  const matches = tokens.every((token, index) => {
-    if (token === words[index]) return true;
-    if (index < tokens.length - 1 && /^\p{L}$/u.test(token)
-      && /^\p{L}{2,}$/u.test(words[index]) && words[index].startsWith(token)) {
-      expanded = true;
-      return true;
+  let edits = 0;
+  for (const [index, token] of tokens.entries()) {
+    const word = words[index];
+    if (token === word) {
+      if (index < tokens.length - 1 && /^\p{L}$/u.test(token)) expanded = true;
+      continue;
     }
-    return false;
-  });
-  return matches && expanded;
+    if (index < tokens.length - 1 && /^\p{L}$/u.test(token)
+      && /^\p{L}{2,}$/u.test(word) && word.startsWith(token)) {
+      expanded = true;
+      continue;
+    }
+    // Initials, numeric words and short words are never corrected.
+    if (!/^\p{L}{4,}$/u.test(token) || !/^\p{L}{4,}$/u.test(word)
+      || Math.abs(token.length - word.length) > 2) return Infinity;
+    edits += distance(token, word);
+    if (edits > 2) return Infinity;
+  }
+  return expanded ? edits : Infinity;
 }
 
 export function createStreetResolver(entries) {
@@ -81,7 +90,8 @@ export function createStreetResolver(entries) {
   }
 
   return ({ city, roadType, street, exactOnly = false, includeAliases = false }) => {
-    const scope = scopes.get(`${resolveSupportedCity(city)}|${roadKey(roadType)}`);
+    const locality = resolveSupportedCity(city);
+    const scope = scopes.get(`${locality}|${roadKey(roadType)}`);
     const input = normalizeStreetName(street);
     const unchanged = { status: "unresolved", street };
     if (!scope || !input) return unchanged;
@@ -96,22 +106,32 @@ export function createStreetResolver(entries) {
     if (exact.length === 1) return result(exact[0], "exact");
     if (exact.length > 1) return { status: "ambiguous", street, suggestions: exact.map((x) => x.street).sort() };
     if (exactOnly || input.length > 80) return unchanged;
-    const initials = [...scope.values()].filter((entry) => [...entry.names].some((name) => matchesInitials(input, name)));
+    const initials = [...scope.values()].filter((entry) => [...entry.names].some((name) => initialsDistance(input, name) === 0));
     if (initials.length === 1) return result(initials[0], "abbreviation");
     if (initials.length > 1) return { status: "ambiguous", street, suggestions: initials.map((x) => x.street).sort() };
     if (input.length < 6) return unchanged;
+    // Preserve existing road-type recovery for an exact name in another scope.
+    if (["str", "bd", "str-la", "sos"].some((type) => {
+      const other = scopes.get(`${locality}|${type}`);
+      return other && other !== scope && [...other.values()].some((entry) => entry.names.has(input));
+    })) return unchanged;
     const numbers = input.match(/\d+/g)?.join("|") || "";
+    const hasInitials = (value) => value.split(" ").slice(0, -1).some((token) => /^\p{L}$/u.test(token));
+    const abbreviated = hasInitials(input);
     const ranked = [...scope.values()].map((entry) => ({
       street: entry.street,
       distance: Math.min(...[...entry.names].map((name) => {
-        if (name.length < 6 || Math.abs(name.length - input.length) > 2 ||
+        if (name.length < 6 ||
           (name.match(/\d+/g)?.join("|") || "") !== numbers) return Infinity;
-        return distance(input, name);
+        if (abbreviated || hasInitials(name)) return initialsDistance(input, name);
+        return Math.abs(name.length - input.length) <= 2 ? distance(input, name) : Infinity;
       })),
     })).filter((entry) => entry.distance <= 2).sort((a, b) => a.distance - b.distance || a.street.localeCompare(b.street));
-    if (!ranked.length || ranked[0].distance > 1) return unchanged;
-    // A second street within two edits makes a one-edit correction uncertain.
-    if (ranked.length > 1) return { status: "ambiguous", street, suggestions: ranked.map((x) => x.street) };
+    if (!ranked.length) return unchanged;
+    // Two edits or another nearby street require a choice, even with one suggestion.
+    if (ranked.length > 1 || ranked[0].distance > 1) {
+      return { status: "ambiguous", street, suggestions: ranked.slice(0, 3).map((x) => x.street) };
+    }
     return result(scope.get(normalizeStreetName(ranked[0].street)), "typo");
   };
 }

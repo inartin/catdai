@@ -51,11 +51,13 @@ async function harness(file, path, stored = {}, lang = 'ro') {
     '@/lib/maib/products.mjs': { maibProduct: key => ({ key, amount_mdl: 15 }) },
     '@/lib/payment-urls.mjs': { featureCheckoutUrl: () => '/payment/checkout' },
     '@/lib/cadastru-map': { cadastruMapLocation: () => null },
+    '@/lib/ga4-payment-client': { trackPaymentAnalytics: noop },
     '@/lib/visitor-browser': { getDeviceId: () => null },
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },
   "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
+    'next/link': { default: (props) => jsx('a', props) },
     'next/navigation': { useRouter: () => router, useSearchParams: () => new URL(browser.location.href).searchParams },
     '@/context/LanguageContext': { useTranslation: () => ({ lang, t: (key, params = {}) => Object.entries(params).reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), translations[lang][key] || key) }) },
     '@/context/AuthContext': { useAuth: () => ({ isAuthenticated: Boolean(authSession), loading: false,
@@ -235,6 +237,7 @@ for (const lang of ['ro', 'ru']) {
   for (const [status, failure, titleKey, noteKey] of [
     [404, { error: 'not_found', suggestions: ['Mihai Eminescu'] }, 'cadastru.addressNotIdentified', 'cadastru.didYouMean'],
     [422, { error: 'ambiguous_street', suggestions: ['Mihai Eminescu', 'Mihail Kogălniceanu'] }, 'cadastru.confirmStreet', 'cadastru.chooseStreet'],
+    [422, { error: 'ambiguous_street', suggestions: ['Mihai Eminescu'] }, 'cadastru.confirmStreet', 'cadastru.chooseStreet'],
     [404, { error: 'not_found', road_type_suggestions: [{ road_type: 'bulevard', street: 'Eminescu' }] }, 'cadastru.addressNotIdentified', 'cadastru.didYouMeanRoadType'],
     [503, { error: 'service_unavailable', road_type_suggestions: [{ road_type: 'bulevard', street: 'Eminescu' }] }, 'cadastru.confirmStreet', 'cadastru.didYouMeanRoadType'],
   ]) {

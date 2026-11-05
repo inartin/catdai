@@ -638,6 +638,13 @@ const abbreviatedPayload = await abbreviated.json();
 assert.equal(abbreviatedPayload.request_address, "Bălți, str G. Cosbuc 13 ap 18");
 assert.equal(abbreviatedPayload.resolved_address, "Bălți, str George Coșbuc 13 ap 18");
 assert.equal(abbreviatedPayload.street_resolution.status, "abbreviation");
+const misspelledInitials = await suggestionsRoute.POST(request({ ...abbreviatedBody, street: "G. Cosbcu" }));
+assert.equal(misspelledInitials.status, 200);
+const misspelledPayload = await misspelledInitials.json();
+assert.equal(misspelledPayload.street_resolution.status, "typo");
+assert.equal(submitted.at(-1).street, "George Coșbuc");
+assert.equal(submitted.at(-1).house_number, abbreviatedBody.house_number);
+assert.equal(submitted.at(-1).apartment_number, abbreviatedBody.apartment_number);
 suggestionFailure = Object.assign(new Error("missing"), { status: 404, code: "not_found" });
 submitted.length = 0;
 const aliasesBeforeSuggestions = clone(tables.cadastru_address_aliases);
@@ -691,6 +698,7 @@ const { createStreetResolver, normalizeStreetName, inspectStreetAddress } = awai
 const initialsResolver = createStreetResolver([
   { city: "Bălți", road_type: "str", street: "George Coșbuc" },
   { city: "Bălți", road_type: "str", street: "Gheorghe Coșbuc" },
+  { city: "Bălți", road_type: "str", street: "Nikolai Zelinski" },
 ]);
 const ambiguousInitialsRoute = await load("src/app/api/cadastru/address/route.js", {
   ...routeMocks,
@@ -701,6 +709,18 @@ const ambiguousInitialsRoute = await load("src/app/api/cadastru/address/route.js
 const ambiguousInitials = await ambiguousInitialsRoute.POST(request(abbreviatedBody));
 assert.equal(ambiguousInitials.status, 422);
 assert.deepEqual((await ambiguousInitials.json()).suggestions, ["George Coșbuc", "Gheorghe Coșbuc"]);
+for (const [street, choices] of [
+  ["G. Cosbcu", ["George Coșbuc", "Gheorghe Coșbuc"]],
+  ["N. Zelinschi", ["Nikolai Zelinski"]],
+  ["Nikolai Zelinschi", ["Nikolai Zelinski"]],
+]) {
+  const uncertain = await ambiguousInitialsRoute.POST(request({ ...abbreviatedBody, street }));
+  assert.equal(uncertain.status, 422);
+  const payload = await uncertain.json();
+  assert.equal(payload.error, "ambiguous_street");
+  assert.deepEqual(payload.suggestions, choices);
+}
+console.log("Combined spelling regressions passed: automatic clear correction, bounded choices without aliases or provider/cache access, and exact house/apartment forwarding.");
 
 // Pasted street/house conflicts are input errors, before cache and provider calls.
 let inputConflictPending = true;

@@ -2,7 +2,9 @@
 
 The address API resolves `street` before cache access, using the same city/type-scoped resolver and OSM snapshot as `catdai-api`. Known Russian aliases, unambiguous given-name initials and clear one-edit typos map to a canonical name; city, house suffix and apartment remain exact. Unknown streets follow the existing lookup. Ambiguous names return 422 with `ambiguous_street` and `suggestions`, without a lookup or cache write.
 
-Initials such as `G. Coșbuc`, `M Eminescu`, and `I.L. Caragiale` expand before lookup only when exactly one street matches the selected city/type. Word order and count must match; the final name and numeric tokens stay exact. Collisions return 422 with the full names as suggestions. Resolution status is `abbreviation`, and the existing result notice shows the submitted and full names. Official address checks do not infer initials.
+Initials such as `G. Coșbuc`, `M Eminescu`, and `I.L. Caragiale` expand before lookup only when exactly one street matches the selected city/type. They can combine with one insertion, deletion, substitution or adjacent-letter swap in written-out words of at least four letters (`G. Cosbcu` → `George Coșbuc`). Word order/count and numeric tokens remain exact; initials themselves are never corrected. A clear one-edit match uses `typo`, while unchanged full names with initials use `abbreviation`; the existing result notice shows the submitted and resolved names. Two-edit matches or competing streets return 422 `ambiguous_street` with up to three canonical choices before cache/provider access, even for a single candidate. The existing RO/RU confirmation card retries only after selection, retaining locality, road type, house suffix and apartment. Exact names known under another road type retain the existing road-type recovery. Official address checks remain exact and never infer initials or typos.
+
+The reviewed Chișinău strada alias `N. Zelinschi` resolves to `Nikolai Zelinski` before cache access and worker requests, including retries without an apartment. House suffixes remain exact and the alias does not establish apartment identity.
 
 ## Pasted addresses in the street field
 

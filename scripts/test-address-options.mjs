@@ -118,3 +118,45 @@ for (const [query, canonical] of [['M. Eminescu', 'Mihai Eminescu'], ['N. Zelins
   assert.equal(search('Nonexistent', query).length, 0, 'suggestions stay in the selected locality');
 }
 console.log('Tolerant autocomplete: partial initials, RO/RU typos, explicit choices, ambiguity, ranking, deduplication, exact street numbers, pasted suffixes and browser/server parity passed.');
+
+// Reviewed spellings share one option; unrelated localities/types stay separate.
+for (const query of ['N. Ze', 'N. Zelinschi', 'Nicolai Zelinski', 'Nikolai Zelinski']) {
+  const options = search('Chișinău', query).filter(option => /zelinski$/i.test(option.street));
+  assert.equal(options.length, 1, `${query} must show only one Zelinski street`);
+  assert.equal(options[0].street, 'Nikolai Zelinski');
+  assert.equal(options[0].source, 'mapmd');
+}
+const zelinskiRows = catalogue.streets.filter(row => /zelinski$/i.test(row.street));
+assert.equal(zelinskiRows.length, 1, 'the downloaded catalogue also deduplicates reviewed spellings');
+assert(zelinskiRows[0].normalizedNames.includes('nicolai zelinski'));
+assert(zelinskiRows[0].normalizedNames.includes('nikolai zelinski'));
+assert(!catalogue.houses['strada:nicolai zelinski'], 'house lists use the canonical street key');
+assert(search('Gașpar', 'Zelinschi').some(option => option.street === 'Nicolae Zelinschi'),
+  'another locality keeps its own street spelling');
+
+const houseFixtureData = { city: 'Chișinău', attribution: 'fixture', streets: [
+  { street: 'Nikolai Zelinski', road_type: 'strada', aliases: [], numbers: ['1', '45/A'],
+    primary_source: 'mapmd', fetched_at: '2026-11-03T10:00:00Z', source_fetched_at: { mapmd: '2026-11-03T10:00:00Z' } },
+  { street: 'Nicolai Zelinski', road_type: 'strada', aliases: [], numbers: ['7', '45A'],
+    primary_source: 'osm', fetched_at: '2026-11-04T10:00:00Z', source_fetched_at: { osm: '2026-11-04T10:00:00Z' } },
+  { street: 'Nicolai Zelinski', road_type: 'str-la', aliases: [], numbers: ['99'],
+    primary_source: 'osm', fetched_at: '2026-11-04T10:00:00Z' },
+] };
+const houseFixture = new vm.SourceTextModule(await fs.readFile(root + '/prefetched-house-numbers.js', 'utf8'),
+  { context, identifier: root + '/prefetched-house-numbers-fixture.js' });
+await houseFixture.link((specifier, parent) => specifier.endsWith('chisinau-addresses.json')
+  ? new vm.SyntheticModule(['default'], function () { this.setExport('default', houseFixtureData); }, { context })
+  : linker(specifier, parent));
+await houseFixture.evaluate();
+const fixtureNumbers = houseFixture.namespace.getPrefetchedHouseNumbers;
+const canonicalInventory = fixtureNumbers({ city: 'Chișinău', road_type: 'strada', street: 'Nikolai Zelinski' });
+const aliasInventory = fixtureNumbers({ city: 'Chișinău', road_type: 'strada', street: 'Nicolai Zelinski' });
+assert.deepEqual([...canonicalInventory.numbers].sort(), ['1', '45/A', '45A', '7'].sort(), 'both inventories survive deduplication');
+assert.deepEqual([...aliasInventory.numbers], [...canonicalInventory.numbers]);
+assert.equal(canonicalInventory.primary_source, 'mapmd');
+assert.equal(canonicalInventory.fetchedAt, Date.parse('2026-11-03T10:00:00Z'), 'newer OSM metadata cannot renew map.md freshness');
+assert.equal(fixtureNumbers({ city: 'Orhei', road_type: 'strada', street: 'Nicolai Zelinski' }), null);
+assert.equal(fixtureNumbers({ city: 'Chișinău', road_type: 'str-la', street: 'Nicolai Zelinski' }).numbers.join(','), '99');
+assert.equal(fixtureNumbers({ city: 'Chișinău', road_type: 'str-la', street: 'Nikolai Zelinski' }), null,
+  'similar names without a reviewed alias in that road type are never merged');
+console.log('Reviewed alias deduplication: one Zelinski option, full alias coverage, retained house inventories, source freshness and locality/type isolation passed.');

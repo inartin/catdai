@@ -2,7 +2,7 @@ import { parseStreetInput } from './cadastru-street-input';
 import snapshot from './cadastru-streets/data/streets.json';
 import prefetched from './cadastru-streets/data/chisinau-addresses.json';
 import corrections from './cadastru-streets/data/street-corrections.json';
-import { normalizeStreetName } from './cadastru-streets/street-resolver';
+import { normalizeStreetName, resolveStreet } from './cadastru-streets/street-resolver';
 import { resolveSupportedCity } from './cadastru-streets/supported-cities';
 import { houseSuggestionKey, matchStreetOptions } from './cadastru-street-matching';
 import { getPrefetchedHouseNumbers } from './prefetched-house-numbers';
@@ -12,13 +12,23 @@ const entriesByCity = new Map();
 for (const row of [...snapshot.streets, ...corrections, ...prefetched.streets.map(row => ({ ...row, city: prefetched.city }))]) {
   const city = resolveSupportedCity(row.city);
   if (!city || !types[row.road_type]) continue;
-  if (!entriesByCity.has(city)) entriesByCity.set(city, []);
-  entriesByCity.get(city).push({
-    street: row.street, road_type: types[row.road_type], label: `${labels[row.road_type]} ${row.provider_street || row.street}`,
-    normalizedNames: [...new Set([row.street, ...(row.aliases || [])].map(normalizeStreetName))],
+  const resolved = resolveStreet({ city, roadType: row.road_type, street: row.street, exactOnly: true });
+  const street = resolved.status === 'exact' ? resolved.street : row.street;
+  const option = {
+    street, road_type: types[row.road_type], label: `${labels[row.road_type]} ${row.provider_street || street}`,
+    normalizedNames: [...new Set([street, row.street, ...(row.aliases || [])].map(normalizeStreetName))],
     ...(row.sources?.includes('mapmd') ? { source: 'mapmd' } : {}),
+  };
+  if (!entriesByCity.has(city)) entriesByCity.set(city, new Map());
+  const entries = entriesByCity.get(city);
+  const key = houseSuggestionKey(option);
+  const previous = entries.get(key);
+  const preferred = previous?.source === 'mapmd' && option.source !== 'mapmd' ? previous : option;
+  entries.set(key, { ...preferred,
+    normalizedNames: [...new Set([...(previous?.normalizedNames || []), ...option.normalizedNames])],
   });
 }
+for (const [city, entries] of entriesByCity) entriesByCity.set(city, [...entries.values()]);
 
 export function streetOptions(city, query) {
   return matchStreetOptions(entriesByCity.get(city) || [], query);
@@ -30,7 +40,6 @@ export function getAddressCatalogue(city) {
   if (city === prefetched.city) {
     for (const row of streets) {
       const key = houseSuggestionKey(row);
-      if (houses[key]) continue;
       const inventory = getPrefetchedHouseNumbers({ city, ...row });
       if (inventory) houses[key] = { numbers: inventory.numbers, fetchedAt: inventory.fetchedAt, attribution: inventory.attribution };
     }

@@ -88,3 +88,28 @@ lateHouses.resolve(Response.json({numbers:['999'],attribution:'old locality'}));
 assert(!walk(tree).some(n=>n.type==='button'&&n.props.children==='999'),'late house responses cannot overwrite another locality');
 assert.equal(requests.length,beforeHouses+2,'a preloaded locality needs no street or house API requests');
 console.log('Preload timing: immediate local matching, hover/keyboard prefetch, request reuse, cached houses and stale-locality rejection passed.');
+
+catalogueFixtures.set('Bălți', { city: 'Bălți', version: 'initials-v1', streets: [
+  { street: 'Mihai Eminescu', road_type: 'strada', label: 'Strada Mihai Eminescu', normalizedNames: ['mihai eminescu'] },
+  { street: 'Nikolai Zelinski', road_type: 'strada', label: 'Strada Nikolai Zelinski', normalizedNames: ['nikolai zelinski'] },
+], houses: { 'strada:nikolai zelinski': { numbers: ['1', '22/D'], fetchedAt: clock, attribution: 'fixture' } } });
+value = { ...value, city: 'Bălți', street: '', houseNumber: '22/D', apartmentNumber: '26' };
+dirty = true; flush(); await settle();
+const beforeInitials = requests.length;
+for (const [query, canonical] of [['M. E', 'Mihai Eminescu'], ['M. Eminescu', 'Mihai Eminescu'],
+  ['M. Eminse', 'Mihai Eminescu'], ['N. Zelinschi', 'Nikolai Zelinski']]) {
+  type(query);
+  assert(options().some(option => option.props.children[0].props.children === `Strada ${canonical}`),
+    `${query} displays the full street immediately`);
+  assert.equal(value.street, query, 'typing a match does not select it');
+  assert.equal(value.houseNumber, '22/D');
+  assert.equal(value.apartmentNumber, '26');
+}
+assert.equal(requests.length, beforeInitials, 'local initials and spelling matches need no provider request');
+options()[0].props.onClick({ preventDefault() {}, stopPropagation() {} }); flush(); await settle();
+assert.equal(value.street, 'Nikolai Zelinski', 'only choosing a suggestion replaces the typed street');
+assert.equal(value.houseNumber, '22/D');
+assert.equal(value.apartmentNumber, '26');
+assert.equal(options().length, 0, 'selection closes the dropdown');
+assert.equal(requests.length, beforeInitials, 'selection reuses saved house numbers');
+console.log('Initials dropdown: immediate full names, misspelled prefixes, explicit selection and preserved house/apartment passed.');

@@ -67,3 +67,54 @@ assert.equal(resolveTyped('Decebal 63',search('Chișinău','Decebal 63')).addres
 const numbered=resolveTyped('31 August 1989',search('Chișinău','31 August 1989'));assert(numbered.status==='ambiguous'?numbered.choices.every(row=>row.street==='31 August 1989'):numbered.address.street==='31 August 1989','numbered street names remain complete even when the road type is ambiguous');
 assert.equal(resolveTyped('Deceb',search('Chișinău','Deceb')).status,'unresolved','a partial name must not silently select the first suggestion');
 console.log('Manual street resolution: browser history input, unlisted streets, explicit types, ambiguity and house-conflict preservation passed.');
+
+// Suggestions tolerate partial initials and spelling without resolving a property.
+const match = matching.namespace.matchStreetOptions;
+const normalize = matching.namespace.normalizeStreetQuery;
+const entry = (street, extra = {}) => ({ street, road_type: 'strada', label: `Strada ${street}`,
+  normalizedNames: [normalize(street)], ...extra });
+const nameFixtures = [entry('Mihai Eminescu'), entry('Nikolai Zelinski'), entry('George Coșbuc'),
+  entry('Ion Luca Caragiale', { normalizedNames: ['ion luca caragiale', 'ион лука караджале'] })];
+for (const [queries, canonical] of [
+  [['M. E', 'M. Eminescu', 'M. Eminsecu', 'M. Eminse'], 'Mihai Eminescu'],
+  [['N. Z', 'N. Zelins', 'N. Zelinschi', 'Nikolai Zelinschi'], 'Nikolai Zelinski'],
+  [['G. Cosbcu'], 'George Coșbuc'],
+  [['I.L. Caragaile', 'И. Л. Караджлае'], 'Ion Luca Caragiale'],
+]) {
+  for (const query of queries) {
+    const options = match(nameFixtures, query);
+    assert(options.some(option => option.street === canonical), `${query} suggests ${canonical} without a dedicated alias`);
+    assert.equal(resolveTyped(query, options).status, 'unresolved', 'approximate suggestions require a choice');
+  }
+}
+for (const query of ['X. Zelinschi', 'M. Eq', 'Eminescu M.', 'M. Qwerty']) {
+  assert.equal(match(nameFixtures, query).length, 0, query);
+}
+const competing = match([entry('Mihai Eminescu'), entry('Mihail Eminescu')], 'M. Eminescu');
+assert.equal(competing.length, 2, 'initials must retain competing full names');
+const differentTypes = match([entry('Mihai Eminescu'), entry('Mihai Eminescu',
+  { road_type: 'str-la', label: 'Stradela Mihai Eminescu' })], 'M. Eminescu');
+assert.equal(differentTypes.length, 2, 'road types remain distinct choices');
+const duplicated = match([
+  entry('Nikolai Zelinski', { normalizedNames: ['nikolai zelinski', 'n zelinschi'] }),
+  entry('Nikolai Zelinski', { source: 'mapmd', label: 'Strada Nicolae Zelinski' }),
+], 'N. Zelinschi');
+assert.equal(duplicated.length, 1);
+assert.equal(duplicated[0].rank, 0, 'a duplicate fuzzy match must not replace an exact alias rank');
+assert.equal(duplicated[0].source, 'mapmd');
+assert.equal(duplicated[0].label, 'Strada Nicolae Zelinski', 'map.md retains display priority');
+const ranked = match([entry('Mihai Eminescu'), entry('M. Eminsecu')], 'M. Eminsecu');
+assert.equal(ranked[0].street, 'M. Eminsecu', 'literal matches rank before fuzzy matches');
+const numberedFixtures = [entry('31 August 1989')];
+assert.equal(match(numberedFixtures, '31 Augst 1989')[0].street, '31 August 1989');
+assert.equal(match(numberedFixtures, '31 Augst 1988').length, 0, 'a different street year cannot become a pasted house');
+assert.equal(match(numberedFixtures, '31 August 1989')[0].house_number, undefined);
+assert.equal(match(numberedFixtures, '31 Augst 1989 22/D')[0].house_number, '22/D');
+assert.equal(match(nameFixtures, 'M. Eminsecu 22/D')[0].house_number, '22/D');
+for (const [query, canonical] of [['M. Eminescu', 'Mihai Eminescu'], ['N. Zelinschi', 'Nikolai Zelinski'],
+  ['M. Eminsecu', 'Mihai Eminescu']]) {
+  assert(search('Chișinău', query).some(option => option.street === canonical), query);
+  assert.deepEqual(match(catalogue.streets, query), search('Chișinău', query), 'browser and server share tolerant matching');
+  assert.equal(search('Nonexistent', query).length, 0, 'suggestions stay in the selected locality');
+}
+console.log('Tolerant autocomplete: partial initials, RO/RU typos, explicit choices, ambiguity, ranking, deduplication, exact street numbers, pasted suffixes and browser/server parity passed.');

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import CadastralDataCard from "@/components/CadastralDataCard";
 
 const LABELS = {
   cadastral_number: "Cadastral number", apartment: "Apartment / unit", building: "Building",
@@ -15,6 +16,26 @@ const LABELS = {
 };
 const label = key => LABELS[key] || (key.charAt(0).toUpperCase() + key.slice(1)).replaceAll("_", " ");
 const date = value => value ? new Date(value).toLocaleString("ro-RO", { timeZone: "Europe/Chisinau" }) : "Unavailable";
+
+function customerReport(snapshot) {
+  if (!snapshot) return null;
+  // Older address reports store the unit number in `apartment` and its facts
+  // in flat fields. Adapt only saved values; never enrich from current records.
+  const apartment = snapshot.apartment && typeof snapshot.apartment === "object" && !Array.isArray(snapshot.apartment)
+    ? snapshot.apartment : {};
+  const aliases = {
+    area_m2: snapshot.apartment_area_m2,
+    floor: snapshot.apartment_floor,
+    type: snapshot.apartment_type,
+  };
+  if (Object.values(aliases).every(value => value == null || value === "")) return snapshot;
+  aliases.estimated_value_lei = snapshot.estimated_value_lei;
+  const details = { ...apartment };
+  for (const [key, value] of Object.entries(aliases)) {
+    if ((details[key] == null || details[key] === "") && value != null && value !== "") details[key] = value;
+  }
+  return { ...snapshot, apartment: details };
+}
 
 // Render every saved field, including unfamiliar registry fields and all parcels.
 // Large nested values (such as map outlines) remain available without filling the page.
@@ -83,7 +104,13 @@ export default function AdminReviewCadastru({ reviewId }) {
             </section>}
             <section className="rounded-lg border border-gray-200 bg-white p-3">
               <h3 className="font-semibold text-gray-900">Saved Cadastru data</h3>
-              {data.snapshot ? <SavedFields value={data.snapshot} /> : <p className="mt-2 text-gray-500">{data.unavailable_reason} Historical data cannot be reconstructed from the current property record.</p>}
+              {data.snapshot ? <>
+                <CadastralDataCard cadastral={customerReport(data.snapshot)} className="mt-3" />
+                <details className="mt-4 border-t border-gray-100 pt-3">
+                  <summary className="cursor-pointer text-xs font-medium text-gray-500">All saved fields</summary>
+                  <SavedFields value={data.snapshot} />
+                </details>
+              </> : <p className="mt-2 text-gray-500">{data.unavailable_reason} Historical data cannot be reconstructed from the current property record.</p>}
             </section>
           </>}
     </div>}

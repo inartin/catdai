@@ -340,9 +340,14 @@ const blockedBuyer = await buyer(), blockedUI = await view(blockedBuyer, blocked
 assert(nodes(await blockedUI.settle()).some(node => node.type === 'aside'), 'Server state supports blocked browser storage');
 
 // The admin report fetches only on expansion, preserves every nested value and retries failures.
-const adminComponentCode = (await transform(await fs.readFile('src/components/admin/AdminReviewCadastru.js', 'utf8'), {
-  filename: 'AdminReviewCadastru.js', jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'automatic' } } }, module: { type: 'es6' },
-})).code;
+const adminComponentSources = new Map();
+for (const file of ['src/components/admin/AdminReviewCadastru.js', 'src/components/CadastralDataCard.js', 'src/components/CadastruFreshnessNote.js']) {
+  adminComponentSources.set(file, (await transform(await fs.readFile(file, 'utf8'), {
+    filename: file, jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'automatic' } } }, module: { type: 'es6' },
+  })).code);
+}
+const reviewMessages = JSON.parse(await fs.readFile('src/locales/ro.json', 'utf8'));
+const { cadastruValueLabel } = await import('../src/lib/cadastru-value-labels.js');
 async function adminReportView({ fail = false, result = savedReport } = {}) {
   const slots = [];
   let cursor = 0, calls = 0;
@@ -353,16 +358,35 @@ async function adminReportView({ fail = false, result = savedReport } = {}) {
   } };
   const uiMocks = {
     react, 'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }), Fragment: 'Fragment' },
+    '@/context/LanguageContext': { useTranslation: () => ({ lang: 'ro', t: (key, vars) => {
+      let value = reviewMessages[key] || key;
+      for (const [key, replacement] of Object.entries(vars || {})) value = value.replaceAll(`{${key}}`, String(replacement));
+      return value;
+    } }) },
+    '@/lib/cadastru-value-labels': { cadastruValueLabel },
+    '@/components/icons/LockIcon': { default: () => null },
   };
   const uiContext = vm.createContext({ fetch: async url => {
     calls++;
     assert.equal(url, `/api/admin/feedback/${guestReview.id}/cadastru`);
     return Response.json(result, { status: fail && calls === 1 ? 500 : 200 });
   } });
-  const mod = new vm.SourceTextModule(adminComponentCode, { context: uiContext });
-  await mod.link(name => new vm.SyntheticModule(Object.keys(uiMocks[name]), function () {
-    for (const [key, value] of Object.entries(uiMocks[name])) this.setExport(key, value);
-  }, { context: uiContext }));
+  const modules = new Map();
+  async function component(file) {
+    if (modules.has(file)) return modules.get(file);
+    const mod = new vm.SourceTextModule(adminComponentSources.get(file), { context: uiContext });
+    modules.set(file, mod);
+    await mod.link(name => {
+      if (name === '@/components/CadastralDataCard') return component('src/components/CadastralDataCard.js');
+      if (name === '@/components/CadastruFreshnessNote') return component('src/components/CadastruFreshnessNote.js');
+      assert(uiMocks[name], `Missing admin component mock: ${name}`);
+      return new vm.SyntheticModule(Object.keys(uiMocks[name]), function () {
+        for (const [key, value] of Object.entries(uiMocks[name])) this.setExport(key, value);
+      }, { context: uiContext });
+    });
+    return mod;
+  }
+  const mod = await component('src/components/admin/AdminReviewCadastru.js');
   await mod.evaluate();
   function resolve(node) {
     if (!node || typeof node !== 'object') return node;
@@ -407,5 +431,49 @@ assert.equal(retryUI.calls, 2);
 const missingUI = await adminReportView({ result: noHistory });
 nodes(missingUI.render()).find(node => node.type === 'button').props.onClick();
 assert(JSON.stringify(await missingUI.settle()).includes('No saved checkout report'), 'Historical gaps are explicit');
+
+// Customer-facing text from the supplied example uses the real result card.
+const screenshotUI = await adminReportView({ result: { ...savedReport, snapshot: {
+  cadastral_number: snapshot.cadastral_number,
+  apartment: { address: 'mun. Chișinău, bd. Decebal 63, ap. 59', area_m2: 41.9, floor: 4, toilet: 'Da', bathroom: 'Da',
+    is_last_floor: 'Nu', estimated_value_lei: '404 207', object_type: 'Încăperi', destination: 'Locativă', room_usage: 'Apartament',
+    ownership_type: 'Privată (pe cote părți)', transactions_count: 'Informația nu poate fi prezentată',
+    real_rights: 'Nu există', notes: 'Nu există', restrictions: 'Nu există' },
+  building: { classifier: 'Bloc cu apartamente', total_floors: 5, condition: 'Satisfacatoare', construction_year: 1965,
+    wall_material: 'piatra de calcar (cotelet)', water: 'Centrala functioneaza', sewage: 'Centrala functioneaza', gas: 'Da', electricity: 'Nu' },
+} } });
+nodes(screenshotUI.render()).find(node => node.type === 'button').props.onClick();
+const screenshotTree = await screenshotUI.settle();
+const screenshotText = JSON.stringify(screenshotTree);
+for (const key of ['Area', 'Floor', 'Toilet', 'Bathroom', 'LastFloor', 'EstimatedValue', 'ObjectType', 'Destination', 'RoomUsage',
+  'PropertyType', 'Transactions', 'RealRights', 'Notes', 'Restrictions', 'Classifier', 'TotalFloors', 'Condition', 'Year', 'WallMaterial', 'Water', 'Sewage', 'Gas', 'Electricity']) {
+  assert(screenshotText.includes(reviewMessages[`form.cadastral${key}`]), `Customer label preserved: ${key}`);
+}
+for (const value of ['41.9 m²', 'Etaj 4/5', '404 207 lei', 'Privată (pe cote părți)', 'Informația nu poate fi prezentată',
+  'Nu există', 'piatra de calcar (cotelet)', 'Centrala functioneaza']) {
+  assert(screenshotText.includes(value), `Customer value preserved: ${value}`);
+}
+assert(nodes(screenshotTree).some(node => node.type === 'details' && node.props.children?.[0]?.props?.children === 'All saved fields'
+  && !node.props.open), 'Additional saved fields stay collapsed below the customer report');
+
+// Historical Mazililor-style address snapshots predate the nested unit format.
+const oldSnapshot = { cadastral_number: '0100104.294.05.053', apartment: '53',
+  matched_address: 'mun. Chișinău, str. Mazililor 32, ap. 53', apartment_area_m2: '104.7',
+  apartment_floor: '8', apartment_type: 'Apartament', estimated_value_lei: '1 442 323' };
+for (const original of [oldSnapshot, { ...oldSnapshot, apartment: { area_m2: '105', floor: '9', estimated_value_lei: '1 500 000' } }]) {
+  const oldUI = await adminReportView({ result: { ...savedReport, snapshot: original } });
+  nodes(oldUI.render()).find(node => node.type === 'button').props.onClick();
+  const oldTree = await oldUI.settle();
+  // Inspect only the visible card, excluding the raw-field disclosure.
+  const card = nodes(oldTree).find(node => node.props?.className?.includes('border-2 border-emerald-200'));
+  const text = JSON.stringify(card);
+  const nested = typeof original.apartment === 'object' ? original.apartment : null;
+  for (const value of [nested ? '105 m²' : '104.7 m²', nested ? '1 500 000 lei' : '1 442 323 lei']) {
+    assert(text.includes(value), `Older saved field appears in the customer card: ${value}`);
+  }
+  assert(nodes(card).some(node => node.type === 'span' && node.props.children === (nested ? '9' : '8')), 'Saved unit floor appears');
+  assert(!text.includes('Clasificator'), 'No building data is invented');
+}
+assert.equal(oldSnapshot.apartment, '53', 'The original historical snapshot is unchanged');
 await db.close();
 console.log('Result reviews: paid ownership, anonymous buyers, rating/comment validation, dismissal, duplicates, guest upgrade, admin privacy, SQL constraints, exact checkout snapshots and component lifecycle passed.');

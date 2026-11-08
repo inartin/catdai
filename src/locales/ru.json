@@ -404,7 +404,7 @@
   "cadastru.openMapApp": "Открыть в картах",
   "cadastru.checkedAt": "Данные проверены:",
   "cadastru.buildingCheckedAt": "Данные здания проверены:",
-  "cadastru.savedDataStale": "Показаны последние сохранённые данные",
+  "cadastru.savedDataStale": "Информация получена из официальных кадастровых источников",
   "cadastru.nearbyStale": "Показаны последние сохранённые данные. Сейчас их не удалось обновить, и они могут быть устаревшими.",
   "cadastru.nearbyIncomplete": "Некоторые источники данных временно недоступны.",
   "cadastru.nearbyTitle": "Рядом с объектом",

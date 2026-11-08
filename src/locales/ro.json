@@ -404,7 +404,7 @@
   "cadastru.openMapApp": "Deschide în hartă",
   "cadastru.checkedAt": "Date verificate la:",
   "cadastru.buildingCheckedAt": "Datele clădirii verificate la:",
-  "cadastru.savedDataStale": "Afișăm ultimele date salvate.",
+  "cadastru.savedDataStale": "Informațiile sunt preluate din surse cadastrale oficiale",
   "cadastru.nearbyStale": "Afișăm ultimele date salvate. Nu au putut fi actualizate momentan și pot fi depășite.",
   "cadastru.nearbyIncomplete": "Unele surse de date sunt indisponibile momentan.",
   "cadastru.nearbyTitle": "Locuri în apropiere",

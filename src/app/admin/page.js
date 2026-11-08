@@ -1008,6 +1008,7 @@ function DashboardContent() {
   const [activeUsersTab, setActiveUsersTab] = useState("chart");
   const [showPaymentsList, setShowPaymentsList] = useState(false);
   const [users, setUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
   const [lastVisitSort, setLastVisitSort] = useState(null);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState(null);
@@ -1381,13 +1382,18 @@ function DashboardContent() {
   }
 
   const s = stats;
-  const sortedUsers = lastVisitSort ? [...users].sort((a, b) => {
+  const userSearchQuery = userSearch.trim().toLowerCase();
+  const filteredUsers = userSearchQuery
+    ? users.filter((user) => [user.email, user.name, user.id].some((value) =>
+      (value || "").toLowerCase().includes(userSearchQuery)))
+    : users;
+  const sortedUsers = lastVisitSort ? [...filteredUsers].sort((a, b) => {
     const aTime = Date.parse(a.lastVisitAt);
     const bTime = Date.parse(b.lastVisitAt);
     if (!Number.isFinite(aTime)) return Number.isFinite(bTime) ? 1 : 0;
     if (!Number.isFinite(bTime)) return -1;
     return lastVisitSort === "desc" ? bTime - aTime : aTime - bTime;
-  }) : users;
+  }) : filteredUsers;
   const externalApiEvents = Array.isArray(s.externalApiUsage?.events)
     ? s.externalApiUsage.events
     : [];
@@ -1815,6 +1821,31 @@ function DashboardContent() {
 
             {activeUsersTab === "users" && (
               <>
+                <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-5 py-3 dark:border-slate-800">
+                  <label htmlFor="admin-user-search" className="sr-only">Search users by email, name, or ID</label>
+                  <input
+                    id="admin-user-search"
+                    type="search"
+                    placeholder="Search by email, name, or ID..."
+                    value={userSearch}
+                    onChange={(event) => setUserSearch(event.target.value)}
+                    className="min-w-0 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 sm:w-80 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                  {userSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setUserSearch("")}
+                      className="cursor-pointer text-xs text-primary hover:underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {!usersLoading && !usersError && (
+                    <span role="status" className="text-xs text-gray-500 dark:text-slate-400">
+                      {fmtNum(filteredUsers.length)} of {fmtNum(users.length)} users
+                    </span>
+                  )}
+                </div>
 
             {usersError ? (
               <div className="px-5 py-8 text-center">
@@ -1825,6 +1856,8 @@ function DashboardContent() {
               <div className="px-5 py-8 text-center text-gray-400">Loading users...</div>
             ) : users.length === 0 ? (
               <div className="px-5 py-8 text-center text-gray-400">No users found</div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="px-5 py-8 text-center text-gray-400">No users match your search</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

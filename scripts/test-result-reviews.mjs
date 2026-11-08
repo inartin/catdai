@@ -450,7 +450,7 @@ for (const key of ['Area', 'Floor', 'Toilet', 'Bathroom', 'LastFloor', 'Estimate
   assert(screenshotText.includes(reviewMessages[`form.cadastral${key}`]), `Customer label preserved: ${key}`);
 }
 for (const value of ['41.9 m²', 'Etaj 4/5', '404 207 lei', 'Privată (pe cote părți)', 'Informația nu poate fi prezentată',
-  'Nu există', 'piatra de calcar (cotelet)', 'Centrala functioneaza']) {
+  'Nu sunt înregistrate', 'piatra de calcar (cotelet)', 'Centrala functioneaza']) {
   assert(screenshotText.includes(value), `Customer value preserved: ${value}`);
 }
 assert(nodes(screenshotTree).some(node => node.type === 'details' && node.props.children?.[0]?.props?.children === 'All saved fields'

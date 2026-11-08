@@ -1,9 +1,9 @@
-// Display-only translations of registry categories. Preserve addresses, numbers,
+// Display-only labels for registry categories. Preserve addresses, numbers,
 // free text and unrecognized values exactly as supplied by the official source.
 const normalize = (value) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 const ENGLISH = new Map(Object.entries({
   "Da": "Yes", "Nu": "No", "Există": "Present", "Lipsă": "None", "Nu sunt": "None",
-  "Nu există": "None", "Nu are": "None", "Fără": "None", "Necunoscut": "Unknown",
+  "Nu există": "None", "Nu sunt înregistrate": "None", "Nu are": "None", "Fără": "None", "Necunoscut": "Unknown",
   "Apartament": "Apartment", "Încăpere": "Unit", "Încăpere izolată": "Separate unit",
   "Încăpere locativă": "Residential unit", "Locativ": "Residential", "Locativă": "Residential",
   "Locuință": "Dwelling", "Locuințe": "Housing", "Fond locativ": "Housing stock",
@@ -28,7 +28,13 @@ const CATEGORY_FIELDS = new Set(["toilet", "bathroom", "is_last_floor", "object_
   "destination", "room_usage", "use_mode", "boundary_type", "land_use", "building_use",
   "ownership_type", "real_rights", "notes", "restrictions", "classifier", "condition", "wall_material", "water", "sewage", "gas", "electricity"]);
 
+const REGISTRY_STATUS_FIELDS = new Set(["real_rights", "notes", "restrictions"]);
+
 export function cadastruValueLabel(value, field, lang) {
+  if (lang !== "en" && REGISTRY_STATUS_FIELDS.has(field)
+    && typeof value === "string" && normalize(value) === "nu exista") {
+    return "Nu sunt înregistrate";
+  }
   if (lang !== "en" || !CATEGORY_FIELDS.has(field) || typeof value !== "string") return value;
   return ENGLISH.get(normalize(value)) || value;
 }

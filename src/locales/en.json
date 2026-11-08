@@ -128,7 +128,7 @@
   "cadastru.openMapApp": "Open in maps",
   "cadastru.checkedAt": "Data checked on:",
   "cadastru.buildingCheckedAt": "Building data checked on:",
-  "cadastru.savedDataStale": "Showing the last saved data.",
+  "cadastru.savedDataStale": "The information is sourced from official cadastral sources",
   "cadastru.nearbyStale": "Showing the last saved data. It could not be updated and may be out of date.",
   "cadastru.nearbyIncomplete": "Some data sources are currently unavailable.",
   "cadastru.nearbyTitle": "Nearby places",

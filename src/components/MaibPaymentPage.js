@@ -195,7 +195,10 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
           </div>
           {isContextualCheckout && <>
             <p className="border-t border-emerald-100 pt-4 text-sm font-semibold text-gray-950">{t('payment.featureIncludes')}</p>
-            <FeaturePurchaseBenefits productKey={product.key} className="mb-6 mt-3" />
+            <div className="mb-6 mt-3">
+              <FeaturePurchaseBenefits productKey={product.key} />
+              {product.key === 'cadastru_lookup_single' && <p className="mt-4 text-xs leading-relaxed text-gray-500"><em>{t('cadastru.purchaseAvailabilityNote')}</em></p>}
+            </div>
           </>}
           {!result && !isFeatureCheckout && <p className="mb-5 text-sm text-gray-600">{t('maib.checkoutCreditNote')}</p>}
         </>}

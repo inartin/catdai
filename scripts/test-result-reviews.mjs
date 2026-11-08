@@ -38,13 +38,20 @@ assert.equal((await calculatorResponse({}, { calculator_usage: {} }, {}, {}, { c
 
 await db.exec(`create schema auth; create table auth.users(id uuid primary key);
   create role anon; create role authenticated; create role service_role bypassrls;
-  create table user_feature_usage_events(id uuid primary key, user_id uuid, feature_key text, source text);
+  create table user_feature_usage_events(id uuid primary key, user_id uuid, feature_key text, source text, metadata jsonb,
+    idempotency_key text, created_at timestamptz default now());
+  create table maib_payment_orders(id uuid primary key, user_id uuid, receipt_email text,
+    product_key text default 'cadastru_lookup_single', product_title text default 'Cadastral data',
+    amount_minor integer default 2000, currency_code text default 'MDL', refunded_minor integer default 0,
+    status text default 'paid', environment text default 'production', language text default 'ro',
+    paid_at timestamptz default now(), created_at timestamptz default now(), cadastru_delivery jsonb);
   create table guest_checkout_accounts(guest_user_id uuid primary key, claimed_user_id uuid);`);
 await db.exec(await fs.readFile('supabase/migrations/20261104192647_result_reviews.sql', 'utf8'));
 
 // A small PostgREST adapter runs the production query chains against PostgreSQL.
+let failingTable = null;
 const admin = { from(table) {
-  assert(['guest_checkout_accounts', 'user_feature_usage_events', 'result_reviews', 'user_feedback'].includes(table));
+  assert(['guest_checkout_accounts', 'user_feature_usage_events', 'result_reviews', 'user_feedback', 'maib_payment_orders'].includes(table));
   let fields = '*', filters = [], args = [], payload, single = false, count, order;
   const chain = {
     select(value) { fields = value; return chain; },
@@ -57,6 +64,7 @@ const admin = { from(table) {
     then(resolve, reject) {
       return (async () => {
         try {
+          if (table === failingTable) throw new Error('Database unavailable');
           if (table === 'user_feedback') return { data: [{ id: 1, message: 'Existing feedback' }], error: null };
           if (payload) {
             const keys = Object.keys(payload);
@@ -73,11 +81,12 @@ const admin = { from(table) {
   return chain;
 } };
 const users = new Map();
+admin.auth = { admin: { getUserById: async id => ({ data: { user: users.get(id) }, error: null }) } };
 async function buyer({ guest = false, source = 'paid_credit', feature = 'cadastru_lookup' } = {}) {
   const user = { id: crypto.randomUUID(), is_anonymous: guest }, usage = crypto.randomUUID();
   users.set(user.id, user);
   await query('insert into auth.users values($1)', [user.id]);
-  await query('insert into user_feature_usage_events values($1,$2,$3,$4)', [usage, user.id, feature, source]);
+  await query('insert into user_feature_usage_events(id,user_id,feature_key,source) values($1,$2,$3,$4)', [usage, user.id, feature, source]);
   return { user, usage };
 }
 const context = vm.createContext({ URL, Response, console: { error() {} } });
@@ -157,10 +166,89 @@ assert.match((await request(guest, null, 'GET')).headers.get('cache-control'), /
 const adminRoute = await moduleFor('src/app/api/admin/feedback/route.js');
 await adminRoute.evaluate();
 assert.equal((await adminRoute.namespace.GET(new Request('https://catdai.test/api/admin/feedback'))).status, 401);
+const guestOrder = crypto.randomUUID(), otherOrder = crypto.randomUUID();
+await query('insert into maib_payment_orders(id,user_id,receipt_email) values($1,$2,$3),($4,$2,$5)',
+  [guestOrder, guest.user.id, 'guest-checkout@example.com', otherOrder, 'other-checkout@example.com']);
+await query('update user_feature_usage_events set metadata=$1 where id=$2', [{ maib_order_id: guestOrder }, guest.usage]);
+// Claiming purchases changes ownership, while the original anonymous review remains.
+await query('update user_feature_usage_events set user_id=$1 where id=$2', [stranger.user.id, guest.usage]);
+await query('update maib_payment_orders set user_id=$1 where id=$2', [stranger.user.id, guestOrder]);
+const registered = await buyer();
+registered.user.email = 'account@example.com';
+registered.user.user_metadata = { full_name: 'Registered Buyer' };
+await request(registered);
+const registeredOrder = crypto.randomUUID();
+await query('insert into maib_payment_orders(id,user_id,receipt_email) values($1,$2,$3)', [registeredOrder, registered.user.id, 'registered-checkout@example.com']);
+await query('update user_feature_usage_events set metadata=$1 where id=$2', [{ maib_order_id: registeredOrder }, registered.usage]);
+const accountOnly = await buyer();
+accountOnly.user.email = 'account-only@example.com';
+await request(accountOnly);
+const historicalGuest = await buyer({ guest: true });
+await request(historicalGuest);
 const adminData = await (await adminRoute.namespace.GET(new Request('https://catdai.test/api/admin/feedback', { headers: { cookie: 'admin=valid' } }))).json();
 assert.equal(adminData.feedback[0].message, 'Existing feedback');
 assert(adminData.reviews.some(row => row.is_anonymous && row.rating === 4));
 assert(!adminData.reviews.some(row => row.user_id === dismissed.user.id), 'Admin reviews exclude dismissals');
+const guestReview = adminData.reviews.find(row => row.user_id === guest.user.id);
+assert.equal(guestReview.contact_email, 'guest-checkout@example.com', 'Uses the reviewed order even after ownership transfer, not another checkout');
+assert.equal(guestReview.contact_email_source, 'checkout');
+const registeredReview = adminData.reviews.find(row => row.user_id === registered.user.id);
+assert.equal(registeredReview.user_name, 'Registered Buyer');
+assert.equal(registeredReview.contact_email, 'registered-checkout@example.com', 'Checkout email takes precedence over account email');
+const accountReview = adminData.reviews.find(row => row.user_id === accountOnly.user.id);
+assert.equal(accountReview.contact_email, 'account-only@example.com');
+assert.equal(accountReview.contact_email_source, 'account');
+assert.equal(adminData.reviews.find(row => row.user_id === historicalGuest.user.id).contact_email, null, 'Missing checkout history does not fabricate contact details');
+
+// Admin expansion reads the frozen report for this exact unlock, never current records.
+const reportRoute = await moduleFor('src/app/api/admin/feedback/[id]/cadastru/route.js');
+await reportRoute.evaluate();
+const report = (id, cookie = 'admin=valid') => reportRoute.namespace.GET(
+  new Request('https://catdai.test/api/admin/feedback/report', { headers: { cookie } }),
+  { params: Promise.resolve({ id: String(id) }) },
+);
+const usageKey = 'paid:cadastru_lookup:0123456789abcdef0123456789abcdef';
+const snapshot = { cadastral_number: '0100106.131.01.020', apartment: { area_m2: 52, transactions_count: 0,
+  notes: '<script>unsafe()</script>', restrictions: null }, building: { construction_year: 1986, gas: false },
+  lands: [{ cadastral_number: '0100106.131', area_m2: 600 }],
+  map_location: { latitude: 47.02, longitude: 28.83 }, map_geometry: { type: 'Polygon', coordinates: [[[28, 47], [29, 47], [28, 47]]] } };
+const delivery = { payload: { ...snapshot, cadastru_evaluation_token: 'secret', review_usage_id: 'internal', locked_sections: {} },
+  usage_key: usageKey, search_label: 'Chișinău, Decebal 22/A ap 20', search_type: 'address' };
+await query('update user_feature_usage_events set idempotency_key=$1 where id=$2', [usageKey, guest.usage]);
+await query('update maib_payment_orders set cadastru_delivery=$1 where id=$2', [delivery, guestOrder]);
+assert.equal((await report(guestReview.id, '')).status, 401);
+assert.equal((await report('bad')).status, 400);
+assert.equal((await report(999999)).status, 404);
+assert.equal((await report(dismissal.id)).status, 404);
+const otherFeature = await buyer({ feature: 'sale_estimate' });
+await request(otherFeature);
+const [otherReview] = await query('select id from result_reviews where user_id=$1', [otherFeature.user.id]);
+assert.equal((await report(otherReview.id)).status, 404, 'Only Cadastru reviews have report expansion');
+const savedResponse = await report(guestReview.id);
+assert.match(savedResponse.headers.get('cache-control'), /private, no-store/);
+const savedReport = await savedResponse.json();
+assert.deepEqual(savedReport.snapshot, snapshot, 'All saved property fields survive, excluding internal access tokens');
+assert.equal(savedReport.purchase.id, guestOrder, 'Report still follows exact usage after guest claim');
+assert.equal(savedReport.purchase.amount_minor, 2000);
+assert.equal(savedReport.search.search_label, delivery.search_label);
+assert.equal(savedReport.unavailable_reason, null);
+assert.equal(savedReport.purchase.cadastru_delivery, undefined);
+const noHistory = await (await report(adminData.reviews.find(row => row.user_id === historicalGuest.user.id).id)).json();
+assert.equal(noHistory.snapshot, null);
+assert(noHistory.unavailable_reason);
+for (const change of [
+  { ...delivery, usage_key: 'another-property' }, null, { ...delivery, payload: null },
+]) {
+  await query('update maib_payment_orders set cadastru_delivery=$1 where id=$2', [change, guestOrder]);
+  assert.equal((await (await report(guestReview.id)).json()).snapshot, null, 'Missing or unrelated snapshots cannot be presented as historical results');
+}
+await query('update maib_payment_orders set cadastru_delivery=$1, product_key=$2 where id=$3', [delivery, 'standard_pack', guestOrder]);
+assert.equal((await (await report(guestReview.id)).json()).snapshot, null, 'Package purchases do not have a single-Cadastru checkout report');
+await query('update maib_payment_orders set product_key=$1, paid_at=null where id=$2', ['cadastru_lookup_single', guestOrder]);
+assert.equal((await (await report(guestReview.id)).json()).snapshot, null, 'Unpaid orders do not establish a purchased report');
+failingTable = 'maib_payment_orders';
+assert.equal((await report(guestReview.id)).status, 500, 'Storage failures remain retryable errors');
+failingTable = null;
 for (const role of ['anon', 'authenticated']) {
   for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
     assert.equal((await query("select has_table_privilege($1,'result_reviews',$2) ok", [role, privilege]))[0].ok, false);
@@ -250,5 +338,74 @@ assert(nodes(failedUI.render()).some(node => node.props?.role === 'alert'), 'Fai
 assert.equal((await request(failedBuyer, null, 'GET')).body.eligible, true);
 const blockedBuyer = await buyer(), blockedUI = await view(blockedBuyer, blockedBuyer.usage, { blockedStorage: true });
 assert(nodes(await blockedUI.settle()).some(node => node.type === 'aside'), 'Server state supports blocked browser storage');
+
+// The admin report fetches only on expansion, preserves every nested value and retries failures.
+const adminComponentCode = (await transform(await fs.readFile('src/components/admin/AdminReviewCadastru.js', 'utf8'), {
+  filename: 'AdminReviewCadastru.js', jsc: { parser: { syntax: 'ecmascript', jsx: true }, transform: { react: { runtime: 'automatic' } } }, module: { type: 'es6' },
+})).code;
+async function adminReportView({ fail = false, result = savedReport } = {}) {
+  const slots = [];
+  let cursor = 0, calls = 0;
+  const react = { useState(initial) {
+    const index = cursor++;
+    if (!(index in slots)) slots[index] = initial;
+    return [slots[index], value => { slots[index] = value; }];
+  } };
+  const uiMocks = {
+    react, 'react/jsx-runtime': { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }), Fragment: 'Fragment' },
+  };
+  const uiContext = vm.createContext({ fetch: async url => {
+    calls++;
+    assert.equal(url, `/api/admin/feedback/${guestReview.id}/cadastru`);
+    return Response.json(result, { status: fail && calls === 1 ? 500 : 200 });
+  } });
+  const mod = new vm.SourceTextModule(adminComponentCode, { context: uiContext });
+  await mod.link(name => new vm.SyntheticModule(Object.keys(uiMocks[name]), function () {
+    for (const [key, value] of Object.entries(uiMocks[name])) this.setExport(key, value);
+  }, { context: uiContext }));
+  await mod.evaluate();
+  function resolve(node) {
+    if (!node || typeof node !== 'object') return node;
+    if (Array.isArray(node)) return node.map(resolve);
+    if (typeof node.type === 'function') return resolve(node.type(node.props));
+    return { ...node, props: { ...node.props, children: resolve(node.props?.children) } };
+  }
+  return {
+    get calls() { return calls; },
+    render() { cursor = 0; return resolve(mod.namespace.default({ reviewId: guestReview.id })); },
+    async settle() { await new Promise(setImmediate); return this.render(); },
+  };
+}
+const adminUI = await adminReportView();
+tree = adminUI.render();
+assert.equal(adminUI.calls, 0, 'Collapsed reviews do not fetch heavy reports');
+nodes(tree).find(node => node.type === 'button').props.onClick();
+assert(nodes(adminUI.render()).some(node => node.props?.role === 'status'));
+tree = await adminUI.settle();
+assert.equal(nodes(tree).find(node => node.type === 'button').props['aria-expanded'], true);
+const renderedText = JSON.stringify(tree);
+for (const value of ['0100106.131.01.020', '52', '1986', '20.00 MDL', 'Transactions', 'Apartment / unit', 'Land parcels', 'Map outline']) {
+  assert(renderedText.includes(value), `Saved field visible: ${value}`);
+}
+assert(nodes(tree).some(node => node.type === 'span' && node.props.children === '0'), 'Zero registry values remain visible');
+assert(nodes(tree).some(node => node.type === 'span' && node.props.children === 'No'), 'False registry values remain visible');
+assert(!nodes(tree).some(node => node.type === 'script'), 'Official free text is rendered as text');
+assert(nodes(tree).some(node => node.type === 'details' && node.props.open === false), 'Large map outlines can be expanded separately');
+nodes(tree).find(node => node.type === 'button').props.onClick();
+tree = adminUI.render();
+assert(!JSON.stringify(tree).includes('0100106.131.01.020'), 'Closing hides the report');
+nodes(tree).find(node => node.type === 'button').props.onClick();
+await adminUI.settle();
+assert.equal(adminUI.calls, 1, 'Reopening the same review reuses its historical report');
+const retryUI = await adminReportView({ fail: true });
+nodes(retryUI.render()).find(node => node.type === 'button').props.onClick();
+tree = await retryUI.settle();
+assert(nodes(tree).some(node => node.props?.role === 'alert'));
+await nodes(tree).find(node => node.type === 'button' && node.props.children === 'Retry').props.onClick();
+assert(!nodes(retryUI.render()).some(node => node.props?.role === 'alert'));
+assert.equal(retryUI.calls, 2);
+const missingUI = await adminReportView({ result: noHistory });
+nodes(missingUI.render()).find(node => node.type === 'button').props.onClick();
+assert(JSON.stringify(await missingUI.settle()).includes('No saved checkout report'), 'Historical gaps are explicit');
 await db.close();
-console.log('Result reviews: paid ownership, anonymous buyers, rating/comment validation, dismissal, duplicates, guest upgrade, admin privacy, SQL constraints and component lifecycle passed.');
+console.log('Result reviews: paid ownership, anonymous buyers, rating/comment validation, dismissal, duplicates, guest upgrade, admin privacy, SQL constraints, exact checkout snapshots and component lifecycle passed.');

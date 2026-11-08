@@ -1098,7 +1098,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
           });
           const result = await response.json();
           if (!active) return;
-          const valid = response.ok && validMunicipalReportsResult(result.municipal_reports);
+          const valid = response.ok && validMunicipalReportsResult(result.municipal_reports, { allowPreview: true });
           loadedReportsKey.current = nearbyKey;
           setReportsState({ key: nearbyKey, data: valid ? result.municipal_reports : null, loading: false, error: !valid });
         } catch {
@@ -1436,6 +1436,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
           {secondaryAvailable && (!state.fallbackAddress || nearbyData) && (
             <CadastruNearbyCard
               nearby={nearbyData}
+              onLockedClick={canUnlock ? startCheckout : undefined}
               loading={nearbySearchAvailable && (nearbyState.key !== nearbyKey || nearbyState.loading)}
               unavailable={!nearbySearchAvailable || (nearbyState.key === nearbyKey && nearbyState.error)}
             />
@@ -1443,6 +1444,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
           {secondaryAvailable && (!state.fallbackAddress || transportData) && (
             <CadastruPublicTransportCard
               transport={transportData}
+              onLockedClick={canUnlock ? startCheckout : undefined}
               loading={nearbySearchAvailable && (transportState.key !== nearbyKey || transportState.loading)}
               unavailable={!nearbySearchAvailable || (transportState.key === nearbyKey && transportState.error)}
             />

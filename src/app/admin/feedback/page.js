@@ -1,6 +1,7 @@
 "use client";
 
 import AdminUserCell from "@/components/admin/AdminUserCell";
+import AdminReviewCadastru from "@/components/admin/AdminReviewCadastru";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -117,7 +118,13 @@ export default function AdminFeedbackPage() {
                 </div>
                 {row.comment ? <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-gray-900">{row.comment}</p>
                   : <p className="mt-3 text-xs text-gray-400">No comment</p>}
-                <div className="mt-3 text-xs text-gray-500"><AdminUserCell row={row} name={row.is_anonymous ? "Anonymous" : row.user_id} /></div>
+                <div className="mt-3 space-y-1 text-xs text-gray-500">
+                  <AdminUserCell row={row} name={row.is_anonymous ? "Anonymous" : row.user_name || row.user_id} />
+                  {row.contact_email ? <p className="break-all">
+                    {row.contact_email_source === "checkout" ? "Checkout email" : "Account email"}: {row.contact_email}
+                  </p> : <p>Email unavailable</p>}
+                </div>
+                {row.feature_key === "cadastru_lookup" && <AdminReviewCadastru reviewId={row.id} />}
               </article>)}</div>}
       </section>
 

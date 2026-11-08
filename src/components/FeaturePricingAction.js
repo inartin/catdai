@@ -159,7 +159,7 @@ export default function FeaturePricingAction({
 
   const offerTitle = t(isCadastruProduct ? "cadastru.mobilePurchaseTitle" : isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl, lang) });
   const packageDetails = isCadastruProduct ? (
-    <PurchaseFeatureChecklist translationKeys={["cadastru.mobilePurchaseArea", "cadastru.purchaseBuilding", "cadastru.mobilePurchaseOfficial"]} />
+    <PurchaseFeatureChecklist translationKeys={["cadastru.mobilePurchaseArea", "cadastru.purchaseBuilding", "cadastru.mobilePurchaseOfficial", "cadastru.mobilePurchaseRights"]} />
   ) : (
     <>
       <p className="mt-4 text-xs font-bold uppercase tracking-wide text-gray-400">

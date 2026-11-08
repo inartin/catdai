@@ -17,8 +17,14 @@ export function municipalReportsInputFromCadastru(payload) {
   return null;
 }
 
-export function validMunicipalReportsResult(data) {
+export function validMunicipalReportsResult(data, { allowPreview = false } = {}) {
   const count = (value) => Number.isInteger(value) && value >= 0;
+  if (allowPreview && data?.full_access === false) {
+    return (data.summary?.at_address === null || count(data.summary?.at_address))
+      && ["nearby", "solved", "total"].every((key) => count(data.summary?.[key]))
+      && Number.isInteger(data.period?.years) && data.period.years > 0
+      && Number.isFinite(Date.parse(data.cache?.fetched_at));
+  }
   return Boolean(data && typeof data === "object"
     && typeof data.address_match_available === "boolean"
     && (data.address_match_available ? count(data.summary?.at_address) : data.summary?.at_address === null)

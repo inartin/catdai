@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
 
-export default function CadastruPublicTransportCard({ transport, loading, unavailable }) {
+export default function CadastruPublicTransportCard({ transport, loading, unavailable, onLockedClick }) {
   const { t } = useTranslation();
   const [expandedModes, setExpandedModes] = useState({});
   const groups = (Array.isArray(transport?.route_groups) ? transport.route_groups : [])
@@ -49,18 +49,30 @@ export default function CadastruPublicTransportCard({ transport, loading, unavai
                   {modeLabel.startsWith("cadastru.") ? t("cadastru.transportMode.unknown") : modeLabel}
                 </h3>
                 <ul className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-3">
-                  {visibleRoutes.map((route, index) => (
-                    <li key={`${group.mode}-${route.ref}`} className={`min-w-0 rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 ${canExpand && !expanded && index === 2 ? "hidden lg:list-item" : ""}`}>
-                      <span
-                        className="inline-flex h-12 min-w-12 items-center justify-center rounded-lg bg-emerald-950 px-2 text-[1.75rem] leading-none font-semibold text-white tabular-nums"
-                        style={{ fontFamily: 'ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace' }}
-                      >
-                        {route.ref}
-                      </span>
-                      {route.name && route.name !== route.ref
-                        ? <p className="mt-2 text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">{route.name}</p> : null}
-                    </li>
-                  ))}
+                  {visibleRoutes.map((route, index) => {
+                    const Route = route.locked && onLockedClick ? "button" : "div";
+                    return (
+                      <li key={route.locked ? `${group.mode}-locked-${index}` : `${group.mode}-${route.ref}`} className={`min-w-0 rounded-xl border border-emerald-100 bg-emerald-50/50 p-3 ${canExpand && !expanded && index === 2 ? "hidden lg:list-item" : ""}`}>
+                        <Route
+                          type={Route === "button" ? "button" : undefined}
+                          onClick={route.locked ? onLockedClick : undefined}
+                          aria-label={route.locked ? t("cadastru.payToUnlock") : undefined}
+                          className={`block w-full text-left ${Route === "button" ? "cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" : ""}`}
+                        >
+                          <span aria-hidden={route.locked || undefined} className={`block ${route.locked ? "select-none blur-sm" : ""}`}>
+                            <span
+                              className="inline-flex h-12 min-w-12 items-center justify-center rounded-lg bg-emerald-950 px-2 text-[1.75rem] leading-none font-semibold text-white tabular-nums"
+                              style={{ fontFamily: 'ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, monospace' }}
+                            >
+                              {route.ref}
+                            </span>
+                            {route.name && route.name !== route.ref
+                              ? <span className="mt-2 block text-sm leading-relaxed text-gray-700 [overflow-wrap:anywhere]">{route.locked ? t("cadastru.transportLockedRoute") : route.name}</span> : null}
+                          </span>
+                        </Route>
+                      </li>
+                    );
+                  })}
                 </ul>
                 {canExpand ? (
                   <button

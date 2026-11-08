@@ -1,4 +1,4 @@
-import { redactCadastruMapData } from "@/lib/cadastru-map";
+import { buildCadastruNearbyPreview } from "@/lib/cadastru-secondary-preview";
 import { canReadCadastruMapData } from "@/lib/cadastru-map-access";
 import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
 import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
@@ -59,10 +59,7 @@ async function handlePost(request) {
     canReadCadastruMapData(request, { payload: entry?.payload, number, address }),
     getStoredNearby(input),
   ]);
-  const respond = (nearby) => NextResponse.json({ nearby: mapAccess ? nearby : {
-    ...redactCadastruMapData(nearby),
-    map_preview: { available: Number.isFinite(nearby?.location?.latitude) && Number.isFinite(nearby?.location?.longitude) },
-  } }, {
+  const respond = (nearby) => NextResponse.json({ nearby: mapAccess ? nearby : buildCadastruNearbyPreview(nearby) }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 

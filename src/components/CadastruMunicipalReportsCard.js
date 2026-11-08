@@ -101,12 +101,13 @@ function ReportGroupContent({ group, label, nearby, lang, t, formatNumber }) {
 export default function CadastruMunicipalReportsCard({ reports, loading, unavailable }) {
   const { lang, t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const locked = reports?.full_access === false;
   const contentId = useId();
   const formatNumber = new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 0 });
   const checkedDate = reports ? new Intl.DateTimeFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", {
     day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Chisinau",
   }).format(new Date(reports.cache.fetched_at)) : "";
-  const groups = reports ? [
+  const groups = reports && !locked ? [
     ...(reports.address_match_available ? [{ key: "at_address", label: t("cadastru.reportsAtAddress") }] : []),
     { key: "nearby", label: t("cadastru.reportsNearby", { distance: formatNumber.format(reports.search_radius_m) }) },
   ] : [];
@@ -145,62 +146,69 @@ export default function CadastruMunicipalReportsCard({ reports, loading, unavail
               </div>
             ))}
           </dl>
-          <button
-            type="button"
-            aria-expanded={expanded}
-            aria-controls={contentId}
-            onClick={() => setExpanded((value) => !value)}
-            className="mt-3 inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
-          >
-            {t(expanded ? "cadastru.reportsCollapse" : "cadastru.reportsExpand")}
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true">
-              <path d="m6 9 6 6 6-6" />
-            </svg>
-          </button>
-          <div id={contentId} hidden={!expanded} className="mt-5 border-t border-gray-100 pt-4">
-            <p className="text-sm leading-relaxed text-gray-500">{t("cadastru.reportsSubtitle")}</p>
-            {!reports.address_match_available ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.reportsAddressUnknown")}</p> : null}
-            {reports.summary.total === 0 ? <p className="mt-5 text-sm text-gray-500">{t("cadastru.reportsEmpty")}</p> : (
-              <div>
-                {groups.map(({ key, label }) => {
-                  const group = reports[key];
-                  const content = (
-                    <ReportGroupContent group={group} label={label} nearby={key === "nearby"} lang={lang} t={t} formatNumber={formatNumber} />
-                  );
-                  return key === "nearby" ? (
-                    <details key={key} className="group overflow-hidden rounded-xl border border-emerald-200 bg-white">
-                      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 bg-white p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 sm:p-5 [&::-webkit-details-marker]:hidden">
-                        <h3 className="text-base font-semibold text-gray-950 sm:text-lg">{label}</h3>
-                        <span className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-                          <span className="group-open:hidden">{t("cadastru.reportsExpandNearby")}</span>
-                          <span className="hidden group-open:inline">{t("cadastru.reportsCollapseNearby")}</span>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true">
-                            <path d="m6 9 6 6 6-6" />
-                          </svg>
-                        </span>
-                      </summary>
-                      <div className="border-t border-emerald-100 bg-white p-4 sm:p-5">{content}</div>
-                    </details>
-                  ) : (
-                    <div key={key} className="py-6">
-                      <h3 className="mb-4 text-lg font-semibold text-gray-950">{label}</h3>
-                      {content}
-                    </div>
-                  );
-                })}
+          {locked && reports.summary.total > 0 ? (
+            <p className="mt-4 text-center text-sm text-gray-500">{t("cadastru.reportsDetailsLocked")}</p>
+          ) : null}
+          {!locked ? (
+            <>
+              <button
+                type="button"
+                aria-expanded={expanded}
+                aria-controls={contentId}
+                onClick={() => setExpanded((value) => !value)}
+                className="mt-3 inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              >
+                {t(expanded ? "cadastru.reportsCollapse" : "cadastru.reportsExpand")}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              <div id={contentId} hidden={!expanded} className="mt-5 border-t border-gray-100 pt-4">
+                <p className="text-sm leading-relaxed text-gray-500">{t("cadastru.reportsSubtitle")}</p>
+                {!reports.address_match_available ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.reportsAddressUnknown")}</p> : null}
+                {reports.summary.total === 0 ? <p className="mt-5 text-sm text-gray-500">{t("cadastru.reportsEmpty")}</p> : (
+                  <div>
+                    {groups.map(({ key, label }) => {
+                      const group = reports[key];
+                      const content = (
+                        <ReportGroupContent group={group} label={label} nearby={key === "nearby"} lang={lang} t={t} formatNumber={formatNumber} />
+                      );
+                      return key === "nearby" ? (
+                        <details key={key} className="group overflow-hidden rounded-xl border border-emerald-200 bg-white">
+                          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 bg-white p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 sm:p-5 [&::-webkit-details-marker]:hidden">
+                            <h3 className="text-base font-semibold text-gray-950 sm:text-lg">{label}</h3>
+                            <span className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+                              <span className="group-open:hidden">{t("cadastru.reportsExpandNearby")}</span>
+                              <span className="hidden group-open:inline">{t("cadastru.reportsCollapseNearby")}</span>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                              </svg>
+                            </span>
+                          </summary>
+                          <div className="border-t border-emerald-100 bg-white p-4 sm:p-5">{content}</div>
+                        </details>
+                      ) : (
+                        <div key={key} className="py-6">
+                          <h3 className="mb-4 text-lg font-semibold text-gray-950">{label}</h3>
+                          {content}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <div className="mt-5 space-y-1 text-xs leading-relaxed text-gray-500">
+                  {reports.incomplete ? <p>{t("cadastru.reportsIncomplete")}</p> : null}
+                  {reports.cache.stale ? <p>{t("cadastru.reportsStale")}</p> : null}
+                </div>
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm">
+                  <div className="text-gray-500">
+                    <p>{t("cadastru.reportsSource")}</p>
+                    <p className="mt-1 text-xs">{t("cadastru.reportsChecked", { date: checkedDate })}</p>
+                  </div>
+                </div>
               </div>
-            )}
-            <div className="mt-5 space-y-1 text-xs leading-relaxed text-gray-500">
-              {reports.incomplete ? <p>{t("cadastru.reportsIncomplete")}</p> : null}
-              {reports.cache.stale ? <p>{t("cadastru.reportsStale")}</p> : null}
-            </div>
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 text-sm">
-              <div className="text-gray-500">
-                <p>{t("cadastru.reportsSource")}</p>
-                <p className="mt-1 text-xs">{t("cadastru.reportsChecked", { date: checkedDate })}</p>
-              </div>
-            </div>
-          </div>
+            </>
+          ) : null}
         </>
       ) : null}
     </section>

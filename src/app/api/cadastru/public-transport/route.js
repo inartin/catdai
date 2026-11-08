@@ -1,4 +1,4 @@
-import { redactCadastruMapData } from "@/lib/cadastru-map";
+import { buildCadastruTransportPreview } from "@/lib/cadastru-secondary-preview";
 import { canReadCadastruMapData } from "@/lib/cadastru-map-access";
 import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
 import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
@@ -61,7 +61,7 @@ async function handlePost(request) {
     canReadCadastruMapData(request, { payload: entry?.payload, number, address }),
     getStoredPublicTransport(input),
   ]);
-  const respond = (publicTransport) => NextResponse.json({ public_transport: mapAccess ? publicTransport : redactCadastruMapData(publicTransport) }, {
+  const respond = (publicTransport) => NextResponse.json({ public_transport: mapAccess ? publicTransport : buildCadastruTransportPreview(publicTransport) }, {
     headers: { "Cache-Control": "private, no-store" },
   });
 

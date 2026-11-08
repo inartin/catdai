@@ -44,6 +44,19 @@ Accounts currently marked Admin (`app_metadata.catdai_is_admin=true`) are exclud
 
 History shows 50 records per page, buyer/receipt email, saved MAIB product title, order/payment reference, status and original/returned/remaining amounts. Deleted accounts retain their orders and saved receipt email. Successful reports use the shared Redis cache for 20 minutes per period/currency/page; Today and both calendar-month options use cache keys tied to their Chișinău period boundaries. Admin authentication runs before cache access. Refresh and Retry send `fresh=1`, read the database again and replace that cached report. The Updated timestamp reflects the original report read. Browser/proxy responses remain private and `no-store`; Redis outages fall back to database reads. Any failed read shows unavailable with Retry, never partial or misleading zero totals, and is not cached. No migration is required. Check: `pnpm exec node --experimental-vm-modules scripts/test-admin-payment-report.mjs`.
 
+### Phone payment counter
+
+`GET /api/payments/today` returns only `{"value":123}`: the number of confirmed production MAIB / legacy Paddle payments from Europe/Chisinau midnight through the request time, across all currencies. It uses the Payments page's gross count rules: refunds/disputes remain counted, admin accounts are excluded, and deleted buyers remain included. Sandbox, pending and failed attempts do not count. Each request reads fresh data; responses are private and `no-store`. Database/auth-service failures return `503`, never a misleading zero.
+
+Set a separate server-only `PAYMENTS_STATS_TOKEN` (generate with `openssl rand -hex 32`) and configure the same token in the private phone app. Send it only as `Authorization: Bearer <token>` over HTTPS; it grants access only to this count. Missing/incorrect authorization returns `401`; an unset server token disables the endpoint with `503`. Keep the token out of URLs, source control and public frontend env variables. Replace the server token and phone configuration to rotate it. No admin login or database migration is required.
+
+```sh
+curl https://catdai.md/api/payments/today \
+  -H "Authorization: Bearer $PAYMENTS_STATS_TOKEN"
+```
+
+Check: `pnpm exec node --experimental-vm-modules scripts/test-payments-today.mjs`.
+
 ## Dashboard
 
 - A centered `Online now` line between the Dashboard heading and period filter shows unique browsers across CatDai seen within 90 seconds. It reads plain-text `GET /api/online-users` on load, every 30 seconds while visible and immediately on returning to the tab, independently of the selected period and cached stats. Loading shows `—`; Redis/request failures show `Unavailable`. Admin pages do not send heartbeats, and authenticated marked admins are excluded on the server.

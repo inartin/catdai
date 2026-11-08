@@ -4,6 +4,7 @@ import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
 import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 import { withStatisticsContext } from "@/lib/statistics-context";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
+import { recordCadastruResultCategories } from "@/lib/cadastru-result-category-tracking";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalNearbyData } from "@/lib/cadastru-external-api";
@@ -59,9 +60,16 @@ async function handlePost(request) {
     canReadCadastruMapData(request, { payload: entry?.payload, number, address }),
     getStoredNearby(input),
   ]);
-  const respond = (nearby) => NextResponse.json({ nearby: mapAccess ? nearby : buildCadastruNearbyPreview(nearby) }, {
-    headers: { "Cache-Control": "private, no-store" },
-  });
+  const respond = async (nearby) => {
+    await recordCadastruResultCategories(body.lookup_id, { result_nearby: true,
+      // Nearby coordinates supply the map during address-outage continuation.
+      ...(!entry && Number.isFinite(nearby?.location?.latitude) && Number.isFinite(nearby?.location?.longitude)
+        ? { result_map: true } : {}),
+    });
+    return NextResponse.json({ nearby: mapAccess ? nearby : buildCadastruNearbyPreview(nearby) }, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  };
 
   let stored = cached;
   // Lazily move valid legacy snapshots to the shared building store without renewing them.

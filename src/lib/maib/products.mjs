@@ -5,20 +5,20 @@ const products = {
   standard_pack: { amount_mdl: 99, grants: allFeatures(2) },
   pro_pack: { amount_mdl: 199, grants: allFeatures(10) },
   extra_pack: { amount_mdl: 499, grants: allFeatures(50) },
-  sale_estimate_single: { amount_mdl: 20, grants: { sale_estimate: 1 } },
-  rent_estimate_single: { amount_mdl: 20, grants: { rent_estimate: 1 } },
-  listing_analysis_single: { amount_mdl: 20, grants: { listing_analysis: 1 } },
-  cadastru_lookup_single: { amount_mdl: 20, grants: { cadastru_lookup: 1 } },
+  sale_estimate_single: { amount_mdl: 49, grants: { sale_estimate: 1 } },
+  rent_estimate_single: { amount_mdl: 49, grants: { rent_estimate: 1 } },
+  listing_analysis_single: { amount_mdl: 49, grants: { listing_analysis: 1 } },
+  cadastru_lookup_single: { amount_mdl: 49, grants: { cadastru_lookup: 1 } },
   cadastru_lookup_5: { amount_mdl: 99, grants: { cadastru_lookup: 5 } },
   cadastru_lookup_20: { amount_mdl: 299, grants: { cadastru_lookup: 20 } },
   // One source bucket funds the shared balance for every feature.
-  credits_10: { amount_mdl: 79, grants: { cadastru_lookup: 10 } },
-  credits_50: { amount_mdl: 249, grants: { cadastru_lookup: 50 } },
+  credits_10: { amount_mdl: 245, grants: { cadastru_lookup: 10 } },
+  credits_50: { amount_mdl: 490, grants: { cadastru_lookup: 50 } },
   all_features_20: { amount_mdl: 299, grants: allFeatures(20) },
   all_features_5: { amount_mdl: 99, grants: allFeatures(5) },
   property_combo_1: { amount_mdl: 59, grants: { cadastru_lookup: 1, sale_estimate: 1, pdf_report: 1 } },
-  yield_calculator_single: { amount_mdl: 20, grants: { yield_calculator: 1 } },
-  pdf_report_single: { amount_mdl: 20, grants: { pdf_report: 1 } },
+  yield_calculator_single: { amount_mdl: 49, grants: { yield_calculator: 1 } },
+  pdf_report_single: { amount_mdl: 49, grants: { pdf_report: 1 } },
 };
 
 export const MAX_SINGLE_QUANTITY = 100;
@@ -35,6 +35,14 @@ export function maibProduct(key, quantity = 1) {
   const discount_percent = Math.round((base_minor - amount_minor) / base_minor * 100);
   return { key, quantity, discount_mdl, discount_percent, amount_minor, amount_mdl: amount_minor / 100, currency_code: "MDL", billingMode: "one_time",
     grants: Object.fromEntries(Object.entries(grants).map(([feature, count]) => [feature, count * quantity])) };
+}
+
+export function maibCreditSavingsPercent(key) {
+  const product = maibProduct(key);
+  if (!product) return 0;
+  const uses = Object.values(product.grants).reduce((total, count) => total + count, 0);
+  const standardAmount = uses * products.cadastru_lookup_single.amount_mdl;
+  return Math.round(100 - product.amount_mdl * 100 / standardAmount);
 }
 
 export function maibOrderQuantity(order) {

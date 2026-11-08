@@ -151,8 +151,9 @@ const { code } = await transform(await fs.readFile("src/app/admin/page.js", "utf
     transform: { react: { runtime: "automatic" } } }, module: { type: "es6" },
 });
 const page = new vm.SourceTextModule(code, { context: pageContext });
-await page.link((name) => {
+await page.link(async (name) => {
   const exports = name === "react/jsx-runtime" ? { jsx, jsxs: jsx, Fragment: "Fragment" }
+    : name.startsWith("@/lib/") ? (await load(`src/lib/${name.slice(6)}.js`)).namespace
     : name === "react" ? { Fragment: "Fragment", useState(initial) {
       const index = stateIndex++;
       if (!(index in states)) states[index] = initial;
@@ -186,6 +187,18 @@ assert.equal(nodes(tree, (node) => node.type === "th" && node.props.children ===
 assert.equal(nodes(tree, (node) => node.type === "td" && node.props.children === "7").length, 1);
 assert.equal(nodes(tree, (node) => node.type === "td" && node.props.children === "3").length, 1);
 assert.equal(nodes(tree, (node) => node.type === "td" && node.props.children === "Yes").length, 1);
+let badge = nodes(tree, (node) => node.type === "span" && node.props.children === "1/4")[0];
+assert.ok(badge.props.className.includes("text-green-700"));
+const recoveredRow = { ...search, result_type: "no_data", result_cadastru: true,
+  result_nearby: true, result_map: true, result_transport: null };
+const recoveredTree = render(CadastruSearchTable, { ...props, rows: [recoveredRow] }, []);
+badge = nodes(recoveredTree, (node) => node.type === "span" && node.props.children === "3/4")[0];
+assert.ok(badge.props.className.includes("text-green-700"), "Verified cadastral results override old no_data metadata");
+assert.ok(badge.props.title.includes("Public transport: No recorded result"));
+const partialTree = render(CadastruSearchTable, { ...props, rows: [{ ...search, result_type: "error", result_nearby: true }] }, []);
+badge = nodes(partialTree, (node) => node.type === "span" && node.props.children === "1/4")[0];
+assert.ok(badge.props.className.includes("text-amber-700"), "Secondary data alone does not make the search green");
+tree = render(CadastruSearchTable, props, []);
 let row = nodes(tree, (node) => node.type === "tr" && node.props.role === "button")[0];
 assert.equal(row.props["aria-expanded"], false);
 row.props.onKeyDown({ key: "Enter", preventDefault() {} });

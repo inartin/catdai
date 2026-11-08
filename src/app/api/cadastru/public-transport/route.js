@@ -4,6 +4,7 @@ import { scheduleCadastruRefresh } from "@/lib/cadastru-refresh";
 import { cadastruLocationOriginKey } from "@/lib/cadastru-location-storage";
 import { withStatisticsContext } from "@/lib/statistics-context";
 import { getCadastruLookupTracking } from "@/lib/cadastru-lookup-tracking";
+import { recordCadastruResultCategories } from "@/lib/cadastru-result-category-tracking";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { fetchExternalPublicTransportData } from "@/lib/cadastru-external-api";
@@ -61,9 +62,12 @@ async function handlePost(request) {
     canReadCadastruMapData(request, { payload: entry?.payload, number, address }),
     getStoredPublicTransport(input),
   ]);
-  const respond = (publicTransport) => NextResponse.json({ public_transport: mapAccess ? publicTransport : buildCadastruTransportPreview(publicTransport) }, {
-    headers: { "Cache-Control": "private, no-store" },
-  });
+  const respond = async (publicTransport) => {
+    await recordCadastruResultCategories(body.lookup_id, { result_transport: true });
+    return NextResponse.json({ public_transport: mapAccess ? publicTransport : buildCadastruTransportPreview(publicTransport) }, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  };
 
   const refresh = async () => {
     try {

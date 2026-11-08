@@ -91,5 +91,10 @@ create index if not exists idx_cadastru_search_events_source_created
 
 -- Nullable for existing events and older app versions during rollout.
 alter table public.cadastru_search_events add column if not exists event_key text;
+alter table public.cadastru_search_events
+  add column if not exists result_cadastru boolean,
+  add column if not exists result_nearby boolean,
+  add column if not exists result_transport boolean,
+  add column if not exists result_map boolean;
 create unique index if not exists idx_cadastru_search_events_event_key
   on public.cadastru_search_events (event_key);

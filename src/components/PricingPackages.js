@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import usePaymentProvider from "@/components/usePaymentProvider";
-import { maibProduct } from "@/lib/maib/products.mjs";
+import { maibProduct, maibCreditSavingsPercent } from "@/lib/maib/products.mjs";
 import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
@@ -28,7 +28,6 @@ export default function PricingPackages() {
     { key: "ten", productKey: "credits_10" },
     { key: "fifty", productKey: "credits_50" },
   ];
-  const standardUnitPrice = maibProduct("cadastru_lookup_single").amount_mdl;
 
   const startCheckout = (productKey) => {
     trackPaymentAnalytics('checkout_button_clicked', productKey, { checkout_source: 'pricing',
@@ -52,7 +51,7 @@ export default function PricingPackages() {
             const product = maibProduct(productKey);
             const uses = Object.values(product.grants).reduce((sum, count) => sum + count, 0);
             const recommended = key === "single";
-            const savingsPercent = Math.round(100 - (product.amount_mdl * 100) / (uses * standardUnitPrice));
+            const savingsPercent = maibCreditSavingsPercent(productKey);
             const locale = lang === "ru" ? "ru-MD" : "ro-MD";
             const unitPrice = (product.amount_mdl / uses).toLocaleString(locale, {
               minimumFractionDigits: uses === 1 ? 0 : 2, maximumFractionDigits: 2,

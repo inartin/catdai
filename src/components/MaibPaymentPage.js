@@ -6,7 +6,7 @@ import { useTranslation } from '@/context/LanguageContext';
 import AuthOptions from '@/components/AuthOptions';
 import CheckoutAccountPrompt from '@/components/CheckoutAccountPrompt';
 import Footer from '@/components/Footer';
-import { maibProduct } from '@/lib/maib/products.mjs';
+import { maibProduct, maibCreditSavingsPercent } from '@/lib/maib/products.mjs';
 import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '@/lib/maib/purchase.mjs';
 import { MAIB_FINAL_STATUSES, maibResultContext } from '@/lib/maib/result.mjs';
 import MaibPaymentResultCard from '@/components/MaibPaymentResultCard';
@@ -223,7 +223,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
           {t('payment.cadastruMoreChecks')}
         </span>
         <Link href={paymentAppLink('/pricing')} className="rounded text-emerald-700 underline underline-offset-4 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
-          {t('payment.cadastruSaveMore')}
+          {t('payment.cadastruSaveMore', { percent: Math.max(...['credits_10', 'credits_50'].map(maibCreditSavingsPercent)) })}
         </Link>
       </p> : <Link href={paymentAppLink('/pricing')} className="mx-auto mt-5 block w-fit text-sm text-gray-500 underline underline-offset-4 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
         {t('payment.showAllPackages')}

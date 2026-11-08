@@ -7,6 +7,7 @@ import AdminUserCell, { VisitorTags } from "@/components/admin/AdminUserCell";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import Tooltip from "@/components/Tooltip";
 import { groupExternalApiEvents } from "@/lib/admin-external-api-groups";
+import { cadastruResultSummary } from "@/lib/cadastru-result-categories";
 import AdminUserCredits from "@/components/AdminUserCredits";
 import ProfileTransactionsTable from "@/components/ProfileTransactionsTable";
 import AdminWorkerStatus from "@/components/admin/AdminWorkerStatus";
@@ -856,7 +857,8 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
         <tbody className="divide-y divide-gray-100">
           {rows.map((row) => {
             const isExpanded = expandedSearchId === row.id;
-            const recovered = row.suggestion_activity?.role === "original" && row.suggestion_activity.recovered_at;
+            const resultSummary = cadastruResultSummary(row);
+            const { recovered } = resultSummary;
             const originalStatus = row.result_type === "error" ? "Failed" : row.result_type === "no_data" ? "No result" : "Success";
             const toggleExpanded = () => setExpandedSearchId(isExpanded ? null : row.id);
             return (
@@ -877,14 +879,15 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
                     {fmtCadastruSearchType(row.search_type)}
                   </td>
                   <td className="px-4 py-3">
-                    {row.result_type ? (
+                    {row.result_type || resultSummary.count ? (
                       <div>
-                        <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${recovered ? "bg-green-50 text-green-700" : row.result_type === "error" ? "bg-red-50 text-red-700" : row.result_type === "no_data"
-                        ? "bg-gray-100 text-gray-600"
-                        : "bg-green-50 text-green-700"}`}>
-                          {recovered ? "Recovered" : originalStatus}
+                        <span title={`Recorded successful results: ${resultSummary.count}/4\n${resultSummary.categories.map((category) => `${category.label}: ${category.success ? "Success" : "No recorded result"}`).join("\n")}`}
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${resultSummary.cadastru ? "bg-green-50 text-green-700"
+                            : resultSummary.count ? "bg-amber-50 text-amber-700"
+                            : row.result_type === "error" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                          {`${resultSummary.count}/4`}
                         </span>
-                        {recovered && <p className="mt-1 text-xs text-gray-500">Original: {originalStatus}</p>}
+                        {recovered && <p className="mt-1 text-xs text-gray-500">Recovered · Original: {originalStatus}</p>}
                       </div>
                     ) : "-"}
                   </td>

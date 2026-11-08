@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { loadCadastruFavorites } from "@/lib/admin-cadastru-favorites";
 import { loadCadastruShareStatistics } from "@/lib/cadastru-share-statistics";
 import { loadCadastruSuggestionActivity } from "@/lib/admin-cadastru-suggestion-activity";
+import { loadCadastruResultCategories } from "@/lib/admin-cadastru-result-categories";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -227,6 +228,10 @@ async function fetchCadastruRows(columns, defaults = {}, range) {
 
 async function fetchCadastruSearchEvents(range) {
   const columnAttempts = [
+    {
+      columns: "id, search_type, user_id, visitor, district, cadastral_number, search_address, search_request, result_type, lookup_source, lookup_id, result_cadastru, result_nearby, result_transport, result_map, valuation_clicked_at, valuation_completed_at, created_at",
+      defaults: {},
+    },
     {
       columns: "id, search_type, user_id, visitor, district, cadastral_number, search_address, search_request, result_type, lookup_source, lookup_id, valuation_clicked_at, valuation_completed_at, created_at",
       defaults: {},
@@ -808,8 +813,8 @@ export async function GET(request) {
   const authUsersById = new Map(users.map((user) => [user.id, user]));
   let cadastruSearches;
   try {
-    const searchesWithFavorites = await loadCadastruSuggestionActivity(
-      await loadCadastruShareStatistics(await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50))));
+    const searchesWithFavorites = await loadCadastruResultCategories(await loadCadastruSuggestionActivity(
+      await loadCadastruShareStatistics(await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50)))));
     cadastruSearches = buildCadastruSearchStats(attachUserNames(cadastruSearchEvents, usersById), cutoffs);
     cadastruSearches.recent = attachUserNames(searchesWithFavorites, usersById);
   } catch (error) {

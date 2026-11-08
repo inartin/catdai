@@ -17,7 +17,7 @@ process.env.MAIB_SIGNATURE_KEY='test-signature-key';
 process.env.MAIB_CLIENT_ID='test-client'; process.env.MAIB_CLIENT_SECRET='test-secret';
 assert.equal(getPaymentProvider(),'maib');
 process.env.PAYMENT_PROVIDER='paddle'; assert.equal(getPaymentProvider(),'paddle'); delete process.env.PAYMENT_PROVIDER;
-for (const [key,amount,uses] of [['standard_pack',99,2],['pro_pack',199,10],['extra_pack',499,50],['sale_estimate_single',20,1],['rent_estimate_single',20,1],['listing_analysis_single',20,1],['cadastru_lookup_single',20,1],['yield_calculator_single',20,1],['pdf_report_single',20,1]]) {
+for (const [key,amount,uses] of [['standard_pack',99,2],['pro_pack',199,10],['extra_pack',499,50],['sale_estimate_single',49,1],['rent_estimate_single',49,1],['listing_analysis_single',49,1],['cadastru_lookup_single',49,1],['yield_calculator_single',49,1],['pdf_report_single',49,1]]) {
   const p=maibProduct(key);assert.equal(p.amount_minor,amount*100);assert.equal(p.billingMode,'one_time');
   assert.deepEqual(Object.values(p.grants),Array(key.endsWith('_pack')?6:1).fill(uses));
 }
@@ -25,8 +25,8 @@ for (const [key, amount, grants] of [
   ['cadastru_lookup_5', 99, { cadastru_lookup: 5 }],
   ['cadastru_lookup_20', 299, { cadastru_lookup: 20 }],
   ['property_combo_1', 59, { cadastru_lookup: 1, sale_estimate: 1, pdf_report: 1 }],
-  ['credits_10', 79, { cadastru_lookup: 10 }],
-  ['credits_50', 249, { cadastru_lookup: 50 }],
+  ['credits_10', 245, { cadastru_lookup: 10 }],
+  ['credits_50', 490, { cadastru_lookup: 50 }],
 ]) {
   const product = maibProduct(key);
   assert.equal(product.amount_minor, amount * 100);
@@ -52,10 +52,10 @@ for (const [lang, single, five, twenty] of [['ro', '1 utilizare', '30 utilizări
 assert.equal(maibProductTitle('cadastru_lookup_single', 'ro', 20, 'pricing'), '20 de utilizări');
 assert.equal(maibProductTitle('pdf_report_single', 'ro'), 'Raport PDF');
 for (const key of ['sale_estimate_single','rent_estimate_single','listing_analysis_single','cadastru_lookup_single','yield_calculator_single','pdf_report_single']) {
-  for (const [quantity, amount, percent] of [[1,20,0],[2,40,0],[3,60,0],[4,80,0],[5,100,0],[20,400,0],[100,2000,0]]) {
+  for (const [quantity, amount, percent] of [[1,49,0],[2,98,0],[3,147,0],[4,196,0],[5,245,0],[20,980,0],[100,4900,0]]) {
     const product = maibProduct(key, quantity);
     assert.equal(product.amount_minor, Math.round(amount * 100));
-    assert.equal(product.discount_mdl, Math.round((quantity * 20 - amount) * 100) / 100);
+    assert.equal(product.discount_mdl, Math.round((quantity * 49 - amount) * 100) / 100);
     assert.equal(product.discount_percent, percent);
     assert.deepEqual(Object.values(product.grants), [quantity]);
     assert.equal(maibOrderQuantity({ product_key: key, grants: product.grants }), quantity);
@@ -298,24 +298,24 @@ for (const key of ['all_features_5', 'all_features_20', 'credits_10', 'credits_5
   assert.equal(bankPayload.orderInfo.items[0].title, insertSnapshot.product_title);
 }
 const bulkBody={...purchaseBody,product_key:'cadastru_lookup_single',quantity:4,request_key:crypto.randomUUID(),amount_minor:1,grants:{cadastru_lookup:999}};
-expectedBankAmount=20;
+expectedBankAmount=49;
 for (const lang of ['ro', 'ru']) {
   for (const checkout_source of ['pricing', undefined]) {
     assert.equal((await create.POST(createRequest({...purchaseBody, product_key:'cadastru_lookup_single', request_key:crypto.randomUUID(), lang, checkout_source}))).status,200);
     const title = checkout_source === 'pricing' ? (lang === 'ro' ? '1 utilizare' : '1 использование') : (lang === 'ro' ? 'Date cadastrale' : 'Кадастровые данные');
     assert.equal(insertSnapshot.product_title, title, 'New orders snapshot the context-specific title');
     assert.equal(bankPayload.orderInfo.items[0].title, title, 'MAIB receives the same title as checkout');
-    assert.equal(insertSnapshot.amount_minor, 2000);
+    assert.equal(insertSnapshot.amount_minor, 4900);
     assert.deepEqual(insertSnapshot.grants, {cadastru_lookup:1}, 'Display context does not change credit grants');
   }
 }
-expectedBankAmount=80;
+expectedBankAmount=196;
 assert.equal((await create.POST(createRequest(bulkBody))).status,200);
-assert.equal(insertSnapshot.amount_minor,8000);
+assert.equal(insertSnapshot.amount_minor,19600);
 assert.deepEqual(insertSnapshot.grants,{cadastru_lookup:4});
 assert.equal(insertSnapshot.product_title,maibProductTitle('cadastru_lookup_single','ro',4));
 assert.equal(service.publicOrder(insertSnapshot).quantity,4);
-assert.equal(bankPayload.orderInfo.items[0].amount,80,'bank receives the bundle total');
+assert.equal(bankPayload.orderInfo.items[0].amount,196,'bank receives the bundle total');
 assert.equal(bankPayload.orderInfo.items[0].quantity,1,'non-uniform unit pricing is submitted as one bundle');
 for (const quantity of [null,0,-1,1.5,'4',MAX_SINGLE_QUANTITY + 1]) {
   assert.equal((await create.POST(createRequest({...bulkBody,quantity}))).status,400);
@@ -329,7 +329,7 @@ assert.equal((await replayResponse.json()).amount_minor,9400,'existing orders re
 assert.equal(bankCreates,bankCreatesBeforeReplay,'identical bulk request reuses its order');
 assert.equal((await create.POST(createRequest({...bulkBody,quantity:3}))).status,409,'a reused request key cannot change quantity');
 existingSnapshot=null;
-for (const [quantity, amount] of [[1,20],[3,60],[5,100],[10,200],[20,400],[21,420],[25,500],[100,2000]]) {
+for (const [quantity, amount] of [[1,49],[3,147],[5,245],[10,490],[20,980],[21,1029],[25,1225],[100,4900]]) {
   expectedBankAmount=amount;
   assert.equal((await create.POST(createRequest({...bulkBody,quantity,request_key:crypto.randomUUID()}))).status,200);
   assert.equal(insertSnapshot.amount_minor,Math.round(amount * 100),'checkout uses the server price tier');
@@ -343,7 +343,7 @@ for(const context of [{checkout_source:'pricing'},{return_to:'/pricing'},{return
   assert.equal((await create.POST(createRequest({...guestSingle,...context}))).status,401);
 }
 assert.equal(bankCreates,beforeGuest,'pricing-origin guest requests never contact the bank');
-expectedBankAmount=20;
+expectedBankAmount=49;
 assert.equal((await create.POST(createRequest(guestSingle))).status,200);
 assert.equal(insertSnapshot.user_id,createUser.id,'guest orders retain verified session ownership');
 assert.equal(guestRegistrations.at(-1).guest_user_id,createUser.id);

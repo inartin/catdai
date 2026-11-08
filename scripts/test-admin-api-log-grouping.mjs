@@ -176,6 +176,7 @@ const jsx = (type, props) => ({ type, props });
 const uiContext = vm.createContext({ console, Date, URLSearchParams,
   window: { confirm: () => { confirmations++; return false; } } });
 const uiMocks = {
+  "@/lib/cadastru-result-categories": { cadastruResultSummary: () => ({ categories: [], count: 0, cadastru: false }) },
   "@/lib/admin-periods": periods.namespace,
   "@/components/admin/AdminUserCell": { default: ({ row, name }) => name || row.user_name || row.user_id || "Anonymous", VisitorTags: () => null },
   react: { Fragment: "Fragment", useCallback: (fn) => fn, useEffect: noop,
@@ -340,6 +341,8 @@ mocks["@/lib/supabase-admin"] = { supabaseAdmin: { from(table) {
   return builder;
 } } };
 mocks["@/lib/admin-auth"] = { requireAdminApiAuth: () => null };
+// Category hydration is exercised by test-cadastru-result-categories.mjs.
+mocks["@/lib/admin-cadastru-result-categories"] = { loadCadastruResultCategories: async (rows) => rows };
 mocks["@/lib/admin-cadastru-favorites"] = { loadCadastruFavorites: async (rows) => rows };
 mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
 mocks["@/lib/cadastru-share-statistics"] = { loadCadastruShareStatistics: async (rows) => rows };

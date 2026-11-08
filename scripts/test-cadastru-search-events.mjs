@@ -40,6 +40,10 @@ await db.exec(`create role anon; create role authenticated; create role service_
 await db.exec(await fs.readFile("supabase/migrations/20261020093634_cadastru_search_journeys.sql", "utf8"));
 
 await db.exec("alter table cadastru_search_events add column visitor jsonb;");
+await db.exec(await fs.readFile("supabase/migrations/20261108185104_cadastru_result_categories.sql", "utf8"));
+await db.exec(await fs.readFile("supabase/migrations/20261108185104_cadastru_result_categories.sql", "utf8"));
+assert.equal((await db.query("select result_cadastru from cadastru_search_events limit 1")).rows[0].result_cadastru, null,
+  "Migration preserves unknown historical coverage and can be reapplied");
 const errors = [];
 let persist = true;
 const environment = { NODE_ENV: "production", ADMIN_TOKEN: "isolated-test-secret" };
@@ -108,6 +112,17 @@ const id = eventId(tokens[0]);
 assert(tokens.every((token) => eventId(token) === id), "three concurrent requests share one event");
 const getRow = async (id) => (await db.query("select * from cadastru_search_events where id=$1", [id])).rows[0];
 const original = await getRow(id);
+assert.equal(original.result_cadastru, true);
+const mapId = eventId(await search({ lookupId: crypto.randomUUID(), resultType: "no_data",
+  resultPayload: { lands: [{ cadastral_number: "2539207.0435", map_location: { latitude: 47.19, longitude: 28.34 } }],
+    buildings: [{ cadastral_number: "2539207.0435.01" }] } }));
+assert.equal((await getRow(mapId)).result_cadastru, true, "Official property collections count despite legacy no_data classification");
+assert.equal((await getRow(mapId)).result_map, true);
+await db.query("update cadastru_search_events set result_nearby=true where id=$1", [mapId]);
+await search({ lookupId: (await getRow(mapId)).lookup_id, resultType: "error" });
+assert.equal((await getRow(mapId)).result_map, true, "Failed retries retain successful map data");
+assert.equal((await getRow(mapId)).result_cadastru, true);
+assert.equal((await getRow(mapId)).result_nearby, true, "Primary updates preserve independent secondary successes");
 const highwayRequest = { city: "Chișinău", road_type: "sos", street: "Hâncești", house_number: "140/2" };
 const highwayId = eventId(await search({ lookupId: crypto.randomUUID(), searchRequest: highwayRequest,
   searchAddress: "Chișinău, sos Hâncești 140/2" }));

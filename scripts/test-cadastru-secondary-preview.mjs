@@ -50,6 +50,7 @@ for (const [path, key, storage, getter, formatter, writer, fetcher] of [
       const route = await loadAppModule(`src/app/api/cadastru/${path}/route.js`, {
         "next/server": { NextResponse: { json: (body, options) => Response.json(body, options) } },
         "@/lib/statistics-context": { withStatisticsContext: handler => handler },
+        "@/lib/cadastru-result-category-tracking": { recordCadastruResultCategories: async () => {} },
         "@/lib/supabase-admin": { supabaseAdmin: { from: () => { throw new Error("Unexpected database read"); } } },
         "@/lib/cache": { getSharedCache: async () => null, setSharedCache: async () => true },
         "@/lib/rate-limit": { rateLimit: () => ({ check: async () => ({ allowed: true }) }) },

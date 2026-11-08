@@ -5,6 +5,7 @@ import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { createCadastruEvaluationToken } from "@/lib/cadastru-evaluation-tracking";
 import { normalizeCadastruLookupId } from "@/lib/cadastru-lookup-tracking";
+import { primaryCadastruResultCategories } from "@/lib/cadastru-result-categories";
 
 const SEARCH_TYPES = new Set(["address", "number"]);
 const RESULT_TYPES = new Set(["error", "no_data", "address_only", "land_only", "apartment_only", "full_data"]);
@@ -120,6 +121,7 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
       result_value: resultValueForSearch(normalizedType, options.resultPayload),
       result_type: normalizeResultType(options.resultType),
       lookup_source: normalizeLookupSource(options.lookupSource),
+      ...primaryCadastruResultCategories(options.resultPayload, options.resultType),
     };
     const lookupId = normalizeCadastruLookupId(options.lookupId);
     const searchSession = normalizeCadastruLookupId(request.headers?.get("x-catdai-search-session"));
@@ -134,8 +136,8 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
 
     let { data, error } = await supabaseAdmin.from("cadastru_search_events").insert(row).select("id").single();
 
-    for (let attempt = 0; attempt < 10 && error; attempt++) {
-      const missingColumn = ["lookup_id", "event_key", "search_request", "result_value", "search_address", "city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
+    for (let attempt = 0; attempt < 12 && error; attempt++) {
+      const missingColumn = ["result_cadastru", "result_map", "lookup_id", "event_key", "search_request", "result_value", "search_address", "city", "district", "cadastral_number", "result_type", "lookup_source"].find((column) =>
         column in row && isMissingColumnError(error, column)
       );
       if (!missingColumn) break;
@@ -156,8 +158,10 @@ export async function logCadastruSearchEvent(request, searchType, options = {}) 
         if (source.error) throw source.error;
       }
       // Retain event identity/time/progress, but reflect the latest attempt outcome.
+      const categories = Object.fromEntries(["result_cadastru", "result_map"]
+        .filter((key) => row[key] === true).map((key) => [key, true]));
       ({ data, error } = await supabaseAdmin.from("cadastru_search_events")
-        .update({ result_type: row.result_type }).eq("event_key", row.event_key).select("id").single());
+        .update({ result_type: row.result_type, ...categories }).eq("event_key", row.event_key).select("id").single());
     }
 
     if (error && !isMissingSchemaError(error)) {

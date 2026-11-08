@@ -7,6 +7,7 @@ import { fetchExternalCadastralData } from "@/lib/cadastru-external-api";
 import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
+import { hasCadastruPropertyResults } from "@/lib/cadastru-result-categories";
 import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
 import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { resolveAccessTier } from "@/lib/access-tier";
@@ -318,7 +319,7 @@ function classifyCadastralResult(payload) {
   if (apartmentData) return "apartment_only";
   if (!buildingData && Array.isArray(payload?.lands) && payload.lands.some((land) => land?.cadastral_number)
     && !payload?.buildings?.length) return "land_only";
-  if (hasAnyAddress(payload) || buildingData) return "address_only";
+  if (hasAnyAddress(payload) || buildingData || hasCadastruPropertyResults(payload)) return "address_only";
   return "no_data";
 }
 

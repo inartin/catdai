@@ -78,7 +78,7 @@ for (lang of ['ro', 'ru']) {
     assert(content.includes(`${total} MDL`));
     const unit = unitPrice.toLocaleString(lang === 'ru' ? 'ru-MD' : 'ro-MD', { minimumFractionDigits: index ? 2 : 0 });
     assert(content.includes(t('pricing.sharedUnitPrice', { price: unit })));
-    assert(content.includes(discount === null ? t('pricing.sharedStandardPrice') : t('pricing.sharedSavingsPerUse', { percent: discount })));
+    if (discount !== null) assert(content.includes(t('pricing.sharedSavingsPerUse', { percent: discount })));
   }
   for (const amount of [49, 245, 490]) assert(locales[lang]['pricing.metaDescription'].includes(`${amount} MDL`));
 }

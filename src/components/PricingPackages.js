@@ -50,31 +50,39 @@ export default function PricingPackages() {
           {offers.map(({ key, productKey }) => {
             const product = maibProduct(productKey);
             const uses = Object.values(product.grants).reduce((sum, count) => sum + count, 0);
-            const recommended = key === "single";
+            const recommended = key === "ten";
             const savingsPercent = maibCreditSavingsPercent(productKey);
             const locale = lang === "ru" ? "ru-MD" : "ro-MD";
             const unitPrice = (product.amount_mdl / uses).toLocaleString(locale, {
               minimumFractionDigits: uses === 1 ? 0 : 2, maximumFractionDigits: 2,
             });
             return (
-              <article key={key} className={`flex flex-col rounded-2xl border bg-white p-6 sm:p-7 ${recommended ? "border-primary shadow-sm ring-1 ring-primary/10" : "border-gray-200"}`}>
+              <article key={key} className={`flex flex-col rounded-2xl border bg-white p-6 sm:p-7 md:px-6 lg:px-7 ${recommended ? "border-primary shadow-sm ring-1 ring-primary/10" : "border-gray-200"}`}>
                 {provider === 'maib' && <PaymentOfferTracker productKey={productKey} checkoutSource="pricing"
                   buyerType={user && !isGuest ? 'account' : 'guest'} language={lang} />}
-                <p className={`text-sm font-semibold ${recommended ? "text-primary" : "text-gray-500"}`}>{t(`pricing.shared.${key}.label`)}</p>
-                <h2 className="mt-7 text-3xl font-bold tracking-tight text-gray-950">{t(`pricing.shared.${key}.uses`)}</h2>
-                <p className="mt-6 text-2xl font-semibold tracking-tight text-gray-900">{product.amount_mdl} <span className="text-base font-medium text-gray-500">MDL</span></p>
-                <p className={`mt-2 text-sm ${uses === 1 ? "text-gray-500" : "text-primary"}`}>
-                  {uses === 1
-                    ? t("pricing.sharedStandardPrice")
-                    : t("pricing.sharedSavingsPerUse", { percent: savingsPercent })}
-                </p>
-                <p className="mt-2 text-sm text-gray-500">{t("pricing.sharedUnitPrice", { price: unitPrice })}</p>
+                <p className={`text-sm ${recommended ? "font-semibold text-primary" : "text-gray-500"}`}>{t(`pricing.shared.${key}.label`)}</p>
+                <h2 className="mt-3 whitespace-nowrap text-2xl font-bold tracking-tight text-gray-950 md:text-xl lg:text-2xl">
+                  {uses}{" "}
+                  {t(uses === 1 ? "pricing.sharedUseSingular" : "pricing.sharedUsePlural")}
+                </h2>
+                <div className="mt-5 border-t border-gray-100 pt-5">
+                  <p className="text-3xl font-bold tracking-tight text-gray-900">{product.amount_mdl} <span className="text-base font-semibold text-gray-500">MDL</span></p>
+                  <p className="mt-2 text-xs text-gray-500">{t("pricing.sharedTotalToPay")}</p>
+                </div>
+                <div className="mt-3">
+                  <p className="text-sm text-gray-900">{t("pricing.sharedUnitPrice", { price: unitPrice })}</p>
+                  {uses > 1 && (
+                    <p className="mt-1 text-sm text-primary">{t("pricing.sharedSavingsPerUse", { percent: savingsPercent })}</p>
+                  )}
+                </div>
                 {provider === "maib" && (
-                  <button type="button" onClick={() => startCheckout(productKey)}
-                    className={`mt-8 inline-flex w-full cursor-pointer items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary ${recommended ? "border-primary bg-primary text-white hover:border-primary-dark hover:bg-primary-dark" : "border-primary bg-white text-primary-dark hover:bg-primary/5 active:bg-primary/10"}`}
-                    aria-label={`${t("pricing.sharedChoose")} - ${t(`pricing.shared.${key}.uses`)}`}>
-                    {t("pricing.sharedChoose")}
-                  </button>
+                  <div className="mt-auto pt-8">
+                    <button type="button" onClick={() => startCheckout(productKey)}
+                      className={`inline-flex w-full cursor-pointer items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary ${recommended ? "border-primary bg-primary text-white hover:border-primary-dark hover:bg-primary-dark" : "border-primary bg-white text-primary-dark hover:bg-primary/5 active:bg-primary/10"}`}
+                      aria-label={`${t("pricing.sharedChoose")} - ${t(`pricing.shared.${key}.uses`)}`}>
+                      {t("pricing.sharedChoose")}
+                    </button>
+                  </div>
                 )}
               </article>
             );

@@ -348,6 +348,7 @@ for (const file of ['src/components/admin/AdminReviewCadastru.js', 'src/componen
 }
 const reviewMessages = JSON.parse(await fs.readFile('src/locales/ro.json', 'utf8'));
 const { cadastruValueLabel } = await import('../src/lib/cadastru-value-labels.js');
+import { cadastruPropertyDetails } from "../src/lib/cadastru-property-details.js";
 async function adminReportView({ fail = false, result = savedReport } = {}) {
   const slots = [];
   let cursor = 0, calls = 0;
@@ -364,6 +365,7 @@ async function adminReportView({ fail = false, result = savedReport } = {}) {
       return value;
     } }) },
     '@/lib/cadastru-value-labels': { cadastruValueLabel },
+    '@/lib/cadastru-property-details': { cadastruPropertyDetails },
     '@/components/icons/LockIcon': { default: () => null },
   };
   const uiContext = vm.createContext({ fetch: async url => {

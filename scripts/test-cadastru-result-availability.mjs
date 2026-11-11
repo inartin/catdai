@@ -7,6 +7,7 @@ import { createRequire } from "node:module";
 import * as jsxRuntime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { cadastruValueLabel } from "../src/lib/cadastru-value-labels.js";
+import { cadastruPropertyDetails } from "../src/lib/cadastru-property-details.js";
 
 const require = createRequire(import.meta.url);
 const { transform, loadBindings } = require("next/dist/build/swc");
@@ -21,6 +22,7 @@ const mocks = {
   "@/context/LanguageContext": { useTranslation: () => ({ lang, t: (key) => locales[lang][key] || key }) },
   "@/components/icons/LockIcon": { default: () => null },
   "@/lib/cadastru-value-labels": { cadastruValueLabel },
+  "@/lib/cadastru-property-details": { cadastruPropertyDetails },
 };
 async function load(name) {
   if (modules.has(name)) return modules.get(name);

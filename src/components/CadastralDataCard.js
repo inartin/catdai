@@ -4,13 +4,13 @@ import { useTranslation } from "@/context/LanguageContext";
 import LockIcon from "@/components/icons/LockIcon";
 import CadastruFreshnessNote from "@/components/CadastruFreshnessNote";
 import { cadastruValueLabel } from "@/lib/cadastru-value-labels";
+import { cadastruPropertyDetails } from "@/lib/cadastru-property-details";
 
 export default function CadastralDataCard({
   cadastral,
   className = "",
   locked = false,
   onLockedClick,
-  forceDesktopLayout = false,
   showRevealButton = false,
   hideCompactRevealButton = false,
   revealButtonLabel,
@@ -24,15 +24,8 @@ export default function CadastralDataCard({
 
   if (!cadastral) return null;
 
-  const displayAddress =
-    cadastral.apartment?.address ||
-    cadastral.building?.address ||
-    cadastral.lands?.[0]?.address ||
-    cadastral.buildings?.[0]?.address ||
-    cadastral.location?.display_name ||
-    cadastral.matched_address;
-  const lands = Array.isArray(cadastral.lands) ? cadastral.lands : [];
-  const addressBuildings = Array.isArray(cadastral.buildings) ? cadastral.buildings : [];
+  const { displayAddress, apartmentRows, buildingRows, lands, buildings: addressBuildings } =
+    cadastruPropertyDetails(cadastral, { lang, t, locked: locked || cadastral.locked_sections?.cadastru_details === true });
   const hasAddressProperties = lands.length > 0 || addressBuildings.length > 0;
   const hasApartmentDetails = Boolean(
     cadastral.apartment?.area_m2 ||
@@ -68,9 +61,9 @@ export default function CadastralDataCard({
     || addressBuildings.some((property) => property?.cadastral_number)
     || Boolean(cadastral.cadastral_number && (displayAddress || hasApartmentDetails || hasBuildingDetails));
   const hasFullDetails = (hasApartmentDetails && hasBuildingDetails) || hasAddressProperties;
-  const widthClass = hasFullDetails || forceDesktopLayout ? "w-full" : "mx-auto w-full max-w-xl";
-  const detailsGridClass = hasFullDetails || forceDesktopLayout
-    ? `grid gap-6 ${forceDesktopLayout ? "grid-cols-2 gap-8" : "lg:grid-cols-2 lg:gap-8"}`
+  const widthClass = hasFullDetails ? "w-full" : "mx-auto w-full max-w-xl";
+  const detailsGridClass = hasFullDetails
+    ? "grid gap-6 lg:grid-cols-2 lg:gap-8"
     : "grid gap-6";
   const detailValueClass = "min-w-0 break-words text-right font-medium text-gray-900";
   const hasLockedDetails = locked || cadastral.locked_sections?.cadastru_details === true;
@@ -131,7 +124,7 @@ export default function CadastralDataCard({
   const detailRow = (section, field, label, value) => {
     if (value === null || value === undefined || value === "") return null;
     return (
-      <div className="flex items-start justify-between gap-4 text-base">
+      <div key={field} className="flex items-start justify-between gap-4 text-base">
         <span className="text-gray-500">{label}</span>
         <span className={valueClassName(section, field)} {...lockedValueProps(section, field)}>
           {cadastruValueLabel(value, field, lang)}
@@ -139,22 +132,6 @@ export default function CadastralDataCard({
       </div>
     );
   };
-  const floorValue = cadastral.apartment?.floor
-    ? cadastral.building?.total_floors && !isFieldLocked("building", "total_floors")
-      ? t("form.floorOf", { floor: cadastral.apartment.floor, total: cadastral.building.total_floors })
-      : cadastral.apartment.floor
-    : null;
-  const roomTypeValue = cadastral.apartment?.type && cadastral.apartment.type !== cadastral.apartment?.room_usage
-    ? cadastral.apartment.type
-    : null;
-  const formatSquareMeters = (value) => {
-    const number = Number(value);
-    if (!Number.isFinite(number)) return value ? `${value} m²` : null;
-    return `${new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 2 }).format(number)} m²`;
-  };
-  const formatEstimatedValue = (value) => (
-    value === null || value === undefined || value === "" ? null : `${value} MDL`
-  );
   const propertyCard = (property, kind, index, count) => (
     <div key={`${kind}-${property?.cadastral_number || index}`} className="min-w-0 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
       <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-emerald-700">
@@ -162,29 +139,7 @@ export default function CadastralDataCard({
         {count > 1 ? ` ${index + 1}` : ""}
       </p>
       <div className="space-y-2.5">
-        {detailRow(kind, "cadastral_number", t("cadastru.numberLabel"), property?.cadastral_number)}
-        {detailRow(kind, "area", t("form.cadastralArea"), property?.area)}
-        {detailRow(kind, "area_m2", t("form.cadastralAreaM2"), formatSquareMeters(property?.area_m2))}
-        {detailRow(kind, "object_type", t("form.cadastralObjectType"), property?.object_type)}
-        {detailRow(kind, "type", t("form.cadastralType"), property?.type)}
-        {detailRow(kind, "destination", t("form.cadastralDestination"), property?.destination)}
-        {detailRow(kind, "room_usage", t("form.cadastralRoomUsage"), property?.room_usage)}
-        {detailRow(kind, "use_mode", t("form.cadastralUseMode"), property?.use_mode)}
-        {detailRow(kind, "boundary_type", t("form.cadastralBoundaryType"), property?.boundary_type)}
-        {detailRow(kind, "land_use", t("form.cadastralLandUse"), kind === "land" ? property?.land_use : null)}
-        {detailRow(kind, "building_use", t("form.cadastralBuildingUse"), kind === "construction" ? property?.building_use : null)}
-        {detailRow(
-          kind,
-          "estimated_value_lei",
-          t("form.cadastralEstimatedValue"),
-          formatEstimatedValue(property?.estimated_value_lei)
-        )}
-        {detailRow(kind, "last_estimated_at", t("form.cadastralLastEstimatedAt"), property?.last_estimated_at)}
-        {detailRow(kind, "ownership_type", t("form.cadastralPropertyType"), property?.ownership_type)}
-        {detailRow(kind, "transactions_count", t("form.cadastralTransactions"), property?.transactions_count)}
-        {detailRow(kind, "real_rights", t("form.cadastralRealRights"), property?.real_rights)}
-        {detailRow(kind, "notes", t("form.cadastralNotes"), property?.notes)}
-        {detailRow(kind, "restrictions", t("form.cadastralRestrictions"), property?.restrictions)}
+        {property.rows.map(([field, label, value]) => detailRow(kind, field, label, value))}
       </div>
     </div>
   );
@@ -241,40 +196,18 @@ export default function CadastralDataCard({
                   {t("form.cadastralApartment")}
                 </p>
                 <div className="space-y-2.5">
-                  {detailRow("apartment", "area_m2", t("form.cadastralArea"), cadastral.apartment?.area_m2 ? `${cadastral.apartment.area_m2} m²` : null)}
-                  {detailRow("apartment", "floor", t("form.cadastralFloor"), floorValue)}
-                  {detailRow("apartment", "toilet", t("form.cadastralToilet"), cadastral.apartment?.toilet)}
-                  {detailRow("apartment", "bathroom", t("form.cadastralBathroom"), cadastral.apartment?.bathroom)}
-                  {detailRow("apartment", "is_last_floor", t("form.cadastralLastFloor"), cadastral.apartment?.is_last_floor)}
-                  {detailRow("apartment", "estimated_value_lei", t("form.cadastralEstimatedValue"), cadastral.apartment?.estimated_value_lei ? `${cadastral.apartment.estimated_value_lei} ${lang === "en" ? "MDL" : "lei"}` : null)}
-                  {detailRow("apartment", "object_type", t("form.cadastralObjectType"), cadastral.apartment?.object_type)}
-                  {detailRow("apartment", "type", t("form.cadastralRoomType"), roomTypeValue)}
-                  {detailRow("apartment", "destination", t("form.cadastralDestination"), cadastral.apartment?.destination)}
-                  {detailRow("apartment", "room_usage", t("form.cadastralRoomUsage"), cadastral.apartment?.room_usage)}
-                  {detailRow("apartment", "ownership_type", t("form.cadastralPropertyType"), cadastral.apartment?.ownership_type)}
-                  {detailRow("apartment", "transactions_count", t("form.cadastralTransactions"), cadastral.apartment?.transactions_count)}
-                  {detailRow("apartment", "real_rights", t("form.cadastralRealRights"), cadastral.apartment?.real_rights)}
-                  {detailRow("apartment", "notes", t("form.cadastralNotes"), cadastral.apartment?.notes)}
-                  {detailRow("apartment", "restrictions", t("form.cadastralRestrictions"), cadastral.apartment?.restrictions)}
+                  {apartmentRows.map(([field, label, value]) => detailRow("apartment", field, label, value))}
                 </div>
               </div>
             )}
 
             {hasBuildingDetails && (
-              <div className={`min-w-0 ${hasApartmentDetails ? forceDesktopLayout ? "border-l border-emerald-100 pl-8" : "border-t border-emerald-100 pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" : ""}`}>
+              <div className={`min-w-0 ${hasApartmentDetails ? "border-t border-emerald-100 pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" : ""}`}>
                 <p className="mb-2.5 text-sm font-semibold uppercase tracking-wider text-emerald-700">
                   {t("form.cadastralBuilding")}
                 </p>
                 <div className="space-y-2.5">
-                  {detailRow("building", "classifier", t("form.cadastralClassifier"), cadastral.building?.classifier)}
-                  {detailRow("building", "total_floors", t("form.cadastralTotalFloors"), cadastral.building?.total_floors)}
-                  {detailRow("building", "condition", t("form.cadastralCondition"), cadastral.building?.condition)}
-                  {detailRow("building", "construction_year", t("form.cadastralYear"), cadastral.building?.construction_year)}
-                  {detailRow("building", "wall_material", t("form.cadastralWallMaterial"), cadastral.building?.wall_material)}
-                  {detailRow("building", "water", t("form.cadastralWater"), cadastral.building?.water)}
-                  {detailRow("building", "sewage", t("form.cadastralSewage"), cadastral.building?.sewage)}
-                  {detailRow("building", "gas", t("form.cadastralGas"), cadastral.building?.gas)}
-                  {detailRow("building", "electricity", t("form.cadastralElectricity"), cadastral.building?.electricity)}
+                  {buildingRows.map(([field, label, value]) => detailRow("building", field, label, value))}
                 </div>
               </div>
             )}

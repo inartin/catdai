@@ -3,6 +3,7 @@ import { requireAdminApiAuth } from "@/lib/admin-auth";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { getSharedCache, setSharedCache } from "@/lib/cache";
 import { CONFIRMED_PAYMENT_STATUSES, paymentAmounts, paymentPeriod, summarizePayments } from "@/lib/admin-payments";
+import { loadCadastruPaymentFunnel } from "@/lib/admin-cadastru-payment-funnel";
 
 const PAGE_SIZE = 50;
 const READ_SIZE = 1000;
@@ -69,7 +70,7 @@ export async function GET(request) {
   if (!/^[1-9]\d{0,5}$/.test(pageValue) || (requestedCurrency && !/^[A-Z]{3}$/.test(requestedCurrency))) {
     return NextResponse.json({ error: "Invalid payment filters" }, { status: 400, headers });
   }
-  const cacheKey = `catdai:admin-payments:v2:${period}:${period === "week" || period === "all" ? "rolling" : since}:${requestedCurrency || "default"}:${pageValue}`;
+  const cacheKey = `catdai:admin-payments:v3:${period}:${period === "week" || period === "all" ? "rolling" : since}:${requestedCurrency || "default"}:${pageValue}`;
   try {
     if (params.get("fresh") !== "1") {
       const cached = await getSharedCache(cacheKey);
@@ -83,12 +84,19 @@ export async function GET(request) {
     const { totals, products } = summarizePayments(filtered);
     const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     const page = Math.min(Number(pageValue), pageCount);
-    const orders = await paymentDetails(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), users);
+    const [orders, cadastruFunnel] = await Promise.all([
+      paymentDetails(filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), users),
+      loadCadastruPaymentFunnel({ since, until }, rows, users).catch((error) => {
+        console.error("[admin-payments] Cadastru funnel:", error.message);
+        return null;
+      }),
+    ]);
     const payload = {
       period, since, until, currency, currencies, totals, products, orders, page, pageCount, pageSize: PAGE_SIZE,
+      cadastruFunnel,
       updatedAt: new Date().toISOString(),
     };
-    await setSharedCache(cacheKey, payload, CACHE_TTL_SECONDS);
+    if (cadastruFunnel) await setSharedCache(cacheKey, payload, CACHE_TTL_SECONDS);
     return NextResponse.json(payload, { headers });
   } catch (error) {
     console.error("[admin-payments]", error.message);

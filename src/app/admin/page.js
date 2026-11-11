@@ -15,9 +15,9 @@ import AdminOnlineUsers from "@/components/admin/AdminOnlineUsers";
 import AdminActiveUsersChart from "@/components/admin/AdminActiveUsersChart";
 import AdminUserPayments from "@/components/admin/AdminUserPayments";
 
-function fmtNum(n) {
+function fmtNum(n, maximumFractionDigits = 0) {
   if (n == null) return "-";
-  return Number(n).toLocaleString("ro-RO", { maximumFractionDigits: 0 });
+  return Number(n).toLocaleString("ro-RO", { maximumFractionDigits });
 }
 
 function fmtPrice(amount, currency) {
@@ -570,6 +570,50 @@ function CadastruResultBadges({ byResultType }) {
         </span>
       ))}
     </span>
+  );
+}
+
+const cadastruDayFormat = new Intl.DateTimeFormat("ro-RO", { day: "numeric", month: "short", timeZone: "UTC" });
+
+function CadastruUsageStats({ stats }) {
+  if (!stats) return null;
+
+  const results = stats.byResultType || {};
+  const successful = (results.full_data || 0) + (results.apartment_only || 0)
+    + (results.land_only || 0) + (results.address_only || 0);
+  const errors = results.error || 0;
+  const noData = results.no_data || 0;
+  const daily = stats.daily || [];
+
+  return (
+    <div className="mt-4 space-y-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
+        <StatCard label="Total searches" value={fmtNum(stats.total)} />
+        <StatCard label="Avg. per day" value={fmtNum(stats.averageDaily, 2)} />
+        <StatCard label="Apartment searches" value={fmtNum(stats.byPropertyType?.apartment?.total)} />
+        <StatCard label="Land searches" value={fmtNum(stats.byPropertyType?.land?.total)} />
+        <StatCard label="Successful" value={<span className="text-emerald-700">{fmtNum(successful)}</span>} />
+        <StatCard label="Unsuccessful" value={<span className="text-red-600">{fmtNum(errors + noData)}</span>}
+          detail={`${fmtNum(errors)} errors · ${fmtNum(noData)} no data`} />
+        <StatCard label="Avg. unique searches" value={fmtNum(stats.averageUniquePerAccount, 2)} detail="Per account with a saved query" />
+      </div>
+
+      {daily.length > 1 && (
+        <div>
+          <h4 id="cadastru-daily-usage" className="text-sm font-semibold text-gray-900">Daily usage</h4>
+          <ul aria-labelledby="cadastru-daily-usage" tabIndex={0} className="mt-2 flex gap-2 overflow-x-auto pb-2">
+            {daily.map(({ day, count }) => (
+              <li key={day} className="min-w-20 shrink-0 rounded-lg border border-gray-200 px-3 py-2">
+                <time dateTime={day} title={day} className="block text-xs text-gray-500">
+                  {cadastruDayFormat.format(new Date(day))}
+                </time>
+                <span className="text-lg font-semibold tabular-nums text-gray-900">{fmtNum(count)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2103,9 +2147,10 @@ function DashboardContent() {
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 className="font-semibold text-gray-900">Cadastru Searches</h3>
               <p className="mt-1 text-xs text-gray-500">
-                {fmtNum(s.cadastruSearches?.total)} searches · {s.periodLabel} · {fmtNum(s.cadastruSearches?.registered)} registered / {fmtNum(s.cadastruSearches?.anonymous)} anonymous
+                {s.periodLabel} · {fmtNum(s.cadastruSearches?.registered)} registered / {fmtNum(s.cadastruSearches?.anonymous)} anonymous
               </p>
-              <p className="mt-1 text-xs text-gray-500">
+              <CadastruUsageStats stats={s.cadastruSearches} />
+              <p className="mt-3 text-xs text-gray-500">
                 {fmtNum(s.cadastruSearches?.address)} address / {fmtNum(s.cadastruSearches?.number)} number · {fmtCadastruResultSummary(s.cadastruSearches?.byResultType)}
               </p>
               <p className="mt-1 text-xs text-gray-500">

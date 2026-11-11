@@ -167,231 +167,56 @@ function buildValuationPrefill(cadastral, addressDistrict) {
   return params;
 }
 
-function triggerCanvasDownload(canvas, fileName) {
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }, "image/png");
-}
-
-function parsePx(value) {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function isVisibleColor(value) {
-  return Boolean(value && value !== "transparent" && !/^rgba\([^,]+,[^,]+,[^,]+,\s*0\)$/i.test(value));
-}
-
-function roundedRectPath(ctx, x, y, width, height, radius) {
-  const r = Math.min(radius, width / 2, height / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + width - r, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-  ctx.lineTo(x + width, y + height - r);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-  ctx.lineTo(x + r, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-
-function wrapCanvasText(ctx, text, maxWidth) {
-  const words = String(text).split(/\s+/).filter(Boolean);
-  const lines = [];
-  let line = "";
-
-  words.forEach((word) => {
-    const next = line ? `${line} ${word}` : word;
-    if (ctx.measureText(next).width <= maxWidth) {
-      line = next;
-      return;
-    }
-    if (line) lines.push(line);
-    line = word;
-  });
-
-  if (line) lines.push(line);
-  return lines;
-}
-
-function drawElementText(ctx, element, rootRect, scale) {
-  const directText = Array.from(element.childNodes)
-    .filter((node) => node.nodeType === Node.TEXT_NODE)
-    .map((node) => node.textContent)
-    .join("")
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!directText) return;
-
-  const computed = window.getComputedStyle(element);
-  if (computed.visibility === "hidden" || computed.display === "none" || !isVisibleColor(computed.color)) return;
-
-  const rect = element.getBoundingClientRect();
-  const fontSize = parsePx(computed.fontSize);
-  const lineHeight = computed.lineHeight === "normal" ? fontSize * 1.2 : parsePx(computed.lineHeight);
-  const paddingLeft = parsePx(computed.paddingLeft);
-  const paddingRight = parsePx(computed.paddingRight);
-  const isFlexTextContainer = computed.display.includes("flex") && element.children.length > 0;
-  const lastChildRect = isFlexTextContainer
-    ? element.children[element.children.length - 1].getBoundingClientRect()
-    : null;
-  const flexTextOffset = lastChildRect
-    ? Math.max(0, lastChildRect.right - rect.left + parsePx(computed.columnGap || computed.gap))
-    : 0;
-  const textPaddingLeft = Math.max(paddingLeft, flexTextOffset);
-  const paddingTop = isFlexTextContainer
-    ? Math.max(0, (rect.height - lineHeight) / 2)
-    : parsePx(computed.paddingTop);
-  const text = computed.textTransform === "uppercase" ? directText.toUpperCase() : directText;
-  const x = (rect.left - rootRect.left + textPaddingLeft) * scale;
-  const y = (rect.top - rootRect.top + paddingTop) * scale;
-  const maxWidth = Math.max(1, (rect.width - textPaddingLeft - paddingRight) * scale);
-
-  ctx.font = computed.font;
-  ctx.fillStyle = computed.color;
-  ctx.textBaseline = "top";
-  ctx.textAlign = computed.textAlign === "right" ? "right" : computed.textAlign === "center" ? "center" : "left";
-
-  const lines = wrapCanvasText(ctx, text, maxWidth);
-  const lineX = ctx.textAlign === "right" ? x + maxWidth : ctx.textAlign === "center" ? x + maxWidth / 2 : x;
-  lines.forEach((line, index) => {
-    ctx.fillText(line, lineX, y + index * lineHeight * scale, maxWidth);
-  });
-}
-
-function drawElementToCanvas(ctx, element, rootRect, scale) {
-  if (!(element instanceof Element)) return;
-  const computed = window.getComputedStyle(element);
-  if (computed.display === "none" || computed.visibility === "hidden") return;
-
-  const rect = element.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return;
-
-  const x = (rect.left - rootRect.left) * scale;
-  const y = (rect.top - rootRect.top) * scale;
-  const width = rect.width * scale;
-  const height = rect.height * scale;
-  const radius = parsePx(computed.borderTopLeftRadius) * scale;
-  const backgroundColor = computed.backgroundColor;
-  const borderTopWidth = parsePx(computed.borderTopWidth) * scale;
-  const borderColor = computed.borderTopColor;
-
-  if (isVisibleColor(backgroundColor)) {
-    ctx.fillStyle = backgroundColor;
-    roundedRectPath(ctx, x, y, width, height, radius);
-    ctx.fill();
-  }
-
-  if (borderTopWidth > 0 && computed.borderTopStyle !== "none" && isVisibleColor(borderColor)) {
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = borderTopWidth;
-    roundedRectPath(ctx, x + borderTopWidth / 2, y + borderTopWidth / 2, width - borderTopWidth, height - borderTopWidth, Math.max(0, radius - borderTopWidth / 2));
-    ctx.stroke();
-  }
-
-  const shouldClip = computed.overflow === "hidden" || computed.overflowX === "hidden" || computed.overflowY === "hidden";
-  if (shouldClip) {
-    ctx.save();
-    roundedRectPath(ctx, x, y, width, height, radius);
-    ctx.clip();
-  }
-
-  if (element.tagName.toLowerCase() === "svg") {
-    Array.from(element.querySelectorAll("path")).forEach((path) => {
-      const pathData = path.getAttribute("d");
-      if (!pathData || typeof Path2D === "undefined") return;
-      const viewBox = element.getAttribute("viewBox")?.split(/\s+/).map(Number);
-      const viewBoxWidth = viewBox?.[2] || 24;
-      const viewBoxHeight = viewBox?.[3] || 24;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.scale(width / viewBoxWidth, height / viewBoxHeight);
-      const canvasPath = new Path2D(pathData);
-      const fill = path.getAttribute("fill") || element.getAttribute("fill") || "currentColor";
-      const stroke = path.getAttribute("stroke") || element.getAttribute("stroke");
-      if (fill !== "none") {
-        ctx.fillStyle = fill === "currentColor" ? computed.color : fill;
-        ctx.fill(canvasPath);
-      }
-      if (stroke && stroke !== "none") {
-        ctx.strokeStyle = stroke === "currentColor" ? computed.color : stroke;
-        ctx.lineWidth = parsePx(element.getAttribute("stroke-width") || element.getAttribute("strokeWidth") || "2");
-        ctx.lineCap = element.getAttribute("stroke-linecap") || element.getAttribute("strokeLinecap") || "butt";
-        ctx.lineJoin = element.getAttribute("stroke-linejoin") || element.getAttribute("strokeLinejoin") || "miter";
-        ctx.stroke(canvasPath);
-      }
-      ctx.restore();
-    });
-  } else {
-    drawElementText(ctx, element, rootRect, scale);
-    Array.from(element.children).forEach((child) => drawElementToCanvas(ctx, child, rootRect, scale));
-  }
-
-  if (shouldClip) ctx.restore();
-}
-
-async function renderElementToCanvas(element) {
-  await document.fonts?.ready;
-
-  const rect = element.getBoundingClientRect();
-  const width = Math.ceil(rect.width);
-  const height = Math.ceil(rect.height);
-  const scale = Math.max(2, Math.min(window.devicePixelRatio || 2, 3));
-  const canvas = document.createElement("canvas");
-  canvas.width = width * scale;
-  canvas.height = height * scale;
-  const ctx = canvas.getContext("2d");
-  ctx.fillStyle = window.getComputedStyle(element).backgroundColor || "#f9fafb";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.scale(scale, scale);
-
-  drawElementToCanvas(ctx, element, rect, 1);
-  return canvas;
-}
-
-function CadastruImageSaveButton({ cadastral, targetRef }) {
-  const { t } = useTranslation();
+function CadastruPdfSaveButton({ ready, reportData, mapCaptureRef }) {
+  const { lang, t } = useTranslation();
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(false);
+  const started = useRef(false);
 
-  const handleSaveImage = async () => {
-    if (!cadastral || isSaving) return;
-    const target = targetRef.current;
-    if (!target) return;
+  const handleSavePdf = () => {
+    if (isSaving) return;
+    started.current = false;
     setIsSaving(true);
-
-    try {
-      const canvas = await renderElementToCanvas(target);
-      const cleanNumber = String(cadastral.cadastral_number || "cadastru").replace(/[^0-9a-z.-]+/gi, "-");
-      triggerCanvasDownload(canvas, `catdai-cadastru-${cleanNumber}.png`);
-    } finally {
-      setIsSaving(false);
-    }
+    setError(false);
   };
 
+  useEffect(() => {
+    if (!isSaving || !ready || started.current) return;
+    started.current = true;
+
+    async function savePdf() {
+      try {
+        const captureMap = mapCaptureRef.current?.capture;
+        const { downloadCadastruReport } = await import("@/lib/cadastru-report-pdf");
+        await downloadCadastruReport({ ...reportData, lang, t, captureMap });
+      } catch {
+        setError(true);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+    void savePdf();
+  }, [isSaving, ready, reportData, mapCaptureRef, lang, t]);
+
   return (
-    <button
-      type="button"
-      onClick={handleSaveImage}
-      disabled={isSaving}
-      className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 max-sm:w-full max-sm:min-w-0"
-    >
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5 shrink-0">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <path d="M7 10l5 5 5-5" />
-        <path d="M12 15V3" />
-      </svg>
-      <span className="max-sm:min-w-0 max-sm:truncate">{isSaving ? t("cadastru.savingImage") : t("cadastru.saveImage")}</span>
-    </button>
+    <div className="min-w-0">
+      <button
+        type="button"
+        data-cadastru-save-pdf
+        onClick={handleSavePdf}
+        disabled={isSaving}
+        aria-busy={isSaving}
+        className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 max-sm:w-full max-sm:min-w-0"
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5 shrink-0">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <path d="M7 10l5 5 5-5" />
+          <path d="M12 15V3" />
+        </svg>
+        <span className="min-w-0 truncate">{t(isSaving ? (ready ? "cadastru.savingPdf" : "cadastru.pdfPreparing") : "cadastru.savePdf")}</span>
+      </button>
+      {error && <p role="alert" className="mt-1 max-w-48 text-xs text-red-700">{t("cadastru.pdfError")}</p>}
+    </div>
   );
 }
 
@@ -547,8 +372,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
     }
     window.location.assign(featureCheckoutUrl(checkoutProductKey, lang, destination.href));
   };
-  const cadastralCardRef = useRef(null);
-  const exportCardRef = useRef(null);
+  const mapCaptureRef = useRef(null);
   const [device, setDevice] = useState({ isMobile: false, isIOS: false });
 
   useEffect(() => {
@@ -670,7 +494,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
           )}
         </a>
       </div>
-      <CadastruParcelMap location={mapLocation} cadastral={state.data} fallbackUrl={mapUrl} />
+      <CadastruParcelMap captureRef={mapCaptureRef} location={mapLocation} cadastral={state.data} fallbackUrl={mapUrl} />
     </div>
   ));
   const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);
@@ -1251,7 +1075,10 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
   />;
 
   const showShareAction = !isLockedPreview && Boolean(isAuthenticated || shareSlug);
-  const hasSecondaryActions = isAuthenticated || showShareAction;
+  const showPdfAction = Boolean(state.data && !isLockedPreview && state.data.full_access !== false && !state.data.error);
+  const hasSecondaryActions = showPdfAction || showShareAction;
+  const reportReady = !authLoading && marketReady && marketState.key === marketKey;
+  const marketData = marketReady && marketState.key === marketKey ? marketState.data : null;
   const showFavoriteAction = isAuthenticated && Boolean(favoritePath);
 
   return (
@@ -1279,7 +1106,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                   ? `col-span-3 row-start-2 grid items-start ${showFavoriteAction ? "grid-cols-[minmax(0,1fr)_auto]" : "grid-cols-1"}`
                   : "col-start-3 row-start-1"}`}>
                   {hasSecondaryActions && (
-                    <div className={`grid min-w-0 items-start gap-2 max-[375px]:[&_svg]:hidden sm:contents ${showShareAction && isAuthenticated ? "grid-cols-2" : "grid-cols-1"}`}>
+                    <div className={`grid min-w-0 items-start gap-2 max-[375px]:[&_svg]:hidden sm:contents ${showShareAction && showPdfAction ? "grid-cols-2" : "grid-cols-1"}`}>
                       {showShareAction && (
                         <CadastruShareButton
                           key={`${shareSlug}:${favoritePath || favoriteNumber || favoriteAddress}`}
@@ -1289,7 +1116,12 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                           searchToken={evaluationToken}
                         />
                       )}
-                      {isAuthenticated && <CadastruImageSaveButton cadastral={state.data} targetRef={exportCardRef} />}
+                      {showPdfAction && (
+                        <CadastruPdfSaveButton key={marketKey} ready={reportReady} mapCaptureRef={mapCaptureRef}
+                          reportData={{ cadastral: state.data, mapLocation: hasMapLocation ? mapLocation : null,
+                            nearby: nearbyData, transport: transportData, reports: reportsData, reportsAvailable,
+                            market: marketData }} />
+                      )}
                     </div>
                   )}
                   {showFavoriteAction && (
@@ -1411,7 +1243,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
           )}
 
           {state.data && (
-            <div ref={cadastralCardRef} className="overflow-visible bg-gray-50 p-1 max-sm:px-0 max-sm:[&_.max-w-xl]:max-w-none">
+            <div className="overflow-visible bg-gray-50 p-1 max-sm:px-0 max-sm:[&_.max-w-xl]:max-w-none">
               {canUnlock && paymentProvider === 'maib' && <PaymentOfferTracker productKey={checkoutProductKey}
                 buyerType={session?.user && !session.user.is_anonymous ? 'account' : 'guest'} language={lang} />}
               <CadastralDataCard
@@ -1456,7 +1288,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
               unavailable={!nearbySearchAvailable || (reportsState.key === nearbyKey && reportsState.error)}
             />
           )}
-          <CadastruListingsCard data={marketReady && marketState.key === marketKey ? marketState.data : null}>
+          <CadastruListingsCard data={marketData}>
             {valuationPrefill && !shareSlug && (
               <button
                 type="button"
@@ -1510,19 +1342,6 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
             <p className="mt-6 text-center text-xs text-gray-500">
               <a href="https://ipcbi.gov.md" className="underline">ipcbi.gov.md</a> · © OpenStreetMap contributors · Powered by <a href="https://www.geoapify.com/" className="underline">Geoapify</a> · © <a href="https://map.md/" className="underline">map.md</a>{protectedMap ? " · © Google" : null}
             </p>
-          )}
-          {state.data && (
-            <div
-              ref={exportCardRef}
-              aria-hidden="true"
-              className="pointer-events-none fixed left-[-10000px] top-0 w-[1024px] overflow-visible bg-gray-50 p-1"
-            >
-              <CadastralDataCard
-                cadastral={state.data}
-                locked={isLockedPreview}
-                forceDesktopLayout
-              />
-            </div>
           )}
         </section>
       </main>

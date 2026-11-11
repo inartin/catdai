@@ -22,7 +22,7 @@ function Stat({ label, value, detail, currency, timeframe, accent = false }) {
         <span className="rounded-md bg-white/5 px-2 py-1 text-xs font-medium text-slate-400">{timeframe}</span>
       </div>
       <p className={`mt-4 break-words text-3xl font-semibold tracking-tight tabular-nums xl:text-4xl ${accent ? "text-emerald-300" : "text-slate-50"}`}>
-        {value}<span className="ml-2 text-sm font-medium tracking-normal text-slate-400">{currency}</span>
+        {value}{currency && <span className="ml-2 text-sm font-medium tracking-normal text-slate-400">{currency}</span>}
       </p>
       <p className="mt-3 text-xs leading-relaxed text-slate-400">{detail}</p>
     </div>
@@ -64,6 +64,7 @@ export default function PaymentsPage() {
     change();
   }
   const totals = result?.totals;
+  const funnel = result?.cadastruFunnel;
   const selectedCurrency = result?.currency || currency || "MDL";
   const activePeriod = PAYMENT_PERIOD_OPTIONS.find(({ key }) => key === period);
   const timeframe = period === "day" ? "Today" : activePeriod.label;
@@ -124,6 +125,23 @@ export default function PaymentsPage() {
             <Stat label="Payments" timeframe={timeframe} value={number(totals.count)} detail={totals.averageMinor == null ? "No completed payments in this period" : `Average payment ${money(totals.averageMinor)} ${selectedCurrency}`} />
           </div>
           <p className="text-xs leading-relaxed text-slate-400">MAIB and legacy Paddle payments. Fees and final bank payouts are not provided by Checkout. Refunds reflect the latest recorded state of payments made in this period.</p>
+
+          <section className="space-y-3" aria-labelledby="cadastru-purchase-funnel">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="cadastru-purchase-funnel" className="font-semibold text-slate-100">Cadastru purchase funnel</h2>
+              <p className="text-xs text-slate-400">Unique visitors · All currencies</p>
+            </div>
+            {funnel ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                <Stat label="Successful search" timeframe={timeframe} value={number(funnel.searched)} detail="Cadastral data returned" />
+                <Stat label="Opened paywall or checkout" timeframe={timeframe} value={number(funnel.opened)} detail="After a successful search" />
+                <Stat label="Purchased" timeframe={timeframe} value={number(funnel.purchased)} accent
+                  detail={funnel.opened
+                    ? `${(funnel.purchased / funnel.opened).toLocaleString("ro-RO", { style: "percent", maximumFractionDigits: 1 })} of visitors who opened the paywall or checkout`
+                    : "Visitors who completed a payment after opening"} />
+              </div>
+            ) : <p role="status" className="text-sm text-slate-400">Cadastru funnel unavailable. Refresh to try again.</p>}
+          </section>
 
           {result.products.length > 0 && (
             <section className="rounded-2xl border border-white/[0.08] bg-[var(--admin-panel)] p-5 sm:p-6">

@@ -9,6 +9,7 @@ import * as jsxRuntime from 'react/jsx-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as language from '../src/lib/language.js';
 import { cadastruValueLabel } from '../src/lib/cadastru-value-labels.js';
+import { cadastruPropertyDetails } from "../src/lib/cadastru-property-details.js";
 import { featureResultPath, allowsGuestCheckout } from '../src/lib/guest-checkout.mjs';
 import { maibProductTitle, purchaseMessages } from '../src/lib/maib/purchase.mjs';
 import * as resultHelpers from '../src/lib/maib/result.mjs';
@@ -60,6 +61,7 @@ const mocks={react:React,'react/jsx-runtime':jsxRuntime,
   '@/context/LanguageContext':{useTranslation:()=>({lang:'en',t}),LanguageProvider:({children})=>children},
   '@/lib/language':language,
   '@/lib/cadastru-value-labels':{cadastruValueLabel},
+  '@/lib/cadastru-property-details': { cadastruPropertyDetails },
   '@/lib/maib/purchase.mjs':{maibProductTitle,MAIB_FEATURE_LABELS:{cadastru_lookup:'pricing.featureCadastru'}},
   '@/lib/maib/result.mjs':resultHelpers,'@/lib/payment-urls.mjs':{paymentAppLink},
   ...Object.fromEntries(Object.entries(copy).map(([lang,values])=>[`@/locales/${lang}.json`,{default:values}]))};

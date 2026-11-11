@@ -288,7 +288,7 @@ function countByValue(rows, key) {
   }, {});
 }
 
-function buildCadastruSearchStats(rows, cutoffs) {
+function buildCadastruSearchStats(rows, cutoffs, range = {}, now = Date.now()) {
   const byType = {
     address: rows.filter((row) => row.search_type === "address").length,
     number: rows.filter((row) => row.search_type === "number").length,
@@ -297,8 +297,25 @@ function buildCadastruSearchStats(rows, cutoffs) {
     apartment: { total: 0, address: 0, number: 0 },
     land: { total: 0, address: 0, number: 0 },
   };
+  const byDay = new Map();
+  const accounts = new Set();
+  const accountQueries = new Set();
   for (const row of rows) {
     const number = String(row.cadastral_number || "").trim();
+    if (row.created_at) {
+      const day = chisinauDateKey(row.created_at);
+      byDay.set(day, (byDay.get(day) || 0) + 1);
+    }
+    if (row.user_id) {
+      const query = row.search_type === "address"
+        ? (row.search_address || "").normalize().trim().toLowerCase().replace(/\s+/g, " ")
+        : number.replace(/\./g, "");
+      if (query) {
+        accounts.add(row.user_id);
+        accountQueries.add(JSON.stringify([row.user_id, row.search_type, query]));
+      }
+    }
+
     const apartmentRequest = row.search_type === "address" && (
       String(row.search_request?.apartment_number || "").trim()
       || /(?:^|[\s,])(?:ap|apt|apartament)\.?\s*\d{1,4}\s*$/iu.test(row.search_address || "")
@@ -312,8 +329,21 @@ function buildCadastruSearchStats(rows, cutoffs) {
     byPropertyType[type][row.search_type]++;
   }
 
+  const firstDay = range.since ? chisinauDateKey(range.since) : [...byDay.keys()].sort()[0];
+  const lastDay = chisinauDateKey(range.until ? Date.parse(range.until) - 1 : now);
+  const daily = [];
+  const end = Date.parse(lastDay);
+  for (let date = Date.parse(firstDay); date <= end; date += PERIODS["24h"]) {
+    const day = new Date(date).toISOString().slice(0, 10);
+    daily.push({ day, count: byDay.get(day) || 0 });
+  }
+  const days = range.period === "week" ? 7 : daily.length;
+
   return {
     total: rows.length,
+    daily,
+    averageDaily: days ? rows.length / days : null,
+    averageUniquePerAccount: accounts.size ? accountQueries.size / accounts.size : null,
     registered: rows.filter((row) => row.user_id).length,
     anonymous: rows.filter((row) => !row.user_id).length,
     address: byType.address,
@@ -728,7 +758,8 @@ export async function GET(request) {
   if (unauthorized) return unauthorized;
 
   const bypassCache = request.nextUrl.searchParams.get("fresh") === "1";
-  const periodRange = adminPeriod(request.nextUrl.searchParams.get("period"));
+  const now = Date.now();
+  const periodRange = adminPeriod(request.nextUrl.searchParams.get("period"), new Date(now));
   const { period, since: periodSince, until: periodUntil } = periodRange;
   const periodConfig = DASHBOARD_PERIODS[period];
   const marketTrendsSinceDate = getMarketTrendsPeriodStart(period, periodRange);
@@ -739,7 +770,6 @@ export async function GET(request) {
     return NextResponse.json(cache[cacheKey].data);
   }
 
-  const now = Date.now();
   const cutoffs = Object.fromEntries(
     Object.entries(PERIODS).map(([k, ms]) => [k, new Date(now - ms).toISOString()])
   );
@@ -815,7 +845,7 @@ export async function GET(request) {
   try {
     const searchesWithFavorites = await loadCadastruResultCategories(await loadCadastruSuggestionActivity(
       await loadCadastruShareStatistics(await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50)))));
-    cadastruSearches = buildCadastruSearchStats(attachUserNames(cadastruSearchEvents, usersById), cutoffs);
+    cadastruSearches = buildCadastruSearchStats(cadastruSearchEvents, cutoffs, periodRange, now);
     cadastruSearches.recent = attachUserNames(searchesWithFavorites, usersById);
   } catch (error) {
     console.error("Failed to load cadastru search statistics:", error.message);

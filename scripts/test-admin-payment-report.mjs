@@ -11,6 +11,9 @@ class FixedDate extends Date {
 }
 let authorized = true;
 let orders = [];
+let searches = [];
+let checkoutEvents = [];
+let failingFunnelPage = null;
 let failingPage = null;
 let failDetails = false;
 let failingUserPage = null;
@@ -22,7 +25,7 @@ const cacheWrites = [];
 const buyer = { id: "buyer", email: "buyer@example.com", user_metadata: { full_name: "Buyer", catdai_is_admin: true } };
 const admin = { id: "admin", app_metadata: { catdai_is_admin: true } };
 let users = [buyer, { id: "guest", is_anonymous: true }, admin];
-const context = vm.createContext({ console: { error() {} }, Date: FixedDate });
+const context = vm.createContext({ console: { error() {} }, Date: FixedDate, URL });
 const periods = new vm.SourceTextModule(await fs.readFile("src/lib/admin-periods.js", "utf8"), { context });
 await periods.link(() => { throw new Error("Unexpected period dependency"); });
 await periods.evaluate();
@@ -67,23 +70,34 @@ const mocks = {
       const query = {
         select() { return query; },
         in(key, values) { filters.push((row) => values.includes(row[key])); return query; },
+        is(key, value) { filters.push((row) => row[key] === value); return query; },
+        or(expression) {
+          assert.equal(expression, "result_cadastru.eq.true,result_type.in.(full_data,apartment_only,land_only,address_only)");
+          filters.push((row) => row.result_cadastru || ["full_data", "apartment_only", "land_only", "address_only"].includes(row.result_type));
+          return query;
+        },
         not(key, operator, value) { assert.equal(operator, "is"); filters.push((row) => row[key] !== value); return query; },
         lt(key, value) { filters.push((row) => row[key] < value); return query; },
         gte(key, value) { filters.push((row) => row[key] >= value); return query; },
-        order(key) { sort.push(key); return query; },
+        order(key, { ascending = true } = {}) { sort.push([key, ascending]); return query; },
         range(from, to) { start = from; end = to; return query; },
         then(resolve, reject) {
           let rows;
           if (table === "maib_payment_orders") {
             if (failDetails) return Promise.resolve({ data: null, error: { message: "Details failed" } }).then(resolve, reject);
             rows = orders.filter((row) => row.provider === "maib").map((row) => ({ id: row.id, receipt_email: "receipt@example.com", product_title: "Saved purchase title" }));
+          } else if (table === "cadastru_search_events" || table === "payment_checkout_events") {
+            if (start === failingFunnelPage) return Promise.resolve({ data: null, error: { message: "Funnel read failed" } }).then(resolve, reject);
+            rows = table === "cadastru_search_events" ? searches : checkoutEvents;
           } else {
             assert.equal(table, "reporting_payment_orders");
             if (start === failingPage) return Promise.resolve({ data: null, error: { message: "Read failed" } }).then(resolve, reject);
             rows = orders.filter((row) => row.provider === "paddle" || row.environment === "production");
           }
           rows = rows.filter((row) => filters.every((filter) => filter(row))).sort((a, b) => {
-            for (const key of sort) { if (a[key] !== b[key]) return a[key] > b[key] ? -1 : 1; }
+            for (const [key, ascending] of sort) {
+              if (a[key] !== b[key]) return (a[key] > b[key] ? 1 : -1) * (ascending ? 1 : -1);
+            }
             return 0;
           });
           return Promise.resolve({ data: rows.slice(start, end + 1), error: null }).then(resolve, reject);
@@ -93,13 +107,27 @@ const mocks = {
     },
   } },
 };
-const route = new vm.SourceTextModule(await fs.readFile("src/app/api/admin/payments/route.js", "utf8"), { context });
-await route.link((id) => {
-  if (id === "@/lib/admin-payments") return helper;
+function mockModule(id) {
   assert.ok(mocks[id], `Unexpected import ${id}`);
   return new vm.SyntheticModule(Object.keys(mocks[id]), function () {
     for (const [key, value] of Object.entries(mocks[id])) this.setExport(key, value);
   }, { context });
+}
+const funnelDeps = { "@/lib/admin-periods": periods };
+for (const name of ["guest-checkout.mjs", "visitor.js"]) {
+  const dependency = new vm.SourceTextModule(await fs.readFile(`src/lib/${name}`, "utf8"), { context });
+  await dependency.link(() => { throw new Error("Unexpected funnel helper dependency"); });
+  await dependency.evaluate();
+  funnelDeps[`@/lib/${name.replace(/\.js$/, "")}`] = dependency;
+}
+const funnel = new vm.SourceTextModule(await fs.readFile("src/lib/admin-cadastru-payment-funnel.js", "utf8"), { context });
+await funnel.link((id) => funnelDeps[id] || mockModule(id));
+await funnel.evaluate();
+const route = new vm.SourceTextModule(await fs.readFile("src/app/api/admin/payments/route.js", "utf8"), { context });
+await route.link((id) => {
+  if (id === "@/lib/admin-payments") return helper;
+  if (id === "@/lib/admin-cadastru-payment-funnel") return funnel;
+  return mockModule(id);
 });
 await route.evaluate();
 const get = (params = "", fresh = true) => route.namespace.GET({ nextUrl: new URL(`https://catdai.md/api/admin/payments?${params}${fresh ? "&fresh=1" : ""}`) });
@@ -124,6 +152,7 @@ assert.equal(report.totals.count, 0);
 assert.equal(report.totals.averageMinor, null);
 assert.equal(report.currency, "MDL");
 assert.equal(report.pageCount, 1);
+assert.deepEqual(report.cadastruFunnel, { searched: 0, opened: 0, purchased: 0 });
 
 orders = [
   payment("paid"),
@@ -263,3 +292,64 @@ await get("period=month", false);
 await get("period=previous_month", false);
 assert.ok(reads >= beforeMonthChange + 2, "Both month caches roll over at Chișinău midnight");
 console.log("Admin payment report checks passed.");
+
+now = Date.parse("2026-11-10T12:00:00Z");
+users = [buyer, { id: "guest", is_anonymous: true }, admin];
+const browser = (id) => `11111111-1111-4111-8111-${String(id).padStart(12, "0")}`;
+const lookup = (id, fields = {}) => ({ id, result_type: "full_data", duplicate_of: null, created_at: "2026-11-10T07:00:00Z", ...fields });
+const resultPath = "/ro/cadastru/rezultat?cadastral_number=0100201.999";
+const checkoutPath = `/payment/maib/checkout?return_to=${encodeURIComponent(resultPath)}`;
+const open = (id, fields = {}) => ({ id, event_type: "checkout_page_opened", product_key: "cadastru_lookup_single",
+  path: checkoutPath, created_at: "2026-11-10T08:00:00Z", ...fields });
+
+searches = [
+  ...Array.from({ length: 1000 }, (_, id) => lookup(id, { user_id: "buyer", visitor: { device_id: browser(id % 2) } })),
+  lookup(1000, { visitor: { device_id: browser(2) }, result_type: "no_data", result_cadastru: true }),
+  lookup(1001, { visitor: { device_id: browser(3) } }),
+  lookup(1002, { user_id: "early-payment" }),
+  lookup(1003, { user_id: "pricing-only" }),
+  lookup(1004, { user_id: "wrong-order", created_at: "2026-11-10T09:00:00Z" }),
+  lookup(1005, { user_id: "before-period", created_at: "2026-11-09T21:59:59Z" }),
+  lookup(1006, { user_id: "no-data", result_type: "no_data" }),
+  lookup(1007, { user_id: "duplicate", duplicate_of: 1 }),
+  lookup(1008, { user_id: "bot", visitor: { device_type: "Bot" } }),
+  lookup(1009, { user_id: "admin" }),
+  lookup(1010),
+];
+checkoutEvents = [
+  open(1, { user_id: "buyer", event_type: "checkout_popup_opened", path: resultPath }),
+  open(2, { user_id: "buyer" }),
+  open(3, { device_id: browser(2) }),
+  open(4, { user_id: "guest", device_id: browser(2), event_type: "checkout_order_created" }),
+  open(5, { user_id: "shared-a", device_id: browser(3) }),
+  open(6, { user_id: "shared-b", device_id: browser(3) }),
+  open(7, { user_id: "early-payment" }),
+  open(8, { user_id: "pricing-only", path: checkoutPath + "&checkout_source=pricing" }),
+  open(9, { user_id: "wrong-order" }),
+  open(10, { user_id: "before-period" }),
+  open(11, { user_id: "no-data" }),
+  open(12, { user_id: "admin" }),
+];
+const paid = (id, fields) => payment(id, { paid_at: "2026-11-10T09:00:00Z", ...fields });
+orders = [
+  paid("buyer-one", { currency_code: "EUR", provider: "paddle" }),
+  paid("buyer-two", { currency_code: "EUR", provider: "paddle" }),
+  paid("guest-package", { user_id: "guest" }),
+  paid("too-early", { user_id: "early-payment", paid_at: "2026-11-10T07:30:00Z" }),
+  paid("sandbox-only", { user_id: "early-payment", environment: "sandbox" }),
+  paid("shared-browser", { user_id: "shared-b" }),
+  paid("pricing", { user_id: "pricing-only" }),
+  paid("wrong-order", { user_id: "wrong-order" }),
+  paid("admin", { user_id: "admin" }),
+];
+report = await (await get("period=day&currency=MDL")).json();
+assert.deepEqual(report.cadastruFunnel, { searched: 6, opened: 3, purchased: 2 },
+  "The ordered funnel includes guest attribution and all currencies, deduplicates repeat steps, and rejects unrelated or out-of-order events");
+assert.deepEqual((await (await get("period=day&currency=EUR")).json()).cadastruFunnel, report.cadastruFunnel);
+failingFunnelPage = 1000;
+const beforeFunnelFailure = cacheWrites.length;
+report = await (await get("period=day")).json();
+assert.equal(report.cadastruFunnel, null, "A failed event page cannot produce a partial funnel");
+assert.ok(report.totals.count > 0, "Sales remain available if the funnel fails");
+assert.equal(cacheWrites.length, beforeFunnelFailure, "An incomplete report is never cached");
+console.log("Cadastru purchase funnel checks passed.");

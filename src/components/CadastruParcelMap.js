@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useTranslation } from "@/context/LanguageContext";
 import { cadastruMapFeatures } from "@/lib/cadastru-map";
 
-export default function CadastruParcelMap({ location, cadastral, fallbackUrl }) {
+export default function CadastruParcelMap({ location, cadastral, fallbackUrl, captureRef }) {
   const { t, lang } = useTranslation();
   const container = useRef(null);
   const mapRef = useRef(null);
@@ -16,6 +16,55 @@ export default function CadastruParcelMap({ location, cadastral, fallbackUrl }) 
   const latitude = location.latitude;
   const longitude = location.longitude;
   const hasBoundaries = JSON.parse(geometry).features.length > 0;
+
+  useImperativeHandle(captureRef, () => ({
+    capture() {
+      const map = mapRef.current;
+      if (!map || failed) return null;
+
+      return new Promise((resolve) => {
+        const finish = (image) => {
+          clearTimeout(timeout);
+          map.off("idle", requestFrame);
+          map.off("render", copyFrame);
+          resolve(image);
+        };
+        // Read the WebGL buffer in the render event, before the browser clears it.
+        const copyFrame = () => {
+          if (mapRef.current !== map || !map.areTilesLoaded()) return finish(null);
+          const source = map.getCanvas();
+          if (!source.width || !source.height) return finish(null);
+          const image = document.createElement("canvas");
+          image.width = source.width;
+          image.height = source.height;
+          const ctx = image.getContext("2d");
+          if (!ctx) return finish(null);
+          try {
+            ctx.drawImage(source, 0, 0);
+            const point = map.project([longitude, latitude]);
+            ctx.scale(source.width / source.clientWidth, source.height / source.clientHeight);
+            ctx.beginPath();
+            ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = "#047857";
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#ffffff";
+            ctx.stroke();
+            finish(image);
+          } catch {
+            finish(null);
+          }
+        };
+        const requestFrame = () => {
+          map.once("render", copyFrame);
+          map.triggerRepaint();
+        };
+        const timeout = setTimeout(() => finish(null), 2000);
+        if (map.loaded()) requestFrame();
+        else map.once("idle", requestFrame);
+      });
+    },
+  }), [failed, latitude, longitude]);
 
   useEffect(() => {
     let disposed = false;

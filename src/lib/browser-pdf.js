@@ -102,7 +102,7 @@ function buildPdfFromJpegs(pages) {
   return concatBytes(chunks);
 }
 
-function canvasToPdfPage(canvas) {
+export function canvasToPdfPage(canvas) {
   return {
     bytes: dataUrlToBytes(canvas.toDataURL("image/jpeg", 0.94)),
     width: canvas.width,
@@ -136,7 +136,11 @@ export function downloadCanvasesAsPdf({ canvases, fileName }) {
     throw new Error("PDF needs at least one page");
   }
 
-  const pdfBytes = buildPdfFromJpegs(canvases.map(canvasToPdfPage));
+  downloadPdfPages({ pages: canvases.map(canvasToPdfPage), fileName });
+}
+
+export function downloadPdfPages({ pages, fileName }) {
+  const pdfBytes = buildPdfFromJpegs(pages);
   const pdfBlob = new Blob([pdfBytes], { type: "application/pdf" });
   const pdfUrl = URL.createObjectURL(pdfBlob);
 

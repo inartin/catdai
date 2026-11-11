@@ -408,6 +408,36 @@ assert.equal(propertyCounts.land.total + propertyCounts.apartment.total, 7,
   "building-only and untyped searches are not guessed; apartment requests never become land fallbacks");
 console.log("Property search counts passed: request intent, legacy labels, parcel/unit numbers, cache, failures and unknown types.");
 
+const weekNow = new Date("2026-11-04T12:00:00Z");
+const week = periods.namespace.adminPeriod("week", weekNow);
+const addressSearch = { ...cachedSearch, search_address: "Chișinău, str Test 10 ap 5", user_id: "a" };
+const activity = [
+  ...Array.from({ length: 52 }, (_, index) => ({ ...addressSearch, id: index + 1, created_at: "2026-11-03T22:05:00Z" })),
+  { ...addressSearch, id: 53, search_address: " CHIȘINĂU, str  Test 10 ap 5 ", result_type: "no_data", created_at: "2026-11-03T21:55:00Z" },
+  { ...addressSearch, id: 54, search_address: "Chișinău, str Test 10 ap 6", result_type: "error", created_at: "2026-11-02T21:00:00Z" },
+  { ...cachedNumber, id: 55, user_id: "b", result_type: "address_only", created_at: "2026-11-02T21:00:00Z" },
+  { ...cachedNumber, id: 56, user_id: "b", cadastral_number: "010010613101097", result_type: "no_data", created_at: "2026-11-02T21:00:00Z" },
+  { ...addressSearch, id: 57, user_id: null, result_type: "apartment_only", created_at: "2026-10-28T13:00:00Z" },
+  { ...addressSearch, id: 58, user_id: "c", search_address: null, result_type: null, created_at: "2026-10-28T13:00:00Z" },
+];
+const searchStats = buildCadastruSearchStats(activity, {}, week, weekNow);
+assert.equal(searchStats.total, 58);
+assert.equal(searchStats.recent.length, 50);
+assert.equal(searchStats.averageDaily, 58 / 7, "rolling week averages over seven days despite two partial calendar dates");
+assert.equal(searchStats.averageUniquePerAccount, 1.5, "repeats collapse per account, including undotted numbers and address formatting");
+assert.equal(searchStats.daily.length, 8);
+assert.equal(searchStats.daily[0].day, "2026-10-28");
+assert.equal(searchStats.daily.at(-1).day, "2026-11-04");
+assert.equal(searchStats.daily.at(-1).count, 52, "all events after local midnight count, beyond the visible table");
+assert.equal(searchStats.daily.at(-2).count, 1);
+assert.equal(searchStats.daily.find(({ day }) => day === "2026-10-31").count, 0);
+const previousMonth = periods.namespace.adminPeriod("previous_month", weekNow);
+const emptyMonth = buildCadastruSearchStats([], {}, previousMonth, weekNow);
+assert.equal(emptyMonth.daily.length, 31, "calendar buckets survive the fall DST change");
+assert.equal(emptyMonth.daily.at(-1).day, "2026-10-31", "the exclusive month end does not add the first of this month");
+assert.equal(emptyMonth.averageDaily, 0);
+assert.equal(emptyMonth.averageUniquePerAccount, null);
+
 const correctedAddress = 'Bălți, str Tudor Vladimirescu 6 ap 16';
 const suggestionRetryId = crypto.randomUUID();
 const recoveredEvent = { ...recorded[0], status: 'failure', suggestion_recovery: {
@@ -445,3 +475,22 @@ assert.equal(groupExternalApiEvents([earlierSuccess, lateFailure])[0].outcome, '
   'an earlier success cannot hide a later failed primary');
 assert.equal(groupExternalApiEvents([{ ...lateFailure, created_at: '2026-11-02T08:22:00Z' }, earlierSuccess])[0].outcome, 'recovered',
   'a later successful primary recovers the same lookup');
+
+nodes(render(), (node) => node.props?.label === "External API")[0].props.onClick();
+slots[2] = { periodLabel: "Last week", cadastruSearches: searchStats };
+assert(!textOf(render()).includes("Daily usage"), "the Cadastru summary starts collapsed");
+nodes(render(), (node) => node.props?.label === "Cadastru Searches")[0].props.onClick();
+tree = render();
+assert(textOf(tree).includes("Last week") && textOf(tree).includes("Daily usage"));
+const dailyTiles = nodes(tree, (node) => node.type === "time");
+assert.equal(dailyTiles.length, 8);
+assert.equal(dailyTiles[0].props.dateTime, "2026-10-28");
+assert.equal(dailyTiles.at(-1).props.dateTime, "2026-11-04");
+assert.equal(nodes(tree, (node) => node.props?.label === "Avg. unique searches")[0].props.value, "1,5");
+assert.equal(textOf(nodes(tree, (node) => node.props?.label === "Successful")[0].props.value), "54");
+assert.equal(textOf(nodes(tree, (node) => node.props?.label === "Unsuccessful")[0].props.value), "3");
+slots[2] = { periodLabel: "Previous month", cadastruSearches: emptyMonth };
+tree = render();
+assert.equal(nodes(tree, (node) => node.type === "time").length, 31, "the open summary updates when the period response changes");
+assert.equal(nodes(tree, (node) => node.props?.label === "Avg. per day")[0].props.value, "0");
+console.log("Cadastru usage summary passed: period boundaries, zero days, full search history, account deduplication and expanded metrics.");

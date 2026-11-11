@@ -1,6 +1,7 @@
 // Isolated UI checks; no servers, network, or database writes.
 // pnpm exec node --experimental-vm-modules scripts/test-cadastru-unlock-actions.mjs
 import { cadastruValueLabel } from "../src/lib/cadastru-value-labels.js";
+import { cadastruPropertyDetails } from "../src/lib/cadastru-property-details.js";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
@@ -19,7 +20,6 @@ const { transform, loadBindings } = require("next/dist/build/swc");
 await loadBindings();
 const jsx = (type, props) => ({ type, props });
 const noop = () => null;
-const AuthRequiredModal = () => null;
 const FeaturePricingAction = () => null;
 const locales = Object.fromEntries(await Promise.all(["ro", "ru"].map(async (lang) =>
   [lang, JSON.parse(await fs.readFile(`src/locales/${lang}.json`, "utf8"))])));
@@ -53,15 +53,10 @@ function findNodes(node, predicate) {
   return [...(predicate(node) ? [node] : []), ...findNodes(node.props?.children, predicate)];
 }
 
-function textOf(node) {
-  if (node == null || typeof node === "boolean") return "";
-  if (Array.isArray(node)) return node.map(textOf).join("");
-  return typeof node === "object" ? textOf(node.props?.children) : String(node);
-}
-
 const CadastralDataCard = await loadJsx("src/components/CadastralDataCard.js", {
   "@/context/LanguageContext": translation,
   "@/lib/cadastru-value-labels": { cadastruValueLabel },
+  "@/lib/cadastru-property-details": { cadastruPropertyDetails },
 });
 const address = "22, Strada Luceafărul, Stăuceni";
 const purchase = { product_key: "cadastru_lookup_single", price_mdl: 25 };
@@ -83,6 +78,7 @@ const singleNumberPreview = {
 };
 
 async function checkPageAction(isAuthenticated) {
+  let checkoutUrl = "";
   const slots = [];
   let cursor = 0;
   let effects = [];
@@ -100,6 +96,12 @@ async function checkPageAction(isAuthenticated) {
   ]);
   const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
     "./loading": { default: noop },
+    "next/link": { default: noop },
+    "@/components/usePaymentProvider": { default: () => "maib" },
+    "@/lib/maib/products.mjs": { maibProduct: (key) => ({ key, amount_mdl: 49 }) },
+    "@/lib/payment-urls.mjs": { featureCheckoutUrl: (key, locale) => `/${locale}/checkout/${key}` },
+    "@/lib/ga4-payment-client": { trackPaymentAnalytics: noop },
+    "@/lib/cadastru-map": { cadastruMapLocation: () => null },
     "@/lib/cadastru-lookup-tracking": { ...trackingModule.namespace },
     "@/lib/visitor-browser": { getDeviceId: () => null },
     "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: () => {} },
@@ -117,10 +119,10 @@ async function checkPageAction(isAuthenticated) {
     "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: () => false,
       validMunicipalReportsResult: () => false },
     "@/components/CadastralDataCard": { default: CadastralDataCard },
-    "@/components/AuthRequiredModal": { default: AuthRequiredModal },
     "@/components/FeaturePricingAction": { default: FeaturePricingAction },
   }, {
-    window: {}, navigator: { userAgent: "" }, localStorage: { removeItem: noop },
+    window: { location: { href: "https://catdai.md/cadastru/rezultat", assign: (url) => { checkoutUrl = url; } } },
+    requestAnimationFrame: noop, navigator: { userAgent: "" }, localStorage: { removeItem: noop },
     sessionStorage: { getItem: (key) => storage.get(key) ?? null },
     fetch: async (url) => {
       assert(isAuthenticated, "anonymous result uses its saved preview");
@@ -136,22 +138,14 @@ async function checkPageAction(isAuthenticated) {
   render();
   effects.forEach((effect) => effect());
   await new Promise((resolve) => setTimeout(resolve, 0));
-  let tree = render();
+  const tree = render();
+  assert.equal(findNodes(tree, (node) => node.props?.reportData).length, 0, "locked previews cannot export a PDF");
   const card = findNodes(tree, (node) => node.type === CadastralDataCard)[0];
   assert(card, "multi-property result renders its cadastral card");
-  const buttons = findNodes(CadastralDataCard(card.props), (node) => node.type === "button");
-  assert.equal(buttons.length, 1, `${lang}: multi-property result offers one shared unlock action`);
-  assert.equal(textOf(buttons[0]), t("cadastru.payToUnlock"));
-  buttons[0].props.onClick();
-  tree = render();
-  const openModals = findNodes(tree, (node) => node.type === AuthRequiredModal && node.props.open);
-  assert.equal(openModals.length, 1, "unlock action opens one modal");
-  assert.equal(openModals[0].props.copyKey, "payment.buyAccess");
-  if (isAuthenticated) {
-    const offer = findNodes(openModals[0], (node) => node.type === FeaturePricingAction)[0];
-    assert.equal(offer.props.offer.product_key, purchase.product_key);
-    assert.equal(offer.props.variant, "cadastru");
-  }
+  const [dock] = findNodes(tree, (node) => node.type === FeaturePricingAction && node.props.mobileDock);
+  assert.equal(dock.props.offer.product_key, purchase.product_key);
+  card.props.onLockedClick();
+  assert.equal(checkoutUrl, `/${lang}/checkout/${purchase.product_key}`);
 }
 
 for (lang of ["ro", "ru"]) {
@@ -164,7 +158,7 @@ for (lang of ["ro", "ru"]) {
     assert.equal(findNodes(CadastralDataCard({ ...props, cadastral: { ...cadastral, full_access: true, locked_sections: {} } }),
       (node) => node.type === "button").length, 0, "full-access results have no unlock action");
     assert.equal(findNodes(CadastralDataCard({ ...props, showRevealButton: false }),
-      (node) => node.type === "button").length, 0, "image exports have no interactive action");
+      (node) => node.type === "button").length, 0, "a card without a reveal action does not show a button");
   }
 }
 console.log("Cadastru single/multi-property login and payment actions pass in RO/RU.");

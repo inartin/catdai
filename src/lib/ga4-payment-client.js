@@ -1,4 +1,5 @@
 import { catalogPaymentParams } from './ga4-payment.mjs';
+import { readGoogleConsent } from './google-consent.mjs';
 
 const browserEvents = new Set(['paid_offer_viewed', 'checkout_button_clicked', 'begin_checkout',
   'maib_pay_button_clicked', 'sent_to_maib', 'returned_from_maib', 'checkout_error']);
@@ -9,7 +10,7 @@ export function paymentAnalyticsAvailable() {
       && ['catdai.md', 'www.catdai.md'].includes(window.location.hostname)
       && !window.location.pathname.startsWith('/admin')
       && /^G-[A-Z0-9]+$/.test(process.env.NEXT_PUBLIC_GA_ID || '')
-      && localStorage.getItem('cookie_consent') === 'granted' && typeof window.gtag === 'function';
+      && readGoogleConsent().analytics_storage === 'granted' && typeof window.gtag === 'function';
   } catch { return false; }
 }
 
@@ -40,6 +41,7 @@ export async function capturePaymentAnalytics(sandbox = false) {
       new Promise(resolve => setTimeout(() => resolve(null), 400)),
     ]);
     if (!values || !paymentAnalyticsAvailable()) return null;
-    return { measurement_id: measurementId, client_id: values[0], session_id: String(values[1] || ''), analytics_consent: true };
+    return { measurement_id: measurementId, client_id: values[0], session_id: String(values[1] || ''),
+      analytics_consent: true, ads_measurement_consent: readGoogleConsent().ad_user_data === 'granted' };
   } catch { return null; }
 }

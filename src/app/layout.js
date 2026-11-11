@@ -8,6 +8,7 @@ import OnlineUsersTracker from "@/components/OnlineUsersTracker";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import GuestAccountPrompt from "@/components/GuestAccountPrompt";
 import { getCanonicalSiteUrl, serializeJsonLd } from "@/lib/seo";
+import { COOKIE_CONSENT_KEY, googleConsentByChoice } from "@/lib/google-consent.mjs";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -76,14 +77,11 @@ export default function RootLayout({ children }) {
                   var isAdminRoute = window.location.pathname.startsWith('/admin');
                   var isDevCadastruRoute = ${process.env.NODE_ENV === "development"} && /^\\/(?:ro\\/|ru\\/|en\\/)?cadastru(?:\\/|$)/.test(window.location.pathname);
                   if (!isAdminRoute && !isDevCadastruRoute) {
-                  var cookieConsent = localStorage.getItem('cookie_consent');
-                  var googleConsent = cookieConsent === 'granted' ? 'granted' : 'denied';
-                  gtag('consent', 'default', {
-                    'analytics_storage': googleConsent,
-                    'ad_storage': googleConsent,
-                    'ad_user_data': googleConsent,
-                    'ad_personalization': googleConsent,
-                  });
+                    var consentByChoice = ${JSON.stringify(googleConsentByChoice)};
+                    var cookieConsent;
+                    try { cookieConsent = localStorage.getItem(${JSON.stringify(COOKIE_CONSENT_KEY)}); } catch {}
+                    gtag('consent', 'default', Object.hasOwn(consentByChoice, cookieConsent)
+                      ? consentByChoice[cookieConsent] : consentByChoice.denied);
                   }
                 `,
               }}
@@ -133,8 +131,8 @@ export default function RootLayout({ children }) {
             {children}
             <FeedbackWidget />
           </AuthProvider>
+          <CookieBanner />
         </LanguageProvider>
-        <CookieBanner />
       </body>
     </html>
   );

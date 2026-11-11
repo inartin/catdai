@@ -21,6 +21,10 @@ for (const invalid of [null, {}, { ...browserContext, analytics_consent: false }
 }
 assert.equal(analytics.verifiedAnalyticsContext(browserContext, { ...options, production: false }), null);
 assert.equal(analytics.verifiedAnalyticsContext(browserContext, { ...options, checkoutSource: null, user: {} }).checkout_origin, 'cadastru');
+for (const invalid of [undefined, false, 'granted', 'true', 1, {}]) {
+  assert.equal(analytics.verifiedAnalyticsContext({ ...browserContext, ads_measurement_consent: invalid }, options).ads_measurement_consent, false);
+}
+assert.equal(analytics.verifiedAnalyticsContext({ ...browserContext, analytics_consent: false, ads_measurement_consent: true }, options), null);
 
 const order = { id: crypto.randomUUID(), product_key: 'credits_10', amount_minor: 8900, currency_code: 'MDL',
   product_title: 'Historical bundle price', environment: 'production', grants: { cadastru_lookup: 10 },
@@ -34,6 +38,9 @@ assert.equal(payload.events[0].params.items[0].quantity, 1, 'A credit pack is on
 assert.equal(payload.events[0].params.transaction_id, order.id);
 assert.equal(payload.client_id, browserContext.client_id);
 assert.equal(payload.events[0].params.session_id, browserContext.session_id);
+assert.deepEqual(payload.consent, { ad_user_data: 'DENIED', ad_personalization: 'DENIED' });
+assert.deepEqual(analytics.paymentMeasurementPayload(purchase, { ...order, ga4_context: browserContext }).consent, payload.consent,
+  'Historical orders without a choice do not grant ad measurement');
 assert(!JSON.stringify(payload).includes('private'));
 assert.equal(analytics.paymentMeasurementPayload(purchase, { ...order, environment: 'sandbox' }), null);
 const refund = analytics.paymentMeasurementPayload({ ...purchase, event_name: 'refund', amount_minor: 2000 }, order);
@@ -57,7 +64,8 @@ const newOrder = async (environment = 'production', gaContext = context) => {
     [saved.id, environment, saved.checkout_id ||= crypto.randomUUID(), saved.payment_id ||= crypto.randomUUID(), 7900, 'MDL', status, refunded]);
   return saved;
 };
-const paid = await newOrder();
+const paid = await newOrder('production', { ...context, ads_measurement_consent: true });
+assert.equal(analytics.paymentMeasurementPayload(purchase, paid).consent.ad_user_data, 'GRANTED');
 await paid.confirm(); await paid.confirm();
 assert.equal((await q('select * from ga4_payment_events')).length, 1, 'Callback/poll duplicates enqueue one purchase');
 await paid.confirm('partially_refunded', 1000); await paid.confirm('partially_refunded', 1000);
@@ -90,25 +98,36 @@ await db.close();
 const sent = [];
 let consent = 'granted';
 const browser = vm.createContext({ process: { env: { NODE_ENV: 'production', NEXT_PUBLIC_GA_ID: measurementId } },
-  localStorage: { getItem: () => consent }, setTimeout,
+  localStorage: { getItem: key => key === 'cookie_consent' ? consent : null }, setTimeout,
   window: { location: { hostname: 'catdai.md', origin: 'https://catdai.md', pathname: '/payment/maib/checkout', search: '?receipt_email=private' },
     gtag: (...args) => args[0] === 'get' ? args[3](args[2] === 'client_id' ? browserContext.client_id : browserContext.session_id) : sent.push(args) },
 });
 const client = new vm.SourceTextModule(await fs.readFile('src/lib/ga4-payment-client.js','utf8'), { context: browser });
-await client.link(() => new vm.SyntheticModule(Object.keys(analytics), function () {
-  for (const [key,value] of Object.entries(analytics)) this.setExport(key,value);
-}, { context: browser }));
+const consentModule = new vm.SourceTextModule(await fs.readFile('src/lib/google-consent.mjs', 'utf8'), { context: browser });
+await client.link(specifier => specifier === './google-consent.mjs' ? consentModule :
+  new vm.SyntheticModule(Object.keys(analytics), function () {
+    for (const [key,value] of Object.entries(analytics)) this.setExport(key,value);
+  }, { context: browser }));
 await client.evaluate();
 assert(client.namespace.trackPaymentAnalytics('begin_checkout', 'credits_10', { email: 'private', checkout_source: 'pricing' }));
 assert.equal(sent[0][2].send_to, measurementId);
 assert.equal(sent[0][2].page_location, 'https://catdai.md/payment/maib/checkout');
 assert(!JSON.stringify(sent).includes('private'));
-assert.equal((await client.namespace.capturePaymentAnalytics()).client_id, browserContext.client_id);
+for (const choice of ['granted', 'analytics_only', 'analytics_and_ads']) {
+  consent = choice;
+  const captured = await client.namespace.capturePaymentAnalytics();
+  assert.equal(captured.client_id, browserContext.client_id);
+  const saved = analytics.verifiedAnalyticsContext(captured, options);
+  assert.deepEqual(analytics.paymentMeasurementPayload(purchase, { ...order, ga4_context: saved }).consent,
+    { ad_user_data: choice === 'analytics_and_ads' ? 'GRANTED' : 'DENIED', ad_personalization: 'DENIED' });
+}
 assert.equal(await client.namespace.capturePaymentAnalytics(true), null);
 assert.equal(client.namespace.trackPaymentAnalytics('begin_checkout', 'credits_10', { sandbox: true }), false);
-consent = 'denied';
-assert.equal(client.namespace.trackPaymentAnalytics('begin_checkout', 'credits_10'), false);
-assert.equal(await client.namespace.capturePaymentAnalytics(), null);
+for (const choice of ['denied', 'unknown', 'constructor', null]) {
+  consent = choice;
+  assert.equal(client.namespace.trackPaymentAnalytics('begin_checkout', 'credits_10'), false);
+  assert.equal(await client.namespace.capturePaymentAnalytics(), null);
+}
 consent = 'granted'; browser.window.location.hostname = 'dev.catdai.md';
 assert.equal(client.namespace.trackPaymentAnalytics('begin_checkout', 'credits_10'), false);
 browser.window.location.hostname = 'catdai.md';

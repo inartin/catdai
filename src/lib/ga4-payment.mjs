@@ -32,7 +32,8 @@ export function verifiedAnalyticsContext(value, { user, productKey, checkoutSour
     || typeof value.session_id !== 'string' || !/^\d{1,20}$/.test(value.session_id)) return null;
   return {
     measurement_id: measurementId, client_id: value.client_id, session_id: value.session_id,
-    analytics_consent: true, checkout_origin: checkoutOrigin(productKey, checkoutSource),
+    analytics_consent: true, ads_measurement_consent: value.ads_measurement_consent === true,
+    checkout_origin: checkoutOrigin(productKey, checkoutSource),
     buyer_type: user?.is_anonymous ? 'guest' : 'account',
   };
 }
@@ -58,7 +59,7 @@ export function paymentMeasurementPayload(event, order) {
   if (event.event_name === 'payment_failed') params.checkout_error_reason = 'bank_reported_failure';
   return { client_id: context.client_id,
     timestamp_micros: Date.parse(event.occurred_at) * 1000,
-    consent: { ad_user_data: 'DENIED', ad_personalization: 'DENIED' },
+    consent: { ad_user_data: context.ads_measurement_consent === true ? 'GRANTED' : 'DENIED', ad_personalization: 'DENIED' },
     events: [{ name: event.event_name, params }] };
 }
 

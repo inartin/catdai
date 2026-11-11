@@ -100,7 +100,8 @@ const sections = [
     title: "10. Cookie-uri și tehnologii similare",
     paragraphs: [
       "Platforma poate utiliza cookie-uri sau tehnologii similare pentru funcționare, preferințe, analiză de utilizare și îmbunătățirea experienței.",
-      "În măsura în care anumite cookie-uri neesențiale sunt utilizate, acestea ar trebui gestionate în conformitate cu regulile aplicabile și, după caz, cu opțiunile de consimțământ oferite utilizatorului.",
+      "Poți refuza cookie-urile opționale, permite doar Google Analytics sau permite și măsurarea în Google Ads a cumpărăturilor făcute după accesarea unei reclame. Măsurarea poate folosi identificatori de browser și de sesiune, produsul cumpărat și valoarea comenzii. Nu trimitem adresa de e-mail de pe chitanță sau datele cardului prin această integrare și nu activăm personalizarea reclamelor.",
+      "Îți poți schimba opțiunea din Setări cookie-uri, în partea de jos a paginii.",
     ],
   },
   {

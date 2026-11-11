@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useTranslation } from "@/context/LanguageContext";
 import TelegramIcon from "@/components/icons/TelegramIcon";
+import { COOKIE_SETTINGS_EVENT } from "@/lib/google-consent.mjs";
 
 function TwitterIcon() {
   return (
@@ -76,6 +77,12 @@ export default function Footer({ checkout = false }) {
   const { lang, t } = useTranslation();
   const provider = usePaymentProvider();
   const faqHref = lang === "ru" ? "/ru/faq" : "/ro/faq";
+  const cookieSettings = (
+    <button type="button" onClick={() => window.dispatchEvent(new Event(COOKIE_SETTINGS_EVENT))}
+      className="min-h-11 cursor-pointer text-left transition-colors hover:text-foreground">
+      {t("cookies.settings")}
+    </button>
+  );
 
   const paymentSystems = (
     <div className={`${checkout ? "" : "mt-4"} flex items-center justify-center gap-4`} aria-label="Payment systems">
@@ -108,6 +115,7 @@ export default function Footer({ checkout = false }) {
           <Link href="/terms" className="transition-colors hover:text-foreground">{t("footer.terms")}</Link>
           <Link href="/privacy" className="transition-colors hover:text-foreground">{t("footer.privacy")}</Link>
           <Link href="/refund" className="transition-colors hover:text-foreground">{t("footer.refund")}</Link>
+          {cookieSettings}
         </div>
         <p className="mt-4 text-center text-xs text-gray-400">{t("footer.copyright")}</p>
       </div>
@@ -142,6 +150,7 @@ export default function Footer({ checkout = false }) {
             <Link href="/refund" className="hover:text-foreground transition-colors">
               {t("footer.refund")}
             </Link>
+            {cookieSettings}
           </div>
 
           <div className="col-span-full flex min-h-11 items-center justify-center gap-3 text-gray-400">

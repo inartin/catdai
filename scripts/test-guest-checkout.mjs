@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import * as guestCheckout from '../src/lib/guest-checkout.mjs';
 import * as upgradeCookie from '../src/lib/guest-upgrade-cookie.mjs';
-import { maibProduct } from '../src/lib/maib/products.mjs';
+import * as maibProducts from '../src/lib/maib/products.mjs';
 import * as purchase from '../src/lib/maib/purchase.mjs';
 import * as paymentResult from '../src/lib/maib/result.mjs';
 import { FEATURE_PURCHASE_CONTENT } from '../src/lib/feature-purchase-content.js';
@@ -43,7 +43,13 @@ function hooks() {
       return [slots[i],value=>{slots[i]=typeof value==='function'?value(slots[i]):value;}]; },
     useRef(initial) { const i=cursor++; return slots[i] ||= {current:initial}; },
     useEffect(fn,deps) { const i=cursor++; if(!slots[i] || deps.some((value,j)=>value!==slots[i][j])) {slots[i]=deps; effects.push(fn);} },
-    useMemo: fn=>fn(), useCallback: fn=>fn, createContext:()=>({Provider:'AuthProvider'}), useContext:noop,
+    useMemo: fn=>fn(),
+    useCallback(fn,deps) {
+      const i=cursor++;
+      if(!slots[i] || deps.some((value,j)=>value!==slots[i].deps[j])) slots[i]={fn,deps};
+      return slots[i].fn;
+    },
+    createContext:()=>({Provider:'AuthProvider'}), useContext:noop,
   };
 }
 function find(node,predicate) {
@@ -97,14 +103,22 @@ assert.equal(linked.savedCookies[0][2].maxAge,0);
 // AuthContext restores the persistent guest session while keeping registered-only
 // navigation separate. Google and Telegram both prepare the same ownership proof.
 let currentSession = null, callback, authCalls=[], signedIn=0, claimFails=false, reloads=0, anonymousCalls=0;
+let authInitialization;
+let initialAuthEvents=['INITIAL_SESSION'];
+let guestClaimAttempts=0;
 const oauthRequests=[], authReturns=[];
 const storage = new Map();
 const browser = { location:{href:'https://catdai.test/evaluare?city=Chisinau',origin:'https://catdai.test',pathname:'/evaluare',search:'?city=Chisinau',hash:'',assign:url=>authCalls.push(url),replace:url=>authReturns.push(url)},
   history:{replaceState:noop},setInterval:()=>1,clearInterval:noop };
 browser.location.reload=()=>{reloads++;};
 const auth = {
+  initialize:async()=>authInitialization ?? {error:null},
   getSession:async()=>({data:{session:currentSession}}),
-  onAuthStateChange:fn=>{callback=fn;return {data:{subscription:{unsubscribe:noop}}};},
+  onAuthStateChange:fn=>{
+    callback=fn;
+    for(const event of initialAuthEvents) queueMicrotask(()=>fn(event,currentSession));
+    return {data:{subscription:{unsubscribe:noop}}};
+  },
   signInAnonymously:async()=>{anonymousCalls++;currentSession=guestSession;await callback('SIGNED_IN',currentSession);return {data:{session:currentSession}};},
   signInWithOAuth:async options=>{oauthRequests.push(options);authCalls.push('oauth');return {data:{url:'https://accounts.google.test/'}};},
   setSession:async()=>{currentSession=accountSession;await callback('SIGNED_IN',currentSession);return {error:null};},
@@ -117,6 +131,7 @@ async function authHarness() {
   },{window:browser,localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},
     document:{addEventListener:noop,removeEventListener:noop},fetch:async(url,options)=>{
       if(url==='/api/auth/telegram') return Response.json({session:{access_token:'account-token',refresh_token:'refresh-token'}});
+      if(url==='/api/auth/guest-upgrade' && options.headers.Authorization==='Bearer account-token') guestClaimAttempts++;
       authCalls.push(options.headers.Authorization);return Response.json({ok:!claimFails},{status:claimFails?503:200});}});
   const render=()=>{react.begin();return authModule.AuthProvider({children:null}).props.value;};
   render(); await react.flush(); return {react,render};
@@ -154,6 +169,45 @@ function setAuthLocation(path) {
   const url=new URL(path,'https://catdai.test');
   Object.assign(browser.location,{href:url.href,origin:url.origin,pathname:url.pathname,search:url.search,hash:url.hash});
 }
+browser.history.replaceState=(_state,_title,path)=>setAuthLocation(path);
+
+// A Google return from pricing can arrive with an older guest session in storage.
+const pricingPath='/payment/maib/checkout?product_key=cadastru_lookup_single&lang=ro&checkout_source=pricing';
+storage.clear();
+setAuthLocation(pricingPath);
+currentSession=guestSession;
+app=await authHarness();
+await app.render().signInWithGoogle();
+const pendingInitialization=Promise.withResolvers();
+authInitialization=pendingInitialization.promise;
+const previousCallback=callback;
+const previousReturnCount=authReturns.length;
+setAuthLocation(`${pricingPath}&code=google-code`);
+app=await authHarness();
+assert.equal(app.render().loading,true,'checkout waits for the Google code exchange');
+assert.equal(callback,previousCallback,'the old guest session cannot trigger a return during OAuth initialization');
+assert.equal(authReturns.length,previousReturnCount);
+currentSession=accountSession;
+setAuthLocation(pricingPath); // Supabase removes the code after exchanging it.
+initialAuthEvents=['INITIAL_SESSION','SIGNED_IN'];
+const beforeClaim=guestClaimAttempts;
+pendingInitialization.resolve({error:null});
+await app.react.flush();
+const signedInPricingAuth=app.render();
+assert.equal(signedInPricingAuth.isAuthenticated,true);
+assert.equal(signedInPricingAuth.loading,false);
+assert.equal(guestClaimAttempts,beforeClaim+1,'concurrent auth events share one guest claim');
+assert.equal(browser.location.pathname+browser.location.search,pricingPath);
+authInitialization=undefined;
+initialAuthEvents=['INITIAL_SESSION'];
+
+currentSession=guestSession;
+setAuthLocation(`${pricingPath}&code=unusable-code`);
+app=await authHarness();
+assert.equal(app.render().isAuthenticated,false);
+assert.match(app.render().error,/Failed to complete sign-in/);
+assert.equal(browser.location.pathname+browser.location.search,pricingPath);
+
 const originalTelegramClient=process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_CLIENT_ID;
 process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_CLIENT_ID='checkout-test';
 browser.Telegram={Login:{auth:(_options,done)=>{setAuthLocation('/');done({id_token:'test-token'});}}};
@@ -189,7 +243,7 @@ async function paymentHarness(query,result=false,provider='maib') {
   const mod=await load(provider==='paddle'?'src/app/payment/paddle/checkout/page.js':'src/components/MaibPaymentPage.js',{
     react,'next/link':{default:'Link'},'@/context/AuthContext':{useAuth:()=>paymentAuth},
     '@/context/LanguageContext':{useTranslation:()=>language},
-    '@/lib/guest-checkout.mjs':guestCheckout,'@/lib/maib/products.mjs':{maibProduct},'@/lib/maib/purchase.mjs':purchase,
+    '@/lib/guest-checkout.mjs':guestCheckout,'@/lib/maib/products.mjs':maibProducts,'@/lib/maib/purchase.mjs':purchase,
     '@/lib/maib/result.mjs':paymentResult,
     '@/lib/feature-purchase-content':{FEATURE_PURCHASE_CONTENT},'@/lib/tracking':{trackPaymentCheckoutEvent:noop},
     '@/lib/ga4-payment-client':{trackPaymentAnalytics:noop,capturePaymentAnalytics:async()=>null},
@@ -213,6 +267,12 @@ assert.equal(find(view.tree,node=>node.props?.children==='payment.guestOrLogin')
 view=await paymentHarness(featureQuery+'&checkout_source=pricing');
 assert.equal(find(view.tree,node=>node.type==='button'&&node.props.children==='payment.continueAsGuest').length,0);
 assert.equal(find(view.tree,node=>node.type==='@/components/AuthOptions').length,1,'pricing checkout retains login options');
+const signedOutPaymentAuth=paymentAuth;
+paymentAuth=signedInPricingAuth;
+view=await paymentHarness(new URL(pricingPath,'https://catdai.test').search);
+assert.equal(find(view.tree,node=>node.type==='@/components/AuthOptions').length,0,'pricing checkout hides login after Google returns');
+assert.equal(find(view.tree,node=>node.type==='form').length,1,'pricing checkout opens the payment form after sign-in');
+paymentAuth=signedOutPaymentAuth;
 for(const provider of ['maib','paddle']) {
   for(const returnTo of ['/cadastru/rezultat?number=123','/evaluare?city=Chisinau','/ru/evaluare?type=rent','/anunt?listing_id=1','/calculator?city=Chisinau']) {
     const query=`?product_key=sale_estimate_single&return_to=${encodeURIComponent(returnTo)}`;

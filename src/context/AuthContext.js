@@ -242,78 +242,65 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     let isMounted = true;
+    let subscription;
+    let updates = Promise.resolve();
+
+    const handleAuthError = (authError) => {
+      if (!isMounted) return;
+      setError(authError.message || "Failed to initialize auth.");
+      setLoading(false);
+    };
 
     const syncAuthState = async (nextSession) => {
+      const nextUser = nextSession?.user ?? null;
       // Finish ownership transfer before feature pages request their paid result.
       let needsGuestUpgrade = false;
       try { needsGuestUpgrade = localStorage.getItem(GUEST_UPGRADE_PENDING_KEY) === '1'; } catch { /* No pending handoff. */ }
-      if (nextSession?.user && !nextSession.user.is_anonymous && needsGuestUpgrade) {
+      if (nextUser && !nextUser.is_anonymous && needsGuestUpgrade) {
         try {
           await syncGuestUpgrade(nextSession.access_token);
           localStorage.removeItem(GUEST_UPGRADE_PENDING_KEY);
-          setGuestUpgradeError(false);
         }
-        catch { setGuestUpgradeError(true); return; }
+        catch {
+          if (isMounted) setGuestUpgradeError(true);
+          return false;
+        }
       }
-      if (!isMounted) return;
-      setSession(nextSession ?? null);
-
-      if (!nextSession) {
-        setUser(null);
-        return;
-      }
-
-      if (nextSession.user) {
-        setUser(nextSession.user);
-        return;
-      }
-
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-      if (!isMounted) return;
-      if (userError) {
-        setError(userError.message || "Failed to fetch user.");
-        return;
-      }
-      setUser(userData?.user ?? null);
+      if (!isMounted) return false;
+      setGuestUpgradeError(false);
+      setSession(nextUser ? nextSession : null);
+      setUser(nextUser);
+      return Boolean(nextUser && !nextUser.is_anonymous);
     };
 
     const initSession = async () => {
-      if (typeof window !== "undefined") {
-        const code = new URL(window.location.href).searchParams.get("code");
-        if (code) {
-          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-          if (!isMounted) return;
-          if (exchangeError) {
-            setError(exchangeError.message || "Failed to complete sign-in.");
-          }
-        }
-      }
-
-      const { data, error: sessionError } = await supabase.auth.getSession();
+      // Supabase exchanges the OAuth code before recovering any older browser session.
+      const { error: initError } = await supabase.auth.initialize();
       if (!isMounted) return;
-      if (sessionError) setError(sessionError.message || "Failed to initialize auth.");
-
-      await syncAuthState(data?.session ?? null);
-      setLoading(false);
-      if (data?.session && restoreAuthReturnTo()) {
-        return;
+      if (initError || new URL(window.location.href).searchParams.has("code")) {
+        setError(initError?.message || "Failed to complete sign-in. Please try again.");
       }
-      stripOAuthParamsFromUrl();
+
+      const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+        // Initial session and sign-in events can arrive together. Finish any guest claim once.
+        updates = updates.then(async () => {
+          if (!isMounted) return;
+          const registered = await syncAuthState(nextSession);
+          if (!isMounted) return;
+          setLoading(false);
+          if (registered && (event === "INITIAL_SESSION" || event === "SIGNED_IN") && restoreAuthReturnTo()) return;
+          if (event === "INITIAL_SESSION") stripOAuthParamsFromUrl();
+        }).catch(handleAuthError);
+        return updates;
+      });
+      subscription = data.subscription;
     };
 
-    initSession();
-
-    const { data } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
-      await syncAuthState(nextSession ?? null);
-      setLoading(false);
-      if (nextSession) {
-        if (!restoreAuthReturnTo()) stripOAuthParamsFromUrl();
-      }
-    });
+    initSession().catch(handleAuthError);
 
     return () => {
       isMounted = false;
-      data.subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, [syncGuestUpgrade]);
 

@@ -104,7 +104,8 @@ const shape = { type: "Polygon", coordinates: [[[28, 47], [28.01, 47], [28.01, 4
 const partial = { status: "success", cadastral_number: number, source: "geodata_wfs",
   registry_unavailable: true, partial: true, building: {}, apartment: {}, form_fields: {}, buildings: [],
   lands: [{ cadastral_number: number, area_m2: "1000", partial: true,
-    object_type: "Teren", map_location: { latitude: 47, longitude: 28 }, map_geometry: shape }] };
+    object_type: "Teren", traffic_intensity: "medie", utilities: { water: "Da", gas: "Nu" },
+    map_location: { latitude: 47, longitude: 28 }, map_geometry: shape }] };
 const complete = { ...partial, source: "cadastru_md_detail", lands: [{ ...partial.lands[0],
   address: "Orhei, str. Test 1", ownership_type: "Private" }] };
 delete complete.partial; delete complete.registry_unavailable; delete complete.lands[0].partial;
@@ -156,6 +157,8 @@ assert.equal(data.registry_unavailable, true, "preview retains the outage notice
 assert.equal(data.full_access, false);
 assert.equal(data.locked_sections.map, true);
 assert.notEqual(data.lands[0].area_m2, "1000", "existing preview masking is retained");
+assert.deepEqual(data.lands[0].utilities, { water: "||", gas: "||" });
+assert.equal(data.lands[0].traffic_intensity, "|||||");
 assert.equal(data.lands[0].map_geometry, undefined, "preview never leaks geometry");
 assert.equal(credits, 0);
 allowed = true;
@@ -177,6 +180,8 @@ assert.equal(response.status, 200);
 data = await response.json();
 assert.equal(data.registry_unavailable, undefined);
 assert.equal(data.lands[0].ownership_type, "Private");
+assert.deepEqual(data.lands[0].utilities, { water: "Da", gas: "Nu" });
+assert.equal(data.lands[0].traffic_intensity, "medie");
 assert.equal(credits, 1, "a recovered full result uses the existing unlock path");
 row = tables.cadastru_records[0];
 assert.ok(Date.parse(row.next_refresh_after) - Date.now() > 89 * 86400_000);

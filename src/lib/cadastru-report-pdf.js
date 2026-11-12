@@ -200,7 +200,7 @@ function drawProperty(report, cadastral, { lang, t }) {
   const address = details.displayAddress || cadastral.resolved_address || cadastral.request_address;
   if (address) report.paragraph(address, { bold: true });
   report.heading(t("result.cadastralDataTitle"), true);
-  drawRows(t("form.cadastralApartment"), details.apartmentRows);
+  drawRows(details.unitTitle, details.apartmentRows);
   drawRows(t("form.cadastralBuilding"), details.buildingRows);
   for (const [items, label] of [[details.lands, "form.cadastralLand"], [details.buildings, "form.cadastralConstruction"]]) {
     items.forEach(({ cadastral_number, rows }, index) => {

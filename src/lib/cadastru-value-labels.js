@@ -6,6 +6,7 @@ const ENGLISH = new Map(Object.entries({
   "Nu există": "None", "Nu sunt înregistrate": "None", "Nu are": "None", "Fără": "None", "Necunoscut": "Unknown",
   "Apartament": "Apartment", "Încăpere": "Unit", "Încăpere izolată": "Separate unit",
   "Încăpere locativă": "Residential unit", "Locativ": "Residential", "Locativă": "Residential",
+  "Nelocativă": "Non-residential", "Magazin": "Shop",
   "Locuință": "Dwelling", "Locuințe": "Housing", "Fond locativ": "Housing stock",
   "Bloc cu apartamente": "Apartment building", "Bloc locativ": "Apartment building",
   "Casă individuală": "Detached house", "Casă de locuit individuală": "Detached house",
@@ -26,7 +27,10 @@ const ENGLISH = new Map(Object.entries({
 
 const CATEGORY_FIELDS = new Set(["toilet", "bathroom", "is_last_floor", "object_type", "type",
   "destination", "room_usage", "use_mode", "boundary_type", "land_use", "building_use",
-  "ownership_type", "real_rights", "notes", "restrictions", "classifier", "condition", "wall_material", "water", "sewage", "gas", "electricity"]);
+  "ownership_type", "real_rights", "notes", "restrictions", "classifier", "condition", "wall_material", "water", "sewage", "gas", "electricity",
+  "located_in_basement", "located_in_semi_basement", "located_on_first_floor", "located_on_second_floor",
+  "located_on_third_floor", "located_on_fourth_floor_or_above", "located_in_attic", "heating", "autonomous_exit",
+  "basement", "semi_basement", "attic", "built_in_garage", "roof_material"]);
 
 const REGISTRY_STATUS_FIELDS = new Set(["real_rights", "notes", "restrictions"]);
 
@@ -36,5 +40,7 @@ export function cadastruValueLabel(value, field, lang) {
     return "Nu sunt înregistrate";
   }
   if (lang !== "en" || !CATEGORY_FIELDS.has(field) || typeof value !== "string") return value;
-  return ENGLISH.get(normalize(value)) || value;
+  const normalized = normalize(value);
+  if (field === "heating" && normalized === "centrala functioneaza") return "Working central system";
+  return ENGLISH.get(normalized) || value;
 }

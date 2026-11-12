@@ -10,7 +10,8 @@ import AuthRequiredModal from "@/components/AuthRequiredModal";
 import InfoCallout from "@/components/InfoCallout";
 import CadastralQuickSearchCard from "@/components/CadastralQuickSearchCard";
 import { usePaymentConfig } from "@/components/usePaymentProvider";
-import { validateCadastralNumber } from "@/lib/validation";
+import { CONSTRUCTION_CADASTRAL_RE, validateCadastralNumber } from "@/lib/validation";
+import { isCadastruNonResidential } from "@/lib/cadastru-property-details";
 
 const cities = [
   "Chișinău",
@@ -389,7 +390,8 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         access_limit: data.access_limit || null,
       });
 
-      const f = data.form_fields || {};
+      const { city, district } = data.form_fields || {};
+      const f = isCadastruNonResidential(data.apartment) ? { city, district } : data.form_fields || {};
       setForm((prev) => ({
         ...prev,
         ...(f.city && { city: f.city }),
@@ -463,9 +465,9 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
     if (form.renovation) params.set("renovation", form.renovation);
     if (form.bathrooms_count != null) params.set("bathrooms", String(form.bathrooms_count));
     if (form.balconies_count != null) params.set("balconies", String(form.balconies_count));
-    if (cadastralData && !cadastralError) {
+    if (cadastralData && !cadastralError && !isCadastruNonResidential(cadastralData.apartment)) {
       const cadastralNumber = cadastralInput.trim();
-      if (cadastralNumber) {
+      if (cadastralNumber && !CONSTRUCTION_CADASTRAL_RE.test(cadastralNumber)) {
         params.set("cadastral_number", cadastralNumber);
       }
     }

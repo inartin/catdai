@@ -87,6 +87,20 @@ export default function CadastruPage() {
             </summary>
             <div className="px-5 pb-5 text-sm leading-6 text-gray-600">
               <span className="whitespace-pre-line">{t("cadastru.infoText")}</span>
+              <section aria-labelledby="cadastru-property-data" className="mt-4 border-t border-gray-200 pt-4">
+                <h3 id="cadastru-property-data" className="font-semibold text-gray-900">
+                  {t("cadastru.propertyDataTitle")}
+                </h3>
+                <p className="mt-2">{t("cadastru.propertyDataIntro")}</p>
+                <dl className="mt-3 space-y-2">
+                  {["Land", "Buildings", "Commercial"].map((type) => (
+                    <div key={type} className="sm:grid sm:grid-cols-[12rem_1fr] sm:gap-3">
+                      <dt className="font-semibold text-gray-900">{t(`cadastru.propertyData${type}Title`)}</dt>
+                      <dd>{t(`cadastru.propertyData${type}Text`)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
               <div className="mt-4">
                 <p className="mb-3 text-sm font-semibold text-gray-900">{t("cadastru.infoExampleLabel")}</p>
                 <div className="space-y-4">

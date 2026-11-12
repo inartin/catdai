@@ -1,6 +1,7 @@
 import { buildFeatureCreditRequiredPayload } from "@/lib/paid-feature-usage";
 import { resolveCadastruCityFromAddress, resolveCadastruSupportedCity } from "@/lib/cadastru-supported-cities";
 import { cadastruMapLocation, redactCadastruMapData } from "@/lib/cadastru-map";
+import { cadastruDisplayAddress, hasDuplicateFootprintArea, isCadastruNonResidential } from "@/lib/cadastru-property-details";
 
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 
@@ -20,9 +21,17 @@ function maskObjectFields(source, visibleFields = []) {
   );
 }
 
-function maskPropertyCollection(items) {
+function maskPropertyCollection(items, displayAddress, construction = false) {
   if (!Array.isArray(items)) return [];
-  return items.map((item) => maskObjectFields(item, ["address", "map_location", "map_geometry"]));
+  return items.map((item) => {
+    const visibleFields = ["map_location", "map_geometry"];
+    if (item?.address === displayAddress) visibleFields.push("address");
+    const masked = maskObjectFields(item, visibleFields);
+    if (construction && hasDuplicateFootprintArea(item)) delete masked.area_m2;
+    const utilities = item?.utilities;
+    return utilities && typeof utilities === "object" && !Array.isArray(utilities)
+      ? { ...masked, utilities: maskObjectFields(utilities) } : masked;
+  });
 }
 
 function addressLocality(payload) {
@@ -47,7 +56,7 @@ function maskAddresses(value, placeholder) {
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(Object.entries(value).map(([key, item]) => [key,
     ADDRESS_FIELDS.has(key) && typeof item === "string" && item
-      ? placeholder
+      ? /^\|+$/.test(item) ? item : placeholder
       : ADDRESS_PARTS.has(key) && (typeof item === "string" || typeof item === "number")
         ? maskValue(item)
         : maskAddresses(item, placeholder),
@@ -68,6 +77,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
       payload?.building?.construction_year || payload?.building_construction_year || null,
   };
   const hasAddressProperties = Boolean(payload?.lands?.length || payload?.buildings?.length);
+  const displayAddress = cadastruDisplayAddress({ ...payload, apartment, building });
 
   const preview = redactCadastruMapData({
     cadastral_number: hasAddressProperties
@@ -85,10 +95,13 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     district: payload?.district || null,
     map_location: payload?.map_location || null,
     map_geometry: payload?.map_geometry || null,
-    apartment: maskObjectFields(apartment, ["address", "floor", "map_location"]),
+    apartment: {
+      ...maskObjectFields(apartment, ["address", "floor", "map_location"]),
+      ...(isCadastruNonResidential(apartment) ? { unit_kind: "non_residential" } : {}),
+    },
     building: maskObjectFields(building, ["address", "classifier", "map_location", "map_geometry"]),
-    lands: maskPropertyCollection(payload?.lands),
-    buildings: maskPropertyCollection(payload?.buildings),
+    lands: maskPropertyCollection(payload?.lands, displayAddress),
+    buildings: maskPropertyCollection(payload?.buildings, displayAddress, true),
     location: maskObjectFields(payload?.location || {}, ["display_name", "road", "house_number", "suburb", "city", "postcode"]),
     matched_address: payload?.matched_address || payload?.building_address || payload?.geocoded_address || null,
     request_address: payload?.request_address || null,

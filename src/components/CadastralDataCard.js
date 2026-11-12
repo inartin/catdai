@@ -24,7 +24,7 @@ export default function CadastralDataCard({
 
   if (!cadastral) return null;
 
-  const { displayAddress, apartmentRows, buildingRows, lands, buildings: addressBuildings } =
+  const { displayAddress, unitTitle, apartmentRows, buildingRows, lands, buildings: addressBuildings } =
     cadastruPropertyDetails(cadastral, { lang, t, locked: locked || cadastral.locked_sections?.cadastru_details === true });
   const hasAddressProperties = lands.length > 0 || addressBuildings.length > 0;
   const hasApartmentDetails = Boolean(
@@ -193,7 +193,7 @@ export default function CadastralDataCard({
             {hasApartmentDetails && (
               <div className="min-w-0">
                 <p className="mb-2.5 text-sm font-semibold uppercase tracking-wider text-emerald-700">
-                  {t("form.cadastralApartment")}
+                  {unitTitle}
                 </p>
                 <div className="space-y-2.5">
                   {apartmentRows.map(([field, label, value]) => detailRow("apartment", field, label, value))}

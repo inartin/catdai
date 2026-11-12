@@ -25,7 +25,7 @@ import usePaymentProvider from "@/components/usePaymentProvider";
 import { maibProduct } from "@/lib/maib/products.mjs";
 import { useTranslation } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
-import { matchCity, validateCadastralNumber } from "@/lib/validation";
+import { CONSTRUCTION_CADASTRAL_RE, matchCity, validateCadastralNumber } from "@/lib/validation";
 import { CADASTRU_SUPPORTED_CITIES } from "@/lib/cadastru-supported-cities";
 import { getCadastruFavoritePath, getSavedCadastruAddress } from "@/lib/cadastru-favorites";
 import { buildFullAccessAddressResultParams, resolveValuationDistrict } from "@/lib/cadastru-valuation-handoff";
@@ -34,6 +34,7 @@ import { getDeviceId } from "@/lib/visitor-browser";
 import { ensureCadastruLookupId, getCadastruSearchSessionId } from "@/lib/cadastru-lookup-tracking";
 import { recordCadastruShareOpen } from "@/lib/cadastru-share-tracking";
 import { cadastruMapLocation } from "@/lib/cadastru-map";
+import { isCadastruNonResidential } from "@/lib/cadastru-property-details";
 import { nearbyAddressFromCadastru } from "@/lib/cadastru-nearby";
 import { featureCheckoutUrl } from "@/lib/payment-urls.mjs";
 import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
@@ -120,6 +121,7 @@ function resolveValuationCity(cadastral) {
 }
 
 function hasApartmentNumber(cadastral) {
+  if (isCadastruNonResidential(cadastral?.apartment)) return false;
   if (
     cadastral?.apartment_number ||
     cadastral?.parsed_input?.apartment ||
@@ -130,7 +132,7 @@ function hasApartmentNumber(cadastral) {
 
   const cadastralNumber = String(cadastral?.cadastral_number || "").trim();
   const validation = validateCadastralNumber(cadastralNumber);
-  return validation.valid && cadastralNumber.split(".").length >= 3;
+  return validation.valid && !CONSTRUCTION_CADASTRAL_RE.test(cadastralNumber) && cadastralNumber.split(".").length >= 3;
 }
 
 function numericParam(value, { integer = false, min, max } = {}) {

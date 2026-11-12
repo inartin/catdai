@@ -9,7 +9,7 @@ import * as jsxRuntime from 'react/jsx-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as language from '../src/lib/language.js';
 import { cadastruValueLabel } from '../src/lib/cadastru-value-labels.js';
-import { cadastruPropertyDetails } from "../src/lib/cadastru-property-details.js";
+import { cadastruDisplayAddress, cadastruPropertyDetails, hasDuplicateFootprintArea, isCadastruNonResidential } from "../src/lib/cadastru-property-details.js";
 import { featureResultPath, allowsGuestCheckout } from '../src/lib/guest-checkout.mjs';
 import { maibProductTitle, purchaseMessages } from '../src/lib/maib/purchase.mjs';
 import * as resultHelpers from '../src/lib/maib/result.mjs';
@@ -61,7 +61,10 @@ const mocks={react:React,'react/jsx-runtime':jsxRuntime,
   '@/context/LanguageContext':{useTranslation:()=>({lang:'en',t}),LanguageProvider:({children})=>children},
   '@/lib/language':language,
   '@/lib/cadastru-value-labels':{cadastruValueLabel},
-  '@/lib/cadastru-property-details': { cadastruPropertyDetails },
+  '@/lib/cadastru-property-details': { cadastruDisplayAddress, cadastruPropertyDetails, hasDuplicateFootprintArea, isCadastruNonResidential },
+  '@/lib/paid-feature-usage': { buildFeatureCreditRequiredPayload: () => ({}) },
+  '@/lib/cadastru-supported-cities': { resolveCadastruCityFromAddress: () => null, resolveCadastruSupportedCity: () => null },
+  '@/lib/cadastru-map': { cadastruMapLocation: () => null, redactCadastruMapData: (value) => value },
   '@/lib/maib/purchase.mjs':{maibProductTitle,MAIB_FEATURE_LABELS:{cadastru_lookup:'pricing.featureCadastru'}},
   '@/lib/maib/result.mjs':resultHelpers,'@/lib/payment-urls.mjs':{paymentAppLink},
   ...Object.fromEntries(Object.entries(copy).map(([lang,values])=>[`@/locales/${lang}.json`,{default:values}]))};
@@ -89,6 +92,101 @@ const card=(await load('src/components/CadastralDataCard.js')).default;
 const property={cadastral_number:'0100106.131.01.097',apartment:{address:'Chișinău, str. Test 1',area_m2:52,floor:2,ownership_type:'Privată',toilet:'Da'},building:{classifier:'Bloc cu apartamente',total_floors:5,wall_material:'Cărămidă',water:'Da'},full_access:true};
 const html=renderToStaticMarkup(React.createElement(card,{cadastral:property}));
 for(const text of ['Cadastral data','Apartment','Building information','Apartment building','Private','Brick','Yes','Chișinău, str. Test 1','0100106.131.01.097'])assert(html.includes(text),text);
+const shop = { ...property, apartment: { address: property.apartment.address, unit_kind: "non_residential",
+  destination: "Nelocativă", room_usage: "Magazin", area_m2: "1606.8", estimated_value_lei: "18 214 167",
+  located_in_basement: "Da", located_in_semi_basement: "Nu", located_in_attic: "Nu",
+  located_on_first_floor: "Da", located_on_second_floor: "Nu", located_on_third_floor: "Nu",
+  located_on_fourth_floor_or_above: "Nu", condition: "Bună", heating: "Centrala functioneaza", autonomous_exit: "Da" } };
+const shopHtml = renderToStaticMarkup(React.createElement(card, { cadastral: shop }));
+for (const text of [">Shop<", "Non-residential", "1606.8", "18 214 167", "Basement placement",
+  "Placement on floor 1", "Technical condition", "Working central system", "Independent exit"]) assert(shopHtml.includes(text), text);
+assert(!shopHtml.includes(">Apartment<"));
+assert(!shopHtml.includes("Unit use"));
+const { buildCadastruPreviewPayload } = await load("src/lib/cadastru-preview.js");
+const preview = buildCadastruPreviewPayload(shop);
+assert.equal(preview.apartment.unit_kind, "non_residential");
+assert.match(preview.apartment.room_usage, /^\|+$/);
+assert.match(preview.apartment.heating, /^\|+$/);
+assert.match(preview.apartment.located_in_basement, /^\|+$/);
+assert.equal(isCadastruNonResidential({ destination: "Nelocativă" }), true);
+const lockedShop = cadastruPropertyDetails(preview, { lang: "en", t, locked: true });
+assert.equal(lockedShop.unitTitle, "Non-residential unit");
+const commercialBuilding = { cadastral_number: "01001040038.01", buildings: [{
+  cadastral_number: "0100104.038.01", address: "mun. Chișinău, bd. Decebal 34, corpul B",
+  destination: "Clădire comercială, prestări servicii", building_use: "Alimentaţie publica",
+  area_m2: "246", footprint_area_m2: "246", interior_area_m2: "556.7", exterior_area_m2: "602.1",
+  construction_year: "2004", basement: "Da", semi_basement: "Nu", attic: "Da", built_in_garage: "Nu",
+  wall_material: "Cărămidă", roof_material: "Ardezie", electricity: "Da", water: "Da", sewage: "Da", gas: "Da",
+  heating: "Casangerie proprie", condition: "Foarte bună", completion_percent: "100", estimated_value_lei: "6 004 322",
+}] };
+const buildingHtml = renderToStaticMarkup(React.createElement(card, { cadastral: commercialBuilding }));
+for (const text of ["Total interior area", "556.7", "246", "2004", "Electricity supply", "Heating type", "100%"]) {
+  assert(buildingHtml.includes(text), text);
+}
+assert(!buildingHtml.includes(">Apartment<"));
+const commercialParcel = { ...commercialBuilding, cadastral_number: "0100104.0038", lands: [{
+  cadastral_number: "0100104.0038", address: "mun. Chișinău, bd. Decebal 34", area: "0.14 ha",
+  land_use: "Comercial", slope: "Mediu inclinata", access_road: "invelis rigid",
+  street_position: "pe strada principală", traffic_intensity: "medie",
+  utilities: { electricity: "Da", water: "Da", sewage: "Da", gas: "Da" }, estimated_value_lei: "8 325 737",
+}] };
+const parcelHtml = renderToStaticMarkup(React.createElement(card, { cadastral: commercialParcel }));
+for (const text of ["0.14 ha", "8 325 737", "Commercial", "Access road", "Position relative to the street",
+  "Overall traffic intensity", "Electricity supply", "Total interior area", "556.7"]) assert(parcelHtml.includes(text), text);
+const parcelPreview = buildCadastruPreviewPayload(commercialParcel, "no_credit", { maskAddress: true });
+assert.match(parcelPreview.lands[0].utilities.water, /^\|+$/);
+assert.match(parcelPreview.lands[0].traffic_intensity, /^\|+$/);
+assert.match(parcelPreview.buildings[0].electricity, /^\|+$/);
+assert.match(parcelPreview.buildings[0].address, /^\|+$/);
+assert.equal(parcelPreview.buildings[0].area_m2, undefined);
+assert.equal((buildingHtml.match(/246 m²/g) || []).length, 1);
+assert(parcelHtml.includes("corpul B"));
+assert(!parcelHtml.includes("blur-sm"));
+
+const parcelDetails = cadastruPropertyDetails(commercialParcel, { lang: "en", t });
+const lockedParcelDetails = cadastruPropertyDetails(parcelPreview, { lang: "en", t, locked: true });
+const lockedParcelHtml = renderToStaticMarkup(React.createElement(card, { cadastral: parcelPreview }));
+const paidShopDetails = cadastruPropertyDetails(shop, { lang: "en", t });
+const lockedShopHtml = renderToStaticMarkup(React.createElement(card, { cadastral: preview }));
+
+function assertPaidAndBlurred(fullRows, lockedRows, fields, lockedHtml) {
+  const byField = (rows) => new Map(rows.map(([field, label, value]) => [field, { label, value }]));
+  const full = byField(fullRows);
+  const masked = byField(lockedRows);
+  for (const field of fields) {
+    assert(full.get(field)?.value, `Missing paid row ${field}`);
+    const row = masked.get(field);
+    assert.match(row?.value || "", /^\|+(?: m²| MDL|%)?$/, `Unmasked or missing row ${field}`);
+    const rowMarkup = lockedHtml.split(`>${row.label}</span>`).slice(1);
+    assert(rowMarkup.some((markup) => /^<span[^>]*blur-sm[^>]*>\|+/.test(markup)), `Missing blur ${field}`);
+  }
+}
+
+assertPaidAndBlurred(parcelDetails.lands[0].rows, lockedParcelDetails.lands[0].rows, [
+  "area", "land_use", "slope", "access_road", "street_position", "traffic_intensity",
+  "electricity", "water", "sewage", "gas", "estimated_value_lei",
+], lockedParcelHtml);
+assertPaidAndBlurred(parcelDetails.buildings[0].rows, lockedParcelDetails.buildings[0].rows, [
+  "address", "destination", "building_use", "footprint_area_m2", "interior_area_m2", "exterior_area_m2",
+  "construction_year", "basement", "semi_basement", "attic", "built_in_garage", "wall_material", "roof_material",
+  "electricity", "water", "sewage", "gas", "heating", "condition", "completion_percent", "estimated_value_lei",
+], lockedParcelHtml);
+assertPaidAndBlurred(paidShopDetails.apartmentRows, lockedShop.apartmentRows, [
+  "destination", "area_m2", "estimated_value_lei", "located_in_basement", "located_in_semi_basement",
+  "located_on_first_floor", "located_on_second_floor", "located_on_third_floor", "located_on_fourth_floor_or_above",
+  "located_in_attic", "condition", "heating", "autonomous_exit",
+], lockedShopHtml);
+assert(!lockedParcelHtml.includes("bd. Decebal 34"));
+assert(!lockedParcelHtml.includes("corpul B"));
+assert(!lockedShopHtml.includes(">Shop<"));
+assert.match(lockedShopHtml, /Unit use<\/span><span[^>]*blur-sm[^>]*>\|+/);
+assert.match(lockedParcelHtml, /blur-sm[^>]*>str\. Exemplu 10/);
+const fromAddress = buildCadastruPreviewPayload(commercialParcel, "no_credit", { maskCadastralNumber: true });
+assert.equal(cadastruDisplayAddress(fromAddress), commercialParcel.lands[0].address);
+assert.match(fromAddress.buildings[0].address, /^\|+$/);
+const distinct = buildCadastruPreviewPayload({ buildings: [{ area_m2: "300", footprint_area_m2: "246" }] });
+assert.equal(distinct.buildings[0].area_m2, "|||");
+assert.equal(distinct.buildings[0].footprint_area_m2, "|||");
 const resultCard=(await load('src/components/MaibPaymentResultCard.js')).default;
 for(const status of ['paid','pending','failed','canceled','expired','refunded','partially_refunded']){
  for(const count of [1,2]){

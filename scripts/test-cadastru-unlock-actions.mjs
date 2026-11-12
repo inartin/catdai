@@ -1,7 +1,8 @@
 // Isolated UI checks; no servers, network, or database writes.
 // pnpm exec node --experimental-vm-modules scripts/test-cadastru-unlock-actions.mjs
 import { cadastruValueLabel } from "../src/lib/cadastru-value-labels.js";
-import { cadastruPropertyDetails } from "../src/lib/cadastru-property-details.js";
+import { cadastruPropertyDetails, isCadastruNonResidential } from "../src/lib/cadastru-property-details.js";
+import { CONSTRUCTION_CADASTRAL_RE } from "../src/lib/validation.js";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
@@ -116,7 +117,8 @@ async function checkPageAction(isAuthenticated) {
     "@/context/LanguageContext": translation,
     "@/context/AuthContext": { useAuth: () => ({ isAuthenticated, loading: false,
       session: isAuthenticated ? { access_token: "test-token" } : null, clearAuthError: noop }) },
-    "@/lib/validation": { matchCity: () => null, validateCadastralNumber: () => ({ valid: false }) },
+    "@/lib/cadastru-property-details": { isCadastruNonResidential },
+    "@/lib/validation": { CONSTRUCTION_CADASTRAL_RE, matchCity: () => null, validateCadastralNumber: () => ({ valid: false }) },
     "@/lib/cadastru-favorites": { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
     "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null, buildFullAccessAddressResultParams: noop },
     "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: () => false,

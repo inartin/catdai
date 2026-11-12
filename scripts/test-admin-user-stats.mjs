@@ -13,6 +13,15 @@ let authorized = true;
 let activityError = null;
 let missingStats = false;
 let failingUserPage = null;
+let pdfCountError = null;
+const pdfDates = [
+  "2026-08-31T20:59:59.000Z",
+  "2026-08-31T21:00:00.000Z",
+  "2026-09-30T21:00:00.000Z",
+  "2026-10-17T20:59:59.000Z",
+  "2026-10-17T21:00:00.000Z",
+  "2026-10-18T08:00:00.000Z",
+];
 let users = [
   { id: "returning", created_at: "2026-09-01T12:00:00Z" },
   { id: "new", created_at: "2026-10-17T21:00:00Z" },
@@ -46,8 +55,8 @@ const mocks = {
         const query = { filters: [] };
         const builder = {
           select(columns, options) { Object.assign(query, { columns, options }); return builder; },
-          gte(column, value) { query.filters.push([column, value]); return builder; },
-          lt(column, value) { query.filters.push([column, value]); return builder; },
+          gte(column, value) { query.filters.push([column, ">=", value]); return builder; },
+          lt(column, value) { query.filters.push([column, "<", value]); return builder; },
           is() { return builder; },
           in() { return builder; },
           eq() { return builder; },
@@ -55,6 +64,15 @@ const mocks = {
           range() { return builder; },
           then(resolve, reject) {
             const result = { data: [], count: 0, error: null };
+            if (table === "cadastru_pdf_events") {
+              assert.equal(query.options?.count, "exact");
+              assert.equal(query.options?.head, true);
+              result.count = pdfDates.filter((date) => query.filters.every(([column, op, value]) => {
+                assert.equal(column, "created_at");
+                return op === ">=" ? date >= value : date < value;
+              })).length;
+              result.error = pdfCountError;
+            }
             return Promise.resolve(result).then(resolve, reject);
           },
         };
@@ -69,6 +87,7 @@ await periods.link(() => { throw new Error("Unexpected period dependency"); });
 await periods.evaluate();
 mocks["@/lib/admin-periods"] = periods.namespace;
 mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
+mocks["@/lib/admin-cadastru-result-categories"] = { loadCadastruResultCategories: async (rows) => rows };
 const route = new vm.SourceTextModule(await fs.readFile("src/app/api/admin/stats/route.js", "utf8"), { context });
 await route.link((id) => {
   const mock = mocks[id];
@@ -89,6 +108,8 @@ assert.equal(response.activeUsers, 5, "Total includes anonymous visitors and reg
 assert.equal(response.newUsers, 1, "New registrations use local midnight");
 assert.equal(response.oldUsers, 1, "Returning registered users are shown separately");
 assert.equal(response.totalUsers, 4, "Total users includes every registration");
+assert.equal(response.cadastruSearches.total, 0, "PDF generation does not add searches");
+assert.equal(response.cadastruSearches.pdfCount, 2, "Today counts PDFs from Chișinău midnight");
 assert.equal("dailyActiveUsers" in response, false, "Chart data loads independently of dashboard statistics");
 assert.deepEqual(JSON.parse(JSON.stringify(activityQueries.at(-1))), {
   p_since: "2026-10-17T21:00:00.000Z",
@@ -99,11 +120,17 @@ for (const period of ["week", "month", "previous_month", "all"]) {
   assert.equal(response.newUsers, period === "all" ? 4 : 2);
   assert.equal(response.oldUsers, period === "all" ? 0 : 1);
   assert.equal(response.totalUsers, 4);
+  assert.equal(response.cadastruSearches.pdfCount, { week: 3, month: 4, previous_month: 1, all: 6 }[period]);
 }
 await get("period=previous_month&fresh=1");
 assert.deepEqual(JSON.parse(JSON.stringify(activityQueries.at(-1))), {
   p_since: "2026-08-31T21:00:00.000Z", p_until: "2026-09-30T21:00:00.000Z",
 }, "Previous month sends both boundaries to the active-user RPC");
+pdfCountError = { message: "PDF statistics query failed" };
+response = await (await get()).json();
+assert.equal(response.cadastruSearches.pdfCount, null, "A failed PDF count is unavailable");
+assert.equal(response.cadastruSearches.total, 0, "Search statistics still load after a PDF count failure");
+pdfCountError = null;
 activityError = { message: "Activity read failed" };
 assert.equal((await (await get()).json()).activeUsers, null, "Read failure cannot appear as zero");
 assert.equal((await (await get()).json()).newUsers, null);

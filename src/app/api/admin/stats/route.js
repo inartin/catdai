@@ -93,6 +93,16 @@ async function fetchActiveUserStats(range) {
   };
 }
 
+async function fetchCadastruPdfCount(range) {
+  const { count, error } = await applyAdminPeriod(
+    supabaseAdmin.from("cadastru_pdf_events").select("id", { count: "exact", head: true }),
+    "created_at",
+    range
+  );
+  if (error) throw new Error(error.message);
+  return count;
+}
+
 function userDisplayName(user) {
   const meta = user?.user_metadata || {};
   const composed = [meta.first_name, meta.last_name].filter(Boolean).join(" ").trim();
@@ -815,6 +825,10 @@ export async function GET(request) {
         return { activeUsers: null, newUsers: null, oldUsers: null };
       }),
       fetchExternalApiResponseTimes(periodRange),
+      fetchCadastruPdfCount(periodRange).catch((error) => {
+        console.error("Failed to load Cadastru PDF count:", error.message);
+        return null;
+      }),
     ]);
   } catch (err) {
     console.error("Failed to load stats:", err);
@@ -838,6 +852,7 @@ export async function GET(request) {
     paymentSummary,
     activeUserStats,
     externalApiResponseTimes,
+    cadastruPdfCount,
   ] = dataResults;
   const usersById = buildUserNameMap(users);
   const authUsersById = new Map(users.map((user) => [user.id, user]));
@@ -846,6 +861,7 @@ export async function GET(request) {
     const searchesWithFavorites = await loadCadastruResultCategories(await loadCadastruSuggestionActivity(
       await loadCadastruShareStatistics(await loadCadastruFavorites(cadastruSearchEvents.slice(0, 50)))));
     cadastruSearches = buildCadastruSearchStats(cadastruSearchEvents, cutoffs, periodRange, now);
+    cadastruSearches.pdfCount = cadastruPdfCount;
     cadastruSearches.recent = attachUserNames(searchesWithFavorites, usersById);
   } catch (error) {
     console.error("Failed to load cadastru search statistics:", error.message);

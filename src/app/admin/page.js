@@ -544,7 +544,7 @@ function fmtProperty(row) {
   ].filter(Boolean).join(" · ") || "-";
 }
 
-function CadastruResultBadges({ byResultType }) {
+function CadastruResultBadges({ byResultType, pdfCount }) {
   const counts = byResultType || {};
   const items = [
     { key: "full", label: "full", count: counts.full_data },
@@ -554,10 +554,6 @@ function CadastruResultBadges({ byResultType }) {
     { key: "none", label: "none", count: counts.no_data },
     { key: "fail", label: "failed", count: counts.error, isError: true },
   ].filter((item) => Boolean(item.count));
-
-  if (!items.length) {
-    return <span className="admin-stat-detail-subtle">No search data yet</span>;
-  }
 
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
@@ -569,6 +565,9 @@ function CadastruResultBadges({ byResultType }) {
           {fmtNum(item.count)} {item.label}
         </span>
       ))}
+      <span className="admin-stat-badge">
+        {pdfCount == null ? "PDF count unavailable" : `${fmtNum(pdfCount)} ${pdfCount === 1 ? "PDF" : "PDFs"} generated`}
+      </span>
     </span>
   );
 }
@@ -587,7 +586,7 @@ function CadastruUsageStats({ stats }) {
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
         <StatCard label="Total searches" value={fmtNum(stats.total)} />
         <StatCard label="Avg. per day" value={fmtNum(stats.averageDaily, 2)} />
         <StatCard label="Apartment searches" value={fmtNum(stats.byPropertyType?.apartment?.total)} />
@@ -596,6 +595,7 @@ function CadastruUsageStats({ stats }) {
         <StatCard label="Unsuccessful" value={<span className="text-red-600">{fmtNum(errors + noData)}</span>}
           detail={`${fmtNum(errors)} errors · ${fmtNum(noData)} no data`} />
         <StatCard label="Avg. unique searches" value={fmtNum(stats.averageUniquePerAccount, 2)} detail="Per account with a saved query" />
+        <StatCard label="PDFs generated" value={stats.pdfCount == null ? "Unavailable" : fmtNum(stats.pdfCount)} />
       </div>
 
       {daily.length > 1 && (
@@ -1704,7 +1704,9 @@ function DashboardContent() {
           <StatCard
             label="Cadastru Searches"
             value={fmtNum(s.cadastruSearches?.total)}
-            detail={showCadastruSearchesList ? "Hide search records" : <CadastruResultBadges byResultType={s.cadastruSearches?.byResultType} />}
+            detail={
+              <CadastruResultBadges byResultType={s.cadastruSearches?.byResultType} pdfCount={s.cadastruSearches?.pdfCount} />
+            }
             onClick={() => setShowCadastruSearchesList((value) => !value)}
             active={showCadastruSearchesList}
           />

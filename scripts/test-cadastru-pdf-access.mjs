@@ -16,9 +16,27 @@ const orders = [];
 let renders = 0;
 let spends = 0;
 let allowSpend = false;
+let persistStatistics = true;
+let collectStatistics = true;
+let failRender = false;
+let failInsert = false;
+const deferred = [];
+const pdfEvents = [];
+const errors = [];
 
 const supabaseAdmin = {
   from(table) {
+    if (table === "cadastru_pdf_events") {
+      return {
+        async insert(row) {
+          assert.deepEqual(Object.keys(row), ["created_at"]);
+          assert(Number.isFinite(Date.parse(row.created_at)));
+          if (failInsert) return { error: { message: "Statistics unavailable" } };
+          pdfEvents.push(row);
+          return { error: null };
+        },
+      };
+    }
     const predicates = [];
     const builder = {
       select() { return this; },
@@ -50,7 +68,12 @@ const getPaidFeatureUsageEvent = async ({ userId, featureKey, idempotencyKey, in
   return usage.get(`${userId}:${idempotencyKey}`);
 };
 const mocks = {
-  "next/server": { NextResponse: { json: Response.json } },
+  "next/server": { NextResponse: { json: Response.json }, after: (callback) => deferred.push(callback) },
+  "@/lib/runtime-persistence": { shouldPersistRuntimeData: () => persistStatistics },
+  "@/lib/statistics-context": {
+    shouldCollectStatistics: () => collectStatistics,
+    withStatisticsContext: (handler) => handler,
+  },
   "@/lib/access-tier": { resolveAccessTier: async (req) => {
     const auth = req.headers.get("authorization");
     return { user_id: auth === "Bearer buyer" ? "buyer" : auth === "Bearer other" ? "other" : null };
@@ -87,6 +110,7 @@ const mocks = {
   "@/lib/validation": { validateCadastralNumber },
   "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true }) }) },
   "@/lib/cadastru-report-pdf": { renderCadastruReport: async (report) => {
+    if (failRender) throw new Error("Render failed");
     renders++;
     assert(report.cadastral === payload || report.cadastral === addressPayload, "only stored payloads reach the renderer");
     return { bytes: new TextEncoder().encode("%PDF"), fileName: "catdai-cadastru.pdf" };
@@ -95,7 +119,7 @@ const mocks = {
   "@/lib/maib/client.mjs": { environment: () => "production" },
 };
 
-const context = vm.createContext({ console, Response });
+const context = vm.createContext({ console: { error: (...args) => errors.push(args) }, Response });
 const routeModule = new vm.SourceTextModule(await readFile("src/app/api/cadastru/pdf/route.js", "utf8"), { context });
 await routeModule.link((name) => {
   const exports = mocks[name] || (name.startsWith("@/locales/") ? { default: {} } : null);
@@ -141,6 +165,7 @@ assert.equal((await post({ cadastral_number: other, address })).status, 402, "th
 assert.equal((await post({ ...search, check_only: true })).status, 200);
 assert.equal(renders, 0, "the entitlement check does not render");
 assert.equal(spends, 0, "the entitlement check does not consume the purchase");
+assert.equal(deferred.length, 0, "denied requests and entitlement checks do not schedule events");
 const pdf = await post({ ...search, payload: { untrusted: true } });
 assert.equal(pdf.headers.get("Content-Type"), "application/pdf");
 assert.equal(pdf.headers.get("Cache-Control"), "private, no-store");
@@ -153,4 +178,25 @@ assert.equal((await post({ address, use_paid_credit: true })).status, 200);
 assert.equal((await post({ address })).status, 200);
 assert.equal((await post({ address, use_paid_credit: true })).status, 200, "retries reuse the same paid unlock");
 assert.equal(spends, 2);
-console.log("Cadastru PDF access passed: free and forged requests blocked, exact paid lookup or receipt required, private export, and idempotent paid-credit use.");
+assert.equal(pdfEvents.length, 0, "statistics writes run after the response");
+assert.equal(deferred.length, 5, "every successful generation, including a paid share and repeat exports, schedules one event");
+for (const callback of deferred.splice(0)) await callback();
+assert.equal(pdfEvents.length, 5);
+
+failRender = true;
+assert.equal((await post({ address })).status, 503);
+failRender = false;
+collectStatistics = false;
+assert.equal((await post({ address })).status, 200);
+collectStatistics = true;
+persistStatistics = false;
+assert.equal((await post({ address })).status, 200);
+persistStatistics = true;
+assert.equal(deferred.length, 0, "failed renders and excluded requests do not schedule events");
+
+failInsert = true;
+assert.equal((await post({ address })).status, 200);
+await deferred.shift()();
+assert.equal(pdfEvents.length, 5);
+assert(errors.some(([message]) => message === "[cadastru/pdf] statistics insert failed:"));
+console.log("Cadastru PDF entitlement and generation statistics checks passed.");

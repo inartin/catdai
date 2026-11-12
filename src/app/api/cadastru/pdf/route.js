@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { resolveAccessTier } from "@/lib/access-tier";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { consumePaidFeatureCredit, getPaidFeatureUsageEvent, getUserFeatureCreditBalance, makePaidFeatureUsageKey } from "@/lib/paid-feature-usage";
@@ -16,6 +16,8 @@ import { loadCadastruMarket } from "@/lib/cadastru-market";
 import { validateCadastralNumber } from "@/lib/validation";
 import { rateLimit } from "@/lib/rate-limit";
 import { renderCadastruReport } from "@/lib/cadastru-report-pdf";
+import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
+import { shouldCollectStatistics, withStatisticsContext } from "@/lib/statistics-context";
 import { normalizeLanguage } from "@/lib/language";
 import { environment as maibEnvironment } from "@/lib/maib/client.mjs";
 import ro from "@/locales/ro.json";
@@ -114,7 +116,7 @@ async function renderReport(payload, lang) {
     transport, reports, reportsAvailable, market, lang, t });
 }
 
-export async function POST(request) {
+async function handlePost(request) {
   const ip = request.headers.get("cf-connecting-ip")?.trim()
     || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const limit = limiter.check(ip);
@@ -155,11 +157,21 @@ export async function POST(request) {
     }
     if (body.check_only === true) return json({ ok: true }, 200);
     const { bytes, fileName } = await renderReport(payload, normalizeLanguage(body.lang));
-    return new Response(bytes, {
+    const response = new Response(bytes, {
       headers: { ...noStore, "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${fileName}"` },
     });
+    if (shouldPersistRuntimeData() && shouldCollectStatistics()) {
+      const created_at = new Date().toISOString();
+      after(async () => {
+        const { error } = await supabaseAdmin.from("cadastru_pdf_events").insert({ created_at });
+        if (error) console.error("[cadastru/pdf] statistics insert failed:", error.message);
+      });
+    }
+    return response;
   } catch (error) {
     console.error("[cadastru/pdf] export failed:", error.message);
     return json({ error: "pdf_unavailable" }, 503);
   }
 }
+
+export const POST = withStatisticsContext(handlePost);

@@ -53,6 +53,7 @@ async function harness(file, path, stored = {}, lang = 'ro') {
     '@/lib/maib/products.mjs': { maibProduct: key => ({ key, amount_mdl: 15 }) },
     '@/lib/payment-urls.mjs': { featureCheckoutUrl: () => '/payment/checkout' },
     '@/lib/cadastru-map': { cadastruMapLocation: () => null },
+    '@/lib/cadastru-nearby': { nearbyAddressFromCadastru: () => null },
     '@/lib/visitor-browser': { getDeviceId: () => null },
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },
   "@/lib/statistics-context": { shouldCollectStatistics: () => true, withStatisticsContext: handler => handler },

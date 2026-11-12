@@ -51,6 +51,7 @@ async function harness(file, path, stored = {}, lang = 'ro') {
     '@/lib/maib/products.mjs': { maibProduct: key => ({ key, amount_mdl: 15 }) },
     '@/lib/payment-urls.mjs': { featureCheckoutUrl: () => '/payment/checkout' },
     '@/lib/cadastru-map': { cadastruMapLocation: () => null },
+    '@/lib/cadastru-nearby': { nearbyAddressFromCadastru: () => null },
     '@/lib/ga4-payment-client': { trackPaymentAnalytics: noop },
     '@/lib/visitor-browser': { getDeviceId: () => null },
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },

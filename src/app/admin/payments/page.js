@@ -132,13 +132,14 @@ export default function PaymentsPage() {
               <p className="text-xs text-slate-400">Unique visitors · All currencies</p>
             </div>
             {funnel ? (
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
                 <Stat label="Successful search" timeframe={timeframe} value={number(funnel.searched)} detail="Cadastral data returned" />
-                <Stat label="Opened paywall or checkout" timeframe={timeframe} value={number(funnel.opened)} detail="After a successful search" />
+                <Stat label="Checkout started" timeframe={timeframe} value={number(funnel.checkoutStarted)} detail="Checkout page opened after a successful search" />
+                <Stat label="Proceeded to payment" timeframe={timeframe} value={number(funnel.proceededToPayment)} detail="Submitted Pay on MAIB checkout" />
                 <Stat label="Purchased" timeframe={timeframe} value={number(funnel.purchased)} accent
-                  detail={funnel.opened
-                    ? `${(funnel.purchased / funnel.opened).toLocaleString("ro-RO", { style: "percent", maximumFractionDigits: 1 })} of visitors who opened the paywall or checkout`
-                    : "Visitors who completed a payment after opening"} />
+                  detail={funnel.checkoutStarted
+                    ? `${(funnel.purchased / funnel.checkoutStarted).toLocaleString("ro-RO", { style: "percent", maximumFractionDigits: 1 })} of visitors who started checkout`
+                    : "Visitors who completed a payment after starting checkout"} />
               </div>
             ) : <p role="status" className="text-sm text-slate-400">Cadastru funnel unavailable. Refresh to try again.</p>}
           </section>

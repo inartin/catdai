@@ -102,6 +102,16 @@ function outlines(features, view, location) {
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}">${paths.join("")}</svg>`);
 }
 
+// Only the paid PDF route calls this. The public preview always uses the blurred path.
+export async function renderCadastruReportMap(payload) {
+  const features = cadastruMapFeatures(payload).features;
+  const location = cadastruMapLocation(payload);
+  const view = camera(features, location);
+  if (!view) return null;
+  const image = await sharp(await background(view)).composite([{ input: outlines(features, view, location) }]).png().toBuffer();
+  return { url: `data:image/png;base64,${image.toString("base64")}`, width: WIDTH, height: HEIGHT };
+}
+
 export async function renderCadastruMapPreview(payload) {
   const features = cadastruMapFeatures(payload).features;
   const location = cadastruMapLocation(payload);

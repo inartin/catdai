@@ -45,12 +45,12 @@ function isMissingPaidUsageRpc(error) {
   return code === "42883" || code === "PGRST202" || message.includes("consume_user_credit");
 }
 
-export async function getPaidFeatureUsageEvent({ userId, featureKey, idempotencyKey }) {
+export async function getPaidFeatureUsageEvent({ userId, featureKey, idempotencyKey, includeMetadata = false }) {
   if (!userId || !featureKey || !idempotencyKey || !shouldPersistRuntimeData()) return null;
 
   const { data, error } = await supabaseAdmin
     .from("user_feature_usage_events")
-    .select("id, source")
+    .select(includeMetadata ? "id, source, metadata" : "id, source")
     .eq("user_id", userId)
     .eq("feature_key", featureKey)
     .eq("idempotency_key", idempotencyKey)

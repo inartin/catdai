@@ -70,7 +70,7 @@ export async function GET(request) {
   if (!/^[1-9]\d{0,5}$/.test(pageValue) || (requestedCurrency && !/^[A-Z]{3}$/.test(requestedCurrency))) {
     return NextResponse.json({ error: "Invalid payment filters" }, { status: 400, headers });
   }
-  const cacheKey = `catdai:admin-payments:v3:${period}:${period === "week" || period === "all" ? "rolling" : since}:${requestedCurrency || "default"}:${pageValue}`;
+  const cacheKey = `catdai:admin-payments:v5:${period}:${period === "week" || period === "all" ? "rolling" : since}:${requestedCurrency || "default"}:${pageValue}`;
   try {
     if (params.get("fresh") !== "1") {
       const cached = await getSharedCache(cacheKey);

@@ -33,7 +33,7 @@ function dataUrlToBytes(dataUrl) {
   return bytes;
 }
 
-function buildPdfFromJpegs(pages) {
+export function buildPdfFromJpegs(pages) {
   const chunks = [];
   const offsets = [0];
   let byteOffset = 0;

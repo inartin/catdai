@@ -14,11 +14,8 @@ function isCadastruResult(path) {
   return CADASTRU_RESULT_PATH.test(url.pathname) && !url.searchParams.has("share_slug");
 }
 
-function openedCadastruPaywall(row) {
-  if (row.event_type === "checkout_popup_opened") {
-    return (row.source_product_key || row.product_key) === "cadastru_lookup_single" && isCadastruResult(row.path);
-  }
-  if (row.event_type !== "checkout_page_opened" || !row.product_key || !row.path?.startsWith("/payment/")) return false;
+function isCadastruCheckout(row) {
+  if (!row.product_key || !row.path?.startsWith("/payment/")) return false;
   const checkout = new URL(row.path, ORIGIN);
   return checkout.searchParams.get("checkout_source") !== "pricing" && isCadastruResult(checkout.searchParams.get("return_to"));
 }
@@ -53,20 +50,27 @@ function summarizeFunnel(searches, checkoutEvents, payments, users) {
     const visitor = identity(row);
     if (visitor && !searched.has(visitor)) searched.set(visitor, Date.parse(row.created_at));
   }
-  const opened = new Map();
+  const checkoutStarted = new Map();
+  const proceededToPayment = new Set();
   for (const row of checkoutEvents) {
     const visitor = identity(row);
-    if (!searched.has(visitor) || opened.has(visitor) || !openedCadastruPaywall(row)) continue;
+    if (!searched.has(visitor)) continue;
     const at = Date.parse(row.created_at);
-    if (at >= searched.get(visitor)) opened.set(visitor, at);
+    if (at < searched.get(visitor)) continue;
+    if (row.event_type === "checkout_page_opened" && !checkoutStarted.has(visitor) && isCadastruCheckout(row)) {
+      checkoutStarted.set(visitor, at);
+    }
+    if (row.event_type === "maib_continue_clicked" && checkoutStarted.has(visitor) && isCadastruCheckout(row)) {
+      proceededToPayment.add(visitor);
+    }
   }
   const purchased = new Set();
   for (const row of payments) {
     const visitor = identity(row);
-    if (opened.has(visitor) && Date.parse(row.paid_at) >= opened.get(visitor)) purchased.add(visitor);
+    if (checkoutStarted.has(visitor) && Date.parse(row.paid_at) >= checkoutStarted.get(visitor)) purchased.add(visitor);
   }
 
-  return { searched: searched.size, opened: opened.size, purchased: purchased.size };
+  return { searched: searched.size, checkoutStarted: checkoutStarted.size, proceededToPayment: proceededToPayment.size, purchased: purchased.size };
 }
 
 async function readEvents(range, buildQuery) {
@@ -87,8 +91,8 @@ export async function loadCadastruPaymentFunnel(range, payments, users) {
       .is("duplicate_of", null)
       .or("result_cadastru.eq.true,result_type.in.(full_data,apartment_only,land_only,address_only)")),
     readEvents(range, () => supabaseAdmin.from("payment_checkout_events")
-      .select("id,user_id,visitor,device_id,created_at,event_type,product_key,source_product_key,path")
-      .in("event_type", ["checkout_popup_opened", "checkout_page_opened", "checkout_order_created"])),
+      .select("id,user_id,visitor,device_id,created_at,event_type,product_key,path")
+      .in("event_type", ["checkout_page_opened", "maib_continue_clicked", "checkout_order_created"])),
   ]);
   return summarizeFunnel(searches, checkoutEvents, payments, users);
 }

@@ -20,6 +20,7 @@ const { transform, loadBindings } = require("next/dist/build/swc");
 await loadBindings();
 const jsx = (type, props) => ({ type, props });
 const noop = () => null;
+const AuthRequiredModal = () => null;
 const FeaturePricingAction = () => null;
 const locales = Object.fromEntries(await Promise.all(["ro", "ru"].map(async (lang) =>
   [lang, JSON.parse(await fs.readFile(`src/locales/${lang}.json`, "utf8"))])));
@@ -79,6 +80,7 @@ const singleNumberPreview = {
 
 async function checkPageAction(isAuthenticated) {
   let checkoutUrl = "";
+  let pdfChecks = 0;
   const slots = [];
   let cursor = 0;
   let effects = [];
@@ -102,6 +104,7 @@ async function checkPageAction(isAuthenticated) {
     "@/lib/payment-urls.mjs": { featureCheckoutUrl: (key, locale) => `/${locale}/checkout/${key}` },
     "@/lib/ga4-payment-client": { trackPaymentAnalytics: noop },
     "@/lib/cadastru-map": { cadastruMapLocation: () => null },
+    "@/lib/cadastru-nearby": { nearbyAddressFromCadastru: () => null },
     "@/lib/cadastru-lookup-tracking": { ...trackingModule.namespace },
     "@/lib/visitor-browser": { getDeviceId: () => null },
     "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: () => {} },
@@ -119,12 +122,19 @@ async function checkPageAction(isAuthenticated) {
     "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: () => false,
       validMunicipalReportsResult: () => false },
     "@/components/CadastralDataCard": { default: CadastralDataCard },
+    "@/components/AuthRequiredModal": { default: AuthRequiredModal },
     "@/components/FeaturePricingAction": { default: FeaturePricingAction },
   }, {
     window: { location: { href: "https://catdai.md/cadastru/rezultat", assign: (url) => { checkoutUrl = url; } } },
     requestAnimationFrame: noop, navigator: { userAgent: "" }, localStorage: { removeItem: noop },
     sessionStorage: { getItem: (key) => storage.get(key) ?? null },
-    fetch: async (url) => {
+    fetch: async (url, options) => {
+      if (url === "/api/cadastru/pdf") {
+        pdfChecks++;
+        assert.equal(options.headers.Authorization, "Bearer test-token");
+        assert.equal(JSON.parse(options.body).use_paid_credit, false);
+        return { status: 402, json: async () => ({ error: "purchase_required" }) };
+      }
       assert(isAuthenticated, "anonymous result uses its saved preview");
       assert.equal(url, "/api/cadastru/address");
       return { ok: true, json: async () => multiPropertyPreview };
@@ -139,7 +149,39 @@ async function checkPageAction(isAuthenticated) {
   effects.forEach((effect) => effect());
   await new Promise((resolve) => setTimeout(resolve, 0));
   const tree = render();
-  assert.equal(findNodes(tree, (node) => node.props?.reportData).length, 0, "locked previews cannot export a PDF");
+  const [pdfAction] = findNodes(tree, (node) => node.props?.identity && node.props?.purchaseOffer);
+  assert(pdfAction, "locked previews show the PDF action");
+  const pdfCursor = cursor;
+  const renderPdf = () => {
+    cursor = pdfCursor;
+    effects = [];
+    const pdf = pdfAction.type(pdfAction.props);
+    effects.forEach((effect) => effect());
+    return pdf;
+  };
+  const [button] = findNodes(renderPdf(), (node) => node.props?.["data-cadastru-save-pdf"] === true);
+  assert(button);
+  assert.equal(pdfChecks, 0, "rendering does not start an export");
+  button.props.onClick();
+  renderPdf();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const [popup] = findNodes(renderPdf(), (node) => node.type === AuthRequiredModal && node.props.open);
+  assert(popup, "the non-paid PDF action opens the purchase popup");
+  const [pdfOffer] = findNodes(popup, (node) => node.type === FeaturePricingAction);
+  assert.equal(pdfOffer.props.offer.product_key, purchase.product_key);
+  assert.equal(pdfChecks, 0, "locked previews open the popup without requesting an export");
+
+  if (isAuthenticated) {
+    slots.length = pdfCursor;
+    pdfAction.props.locked = false;
+    const [unlockedButton] = findNodes(renderPdf(), (node) => node.props?.["data-cadastru-save-pdf"] === true);
+    unlockedButton.props.onClick();
+    renderPdf();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(pdfChecks, 1, "a visible result still requires server authorization");
+    assert(findNodes(renderPdf(), (node) => node.type === AuthRequiredModal && node.props.open).length,
+      "a free unlock opens the purchase popup after the server declines the export");
+  }
   const card = findNodes(tree, (node) => node.type === CadastralDataCard)[0];
   assert(card, "multi-property result renders its cadastral card");
   const [dock] = findNodes(tree, (node) => node.type === FeaturePricingAction && node.props.mobileDock);

@@ -55,6 +55,7 @@ async function harness(file, path, stored = {}, lang = 'ro') {
     '@/lib/maib/products.mjs': { maibProduct },
     '@/lib/payment-urls.mjs': { featureCheckoutUrl },
     '@/lib/cadastru-map': { cadastruMapLocation: () => null },
+    '@/lib/cadastru-nearby': { nearbyAddressFromCadastru: () => null },
     '@/components/usePaymentProvider': { default: () => 'maib' },
     '@/lib/visitor-browser': { getDeviceId: () => null },
     '@/lib/cadastru-share-tracking': { recordCadastruShareOpen: () => {} },

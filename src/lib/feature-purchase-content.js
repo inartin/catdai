@@ -3,7 +3,7 @@ export const FEATURE_PURCHASE_CONTENT = {
     title: "cadastru.purchaseTitle",
     checkoutTitle: "cadastru.checkoutTitle",
     summary: "cadastru.purchasePackage",
-    benefits: ["Area", "Value", "Building", "Rights", "Map"].map((key) => `cadastru.purchase${key}`),
+    benefits: ["Area", "Value", "Building", "Rights", "Map", "Pdf"].map((key) => `cadastru.purchase${key}`),
   },
   sale_estimate_single: {
     title: "payment.featureSaleTitle",

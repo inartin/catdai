@@ -104,6 +104,7 @@ export default function FeaturePricingAction({
   className = "",
   trackPopupOpen = false,
   onCheckoutStart,
+  checkoutPath,
   variant = "default",
   mobileDock = false,
 }) {
@@ -154,7 +155,8 @@ export default function FeaturePricingAction({
       { buyer_type: user && !isGuest ? 'account' : 'guest', language: lang });
     setStatus("redirecting");
     onCheckoutStart?.();
-    window.location.href = featureCheckoutUrl(packageOffer.product_key, lang, window.location.href);
+    const destination = checkoutPath ? new URL(checkoutPath, window.location.origin).href : window.location.href;
+    window.location.href = featureCheckoutUrl(packageOffer.product_key, lang, destination);
   };
 
   const offerTitle = t(isCadastruProduct ? "cadastru.mobilePurchaseTitle" : isSingleOffer ? "maib.singleFeatureTitle" : provider === "maib" ? "maib.extraPackageTitle" : "payment.extraPackageTitle", { price: formatMdl(packageOffer.price_mdl, lang) });

@@ -34,6 +34,7 @@ import { getDeviceId } from "@/lib/visitor-browser";
 import { ensureCadastruLookupId, getCadastruSearchSessionId } from "@/lib/cadastru-lookup-tracking";
 import { recordCadastruShareOpen } from "@/lib/cadastru-share-tracking";
 import { cadastruMapLocation } from "@/lib/cadastru-map";
+import { nearbyAddressFromCadastru } from "@/lib/cadastru-nearby";
 import { featureCheckoutUrl } from "@/lib/payment-urls.mjs";
 import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
 import PaymentOfferTracker from "@/components/PaymentOfferTracker";
@@ -167,45 +168,68 @@ function buildValuationPrefill(cadastral, addressDistrict) {
   return params;
 }
 
-function CadastruPdfSaveButton({ ready, reportData, mapCaptureRef }) {
+function CadastruPdfSaveButton({ ready, locked, identity, accessToken, checkoutPath, purchaseOffer }) {
   const { lang, t } = useTranslation();
-  const [isSaving, setIsSaving] = useState(false);
+  const [request, setRequest] = useState(null);
+  const [purchase, setPurchase] = useState(null);
   const [error, setError] = useState(false);
-  const started = useRef(false);
+  const started = useRef(null);
 
-  const handleSavePdf = () => {
-    if (isSaving) return;
-    started.current = false;
-    setIsSaving(true);
+  const handleSavePdf = (useCredit = false) => {
+    if (request) return;
     setError(false);
+    if (locked || (!accessToken && !identity.share_slug)) {
+      setPurchase({});
+      return;
+    }
+    setPurchase(null);
+    setRequest({ useCredit, checked: useCredit });
   };
 
   useEffect(() => {
-    if (!isSaving || !ready || started.current) return;
-    started.current = true;
+    if (!request || started.current === request || (request.checked && !ready)) return;
+    started.current = request;
 
     async function savePdf() {
       try {
-        const captureMap = mapCaptureRef.current?.capture;
-        const { downloadCadastruReport } = await import("@/lib/cadastru-report-pdf");
-        await downloadCadastruReport({ ...reportData, lang, t, captureMap });
+        const response = await fetch("/api/cadastru/pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+          body: JSON.stringify({ ...identity, lang, check_only: !ready, use_paid_credit: request.useCredit }),
+        });
+        if (response.status === 402) {
+          setPurchase(await response.json());
+        } else if (!response.ok) {
+          throw new Error("PDF unavailable");
+        } else if (!ready) {
+          setRequest({ checked: true });
+          return;
+        } else {
+          const url = URL.createObjectURL(await response.blob());
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = response.headers.get("Content-Disposition")?.match(/filename="([^"]+)"/)?.[1] || "catdai-cadastru.pdf";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
       } catch {
         setError(true);
-      } finally {
-        setIsSaving(false);
       }
+      setRequest(null);
     }
     void savePdf();
-  }, [isSaving, ready, reportData, mapCaptureRef, lang, t]);
+  }, [accessToken, identity, lang, ready, request]);
 
   return (
     <div className="min-w-0">
       <button
         type="button"
         data-cadastru-save-pdf
-        onClick={handleSavePdf}
-        disabled={isSaving}
-        aria-busy={isSaving}
+        onClick={() => handleSavePdf()}
+        disabled={Boolean(request)}
+        aria-busy={Boolean(request)}
         className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2.5 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 max-sm:w-full max-sm:min-w-0"
       >
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5 shrink-0">
@@ -213,9 +237,20 @@ function CadastruPdfSaveButton({ ready, reportData, mapCaptureRef }) {
           <path d="M7 10l5 5 5-5" />
           <path d="M12 15V3" />
         </svg>
-        <span className="min-w-0 truncate">{t(isSaving ? (ready ? "cadastru.savingPdf" : "cadastru.pdfPreparing") : "cadastru.savePdf")}</span>
+        <span className="min-w-0 truncate">{t(request ? (ready ? "cadastru.savingPdf" : "cadastru.pdfPreparing") : "cadastru.savePdf")}</span>
       </button>
       {error && <p role="alert" className="mt-1 max-w-48 text-xs text-red-700">{t("cadastru.pdfError")}</p>}
+      <AuthRequiredModal open={Boolean(purchase)} onClose={() => setPurchase(null)} showAuthOptions={false} variant="paywall">
+        {purchase && <>
+          <FeaturePricingAction offer={purchaseOffer} variant="paywall" trackPopupOpen checkoutPath={checkoutPath} />
+          {purchase.paid_credit_available && (
+            <button type="button" onClick={() => handleSavePdf(true)}
+              className="mt-4 min-h-11 w-full cursor-pointer rounded-xl border border-emerald-200 px-4 text-sm font-semibold text-emerald-800 hover:bg-emerald-50">
+              {t("cadastru.pdfUsePaidCredit")}
+            </button>
+          )}
+        </>}
+      </AuthRequiredModal>
     </div>
   );
 }
@@ -372,7 +407,6 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
     }
     window.location.assign(featureCheckoutUrl(checkoutProductKey, lang, destination.href));
   };
-  const mapCaptureRef = useRef(null);
   const [device, setDevice] = useState({ isMobile: false, isIOS: false });
 
   useEffect(() => {
@@ -494,7 +528,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
           )}
         </a>
       </div>
-      <CadastruParcelMap captureRef={mapCaptureRef} location={mapLocation} cadastral={state.data} fallbackUrl={mapUrl} />
+      <CadastruParcelMap location={mapLocation} cadastral={state.data} fallbackUrl={mapUrl} />
     </div>
   ));
   const nearbySearchAvailable = Boolean(nearbyAddress || validateCadastralNumber(nearbyNumber).valid);
@@ -1075,7 +1109,13 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
   />;
 
   const showShareAction = !isLockedPreview && Boolean(isAuthenticated || shareSlug);
-  const showPdfAction = Boolean(state.data && !isLockedPreview && state.data.full_access !== false && !state.data.error);
+  const showPdfAction = Boolean(state.data && !state.data.error);
+  const pdfAddress = state.data?.resolved_address || nearbyAddress;
+  const pdfIdentity = shareSlug ? { share_slug: shareSlug }
+    : { cadastral_number: nearbyNumber, address: pdfAddress };
+  const pdfCheckoutPath = shareSlug ? getCadastruFavoritePath({
+    lang, cadastral: state.data, addressRequest: nearbyAddressFromCadastru(state.data),
+  }) : isAddressPreviewHandoff && !savedAddress ? favoritePath : undefined;
   const hasSecondaryActions = showPdfAction || showShareAction;
   const reportReady = !authLoading && marketReady && marketState.key === marketKey;
   const marketData = marketReady && marketState.key === marketKey ? marketState.data : null;
@@ -1117,10 +1157,9 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                         />
                       )}
                       {showPdfAction && (
-                        <CadastruPdfSaveButton key={marketKey} ready={reportReady} mapCaptureRef={mapCaptureRef}
-                          reportData={{ cadastral: state.data, mapLocation: hasMapLocation ? mapLocation : null,
-                            nearby: nearbyData, transport: transportData, reports: reportsData, reportsAvailable,
-                            market: marketData }} />
+                        <CadastruPdfSaveButton key={`${session?.user?.id || ""}:${shareSlug || nearbyNumber || pdfAddress}`}
+                          ready={reportReady} locked={isLockedPreview} identity={pdfIdentity} accessToken={session?.access_token}
+                          checkoutPath={pdfCheckoutPath} purchaseOffer={purchaseOffer || { product_key: "cadastru_lookup_single" }} />
                       )}
                     </div>
                   )}

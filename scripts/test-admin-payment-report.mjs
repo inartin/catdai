@@ -152,7 +152,7 @@ assert.equal(report.totals.count, 0);
 assert.equal(report.totals.averageMinor, null);
 assert.equal(report.currency, "MDL");
 assert.equal(report.pageCount, 1);
-assert.deepEqual(report.cadastruFunnel, { searched: 0, opened: 0, purchased: 0 });
+assert.deepEqual(report.cadastruFunnel, { searched: 0, checkoutStarted: 0, proceededToPayment: 0, purchased: 0 });
 
 orders = [
   payment("paid"),
@@ -315,6 +315,7 @@ searches = [
   lookup(1008, { user_id: "bot", visitor: { device_type: "Bot" } }),
   lookup(1009, { user_id: "admin" }),
   lookup(1010),
+  lookup(1011, { user_id: "no-checkout" }),
 ];
 checkoutEvents = [
   open(1, { user_id: "buyer", event_type: "checkout_popup_opened", path: resultPath }),
@@ -329,6 +330,12 @@ checkoutEvents = [
   open(10, { user_id: "before-period" }),
   open(11, { user_id: "no-data" }),
   open(12, { user_id: "admin" }),
+  open(13, { user_id: "guest", device_id: browser(2), event_type: "maib_continue_clicked", created_at: "2026-11-10T08:10:00Z" }),
+  open(14, { user_id: "guest", device_id: browser(2), event_type: "maib_continue_clicked", created_at: "2026-11-10T08:11:00Z" }),
+  open(15, { user_id: "early-payment", event_type: "maib_continue_clicked", created_at: "2026-11-10T08:10:00Z" }),
+  open(16, { user_id: "buyer", event_type: "maib_continue_clicked", created_at: "2026-11-10T07:50:00Z" }),
+  open(17, { user_id: "buyer", event_type: "maib_continue_clicked", path: checkoutPath + "&checkout_source=pricing" }),
+  open(18, { user_id: "no-checkout", event_type: "maib_continue_clicked" }),
 ];
 const paid = (id, fields) => payment(id, { paid_at: "2026-11-10T09:00:00Z", ...fields });
 orders = [
@@ -341,10 +348,11 @@ orders = [
   paid("pricing", { user_id: "pricing-only" }),
   paid("wrong-order", { user_id: "wrong-order" }),
   paid("admin", { user_id: "admin" }),
+  paid("no-checkout", { user_id: "no-checkout" }),
 ];
 report = await (await get("period=day&currency=MDL")).json();
-assert.deepEqual(report.cadastruFunnel, { searched: 6, opened: 3, purchased: 2 },
-  "The ordered funnel includes guest attribution and all currencies, deduplicates repeat steps, and rejects unrelated or out-of-order events");
+assert.deepEqual(report.cadastruFunnel, { searched: 7, checkoutStarted: 3, proceededToPayment: 2, purchased: 2 },
+  "Pay submissions deduplicate after contextual checkout and remain separate from confirmed purchases");
 assert.deepEqual((await (await get("period=day&currency=EUR")).json()).cadastruFunnel, report.cadastruFunnel);
 failingFunnelPage = 1000;
 const beforeFunnelFailure = cacheWrites.length;

@@ -1,4 +1,6 @@
-import { canvasToPdfPage, createPdfPageCanvas, downloadPdfPages, PDF_CANVAS_HEIGHT, PDF_CANVAS_WIDTH } from "./browser-pdf.js";
+import { readFile } from "node:fs/promises";
+import sharp from "sharp";
+import { buildPdfFromJpegs, PDF_CANVAS_HEIGHT, PDF_CANVAS_WIDTH, PDF_CANVAS_SCALE } from "./browser-pdf.js";
 import { cadastruPropertyDetails } from "./cadastru-property-details.js";
 import { cadastruValueLabel } from "./cadastru-value-labels.js";
 
@@ -11,19 +13,31 @@ const GREEN = "#047857";
 const BORDER = "#e5e7eb";
 const SERIES_COLORS = [GREEN, "#305da8"];
 
-function wrappedLines(ctx, text, width) {
+function escapeSvg(value) {
+  return String(value).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").replace(/[&<>]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[char]);
+}
+
+function textWidth(value, size, bold) {
+  return [...String(value)].reduce((width, char) => {
+    if (/[ iIl.,!':;|]/.test(char)) return width + 0.34 * size;
+    if (/[mMwW@%ШЩЖЮшщжю]/u.test(char)) return width + 0.96 * size;
+    return width + (bold ? 0.67 : 0.62) * size;
+  }, 0);
+}
+
+function wrappedLines(text, width, size, bold = false) {
   const lines = [];
   let line = "";
   for (const word of String(text).split(/\s+/).filter(Boolean)) {
     const next = line ? `${line} ${word}` : word;
-    if (ctx.measureText(next).width <= width) {
+    if (textWidth(next, size, bold) <= width) {
       line = next;
       continue;
     }
     if (line) lines.push(line);
     line = "";
     for (const char of word) {
-      if (line && ctx.measureText(line + char).width > width) {
+      if (line && textWidth(line + char, size, bold) > width) {
         lines.push(line);
         line = "";
       }
@@ -36,29 +50,27 @@ function wrappedLines(ctx, text, width) {
 
 function createReport(logo, t, reportDate) {
   const pages = [];
-  let { canvas, ctx } = createPdfPageCanvas();
+  let parts = [];
   let y = 0;
-  const font = (size, bold) => `${bold ? 700 : 400} ${size}px Arial, Helvetica, sans-serif`;
-  const draw = (text, x, top, size, color, bold = false) => {
-    ctx.font = font(size, bold);
-    ctx.textBaseline = "top";
-    ctx.fillStyle = color;
-    ctx.fillText(text, x, top);
+  const rect = (x, top, width, height, color) => {
+    parts.push(`<rect x="${x}" y="${top}" width="${width}" height="${height}" fill="${color}"/>`);
   };
-  const rule = (top) => {
-    ctx.fillStyle = BORDER;
-    ctx.fillRect(MARGIN, top, WIDTH, 1);
+  const draw = (text, x, top, size, color, bold = false, anchor = "start") => {
+    parts.push(`<text x="${x}" y="${top + size * 0.84}" font-size="${size}" font-weight="${bold ? 700 : 400}" fill="${color}" text-anchor="${anchor}">${escapeSvg(text)}</text>`);
   };
+  const drawImage = (source, x, top, width, height) => {
+    parts.push(`<image href="${source.url}" x="${x}" y="${top}" width="${width}" height="${height}"/>`);
+  };
+  const rule = (top) => rect(MARGIN, top, WIDTH, 1, BORDER);
   const header = () => {
     let brandX = MARGIN;
     if (logo) {
-      const logoWidth = 32 * logo.naturalWidth / logo.naturalHeight;
-      ctx.drawImage(logo, MARGIN, 36, logoWidth, 32);
+      const logoWidth = 32 * logo.width / logo.height;
+      drawImage(logo, MARGIN, 36, logoWidth, 32);
       brandX += logoWidth + 10;
     }
     draw("catdai.md", brandX, 41, 20, GREEN, true);
-    ctx.font = font(13, false);
-    draw(reportDate, PDF_CANVAS_WIDTH - MARGIN - ctx.measureText(reportDate).width, 45, 13, MUTED);
+    draw(reportDate, PDF_CANVAS_WIDTH - MARGIN, 45, 13, MUTED, false, "end");
     rule(82);
     y = 102;
   };
@@ -66,25 +78,25 @@ function createReport(logo, t, reportDate) {
     const footerY = BOTTOM + 27;
     rule(BOTTOM + 14);
     const footer = lastPage ? t("cadastru.pdfDisclaimer") : "catdai.md";
-    ctx.font = font(12, false);
-    wrappedLines(ctx, footer, WIDTH - 46).forEach((line, index) => {
+    wrappedLines(footer, WIDTH - 46, 12).forEach((line, index) => {
       draw(line, MARGIN, footerY + index * 15, 12, MUTED);
     });
     draw(String(pages.length + 1), PDF_CANVAS_WIDTH - MARGIN - 26, footerY, 12, MUTED);
-    pages.push(canvasToPdfPage(canvas));
-    canvas.width = 0;
+    pages.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${PDF_CANVAS_WIDTH * PDF_CANVAS_SCALE}" height="${PDF_CANVAS_HEIGHT * PDF_CANVAS_SCALE}" viewBox="0 0 ${PDF_CANVAS_WIDTH} ${PDF_CANVAS_HEIGHT}">
+      <rect width="100%" height="100%" fill="white"/>
+      <g font-family="Arial, Liberation Sans, sans-serif">${parts.join("")}</g>
+    </svg>`);
+    parts = [];
   };
   const ensure = (height) => {
     if (y + height <= BOTTOM) return;
     finishPage();
-    ({ canvas, ctx } = createPdfPageCanvas());
     header();
   };
   const paragraph = (text, { size = 14, bold = false, color = INK, gap = 6 } = {}) => {
     if (text === null || text === undefined || text === "") return;
-    ctx.font = font(size, bold);
     const lineHeight = Math.ceil(size * 1.35);
-    for (const line of wrappedLines(ctx, text, WIDTH)) {
+    for (const line of wrappedLines(text, WIDTH, size, bold)) {
       ensure(lineHeight);
       draw(line, MARGIN, y, size, color, bold);
       y += lineHeight;
@@ -92,19 +104,16 @@ function createReport(logo, t, reportDate) {
     y += gap;
   };
   const propertyNumber = (value) => {
-    ctx.fillStyle = "#ecfdf5";
-    ctx.fillRect(MARGIN, y, WIDTH, 78);
-    ctx.fillStyle = GREEN;
-    ctx.fillRect(MARGIN, y, 4, 78);
+    rect(MARGIN, y, WIDTH, 78, "#ecfdf5");
+    rect(MARGIN, y, 4, 78, GREEN);
     draw(t("cadastru.numberLabel"), MARGIN + 20, y + 12, 12, GREEN, true);
     draw(value, MARGIN + 20, y + 30, 32, INK, true);
     y += 92;
   };
   const heading = (text, section = false, keepWith = 17) => {
     const size = section ? 21 : 16;
-    ctx.font = font(size, true);
     const spacing = section ? 38 : 17;
-    ensure(wrappedLines(ctx, text, WIDTH).length * Math.ceil(size * 1.35) + spacing + keepWith);
+    ensure(wrappedLines(text, WIDTH, size, true).length * Math.ceil(size * 1.35) + spacing + keepWith);
     y += section ? 17 : 9;
     if (section) {
       rule(y);
@@ -114,9 +123,8 @@ function createReport(logo, t, reportDate) {
   };
   const rows = (items, { gap = 6 } = {}) => {
     for (const [index, [label, value]] of items.entries()) {
-      ctx.font = font(14, false);
-      const labelLines = wrappedLines(ctx, label, 222);
-      const valueLines = wrappedLines(ctx, value, WIDTH - 246);
+      const labelLines = wrappedLines(label, 222, 14);
+      const valueLines = wrappedLines(value, WIDTH - 246, 14);
       const lineCount = Math.max(labelLines.length, valueLines.length);
       if (lineCount * 19 < BOTTOM - 102) ensure(lineCount * 19 + gap);
       for (let i = 0; i < lineCount; i += 1) {
@@ -133,7 +141,7 @@ function createReport(logo, t, reportDate) {
     const height = Math.min(310, WIDTH * source.height / source.width);
     const width = height * source.width / source.height;
     ensure(height + 45);
-    ctx.drawImage(source, MARGIN + (WIDTH - width) / 2, y, width, height);
+    drawImage(source, MARGIN + (WIDTH - width) / 2, y, width, height);
     y += height + 10;
   };
   const chart = (series, date, number) => {
@@ -148,26 +156,19 @@ function createReport(logo, t, reportDate) {
     const top = y + 15;
     for (const [index, value] of [high, (high + low) / 2, low].entries()) {
       const gridY = top + index * 50;
-      ctx.fillStyle = BORDER;
-      ctx.fillRect(left, gridY, plotWidth, 1);
+      rect(left, gridY, plotWidth, 1, BORDER);
       if (high !== low || index === 1) draw(number.format(value), MARGIN, gridY - 7, 12, MUTED);
     }
     series.forEach((line, index) => {
-      ctx.beginPath();
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = SERIES_COLORS[index % SERIES_COLORS.length];
-      line.points.forEach((point, i) => {
+      const coordinates = line.points.map((point) => {
         const x = left + (point.time - from) / Math.max(1, until - from) * plotWidth;
         const pointY = top + (high === low ? 50 : (high - point.value) / (high - low) * 100);
-        if (i === 0) ctx.moveTo(x, pointY);
-        else ctx.lineTo(x, pointY);
+        return `${x},${pointY}`;
       });
-      ctx.stroke();
+      parts.push(`<polyline points="${coordinates.join(" ")}" fill="none" stroke="${SERIES_COLORS[index % SERIES_COLORS.length]}" stroke-width="2.5"/>`);
     });
     draw(date(from), left, top + 112, 12, MUTED);
-    ctx.font = font(12, false);
-    const endDate = date(until);
-    draw(endDate, left + plotWidth - ctx.measureText(endDate).width, top + 112, 12, MUTED);
+    draw(date(until), left + plotWidth, top + 112, 12, MUTED, false, "end");
     y = top + 137;
     series.forEach((line, index) => paragraph(line.label, { size: 12, color: SERIES_COLORS[index % SERIES_COLORS.length] }));
   };
@@ -175,9 +176,14 @@ function createReport(logo, t, reportDate) {
   paragraph(t("cadastru.pdfTitle"), { size: 34, bold: true, gap: 8 });
   return {
     paragraph, propertyNumber, heading, rows, image, chart,
-    download(fileName) {
+    async toPdf() {
       finishPage(true);
-      downloadPdfPages({ pages, fileName });
+      const images = [];
+      for (const svg of pages) {
+        const { data, info } = await sharp(Buffer.from(svg)).jpeg({ quality: 94 }).toBuffer({ resolveWithObject: true });
+        images.push({ bytes: data, width: info.width, height: info.height });
+      }
+      return buildPdfFromJpegs(images);
     },
   };
 }
@@ -331,16 +337,17 @@ function drawMarket(report, market, { t, number, date }) {
   }
 }
 
-function loadLogo() {
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => resolve(null);
-    image.src = "/icon0.svg";
-  });
+async function loadLogo() {
+  try {
+    const svg = await readFile(new URL("../app/icon0.svg", import.meta.url));
+    const { data, info } = await sharp(svg).resize({ height: 64 }).png().toBuffer({ resolveWithObject: true });
+    return { url: `data:image/png;base64,${data.toString("base64")}`, width: info.width, height: info.height };
+  } catch {
+    return null;
+  }
 }
 
-export async function downloadCadastruReport({ cadastral, mapLocation, captureMap, nearby, transport, reports,
+export async function renderCadastruReport({ cadastral, mapLocation, mapImage, nearby, transport, reports,
   reportsAvailable, market, lang, t }) {
   if (!cadastral || cadastral.locked_sections?.cadastru_details || cadastral.full_access === false) {
     throw new Error("Cadastral report is locked");
@@ -353,7 +360,7 @@ export async function downloadCadastruReport({ cadastral, mapLocation, captureMa
   };
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
   const options = { lang, t, number, date };
-  const [logo, mapImage] = await Promise.all([loadLogo(), mapLocation ? captureMap?.() : null]);
+  const logo = await loadLogo();
   const report = createReport(logo, t, date(new Date()));
   drawProperty(report, cadastral, options);
   if (mapLocation) {
@@ -372,5 +379,5 @@ export async function downloadCadastruReport({ cadastral, mapLocation, captureMa
   drawMarket(report, market, options);
   const id = String(cadastral.cadastral_number || cadastral.lands?.[0]?.cadastral_number || cadastral.buildings?.[0]?.cadastral_number || "")
     .replace(/[^0-9.]/g, "");
-  report.download(`catdai-cadastru${id ? `-${id}` : ""}.pdf`);
+  return { bytes: await report.toPdf(), fileName: `catdai-cadastru${id ? `-${id}` : ""}.pdf` };
 }

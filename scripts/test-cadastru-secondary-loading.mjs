@@ -91,6 +91,7 @@ const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
   "@/lib/payment-urls.mjs": { featureCheckoutUrl: () => "/payment/checkout" },
   "@/lib/ga4-payment-client": { trackPaymentAnalytics: noop },
   "@/lib/cadastru-map": { cadastruMapLocation: () => null },
+  "@/lib/cadastru-nearby": { nearbyAddressFromCadastru: () => null },
   "@/lib/cadastru-lookup-tracking": { ...lookupModule.namespace },
   "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: (slug) => trackedOpens.push(slug) },
   react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },

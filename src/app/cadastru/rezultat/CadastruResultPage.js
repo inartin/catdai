@@ -389,8 +389,10 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
   const originalStreet = originalStreetParam || String(state.data?.street_resolution?.original || "").slice(0, 80);
   const resolvedStreet = resolvedStreetParam || String(state.data?.street_resolution?.resolved || "").slice(0, 80);
   const isLockedPreview = state.data?.locked_sections?.cadastru_details === true;
-  const canUnlock = isLockedPreview && !state.data?.registry_unavailable;
-  const purchaseOffer = state.data?.access_limit?.purchase || (isLockedPreview ? { product_key: "cadastru_lookup_single" } : null);
+  const purchaseOffer = state.data?.access_limit?.purchase ?? (
+    isLockedPreview && !state.data.registry_unavailable ? { product_key: "cadastru_lookup_single" } : null
+  );
+  const canUnlock = isLockedPreview && Boolean(purchaseOffer);
   const singlePurchaseProduct = purchaseOffer?.product_key?.endsWith("_single") ? maibProduct(purchaseOffer.product_key) : null;
   const checkoutProductKey = paymentProvider === "maib" && singlePurchaseProduct ? singlePurchaseProduct.key : "extra_pack";
   const unlockPriceMdl = paymentProvider === "maib"
@@ -1111,7 +1113,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
   />;
 
   const showShareAction = !isLockedPreview && Boolean(isAuthenticated || shareSlug);
-  const showPdfAction = Boolean(state.data && !state.data.error);
+  const showPdfAction = Boolean(state.data && !state.data.error && (!isLockedPreview || canUnlock));
   const pdfAddress = state.data?.resolved_address || nearbyAddress;
   const pdfIdentity = shareSlug ? { share_slug: shareSlug }
     : { cadastral_number: nearbyNumber, address: pdfAddress };

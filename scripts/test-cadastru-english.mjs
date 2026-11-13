@@ -9,7 +9,7 @@ import * as jsxRuntime from 'react/jsx-runtime';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as language from '../src/lib/language.js';
 import { cadastruValueLabel } from '../src/lib/cadastru-value-labels.js';
-import { cadastruDisplayAddress, cadastruPropertyDetails, hasDuplicateFootprintArea, isCadastruNonResidential } from "../src/lib/cadastru-property-details.js";
+import { cadastruDisplayAddress, cadastruPropertyDetails, cadastruReportBlockedByRegistry, hasDuplicateFootprintArea, isCadastruNonResidential } from "../src/lib/cadastru-property-details.js";
 import { featureResultPath, allowsGuestCheckout } from '../src/lib/guest-checkout.mjs';
 import { maibProductTitle, purchaseMessages } from '../src/lib/maib/purchase.mjs';
 import * as resultHelpers from '../src/lib/maib/result.mjs';
@@ -61,7 +61,7 @@ const mocks={react:React,'react/jsx-runtime':jsxRuntime,
   '@/context/LanguageContext':{useTranslation:()=>({lang:'en',t}),LanguageProvider:({children})=>children},
   '@/lib/language':language,
   '@/lib/cadastru-value-labels':{cadastruValueLabel},
-  '@/lib/cadastru-property-details': { cadastruDisplayAddress, cadastruPropertyDetails, hasDuplicateFootprintArea, isCadastruNonResidential },
+  '@/lib/cadastru-property-details': { cadastruDisplayAddress, cadastruPropertyDetails, cadastruReportBlockedByRegistry, hasDuplicateFootprintArea, isCadastruNonResidential },
   '@/lib/paid-feature-usage': { buildFeatureCreditRequiredPayload: () => ({}) },
   '@/lib/cadastru-supported-cities': { resolveCadastruCityFromAddress: () => null, resolveCadastruSupportedCity: () => null },
   '@/lib/cadastru-map': { cadastruMapLocation: () => null, redactCadastruMapData: (value) => value },

@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { consumePaidFeatureCredit, getPaidFeatureUsageEvent, getUserFeatureCreditBalance, makePaidFeatureUsageKey } from "@/lib/paid-feature-usage";
 import { getCadastruRecordByAddress, getCadastruRecordByNumber } from "@/lib/cadastru-records";
 import { withCadastruFreshness } from "@/lib/cadastru-cache";
+import { cadastruReportBlockedByRegistry } from "@/lib/cadastru-property-details";
 import { nearbyAddressFromCadastru, nearbyInputFromCadastru, validNearbyResult } from "@/lib/cadastru-nearby";
 import { nearbyFromStorage, getStoredNearby } from "@/lib/cadastru-nearby-storage";
 import { publicTransportInputFromCadastru } from "@/lib/cadastru-public-transport";
@@ -134,10 +135,11 @@ async function handlePost(request) {
       return json({ error: "result_not_found" }, 404);
     }
 
-    const canApplyCredit = Boolean(!body.share_slug && userId && report.key && !payload.registry_unavailable);
+    const blockedByRegistry = cadastruReportBlockedByRegistry(payload);
+    const canApplyCredit = Boolean(!body.share_slug && userId && report.key && !blockedByRegistry);
     if (!report.paid) {
       if (body.check_only === true && report.confirmedPurchase) return json({ ok: true }, 200);
-      if (body.check_only !== true && report.key && !payload.registry_unavailable
+      if (body.check_only !== true && report.key && !blockedByRegistry
         && (report.confirmedPurchase || (canApplyCredit && body.use_paid_credit === true))) {
         // Older receipt deliveries can have used the free balance first. Spend
         // one paid credit for this lookup before generating its paid export.

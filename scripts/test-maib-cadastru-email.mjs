@@ -8,8 +8,10 @@ import { featureResultPath } from '../src/lib/guest-checkout.mjs';
 import { getSavedCadastruAddress } from '../src/lib/cadastru-favorites.js';
 import { cadastruPaidHistoryMetadata } from '../src/lib/cadastru-paid-history.js';
 import { getCadastruSharePath } from '../src/lib/cadastru-share-url.js';
+import { cadastruReportBlockedByRegistry } from '../src/lib/cadastru-property-details.js';
 
 const number = '0100106.131.01.020';
+const parcelNumber = '0100106.131';
 const usageKey = (feature, value) => `paid:${feature}:${crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex').slice(0, 32)}`;
 const official = { status: 'success', cadastral_number: number, apartment: { area_m2: 52 }, cadastru_evaluation_token: 'private-token' };
 let payload = official, reads = [], ambiguous = false;
@@ -22,6 +24,7 @@ const mocks = {
     reads.push({ kind, value, options }); return payload && { payload, lookupSource: 'api', resultType: 'full_data' };
   }])),
   '@/lib/cadastru-cache': { cleanCadastruPayload: value => { const copy = { ...value }; delete copy.access_limit; return copy; } },
+  '@/lib/cadastru-property-details': { cadastruReportBlockedByRegistry },
   '@/lib/paid-feature-usage': { makePaidFeatureUsageKey: usageKey },
   '@/lib/cadastru-paid-history': { cadastruPaidHistoryMetadata },
   '@/lib/cadastru-share-statistics': { resolveCadastruShareSearch: async () => 1 },
@@ -30,7 +33,7 @@ const mocks = {
     inspectStreetAddress: ({ street }) => ({ status: 'unchanged', street }),
     resolveStreet: ({ street }) => ({ status: ambiguous ? 'ambiguous' : 'exact', street: street.replace('Дечебал', 'Decebal') }),
   },
-  '@/lib/validation': { validateCadastralNumber: value => ({ valid: value === number, value }) },
+  '@/lib/validation': { validateCadastralNumber: value => ({ valid: value === number || value === parcelNumber, value }) },
 };
 await deliveryModule.link(name => new vm.SyntheticModule(Object.keys(mocks[name]), function () {
   for (const [key, value] of Object.entries(mocks[name])) this.setExport(key, value);
@@ -63,6 +66,14 @@ assert.equal((await prepare({ returnTo: `${addressPath}&cadastral_number=${numbe
 payload = { status: 'success', lands: [{ cadastral_number: '0100106.131' }] };
 const aggregateDelivery = JSON.parse(JSON.stringify(await prepare({ returnTo: addressPath })));
 assert.equal(aggregateDelivery.usage_key, usageKey('cadastru_lookup', { address: 'chișinău, bd decebal 22/a ap 20' }));
+const parcelReturn = { returnTo: `/ro/cadastru/rezultat?cadastral_number=${parcelNumber}&source=number` };
+payload = { status: 'success', cadastral_number: parcelNumber, registry_unavailable: true,
+  lands: [{ cadastral_number: parcelNumber, area_m2: '450' }] };
+assert.equal(await prepare(parcelReturn), null, 'bare recovery data has no receipt snapshot');
+payload.lands[0].estimated_value_lei = '200000';
+const parcelDelivery = await prepare(parcelReturn);
+assert.equal(parcelDelivery.usage_key, usageKey('cadastru_lookup', { cadastral_number: parcelNumber }));
+assert.equal(parcelDelivery.payload.lands[0].estimated_value_lei, '200000');
 for (const bad of [null, { error: 'unavailable' }, { status: 'failed' }, { locked_sections: { cadastru_details: true } }, { registry_unavailable: true }, { unit_list_entry: true }]) {
   payload = bad; assert.equal(await prepare(), null, 'missing/partial/unverified reports never become public');
 }

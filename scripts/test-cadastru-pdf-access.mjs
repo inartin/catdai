@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 import { validateCadastralNumber } from "../src/lib/validation.js";
+import { cadastruReportBlockedByRegistry } from "../src/lib/cadastru-property-details.js";
 
 const number = "0100201.999.01.0101";
 const other = "0100201.999.01.0102";
@@ -98,6 +99,7 @@ const mocks = {
     getCadastruRecordByAddress: async (value) => value === address ? { payload: addressPayload } : null,
   },
   "@/lib/cadastru-cache": { withCadastruFreshness: (entry) => entry.payload },
+  "@/lib/cadastru-property-details": { cadastruReportBlockedByRegistry },
   "@/lib/cadastru-nearby": { nearbyAddressFromCadastru: () => null, nearbyInputFromCadastru: () => null, validNearbyResult: () => false },
   "@/lib/cadastru-nearby-storage": { nearbyFromStorage: () => null, getStoredNearby: () => null },
   "@/lib/cadastru-public-transport": { publicTransportInputFromCadastru: () => null },
@@ -148,6 +150,13 @@ assert.equal((await post({ ...search, check_only: true, use_paid_credit: true })
 assert.equal((await post({ share_slug: slug }, null)).status, 402);
 assert.equal(renders, 0);
 assert.equal(spends, 0);
+
+payload.registry_unavailable = true;
+assert.equal((await (await post(search)).json()).paid_credit_available, false, "bare recovery cannot apply a credit");
+payload.lands = [{ cadastral_number: "0100201.999", estimated_value_lei: "120000" }];
+assert.equal((await (await post(search)).json()).paid_credit_available, true, "a verified parcel report can apply a credit");
+delete payload.registry_unavailable;
+delete payload.lands;
 
 orders.push({ ...order, status: "registered", paid_at: null });
 assert.equal((await post(search)).status, 402, "pending order cannot export");

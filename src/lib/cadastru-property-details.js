@@ -28,6 +28,16 @@ export function cadastruDisplayAddress(cadastral) {
     || cadastral?.matched_address;
 }
 
+export function cadastruReportBlockedByRegistry(payload) {
+  if (!payload?.registry_unavailable) return false;
+  // A verified property with a sourced address or assessed value still has
+  // report data when other registry requests fail. Bare map recovery waits.
+  const hasReportDetails = [payload.lands, payload.buildings].some((properties) =>
+    Array.isArray(properties) && properties.some((property) =>
+      property?.cadastral_number && (property.address || property.estimated_value_lei)));
+  return !hasReportDetails;
+}
+
 export function hasDuplicateFootprintArea(property) {
   const footprint = property?.footprint_area_m2;
   return !property?.area && footprint != null && footprint !== ""

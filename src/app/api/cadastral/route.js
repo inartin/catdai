@@ -8,6 +8,7 @@ import { fetchCadastruDetailData } from "@/lib/cadastru-address-search";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
 import { logCadastruSearchEvent } from "@/lib/cadastru-search-events";
 import { hasCadastruPropertyResults } from "@/lib/cadastru-result-categories";
+import { cadastruReportBlockedByRegistry } from "@/lib/cadastru-property-details";
 import { getCadastruRecordByNumber, persistCadastruRecord } from "@/lib/cadastru-records";
 import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { resolveAccessTier } from "@/lib/access-tier";
@@ -533,9 +534,8 @@ async function handlePost(request) {
       return res;
     }
 
-    // Verified outage data remains available to entitled viewers without
-    // recording a full-result unlock. Anonymous previews keep their masking.
-    if (payload.registry_unavailable) {
+    // Bare recovery data remains available to entitled viewers without an unlock charge.
+    if (cadastruReportBlockedByRegistry(payload)) {
       return NextResponse.json({ ...payload, cadastru_evaluation_token: evaluationToken });
     }
 

@@ -1,7 +1,7 @@
 import { buildFeatureCreditRequiredPayload } from "@/lib/paid-feature-usage";
 import { resolveCadastruCityFromAddress, resolveCadastruSupportedCity } from "@/lib/cadastru-supported-cities";
 import { cadastruMapLocation, redactCadastruMapData } from "@/lib/cadastru-map";
-import { cadastruDisplayAddress, hasDuplicateFootprintArea, isCadastruNonResidential } from "@/lib/cadastru-property-details";
+import { cadastruDisplayAddress, cadastruReportBlockedByRegistry, hasDuplicateFootprintArea, isCadastruNonResidential } from "@/lib/cadastru-property-details";
 
 const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 
@@ -78,6 +78,8 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
   };
   const hasAddressProperties = Boolean(payload?.lands?.length || payload?.buildings?.length);
   const displayAddress = cadastruDisplayAddress({ ...payload, apartment, building });
+  const accessLimit = buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason);
+  if (cadastruReportBlockedByRegistry(payload)) accessLimit.purchase = null;
 
   const preview = redactCadastruMapData({
     cadastral_number: hasAddressProperties
@@ -116,7 +118,7 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
       map: true,
       ...(maskCadastralNumber && !hasAddressProperties ? { cadastral_number: true } : {}),
     },
-    access_limit: buildFeatureCreditRequiredPayload(CADASTRU_LOOKUP_FEATURE_KEY, reason),
+    access_limit: accessLimit,
   });
   preview.map_preview = { available: Boolean(cadastruMapLocation(payload)) };
   if (options?.maskAddress !== true) return preview;

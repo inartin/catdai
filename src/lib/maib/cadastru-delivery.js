@@ -2,6 +2,7 @@ import { featureResultPath } from '@/lib/guest-checkout.mjs';
 import { getSavedCadastruAddress } from '@/lib/cadastru-favorites';
 import { getCadastruRecordByAddress, getCadastruRecordByNumber } from '@/lib/cadastru-records';
 import { cleanCadastruPayload } from '@/lib/cadastru-cache';
+import { cadastruReportBlockedByRegistry } from '@/lib/cadastru-property-details';
 import { makePaidFeatureUsageKey } from '@/lib/paid-feature-usage';
 import { cadastruPaidHistoryMetadata } from '@/lib/cadastru-paid-history';
 import { resolveCadastruShareSearch } from '@/lib/cadastru-share-statistics';
@@ -43,7 +44,7 @@ export async function buildMaibCadastruDelivery({ productKey, returnTo, checkout
     ? await getCadastruRecordByNumber(number.value, { allowExpired: true })
     : await getCadastruRecordByAddress(lookupAddress, { allowExpired: true, requireUnitDetails: true });
   const payload = entry?.payload;
-  if (!payload || payload.error || payload.registry_unavailable || payload.unit_list_entry
+  if (!payload || payload.error || cadastruReportBlockedByRegistry(payload) || payload.unit_list_entry
     || payload.locked_sections?.cadastru_details || (payload.status && payload.status !== 'success')) return null;
 
   const usageNumber = number.valid ? number.value : payload.cadastral_number;

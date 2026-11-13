@@ -118,7 +118,7 @@ const overrides = {
     checkFeatureAccess: async () => ({ allowed, reason: "no_credit" }),
     consumeFeatureCredit: async () => { credits++; return { allowed, reason: "no_credit" }; },
     makePaidFeatureUsageKey: (_feature, params) => JSON.stringify(params),
-    buildFeatureCreditRequiredPayload: (_feature, reason) => ({ reason }),
+    buildFeatureCreditRequiredPayload: (_feature, reason) => ({ reason, purchase: { product_key: "cadastru_lookup_single" } }),
   },
   "@/lib/cadastru-search-events": { logCadastruSearchEvent: async () => null },
   "@/lib/cadastru-external-api": { fetchExternalCadastralData: async () => {
@@ -154,6 +154,7 @@ assert.equal(credits, 0, "reading cached outage data also leaves credits untouch
 allowed = false;
 data = await (await lookup()).json();
 assert.equal(data.registry_unavailable, true, "preview retains the outage notice");
+assert.equal(data.access_limit.purchase, null, "bare recovery has no purchase offer");
 assert.equal(data.full_access, false);
 assert.equal(data.locked_sections.map, true);
 assert.notEqual(data.lands[0].area_m2, "1000", "existing preview masking is retained");
@@ -201,4 +202,19 @@ assert.equal(data.registry_unavailable, true);
 assert.equal(credits, 0);
 const cached = await caching.readCadastruCache("number", number, { allowExpired: true });
 assert.ok(Date.parse(cached.expiresAt) - Date.now() <= 300_000, "Redis-only recovery uses the same early refresh deadline");
-console.log("Outage checks passed: verified partial data, masking, no credit use, early refresh, recovery and richer-record preservation.");
+
+workerPayload = { ...partial, lands: [{ ...partial.lands[0],
+  address: "Orhei, str. Test 1", estimated_value_lei: "120000" }] };
+allowed = false;
+data = await (await lookup({ skip_cache: true })).json();
+assert.equal(data.registry_unavailable, true, "a usable report retains its early refresh flag");
+assert.equal(data.access_limit.purchase.product_key, "cadastru_lookup_single");
+assert.match(data.lands[0].estimated_value_lei, /^\|+$/, "assessed value remains masked");
+assert(!JSON.stringify(data).includes("Orhei, str. Test 1"), "number preview still masks the sourced address");
+assert.equal(credits, 0);
+allowed = true;
+data = await (await lookup()).json();
+assert.equal(data.lands[0].estimated_value_lei, "120000");
+assert.equal(data.lands[0].address, "Orhei, str. Test 1");
+assert.equal(credits, 1, "a verified report uses the normal credit path despite optional registry failure");
+console.log("Outage checks passed: masking, purchase eligibility, early refresh, recovery and richer-record preservation.");

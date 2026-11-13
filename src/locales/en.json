@@ -86,7 +86,7 @@
   "cadastru.verifyAddress": "Check address",
   "cadastru.retrying": "We did not receive cadastral data on the first attempt. Retrying the search…",
   "cadastru.registryRetrying": "Checking the registry for missing data…",
-  "cadastru.registryUnavailablePartial": "The cadastral registry is temporarily unavailable. We are showing the available property data. You can check for missing data again without using another unlock for this partial result.",
+  "cadastru.registryUnavailablePartial": "The cadastral registry is temporarily unavailable. We are showing the property data we could verify.",
   "cadastru.retrySearch": "Try again",
   "cadastru.otherDataAvailable": "In the meantime, we are showing other available information for this address.",
   "cadastru.missingAddressFields": "Enter the street and house number.",

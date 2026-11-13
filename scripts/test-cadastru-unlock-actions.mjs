@@ -2,7 +2,9 @@
 // pnpm exec node --experimental-vm-modules scripts/test-cadastru-unlock-actions.mjs
 import { cadastruValueLabel } from "../src/lib/cadastru-value-labels.js";
 import { cadastruPropertyDetails, isCadastruNonResidential } from "../src/lib/cadastru-property-details.js";
-import { CONSTRUCTION_CADASTRAL_RE } from "../src/lib/validation.js";
+import { CONSTRUCTION_CADASTRAL_RE, validateCadastralNumber } from "../src/lib/validation.js";
+import { getCadastruFavoritePath } from "../src/lib/cadastru-favorites.js";
+import { featureCheckoutUrl } from "../src/lib/payment-urls.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
@@ -78,8 +80,19 @@ const singleNumberPreview = {
   full_access: false,
   locked_sections: { cadastru_details: true, cadastral_number: true },
 };
+const parcelNumber = "0100201.999";
+const parcelPreview = {
+  ...multiPropertyPreview,
+  cadastral_number: parcelNumber,
+  matched_address: "Stăuceni, str. Exemplu 10",
+  address_locality: "Stăuceni",
+  lands: [{ cadastral_number: "|||||||||||", area_m2: "||||", estimated_value_lei: "||||||" }],
+  buildings: [],
+  registry_unavailable: true,
+  locked_sections: { cadastru_details: true, address: true },
+};
 
-async function checkPageAction(isAuthenticated) {
+async function checkPageAction(isAuthenticated, numberPreview) {
   let checkoutUrl = "";
   let pdfChecks = 0;
   const slots = [];
@@ -93,6 +106,9 @@ async function checkPageAction(isAuthenticated) {
     }];
   };
   const request = { city: "Stăuceni", road_type: "strada", street: "Luceafărul", house_number: "22" };
+  const lookupParams = new URLSearchParams(numberPreview
+    ? { source: "number", cadastral_number: parcelNumber, lookup_id: crypto.randomUUID() }
+    : { source: "address", preview: "1" });
   const storage = new Map([
     ["catdai:cadastru-address-result-preview:v1", JSON.stringify(multiPropertyPreview)],
     ["catdai:cadastru-address-lookup-request:v1", JSON.stringify(request)],
@@ -102,7 +118,7 @@ async function checkPageAction(isAuthenticated) {
     "next/link": { default: noop },
     "@/components/usePaymentProvider": { default: () => "maib" },
     "@/lib/maib/products.mjs": { maibProduct: (key) => ({ key, amount_mdl: 49 }) },
-    "@/lib/payment-urls.mjs": { featureCheckoutUrl: (key, locale) => `/${locale}/checkout/${key}` },
+    "@/lib/payment-urls.mjs": { featureCheckoutUrl },
     "@/lib/ga4-payment-client": { trackPaymentAnalytics: noop },
     "@/lib/cadastru-map": { cadastruMapLocation: () => null },
     "@/lib/cadastru-nearby": { nearbyAddressFromCadastru: () => null },
@@ -113,13 +129,13 @@ async function checkPageAction(isAuthenticated) {
     react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0],
       useEffect: (effect) => effects.push(effect) },
     "next/navigation": { useRouter: () => ({ push: noop }),
-      useSearchParams: () => new URLSearchParams("source=address&preview=1") },
+      useSearchParams: () => lookupParams },
     "@/context/LanguageContext": translation,
     "@/context/AuthContext": { useAuth: () => ({ isAuthenticated, loading: false,
       session: isAuthenticated ? { access_token: "test-token" } : null, clearAuthError: noop }) },
     "@/lib/cadastru-property-details": { isCadastruNonResidential },
-    "@/lib/validation": { CONSTRUCTION_CADASTRAL_RE, matchCity: () => null, validateCadastralNumber: () => ({ valid: false }) },
-    "@/lib/cadastru-favorites": { getCadastruFavoritePath: () => null, getSavedCadastruAddress: () => null },
+    "@/lib/validation": { CONSTRUCTION_CADASTRAL_RE, matchCity: () => null, validateCadastralNumber },
+    "@/lib/cadastru-favorites": { getCadastruFavoritePath, getSavedCadastruAddress: () => null },
     "@/lib/cadastru-valuation-handoff": { resolveValuationDistrict: () => null, buildFullAccessAddressResultParams: noop },
     "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: () => false,
       validMunicipalReportsResult: () => false },
@@ -127,10 +143,17 @@ async function checkPageAction(isAuthenticated) {
     "@/components/AuthRequiredModal": { default: AuthRequiredModal },
     "@/components/FeaturePricingAction": { default: FeaturePricingAction },
   }, {
-    window: { location: { href: "https://catdai.md/cadastru/rezultat", assign: (url) => { checkoutUrl = url; } } },
+    window: { location: { href: `https://catdai.md/${lang}/cadastru/rezultat?${lookupParams}`, assign: (url) => { checkoutUrl = url; } } },
     requestAnimationFrame: noop, navigator: { userAgent: "" }, localStorage: { removeItem: noop },
     sessionStorage: { getItem: (key) => storage.get(key) ?? null },
     fetch: async (url, options) => {
+      if (numberPreview) {
+        if (url === "/api/cadastral") {
+          assert.equal(JSON.parse(options.body).cadastral_number, parcelNumber);
+          return { ok: true, json: async () => numberPreview };
+        }
+        return { ok: false, json: async () => ({}) };
+      }
       if (url === "/api/cadastru/pdf") {
         pdfChecks++;
         assert.equal(options.headers.Authorization, "Bearer test-token");
@@ -151,7 +174,48 @@ async function checkPageAction(isAuthenticated) {
   effects.forEach((effect) => effect());
   await new Promise((resolve) => setTimeout(resolve, 0));
   const tree = render();
+  const [card] = findNodes(tree, (node) => node.type === CadastralDataCard);
+  assert(card, "result renders its cadastral card");
+  const [dock] = findNodes(tree, (node) => node.type === FeaturePricingAction && node.props.mobileDock);
   const [pdfAction] = findNodes(tree, (node) => node.props?.identity && node.props?.purchaseOffer);
+
+  const assertCheckout = () => {
+    const checkout = new URL(checkoutUrl);
+    assert.equal(checkout.pathname, "/payment/checkout");
+    assert.equal(checkout.searchParams.get("product_key"), purchase.product_key);
+    assert.equal(checkout.searchParams.get("lang"), lang);
+    if (numberPreview) {
+      const returnTo = new URL(checkout.searchParams.get("return_to"), checkout.origin);
+      assert.equal(returnTo.pathname, `/${lang}/cadastru/rezultat`);
+      for (const [key, value] of lookupParams) assert.equal(returnTo.searchParams.get(key), value);
+    }
+  };
+
+  if (numberPreview) {
+    const cardContent = CadastralDataCard(card.props);
+    const [addressField, ...fields] = findNodes(cardContent, (node) => node.props?.role === "button");
+    if (numberPreview.access_limit.purchase === null) {
+      assert(!addressField && !dock && !pdfAction, "bare recovery cannot start checkout");
+      assert(findNodes(cardContent, (node) => node.type === "button" && node.props.children === t("cadastru.retrySearch")).length,
+        "bare recovery offers a retry");
+      return;
+    }
+    assert(dock && pdfAction, "verified number preview offers checkout on mobile and from Save PDF");
+    assert(addressField && fields.length > 0, "masked address and property values are interactive");
+    addressField.props.onClick();
+    assertCheckout();
+    checkoutUrl = "";
+    let prevented = false;
+    fields[0].props.onKeyDown({ key: "Enter", preventDefault: () => { prevented = true; } });
+    assert(prevented);
+    assertCheckout();
+    checkoutUrl = "";
+    const [desktopUnlock] = findNodes(cardContent, (node) => node.type === "button");
+    desktopUnlock.props.onClick();
+    assertCheckout();
+    return;
+  }
+
   assert(pdfAction, "locked previews show the PDF action");
   const pdfCursor = cursor;
   const renderPdf = () => {
@@ -184,17 +248,17 @@ async function checkPageAction(isAuthenticated) {
     assert(findNodes(renderPdf(), (node) => node.type === AuthRequiredModal && node.props.open).length,
       "a free unlock opens the purchase popup after the server declines the export");
   }
-  const card = findNodes(tree, (node) => node.type === CadastralDataCard)[0];
-  assert(card, "multi-property result renders its cadastral card");
-  const [dock] = findNodes(tree, (node) => node.type === FeaturePricingAction && node.props.mobileDock);
   assert.equal(dock.props.offer.product_key, purchase.product_key);
   card.props.onLockedClick();
-  assert.equal(checkoutUrl, `/${lang}/checkout/${purchase.product_key}`);
+  assertCheckout();
 }
 
 for (lang of ["ro", "ru"]) {
   await checkPageAction(false);
   await checkPageAction(true);
+  await checkPageAction(false, parcelPreview);
+  await checkPageAction(true, parcelPreview);
+  await checkPageAction(false, { ...parcelPreview, access_limit: { purchase: null } });
   for (const cadastral of [multiPropertyPreview, singleNumberPreview]) {
     const props = { cadastral, onLockedClick: noop, showRevealButton: true };
     assert.equal(findNodes(CadastralDataCard(props), (node) => node.type === "button").length, 1,
@@ -205,4 +269,4 @@ for (lang of ["ro", "ru"]) {
       (node) => node.type === "button").length, 0, "a card without a reveal action does not show a button");
   }
 }
-console.log("Cadastru single/multi-property login and payment actions pass in RO/RU.");
+console.log("Cadastru address and number unlock actions pass in RO/RU, including partial registry results.");

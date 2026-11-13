@@ -33,5 +33,23 @@ assert.equal((await call('cadastru_records','missing')).changed,false);
 await assert.rejects(call('listing','test'),/Invalid land/);
 for(const role of ['anon','authenticated']) assert.equal((await db.query(`select has_function_privilege('${role}','public.backfill_cadastru_land_classification(text,text,text,jsonb)','execute') allowed`)).rows[0].allowed,false);
 assert.equal((await db.query("select prosecdef from pg_proc where proname='backfill_cadastru_land_classification'")).rows[0].prosecdef,false);
-console.log('Land classification SQL: preservation, exact identity, replay, permissions passed');
+await db.exec(await fs.readFile(new URL('supabase/migrations/20261112184637_collector_land_evaluation_refresh.sql',root),'utf8'));
+const refresh=async(table,key,before,after)=>(await db.query(
+ 'select merge_cadastru_land_refresh($1,$2,$3,$4) result',[table,key,before,after])).rows[0].result;
+for(const [table,key,column] of [['cadastru_records',number,'cadastral_number'],['cadastru_address_aliases','test','address_key'],['cadastru_buildings',`${number}.01`,'cadastral_number']]) {
+ const before=(await db.query(`select * from ${table} where ${column}=$1`,[key])).rows[0];
+ const updated={...before.raw_payload,lands:before.raw_payload.lands.map((item,index)=>index?item:{...item,slope:'Plana'})};
+ assert.equal(await refresh(table,key,before.raw_payload,updated),true);
+ assert.equal(await refresh(table,key,before.raw_payload,{discarded:true}),false,'a stale write cannot replace a newer payload');
+ const after=(await db.query(`select * from ${table} where ${column}=$1`,[key])).rows[0];
+ assert.deepEqual(after.raw_payload,updated);
+ for(const field of Object.keys(before).filter(k=>!['raw_payload','updated_at','payload_hash'].includes(k))) assert.deepEqual(after[field],before[field],field);
+}
+await assert.rejects(refresh('listing','test',{},{}),/Invalid cadastral land refresh/);
+for(const [role,allowed] of [['anon',false],['authenticated',false],['service_role',true]]) {
+ const {rows}=await db.query("select has_function_privilege($1,'public.merge_cadastru_land_refresh(text,text,jsonb,jsonb)','execute') allowed",[role]);
+ assert.equal(rows[0].allowed,allowed,role);
+}
+assert.equal((await db.query("select prosecdef from pg_proc where proname='merge_cadastru_land_refresh'")).rows[0].prosecdef,false);
+console.log('Land refresh SQL passed: row preservation, concurrent writes and service-only permissions.');
 await db.close();

@@ -72,6 +72,9 @@ export default function CadastralDataCard({
   const addressDetail = locality && displayAddress?.startsWith(`${locality}, `)
     ? displayAddress.slice(locality.length + 2) : displayAddress;
   const showLockedRevealButton = Boolean(showRevealButton && hasLockedDetails && onLockedClick);
+  const registryRetryAvailable = cadastral.registry_unavailable && (
+    !hasPropertyResult || (onRegistryRetry && hasLockedDetails && cadastral.access_limit?.purchase === null)
+  );
   const showCompactRevealButton = showLockedRevealButton && !hideCompactRevealButton;
   const revealButton = showCompactRevealButton ? (
     <button
@@ -89,44 +92,25 @@ export default function CadastralDataCard({
     (section === "building" && field === "classifier")
   );
   const isFieldLocked = (section, field) => hasLockedDetails && !isVisibleLockedField(section, field);
-  const lockedValueProps = (section, field) => {
-    if (!isFieldLocked(section, field)) return {};
-    return {
-      role: onLockedClick ? "button" : undefined,
-      tabIndex: onLockedClick ? 0 : undefined,
-      onClick: onLockedClick,
-      onKeyDown: (event) => {
-        if (!onLockedClick) return;
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onLockedClick();
-        }
-      },
-    };
-  };
-  const valueClassName = (section, field) => (
-    `${detailValueClass} ${isFieldLocked(section, field) ? "select-none blur-sm cursor-pointer" : ""}`
-  );
-  const cadastralNumberProps = isCadastralNumberLocked
-    ? {
-        role: onLockedClick ? "button" : undefined,
-        tabIndex: onLockedClick ? 0 : undefined,
-        onClick: onLockedClick,
-        onKeyDown: (event) => {
-          if (!onLockedClick) return;
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onLockedClick();
-          }
-        },
+  const lockedValueClass = `select-none blur-sm${onLockedClick ? " cursor-pointer" : ""}`;
+  const lockedActionProps = onLockedClick ? {
+    role: "button",
+    tabIndex: 0,
+    onClick: onLockedClick,
+    onKeyDown: (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onLockedClick();
       }
-    : {};
+    },
+  } : {};
   const detailRow = (section, field, label, value) => {
     if (value === null || value === undefined || value === "") return null;
+    const fieldLocked = isFieldLocked(section, field);
     return (
       <div key={field} className="flex items-start justify-between gap-4 text-base">
         <span className="text-gray-500">{label}</span>
-        <span className={valueClassName(section, field)} {...lockedValueProps(section, field)}>
+        <span className={`${detailValueClass} ${fieldLocked ? lockedValueClass : ""}`} {...(fieldLocked ? lockedActionProps : {})}>
           {cadastruValueLabel(value, field, lang)}
         </span>
       </div>
@@ -161,8 +145,8 @@ export default function CadastralDataCard({
             </p>
             <div className={showCompactRevealButton && isCadastralNumberLocked ? "relative mt-2 min-h-10" : "relative mt-1"}>
               <p
-                className={`font-mono text-xl font-semibold tracking-wide text-emerald-950 ${isCadastralNumberLocked ? "select-none blur-sm cursor-pointer" : ""}`}
-                {...cadastralNumberProps}
+                className={`font-mono text-xl font-semibold tracking-wide text-emerald-950 ${isCadastralNumberLocked ? lockedValueClass : ""}`}
+                {...(isCadastralNumberLocked ? lockedActionProps : {})}
               >
                 {cadastral.cadastral_number}
               </p>
@@ -175,7 +159,8 @@ export default function CadastralDataCard({
           <p className="text-base text-gray-600">
             {isAddressLocked ? <>
               {locality ? `${locality}, ` : null}
-              <span className="select-none blur-sm cursor-pointer" {...lockedValueProps("address", "address")} aria-label={t("cadastru.payToUnlock")}>
+              <span className={lockedValueClass} {...lockedActionProps}
+                aria-label={onLockedClick ? t("cadastru.payToUnlock") : undefined}>
                 {addressDetail}
               </span>
             </> : displayAddress}
@@ -236,7 +221,7 @@ export default function CadastralDataCard({
             </button>
           </div>
         ) : null}
-        {cadastral.registry_unavailable && !hasPropertyResult ? (
+        {registryRetryAvailable ? (
           <div role="status" className="mt-4 rounded-xl bg-sky-50 p-4 text-sm text-sky-950">
             <p>{t("cadastru.registryUnavailablePartial")}</p>
             {onRegistryRetry ? <button type="button" disabled={registryRetrying}

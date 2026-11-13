@@ -388,7 +388,7 @@
   "cadastru.verifyAddress": "Verifică adresa",
   "cadastru.retrying": "Nu am primit datele cadastrale la prima încercare. Reîncercăm căutarea…",
   "cadastru.registryRetrying": "Verificăm datele lipsă din registru…",
-  "cadastru.registryUnavailablePartial": "Registrul cadastral este temporar indisponibil. Afișăm datele disponibile despre proprietate. Datele lipsă pot fi verificate din nou fără consumarea unei deblocări pentru acest rezultat parțial.",
+  "cadastru.registryUnavailablePartial": "Registrul cadastral este temporar indisponibil. Afișăm datele pe care le-am putut verifica despre proprietate.",
   "cadastru.retrySearch": "Încearcă din nou",
   "cadastru.otherDataAvailable": "Între timp, afișăm celelalte informații disponibile pentru această adresă.",
   "cadastru.missingAddressFields": "Completează strada și numărul imobilului.",

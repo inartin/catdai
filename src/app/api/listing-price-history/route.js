@@ -39,13 +39,15 @@ export async function GET(request) {
     );
   }
 
-  const externalId = normalizeExternalId(new URL(request.url).searchParams.get("external_id"));
+  const params = new URL(request.url).searchParams;
+  const externalId = normalizeExternalId(params.get("external_id"));
   if (!externalId) {
     return NextResponse.json({ error: "invalid_external_id" }, { status: 400 });
   }
 
+  const isRent = params.get("listing_type") === "rent";
   const { data: listings, error: listingError } = await supabaseAdmin
-    .from("listing")
+    .from(isRent ? "listing_rent" : "listing")
     .select("id, external_id")
     .eq("external_id", externalId)
     .order("last_seen_at", { ascending: false })
@@ -61,7 +63,7 @@ export async function GET(request) {
   }
 
   const { data: history, error: historyError } = await supabaseAdmin
-    .from("listing_price_history")
+    .from(isRent ? "listing_rent_price_history" : "listing_price_history")
     .select("id, price_amount, price_currency, observed_at, source_updated_at")
     .eq("listing_id", listing.id)
     .order("observed_at", { ascending: true });

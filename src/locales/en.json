@@ -1,4 +1,8 @@
 {
+  "linkAnalyzer.subtitle": "Compare the sale price or monthly rent with similar apartments on the market",
+  "linkAnalyzer.errorUnsupportedType": "Apartment listings for sale or monthly rent are supported.",
+  "result.listingAskingRent": "Asking rent",
+  "result.listingRentDifference": "Difference from estimate: {difference}",
   "cadastru.tryWithoutApartmentTitle": "Search separately for the building or land",
   "cadastru.tryWithoutApartmentDescription": "You can try the same address without the apartment number. This is a new search; availability of building or land data has not been confirmed.",
   "cadastru.tryWithoutApartment": "Try without apartment",

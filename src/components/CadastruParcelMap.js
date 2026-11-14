@@ -30,7 +30,7 @@ export default function CadastruParcelMap({ location, cadastral, fallbackUrl }) 
       map = new gl.Map({
         container: container.current,
         style: "/api/cadastru/map/styles/satelite/style.json",
-        center: [longitude, latitude], zoom: 18, maxZoom: 21,
+        center: [longitude, latitude], zoom: 17, maxZoom: 21,
         // Split-tile caches can retain satellite-only layers across a style
         // switch. Keep complete source tiles so street buildings render at once.
         zoomLevelsToOverscale: undefined,
@@ -61,7 +61,8 @@ export default function CadastruParcelMap({ location, cadastral, fallbackUrl }) 
             const polygons = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
             for (const polygon of polygons) for (const ring of polygon) for (const point of ring) bounds.extend(point.slice(0, 2));
           }
-          map.fitBounds(bounds, { padding: 48, maxZoom: 18, duration: 0 });
+          const camera = map.cameraForBounds(bounds, { padding: 48, maxZoom: 18 });
+          if (camera) map.jumpTo({ ...camera, zoom: camera.zoom - 1 });
           fitted = true;
         }
       });

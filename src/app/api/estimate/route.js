@@ -11,14 +11,13 @@ import {
 } from "@/lib/free-monthly-feature-usage";
 import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
 import {
-  checkFeatureAccess,
-  consumeFeatureCredit,
   consumePaidFeatureCredit,
   getPaidFeatureUsageEvent,
   getUserFeatureCreditBalance,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
-import { getEvaluationPurchaseOffer, getFeaturePurchaseOffer } from "@/lib/payment-products";
+import { precheckListingAnalysisAccess, resolveListingAnalysisPayload } from "@/lib/listing-analysis-access";
+import { getEvaluationPurchaseOffer } from "@/lib/payment-products";
 import { rateLimit } from "@/lib/rate-limit";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { recordCadastruEvaluationStep } from "@/lib/cadastru-evaluation-tracking";
@@ -256,7 +255,6 @@ const ESTIMATE_CACHE_TTL_SECONDS = 30 * 60;
 const ESTIMATE_CACHE_MAX_ENTRIES = 250;
 const ESTIMATE_CACHE_PREFIX = "catdai:estimate:v2:";
 const FULL_EVALUATION_FEATURE_KEY = "sale_estimate";
-const LISTING_ANALYSIS_FEATURE_KEY = "listing_analysis";
 
 let estimateCache = new Map();
 
@@ -394,89 +392,6 @@ function buildUsageMetadata({ params, body }) {
     evaluation_group_id: body.evaluation_group_id || null,
     log_id: body.log_id || null,
     language: body.language || null,
-  };
-}
-
-function getListingAnalysisExternalId(body) {
-  const externalId = String(body?.listing_analysis?.external_id || "").trim();
-  return externalId || null;
-}
-
-function makeListingAnalysisUsageKey(body) {
-  const externalId = getListingAnalysisExternalId(body);
-  return externalId
-    ? makePaidFeatureUsageKey(LISTING_ANALYSIS_FEATURE_KEY, { external_id: externalId })
-    : null;
-}
-
-function buildListingAnalysisUsageMetadata({ params, body }) {
-  return {
-    feature: "listing_analysis",
-    listing_analysis: body.listing_analysis || {},
-    params,
-    evaluation_group_id: body.evaluation_group_id || null,
-    log_id: body.log_id || null,
-    language: body.language || null,
-  };
-}
-
-async function precheckListingAnalysisAccess(request, body) {
-  const idempotencyKey = makeListingAnalysisUsageKey(body);
-  if (!idempotencyKey) return null;
-
-  const access = await resolveAccessTier(request);
-  const check = await checkFeatureAccess({
-    userId: access.user_id,
-    featureKey: LISTING_ANALYSIS_FEATURE_KEY,
-    idempotencyKey,
-  });
-
-  return { access, idempotencyKey, check };
-}
-
-async function consumeListingAnalysisCredit(listingAccess, body, params) {
-  if (!listingAccess) return null;
-
-  return consumeFeatureCredit({
-    userId: listingAccess.access.user_id,
-    featureKey: LISTING_ANALYSIS_FEATURE_KEY,
-    idempotencyKey: listingAccess.idempotencyKey,
-    metadata: buildListingAnalysisUsageMetadata({ params, body }),
-  });
-}
-
-function buildListingAnalysisAccessPayload(data, listingAccess, paidCreditUsage) {
-  const preview = buildEstimatePreview(data);
-  if (!listingAccess?.check?.allowed) {
-    return {
-      ...preview,
-      access_tier: listingAccess?.access?.tier || "free",
-      full_access: false,
-      access_limit: {
-        reason: listingAccess?.check?.reason || "no_credit",
-        feature_key: LISTING_ANALYSIS_FEATURE_KEY,
-        purchase: getFeaturePurchaseOffer(LISTING_ANALYSIS_FEATURE_KEY),
-      },
-      locked_sections: {
-        ...preview.locked_sections,
-        listing_price_history: true,
-        listing_duplicates: true,
-      },
-    };
-  }
-
-  return {
-    ...data,
-    access_tier: listingAccess.access.tier,
-    full_access: true,
-    access_source: paidCreditUsage?.source || listingAccess.check?.source || "paid_credit",
-    review_usage_id: paidCreditUsage?.source === "paid_credit" ? paidCreditUsage.usage_event_id : null,
-    paid_credit_usage: paidCreditUsage
-      ? {
-        remaining: paidCreditUsage.remaining_uses,
-      }
-      : null,
-    locked_sections: {},
   };
 }
 
@@ -997,7 +912,7 @@ async function handlePost(request) {
     p_balconies_count: v.balconies_count ?? null,
   };
 
-  let listingAnalysisAccess = null;
+  let listingAnalysisAccess;
   try {
     listingAnalysisAccess = await precheckListingAnalysisAccess(request, body);
   } catch (error) {
@@ -1017,20 +932,7 @@ async function handlePost(request) {
     let trackingAccess;
 
     if (listingAnalysisAccess) {
-      let paidCreditUsage = null;
-      if (listingAnalysisAccess.check?.allowed) {
-        paidCreditUsage = await consumeListingAnalysisCredit(listingAnalysisAccess, body, params);
-        if (!paidCreditUsage?.allowed) {
-          listingAnalysisAccess = {
-            ...listingAnalysisAccess,
-            check: {
-              allowed: false,
-              reason: paidCreditUsage?.reason || "no_credit",
-            },
-          };
-        }
-      }
-      responsePayload = buildListingAnalysisAccessPayload(cachedData, listingAnalysisAccess, paidCreditUsage);
+      responsePayload = await resolveListingAnalysisPayload(cachedData, listingAnalysisAccess, body, params, buildEstimatePreview);
       trackingAccess = listingAnalysisAccess.access;
     } else {
       let estimateAccess;
@@ -1161,20 +1063,7 @@ async function handlePost(request) {
   let trackingAccess;
 
   if (listingAnalysisAccess) {
-    let paidCreditUsage = null;
-    if (listingAnalysisAccess.check?.allowed) {
-      paidCreditUsage = await consumeListingAnalysisCredit(listingAnalysisAccess, body, params);
-      if (!paidCreditUsage?.allowed) {
-        listingAnalysisAccess = {
-          ...listingAnalysisAccess,
-          check: {
-            allowed: false,
-            reason: paidCreditUsage?.reason || "no_credit",
-          },
-        };
-      }
-    }
-    responsePayload = buildListingAnalysisAccessPayload(data, listingAnalysisAccess, paidCreditUsage);
+    responsePayload = await resolveListingAnalysisPayload(data, listingAnalysisAccess, body, params, buildEstimatePreview);
     trackingAccess = listingAnalysisAccess.access;
   } else {
     let estimateAccess;

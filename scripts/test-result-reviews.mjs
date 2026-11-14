@@ -28,9 +28,48 @@ for (const [file, name] of [
   }
   assert.equal(build({}, { hasFullAccess: false, access: {}, sharedLink: null }).review_usage_id, undefined);
 }
-const buildListing = await resultFunction('src/app/api/estimate/route.js', 'buildListingAnalysisAccessPayload', { buildEstimatePreview: () => ({}) });
-assert.equal(buildListing({}, { check: { allowed: true }, access: {} }, { source: 'paid_credit', usage_event_id: 'listing-unlock' }).review_usage_id, 'listing-unlock');
-assert.equal(buildListing({}, { check: { allowed: true }, access: {} }, { source: 'free_monthly' }).review_usage_id, null);
+const listingBody = { listing_analysis: { external_id: '105784182' } };
+const listingAccess = { access: { user_id: 'buyer' }, check: { allowed: true }, idempotencyKey: 'listing-key' };
+const listingData = { estimate_type: 'rent', estimate: { market_rate: 400 } };
+const rentalPreview = { estimate: { market_rate: null }, locked_sections: { market_estimate: true } };
+const resolveRentalListing = await resultFunction('src/app/api/estimate-rent/route.js', 'resolveRentResponse', {
+  precheckListingAnalysisAccess: async () => listingAccess,
+  resolveListingAnalysisPayload: async (data, access, body, params, preview) => {
+    assert.equal(access, listingAccess);
+    assert.equal(body, listingBody);
+    return preview(data);
+  },
+  buildRentEstimatePreview: (data, { hideMarketEstimate }) => {
+    assert.equal(data, listingData);
+    assert.equal(hideMarketEstimate, true);
+    return rentalPreview;
+  },
+}, true);
+assert.equal((await resolveRentalListing({}, listingBody, {}, listingData)).payload, rentalPreview);
+
+for (const usage of [
+  { allowed: true, source: 'paid_credit', usage_event_id: 'listing-unlock' },
+  { allowed: true, source: 'free_monthly' },
+  { allowed: false, reason: 'no_credit' },
+]) {
+  const resolveListing = await resultFunction('src/lib/listing-analysis-access.js', 'resolveListingAnalysisPayload', {
+    LISTING_ANALYSIS_FEATURE_KEY: 'listing_analysis',
+    consumeFeatureCredit: async ({ featureKey, idempotencyKey }) => {
+      assert.equal(featureKey, 'listing_analysis');
+      assert.equal(idempotencyKey, 'listing-key');
+      return usage;
+    },
+    getFeaturePurchaseOffer: () => ({ product_key: 'listing_analysis_single' }),
+  }, true);
+  const result = await resolveListing(listingData, listingAccess, listingBody, {}, () => rentalPreview);
+  assert.equal(result.full_access, usage.allowed);
+  if (usage.allowed) {
+    assert.equal(result.review_usage_id, usage.usage_event_id || null);
+  } else {
+    assert.equal(result.estimate.market_rate, null);
+    assert.equal(result.access_limit.feature_key, 'listing_analysis');
+  }
+}
 const calculatorResponse = await resultFunction('src/app/api/estimate-rent/route.js', 'resolveRentResponse', {
   consumeYieldCalculatorCredit: async () => ({ allowed: true, source: 'paid_credit', usage_event_id: 'calculator-unlock' }),
 }, true);

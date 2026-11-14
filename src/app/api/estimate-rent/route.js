@@ -11,6 +11,7 @@ import {
   makeMonthlyFeatureUsageKey,
 } from "@/lib/free-monthly-feature-usage";
 import { persistPaidEvaluationSnapshot } from "@/lib/evaluation-snapshots";
+import { precheckListingAnalysisAccess, resolveListingAnalysisPayload } from "@/lib/listing-analysis-access";
 import {
   checkFeatureAccess,
   consumeFeatureCredit,
@@ -751,6 +752,22 @@ async function resolveRentResponse(request, body, params, rawData, calculatorAcc
         locked_sections: {},
       },
     };
+  }
+
+  if (body.listing_analysis) {
+    const listingAccess = await precheckListingAnalysisAccess(request, body);
+    if (listingAccess) {
+      return {
+        access: listingAccess.access,
+        payload: await resolveListingAnalysisPayload(
+          rawData,
+          listingAccess,
+          body,
+          params,
+          (data) => buildRentEstimatePreview(data, { hideMarketEstimate: true })
+        ),
+      };
+    }
   }
 
   const estimateAccess = await resolveRentEstimateAccess(request, body, params);

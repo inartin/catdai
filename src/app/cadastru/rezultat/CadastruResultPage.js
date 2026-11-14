@@ -466,7 +466,7 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
         q: `${latitude},${longitude}`,
         ll: `${latitude},${longitude}`,
         t: "k",
-        z: "18",
+        z: "17",
         hl: lang,
         output: "embed",
       })}`

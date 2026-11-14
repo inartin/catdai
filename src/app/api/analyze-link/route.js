@@ -104,12 +104,19 @@ function textIncludesAny(value, needles) {
   return needles.some((needle) => normalized.includes(needle));
 }
 
-function detectSellApartment(parsed) {
+function detectApartmentOffer(parsed) {
   const features = parsed.features || {};
   const titleText = [parsed.title, parsed.name].filter(Boolean).join(" ");
-
   const dealType = pickAnyFeature(features, FEATURE_KEYS.dealType);
-  if (dealType ? !textIncludesAny(dealType, ["vand"]) : !textIncludesAny(titleText, ["vand"])) {
+
+  // 999 has separate offer types for monthly rent, daily rent and wanted ads.
+  const monthlyRentLabel = normalizeDiacritics("De închiriat lunar");
+  const isMonthlyRent = dealType
+    ? normalizeDiacritics(dealType) === monthlyRentLabel
+    : textIncludesAny(titleText, [monthlyRentLabel]);
+  const isSale = textIncludesAny(dealType || titleText, ["vand"])
+    && !textIncludesAny(titleText, ["anchir", "inchir", "chirie", "arenda", "rent"]);
+  if (!isMonthlyRent && !isSale) {
     return { error: "unsupported_listing_type" };
   }
 
@@ -123,19 +130,15 @@ function detectSellApartment(parsed) {
     return { error: "unsupported_listing_type" };
   }
 
-  if (textIncludesAny(titleText, ["anchir", "inchir", "chirie", "arenda", "rent"])) {
-    return { error: "unsupported_listing_type" };
-  }
-
   if (!textIncludesAny(titleText, ["apartament"]) && categoryValues.length === 0) {
     return { error: "unsupported_listing_type" };
   }
 
-  return { valid: true };
+  return { type: isMonthlyRent ? "rent" : "sale" };
 }
 
 function mapToParams(parsed) {
-  const supportedType = detectSellApartment(parsed);
+  const supportedType = detectApartmentOffer(parsed);
   if (supportedType.error) return supportedType;
 
   const isChisinau = detectChisinau(parsed);
@@ -156,7 +159,12 @@ function mapToParams(parsed) {
   const rooms = clampInt(parseFirstInt(pickFeature(features, FEATURE_KEYS.rooms)), 1, 5);
   if (!rooms) return { error: "insufficient_data" };
 
-  const params = { city, district, rooms: String(rooms) };
+  const params = {
+    city,
+    district,
+    rooms: String(rooms),
+    ...(supportedType.type === "rent" ? { type: "rent" } : {}),
+  };
 
   const area = parseFloat(String(pickFeature(features, FEATURE_KEYS.area) || "").replace(",", "."));
   if (Number.isFinite(area) && area > 0 && area <= 1000) params.area = String(area);

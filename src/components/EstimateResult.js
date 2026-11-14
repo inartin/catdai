@@ -348,7 +348,7 @@ function getListingHistoryTone(point) {
   };
 }
 
-function ListingPriceHistoryChart({ history, currency, compact = false, locked = false, onLockedClick }) {
+function ListingPriceHistoryChart({ history, currency, compact = false, locked = false, onLockedClick, className }) {
   const { t, lang } = useTranslation();
   const lockedTooltipKey = useContext(LockedTooltipContext);
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -357,10 +357,10 @@ function ListingPriceHistoryChart({ history, currency, compact = false, locked =
   const mobileFullWidthClassName =
     "-ml-[8rem] w-[calc(100%+8rem)] sm:-ml-[9.25rem] sm:w-[calc(100%+9.25rem)] lg:ml-0 lg:w-full";
 
-  const wrapperClassName = `${compact
+  const wrapperClassName = className ?? (compact
     ? `mt-5 border-t border-gray-100 pt-4 ${mobileFullWidthClassName}`
     : `mt-5 border-t border-gray-100 pt-4 ${mobileFullWidthClassName} lg:mt-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0`
-    }`;
+  );
 
   if (points.length < 2) {
     return (
@@ -1603,6 +1603,62 @@ function RentTaxToggle({ checked, onChange }) {
   );
 }
 
+function RentListingPriceComparison({ listing, marketRate, locked, onLockedClick }) {
+  const { t, lang } = useTranslation();
+  const currency = listing.currency.toUpperCase();
+  const canCompare = currency === "EUR";
+  const delta = canCompare && marketRate > 0 ? listing.asking_price - marketRate : null;
+  const percent = delta == null ? null : (delta / marketRate) * 100;
+  const verdictKey = percent < -LISTING_FAIR_BAND_PCT
+    ? "result.listingDeltaBelow"
+    : percent > LISTING_FAIR_BAND_PCT
+      ? "result.listingDeltaAbove"
+      : "result.listingDeltaFair";
+  const listingUrl = build999ListingUrl(listing.external_id, lang);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 divide-x divide-gray-100 text-center">
+        <div className="min-w-0 p-4 sm:p-6">
+          <p className="text-sm font-medium text-gray-500">{t("result.rentEstimatedMonthly")}</p>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-5xl">
+            {locked ? (
+              <LockedValue onClick={onLockedClick} text="€999" />
+            ) : formatNullablePrice(marketRate)}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">{t("result.rentPerMonth")}</p>
+        </div>
+        <div className="min-w-0 bg-gray-50 p-4 sm:p-6">
+          <p className="text-sm font-medium text-gray-500">{t("result.listingAskingRent")}</p>
+          <p className="mt-2 break-words text-3xl font-bold tracking-tight text-gray-900 sm:text-5xl">
+            {formatCurrencyPrice(listing.asking_price, currency)}
+          </p>
+          <p className="mt-1 text-sm text-gray-500">{t("result.rentPerMonth")}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-gray-100 px-4 py-3 sm:px-6">
+        <p className="text-sm font-semibold text-gray-700">
+          {!canCompare ? t("result.listingComparisonUnavailable") : locked ? (
+            <LockedTextTokens
+              text={t("result.listingRentDifference", { difference: "__DIFFERENCE__" })}
+              replacements={{ __DIFFERENCE__: "€99 (99.9%)" }}
+              onClick={onLockedClick}
+            />
+          ) : percent !== null ? t(verdictKey, {
+            amount: formatPrice(Math.abs(delta)),
+            percent: Math.abs(percent).toFixed(1),
+          }) : null}
+        </p>
+        {listingUrl && (
+          <a href={listingUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-primary hover:underline">
+            {t("result.viewListingCta")}
+          </a>
+        )}
+      </div>
+    </>
+  );
+}
+
 function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const { t, lang } = useTranslation();
   const { isAuthenticated, clearAuthError } = useAuth();
@@ -1668,6 +1724,13 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
   const stats = data.market_stats || {};
   const input = data.input || {};
   const filtersUsed = data.filters_used || {};
+  const listing = data.listing_comparison;
+  const listingAddress = listing?.address_text && formatDuplicateListingAddress(listing.address_text);
+  const duplicates = data.listing_duplicates;
+  const duplicateItems = ["high", "medium"]
+    .flatMap((probability) => (duplicates?.[probability] || []).map((item) => normalizeDuplicateListing(item, t, lang, probability)))
+    .filter(Boolean);
+  const duplicatesSectionRef = useRef(null);
   const districts = Array.isArray(input.districts)
     ? input.districts
     : input.district ? [input.district] : [];
@@ -1732,15 +1795,25 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         ) : null}
       </AuthRequiredModal>
       <div className="w-full min-w-0 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm sm:p-8">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="mb-1 text-sm font-medium uppercase tracking-wide text-gray-400">{t("result.rentProfileAnalyzed")}</p>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+          {listing?.image_url && (
+            <div
+              aria-hidden="true"
+              className="aspect-[4/3] w-28 shrink-0 rounded-xl bg-gray-100 bg-cover bg-center sm:w-32"
+              style={{ backgroundImage: `url(${JSON.stringify(listing.image_url)})` }}
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 text-sm font-medium uppercase tracking-wide text-gray-400">
+              {t(listing ? "result.listingAnalysisTitle" : "result.rentProfileAnalyzed")}
+            </p>
             <h2 className="mt-2 text-2xl font-bold text-gray-900">
               {t("result.apartment")} {roomsLabel}
               {input.area_m2 ? ` · ${input.area_m2}m²` : ""}
             </h2>
             <p className="mt-1 text-base text-gray-500">
               {selectedDistrictLabel}{input.city ? `, ${t(`data.city.${input.city}`)}` : ""}
+              {listingAddress ? `, ${listingAddress}` : ""}
             </p>
             <div className={`mt-4 flex flex-wrap gap-2 ${rentYieldCalculation ? "hidden sm:flex" : ""}`}>
               {input.renovation && (
@@ -1764,11 +1837,33 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
                 </span>
               )}
             </div>
+            {duplicates && (
+              duplicateItems.length > 0 ? (
+                <button
+                  type="button"
+                  className="mt-4 rounded-lg bg-primary/5 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10"
+                  onClick={() => duplicatesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                >
+                  {duplicateItems.length} {t("result.listingDuplicateCount", { count: duplicateItems.length })}
+                </button>
+              ) : (
+                <p className="mt-4 text-sm font-medium text-emerald-700">{t("result.listingDuplicateNoneFound")}</p>
+              )
+            )}
           </div>
           <div className="flex shrink-0 flex-col items-start gap-3 sm:items-end">
             <ResultDateBadge lang={lang} date={data.snapshot?.created_at} />
           </div>
         </div>
+        {listing && (
+          <ListingPriceHistoryChart
+            history={listing.price_history}
+            currency={listing.currency}
+            className="mt-5 border-t border-gray-100 pt-4"
+            locked={!isPaid && lockedSections.listing_price_history === true}
+            onLockedClick={openFullAnalysisAuthModal}
+          />
+        )}
       </div>
 
       {rentYieldCalculation ? (
@@ -1780,6 +1875,23 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
             onLockedClick={openFullAnalysisAuthModal}
           />
         </>
+      ) : listing ? (
+        <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <RentListingPriceComparison
+            listing={listing}
+            marketRate={estimate.market_rate}
+            locked={hideMarketEstimate}
+            onLockedClick={openFullAnalysisAuthModal}
+          />
+          <ValuationEvidenceSummary
+            evidence={data.valuation_evidence}
+            comparableCount={stats.comparable_count}
+            className="m-4 text-left sm:m-6"
+          />
+          {purchaseOffer && !compactLayout && (
+            <FeaturePricingAction offer={purchaseOffer} variant="inline" className="m-6 hidden lg:block" />
+          )}
+        </div>
       ) : (
         <div className="grid w-full min-w-0 grid-cols-2 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm sm:grid-cols-3">
           <RentLevelListingCard
@@ -1828,7 +1940,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         </div>
       )}
 
-      {!compactLayout && <BuyRentEstimateAction data={data} />}
+      {!compactLayout && !listing && <BuyRentEstimateAction data={data} />}
 
       {!isPaid && freeMonthlyLimitReached && (
         <p className="text-sm text-gray-600 px-1">
@@ -1920,6 +2032,14 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
         </div>
 
         <aside className="flex min-w-0 flex-col gap-5">
+          <DuplicateListingsPreview
+            t={t}
+            count={duplicateItems.length}
+            listings={duplicateItems}
+            sectionRef={duplicatesSectionRef}
+            locked={!isPaid || duplicates?.locked === true}
+            onLockedClick={openFullAnalysisAuthModal}
+          />
           {listings.length > 0 && (
             <RelevantListingsPreview
               t={t}
@@ -1928,7 +2048,7 @@ function RentEstimateResult({ data, onReset, compactLayout = false }) {
               sidebar
             />
           )}
-          {!isReadOnlyResult && onReset && <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />}
+          {!listing && !isReadOnlyResult && onReset && <EditCriteriaButton onClick={onReset} compactLayout={compactLayout} />}
           {purchaseOffer ? (
             <FeaturePricingAction offer={purchaseOffer} mobileDock={!compactLayout} />
           ) : null}

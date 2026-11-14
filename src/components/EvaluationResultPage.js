@@ -297,6 +297,11 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
             building_types: buildingTypes,
             renovation: v.renovation ?? null,
             bathrooms_count: v.bathrooms_count ?? null,
+            ...(listingAnalysis ? {
+              listing_analysis: listingAnalysis,
+              total_floors: v.total_floors ?? null,
+              balconies_count: v.balconies_count ?? null,
+            } : {}),
             ...(shareSlug ? { share_slug: shareSlug } : {}),
             ...trackingData,
           }
@@ -371,13 +376,18 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
             let listingComparison = shareSlug ? null : buildListingComparison(pRaw);
             let listingDuplicates = null;
             if (listingComparison?.external_id) {
+              const listingType = res1.data.estimate_type === "rent" ? "rent" : "sale";
+              const historyParams = new URLSearchParams({
+                external_id: listingComparison.external_id,
+                listing_type: listingType,
+              });
               const [historyRes, duplicateRes] = await Promise.all([
-                fetchJson(`/api/listing-price-history?external_id=${encodeURIComponent(listingComparison.external_id)}`),
+                fetchJson(`/api/listing-price-history?${historyParams}`),
                 fetchJson("/api/listing-duplicates", {
                   method: "POST",
                   headers,
                   body: JSON.stringify({
-                    listing_type: "sale",
+                    listing_type: listingType,
                     external_id: listingComparison.external_id,
                     listing_price: listingComparison.asking_price,
                     listing_currency: listingComparison.currency,
@@ -447,7 +457,7 @@ function EvaluareContent({ routePath = "/evaluare", pageTitleKey = "evaluare.pag
     return () => {
       cancelled = true;
     };
-  }, [authLoading, session?.access_token, paramsString, router, routePath, lang, t]);
+  }, [authLoading, session?.access_token, paramsString, router, routePath, isListingAnalysisPage, lang, t]);
 
   useEffect(() => {
     const hydrateListingImages = async (data, updateResult, slot) => {

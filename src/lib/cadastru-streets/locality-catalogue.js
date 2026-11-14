@@ -31,3 +31,7 @@ export function resolveLocality(value, context = '', settlementType = '') {
  return matches.length===1 ? matches[0].city : null;
 }
 export function localityAliases(city) {const row=byCity.get(normalizeLocality(city));return row ? [row.ro,row.ru,row.city] : [];}
+
+// Internal qualifiers identify the settlement; provider queries use its public name.
+export function localitySearchName(city) { return byCity.get(normalizeLocality(city))?.ro || city; }
+export function localitySearchContext(city) { return byCity.get(normalizeLocality(city))?.ancestors.map(row => row.ro).join(', ') || ''; }

@@ -1,8 +1,8 @@
 {
-  "locality-catalogue.js": "9bed2aad2c610737088de4343c4dd28096252f7b417217eeb29e2ff8d510189c",
+  "locality-catalogue.js": "1dc7ee16d3254db20895c7016f53e9af104da0f62b11a7b231994bfd4969ade8",
   "street-resolver.js": "90c1190804c124ee5ac94d6a4cd7d10f58c9ccc8fc63b026f6faba14523a9587",
   "data/localities.json": "c6027372423dbc07b0be2fd0e8424dced39eb393131833458b7b9396eac6fb9a",
   "supported-cities.js": "e9263cb7333f62c4472fb5c4fc79255bbb8fc7e3a471ad64658d351151a9d4ff",
   "data/streets.json": "f8773dced7a48d4a51c850f580df67b11ab3af95bb5cf55986a49222bfd9beb8",
-  "data/street-corrections.json": "28c104c3a04308f061420b8fd3f0b49f8c9694576a873f7dbfe752078f294c16"
+  "data/street-corrections.json": "994705fcd03707694f0c1301f92225536c8e44992a6ef3fec6fd0c36486a1229"
 }

@@ -19,6 +19,12 @@
     "merge_streets": ["Lenin", "Vladimir Lenin"]
   },
   {
+    "city": "Congaz",
+    "road_type": "str",
+    "street": "Montajnaia",
+    "aliases": ["Монтажная"]
+  },
+  {
     "city": "Chișinău",
     "road_type": "bd",
     "street": "Ștefan cel Mare și Sfânt",
@@ -35,7 +41,7 @@
     "city": "Chișinău",
     "road_type": "bd",
     "street": "Moscova",
-    "aliases": ["Москва", "Москвы"]
+    "aliases": ["Москва", "Москвы", "Moscovei"]
   },
   {
     "city": "Chișinău",
@@ -53,31 +59,31 @@
     "city": "Chișinău",
     "road_type": "str",
     "street": "Alexandr Pușkin",
-    "aliases": ["Пушкин", "Пушкина"]
+    "aliases": ["Пушкин", "Пушкина", "Александр Пушкин"]
   },
   {
     "city": "Chișinău",
     "road_type": "str",
     "street": "Lev Tolstoi",
-    "aliases": ["Толстой", "Толстого"]
+    "aliases": ["Толстой", "Толстого", "Лев Толстой"]
   },
   {
     "city": "Chișinău",
     "road_type": "str",
     "street": "Alexei Mateevici",
-    "aliases": ["Матеевич", "Матеевича"]
+    "aliases": ["Матеевич", "Матеевича", "Алексей Матеевич"]
   },
   {
     "city": "Chișinău",
     "road_type": "str",
     "street": "Alexei Șciusev",
-    "aliases": ["Щусев", "Щусева"]
+    "aliases": ["Щусев", "Щусева", "Алексей Щусев"]
   },
   {
     "city": "Chișinău",
     "road_type": "bd",
     "street": "Dimitrie Cantemir",
-    "aliases": ["Кантемир", "Кантемира"]
+    "aliases": ["Кантемир", "Кантемира", "Димитрие Кантемир"]
   },
   {
     "city": "Chișinău",
@@ -106,13 +112,325 @@
   {
     "city": "Chișinău",
     "road_type": "str",
+    "street": "Miron Costin",
+    "aliases": ["Мирон Костин"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
     "street": "Nikolai Zelinski",
-    "aliases": [
-      "Николай Зелински",
-      "Nicolae Zelinski",
-      "Зелинского",
-      "N. Zelinschi",
-      "Nicolai Zelinski"
-    ]
+    "aliases": ["Николай Зелински", "Nicolae Zelinski", "Nicolai Zelinski", "Зелинского", "N. Zelinschi"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Ismail",
+    "aliases": ["Izmail", "Измаил", "Измайловская", "Izmailovskaia"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Dumitru Râșcanu",
+    "aliases": ["Dumitru Rîșcanu"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Andrei Doga",
+    "aliases": ["Андрей Дога"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Nicolae Milescu Spătarul",
+    "aliases": ["Николае Милеску-Спэтарул", "Milescu Spătarul", "M. Spataru", "M.Spataru"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Matei Basarab",
+    "aliases": ["Матей Басараб", "M. Basarab"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Vadul lui Vodă",
+    "aliases": ["Вадул луй Водэ"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Mitropolit Varlaam",
+    "aliases": ["Митрополит Варлаам"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Doctor Tudor Strișcă",
+    "aliases": ["Тудор Стришкэ"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Pantelimon Halippa",
+    "aliases": ["Пан Халиппа", "Pan Halippa"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Mitropolit Dosoftei",
+    "aliases": ["Митрополит Дософтей", "Mitropolitul Dosoftei"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Grădinilor",
+    "aliases": ["Грэдинилор"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Vissarion Belinski",
+    "aliases": ["Виссарион Белинский"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Academician Sergiu Rădăuțanu",
+    "aliases": ["Академик Сергей Рэдэуцану"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "bd",
+    "street": "Iuri Gagarin",
+    "aliases": ["Юрий Гагарин"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Paris",
+    "aliases": ["Парис"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Ion Pelivan",
+    "aliases": ["Ион Пеливан"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Buiucani",
+    "aliases": ["Буюкань"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Doina și Ion Aldea-Teodorovici",
+    "aliases": ["Дойна и Ион Алдя-Теодорович"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "bd",
+    "street": "Constantin Negruzzi",
+    "aliases": ["C. Negruzzi"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Profesor Ion Dumeniuc",
+    "aliases": ["Ион Думенюк"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Ștefan Neaga",
+    "aliases": ["Штефан Няга"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Academician Andrei Saharov",
+    "aliases": ["Академик Андрей Сахаров"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Constantin Brâncoveanu",
+    "aliases": ["Constantin Brîncoveanu"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Belgrad",
+    "aliases": ["Белград"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Colina Pușkin",
+    "aliases": ["Колина Пушкин"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Petru Rareș",
+    "aliases": ["Петру Рареш"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Eugen Coca",
+    "aliases": ["Еуджен Кока"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Alexandru Hâjdeu",
+    "aliases": ["Александру Хыждеу"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Aerodromului",
+    "aliases": ["Аеродромулуй"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Sfânta Treime",
+    "aliases": ["Sfînta Treime"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Ghenadie Iablocikin",
+    "aliases": ["Геннадий Яблочкин"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Fiodor Tolbuhin",
+    "aliases": ["Федор Толбухин"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Pictor Mihai Grecu",
+    "aliases": ["Пиктор Михай Греку"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Primăverii",
+    "aliases": ["Примэверий"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Constantin Brâncuși",
+    "aliases": ["Константин Брынкушь"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Alessandro Bernardazzi",
+    "aliases": ["Alexandru Bernardazzi", "Александр Бернардацци"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Ion Callimachi",
+    "aliases": ["Ion Calimachi"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Petricani",
+    "aliases": ["Петрикань"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Pavel Boțu",
+    "aliases": ["Павел Боцу"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Liviu Deleanu",
+    "aliases": ["L. Deleanu"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Piața Veche",
+    "aliases": ["Пиаца Веке"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Mitropolit Petru Movilă",
+    "aliases": ["Petru Movilă"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Nicolae Testemițanu",
+    "aliases": ["N. Testemiteanu"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Dante Alighieri",
+    "aliases": ["Dante"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Grigore Alexandrescu",
+    "aliases": ["Григоре Александреску"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Eugen Doga",
+    "aliases": ["Еуджен Дога"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Mitropolit Gavriil Bănulescu-Bodoni",
+    "aliases": ["Митрополит Бэнулеску-Бодони", "Bănulescu Bodoni"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Ion Vasilenco",
+    "aliases": ["Василенко"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Caucaz",
+    "aliases": ["Кауказ"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Băcioii Noi",
+    "aliases": ["Бэчоий Ной"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "str",
+    "street": "Decembriștilor",
+    "aliases": ["Дечембриштилор"]
+  },
+  {
+    "city": "Chișinău",
+    "road_type": "bd",
+    "street": "Dacia",
+    "aliases": ["Дачи"]
   }
 ]

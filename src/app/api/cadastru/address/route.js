@@ -8,7 +8,7 @@ import { createSuggestionRecoveryToken, readSuggestionRecoveryToken, recordSugge
 import { resolveStreet, inspectStreetAddress } from "@/lib/cadastru-streets/street-resolver";
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
-import { fetchExternalCadastruAddressData } from "@/lib/cadastru-external-api";
+import { fetchExternalCadastruAddressData, fetchExternalStreetSuggestions } from "@/lib/cadastru-external-api";
 import { findCadastralByAddress, getVerifiedAddressAlternative } from "@/lib/cadastru-address-search";
 import { getBuildingFallback } from "@/lib/cadastru-buildings";
 import { buildCadastruPreviewPayload } from "@/lib/cadastru-preview";
@@ -233,10 +233,28 @@ async function handlePost(request, { learned } = {}) {
   };
   let failedUsageEventId = null;
   const roadTypeSuggestions = () => suggestRoadTypes({ city, roadType, street });
-  const noResultSuggestions = () => {
+  const noResultSuggestions = async () => {
     const alternateRoadTypes = roadTypeSuggestions();
-    const suggestions = alternateRoadTypes.length ? []
+    let suggestions = alternateRoadTypes.length ? []
       : suggestStreets({ city, roadType, street, excludeStreet: resolution.street });
+    // The bundled dictionary is intentionally partial. Reuse the provider-backed
+    // autocomplete only when its local result-page suggestions have no candidate.
+    if (!alternateRoadTypes.length && !suggestions.length && typeof fetchExternalStreetSuggestions === "function") {
+      try {
+        const provider = await fetchExternalStreetSuggestions({ city, query: street });
+        const expectedRoadType = roadType === "bd" ? "bulevard" : roadType === "str-la" ? "str-la" : roadType === "sos" ? "sos" : "strada";
+        const seen = new Set();
+        suggestions = (Array.isArray(provider?.streets) ? provider.streets : [])
+          .filter((value) => value?.road_type === expectedRoadType && typeof value.street === "string" && value.street.trim())
+          .map((value) => value.street.trim())
+          .filter((value) => {
+            const key = value.toLocaleLowerCase();
+            if (seen.has(key) || key === street.toLocaleLowerCase()) return false;
+            seen.add(key); return true;
+          })
+          .slice(0, 3);
+      } catch { /* Provider suggestions are optional after a completed miss. */ }
+    }
     const offered = alternateRoadTypes.length ? alternateRoadTypes.map(value => ({...suggestionAddress,
       street:value.street, roadType:normalizeRoadType(value.road_type)})) : suggestions;
     const token = shouldTrackCadastruSearch
@@ -491,7 +509,7 @@ async function handlePost(request, { learned } = {}) {
         return NextResponse.json(
           {
             error: "not_found",
-            ...noResultSuggestions(),
+            ...(await noResultSuggestions()),
             message: "Could not find cadastral data for this address.",
           },
           { status: 404 }
@@ -564,7 +582,7 @@ async function handlePost(request, { learned } = {}) {
     return NextResponse.json(
       {
         error: isNotFound ? "not_found" : "upstream_failed",
-        ...(isNotFound ? noResultSuggestions() : {}),
+        ...(isNotFound ? await noResultSuggestions() : {}),
         message: isNotFound ? "Could not find cadastral data for this address." : "Cadastral lookup failed.",
       },
       { status: isNotFound ? 404 : 502 }

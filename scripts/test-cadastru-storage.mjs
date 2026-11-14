@@ -71,7 +71,11 @@ async function load(entry, extraMocks = {}, globals = {}) {
   const context = vm.createContext({ console, Date, URL, URLSearchParams, Request, Response, Headers, AbortSignal, Buffer, setTimeout, clearTimeout, process, ...globals });
   const modules = new Map(), mocks = { ...baseMocks, ...extraMocks };
   if (mocks["@/lib/cadastru-records"]) mocks["@/lib/cadastru-records"] = { persistCadastruRecord: async () => { throw new Error("Unexpected number persistence"); }, ...mocks["@/lib/cadastru-records"] };
-  if (mocks["@/lib/cadastru-external-api"]) mocks["@/lib/cadastru-external-api"] = { fetchExternalCadastralData: async () => { throw new Error("Unexpected number refresh"); }, ...mocks["@/lib/cadastru-external-api"] };
+  if (mocks["@/lib/cadastru-external-api"]) mocks["@/lib/cadastru-external-api"] = {
+    fetchExternalCadastralData: async () => { throw new Error("Unexpected number refresh"); },
+    fetchExternalStreetSuggestions: async () => ({ streets: [] }),
+    ...mocks["@/lib/cadastru-external-api"],
+  };
   if (mocks["next/server"]) mocks["next/server"] = { after: callback => deferredRefreshes.push(callback), ...mocks["next/server"] };
   async function moduleFor(id) {
     if (modules.has(id)) return modules.get(id);
@@ -621,7 +625,9 @@ const suggestionsRoute = await load("src/app/api/cadastru/address/route.js", {
     submitted.push(fields);
     if (suggestionFailure) throw suggestionFailure;
     return { lands: [{ cadastral_number: "0300101.001", address: `Bălți, str ${fields.street} ${fields.house_number}` }] };
-  } },
+  }, fetchExternalStreetSuggestions: async ({ city }) => ({ city, streets: city === "Stăuceni"
+    ? [{ street: "Luceafărul", road_type: "strada" }, { street: "Other Type", road_type: "bulevard" }]
+    : [] }) },
   "@/lib/cadastru-address-search": { getVerifiedAddressAlternative: () => null, findCadastralByAddress: async () => { backupLookups++; throw backupFailure; } },
 });
 const baltiRequest = { city: "Bălți", road_type: "strada", street: "Radiceva", house_number: "28", apartment_number: "7", skip_cache: true, search_context: "cadastru" };
@@ -691,6 +697,9 @@ assert.deepEqual(clone((await roadTypeResponse.json()).road_type_suggestions),
   [{ road_type: "strada", street: "Miron Costin" }]);
 assert.equal(submitted.at(-1).road_type, "bulevard", "the timeout does not trigger an automatic retry");
 assert.equal(backupLookups, previousBackupLookups, "known road-type mismatch skips the repeated slow local lookup after worker timeout");
+const providerOnly = await suggestionsRoute.POST(request({ city: "Stăuceni", road_type: "strada", street: "Luceafarul Nou", house_number: "10", skip_cache: true }));
+assert.equal(providerOnly.status, 404);
+assert.deepEqual((await providerOnly.json()).suggestions, ["Luceafărul"], "provider-only streets are offered after local suggestions are exhausted");
 console.log("Did-you-mean regressions passed: RO/RU spellings, scope, original lookup first, no-data-only suggestions, retry identity and timeout exclusion.");
 
 // Ambiguous initials must offer full names before any cache or provider lookup.

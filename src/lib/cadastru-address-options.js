@@ -80,7 +80,7 @@ export function createStreetOptionLookup({ read, write, fetchStreets }) {
     try {
       const streets = await providerOptions(city,query);
       if (streets.length) return streets;
-      const pasted = query.trim().match(/^(.*?)\s+(?:nr\.?\s*)?(\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z]))?)$/i);
+      const pasted = query.trim().match(/^(.*?)\s+(?:nr\.?\s*)?(\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z])|-\d{1,4})?)$/i);
       if (pasted && normalizeStreetName(pasted[1]).length >= 2) {
         return (await providerOptions(city,pasted[1])).map(row => ({...row,house_number:pasted[2].toUpperCase(),label:`${row.label} ${pasted[2].toUpperCase()}`}));
       }

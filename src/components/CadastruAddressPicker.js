@@ -123,7 +123,7 @@ export default function CadastruAddressPicker({ value, onChange, onReady, lang, 
         onFocus={() => setNumbersOpen(true)} onClick={() => setNumbersOpen(true)}
         onBlur={e => {if (!e.relatedTarget?.closest('[data-house-suggestions]')) setNumbersOpen(false);}}
         onKeyDown={e => {if (e.key === 'Escape') setNumbersOpen(false);}}
-        onChange={e => {setNumbersOpen(true);onChange({...value,houseNumber:e.target.value.replace(/[^\da-z/]/gi,'').toUpperCase()});}} /></label>
+        onChange={e => {setNumbersOpen(true);onChange({...value,houseNumber:e.target.value.replace(/[^\da-z/-]/gi,'').toUpperCase()});}} /></label>
       <label className="text-sm font-semibold text-gray-700">{t('cadastru.apartmentNumber')}<input type="text" autoComplete="off" name="lookup-unit-query" className={inputClass} inputMode="numeric" value={value.apartmentNumber} placeholder={t('cadastru.apartmentPlaceholder')} onChange={e => onChange({...value,apartmentNumber:e.target.value.replace(/\D/g,'').slice(0,4)})} /></label>
     </div>
     <div aria-live="polite" data-house-suggestions onBlurCapture={e => {

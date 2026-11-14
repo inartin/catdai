@@ -11,9 +11,9 @@ export function learnedAddress(value) {
   const road = value.roadType || value.road_type || "strada";
   const roadType = ({strada:"str", bulevard:"bd", str:"str", bd:"bd", "str-la":"str-la", sos:"sos"})[road];
   const street = clean(value.street);
-  const houseNumber = clean(value.houseNumber || value.house_number).replace(/\s*\/\s*/g, "/").toUpperCase();
+  const houseNumber = clean(value.houseNumber || value.house_number).replace(/\s*([/-])\s*/g, "$1").toUpperCase();
   const unit = clean(value.apartmentNumber || value.apartment_number);
-  if (!city || !roadType || !street || street.length > 80 || !/^\d{1,4}(?:[A-Z]|\/(?:\d{1,4}|[A-Z]))?$/.test(houseNumber)
+  if (!city || !roadType || !street || street.length > 80 || !/^\d{1,4}(?:[A-Z]|\/(?:\d{1,4}|[A-Z])|-\d{1,4})?$/.test(houseNumber)
     || (unit && (!/^\d{1,4}$/.test(unit) || Number(unit) < 1))) return null;
   return {city, roadType, street, houseNumber, apartmentNumber:unit ? String(Number(unit)) : ""};
 }

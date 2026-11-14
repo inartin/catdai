@@ -32,7 +32,7 @@ const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 const STREET_MAX_LENGTH = 80;
 const HOUSE_NUMBER_MAX_LENGTH = 10;
 const APARTMENT_NUMBER_MAX_LENGTH = 4;
-const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z]))?$/i;
+const HOUSE_NUMBER_PATTERN = /^\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z])|-\d{1,4})?$/i;
 const APARTMENT_NUMBER_PATTERN = /^\d{1,4}$/;
 const MAX_APARTMENT_NUMBER = 9999;
 
@@ -170,7 +170,7 @@ async function handlePost(request, { learned } = {}) {
   const city = resolveCadastruSupportedCity(body.city || "Chișinău") || normalizeSpaces(body.city);
   const roadType = normalizeRoadType(body.road_type);
   const street = normalizeSpaces(body.street);
-  const houseNumber = normalizeSpaces(body.house_number).replace(/\s*\/\s*/g, "/").toUpperCase();
+  const houseNumber = normalizeSpaces(body.house_number).replace(/\s*([/-])\s*/g, "$1").toUpperCase();
   const apartmentInput = normalizeSpaces(body.apartment_number);
   const apartmentNumber = /^\d{1,4}$/.test(apartmentInput) ? String(Number(apartmentInput)) : apartmentInput;
 
@@ -194,7 +194,7 @@ async function handlePost(request, { learned } = {}) {
       {
         error: "invalid_address_fields",
         field: fieldValidation.field,
-        message: "House number must use digits with an optional numeric or single Latin-letter suffix after /. Apartment number, when provided, must be a realistic number.",
+        message: "Use a house number such as 17, 17A, 17/2, or 15-17. Apartment number, when provided, must be a realistic number.",
       },
       { status: 400 }
     );

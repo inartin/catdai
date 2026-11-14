@@ -80,7 +80,7 @@ export function matchStreetOptions(entries, query) {
     found.set(key, { ...preferred, rank: Math.min(rank, previous?.rank ?? Infinity) });
   }
   if (!found.size) {
-    const pasted = query.trim().match(/^(.*?)\s+(?:nr\.?\s*)?(\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z]))?)$/i);
+    const pasted = query.trim().match(/^(.*?)\s+(?:nr\.?\s*)?(\d{1,4}(?:[a-z]|\/(?:\d{1,4}|[a-z])|-\d{1,4})?)$/i);
     if (pasted && normalizeStreetQuery(pasted[1]).length >= 2) {
       const streetNumbers = numberTokens(normalizeStreetQuery(pasted[1]));
       return matchStreetOptions(entries, pasted[1])

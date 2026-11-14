@@ -184,6 +184,14 @@ const request = body => new Request("http://localhost/api/cadastru/address", { m
   const confirmation = await letterRoute.POST(request({ ...fields, house_number: '22' }));
   assert.equal(confirmation.status, 422);
   assert.deepEqual((await confirmation.json()).address_suggestions, [choice]);
+  const compoundChoice = { ...fields, house_number: '21-22', apartment_number: '8' };
+  letterFailure.addressSuggestions = [compoundChoice, { ...compoundChoice, apartment_number: '9' }];
+  const compoundConfirmation = await letterRoute.POST(request({ ...fields, house_number: '22', apartment_number: '8' }));
+  assert.equal((await compoundConfirmation.json()).address_suggestions, undefined);
+  letterFailure = null;
+  const compound = await letterRoute.POST(request({ ...fields, house_number: '21 - 22' }));
+  assert.equal(compound.status, 200);
+  assert.equal(submissions.at(-1).house_number, '21-22');
   console.log('Letter suffix regressions passed: exact app validation, worker forwarding, conflict/confirmation, records, cache separation and nearby origins.');
 }
 

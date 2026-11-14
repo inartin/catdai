@@ -20,11 +20,11 @@ export function primaryCadastruResultCategories(payload, resultType) {
   };
 }
 
-export function cadastruResultSummary(search) {
+export function cadastruResultSummary(search, listRow = {}) {
   const recovered = search.suggestion_activity?.role === "original" && Boolean(search.suggestion_activity.recovered_at);
   const primary = primaryCadastruResultCategories(null, search.result_type).result_cadastru;
   const categories = CADASTRU_RESULT_CATEGORIES.map(([key, label]) => ({
-    key, label, success: search[key] === true || (key === "result_cadastru" && (primary || recovered)),
+    key, label, success: (search[key] ?? listRow[key]) === true || (key === "result_cadastru" && (primary || recovered)),
   }));
   return { categories, count: categories.filter((category) => category.success).length,
     cadastru: categories[0].success, recovered };

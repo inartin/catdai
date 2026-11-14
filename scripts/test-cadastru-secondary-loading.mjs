@@ -60,6 +60,7 @@ let effects = [];
 const frames = new Map();
 let nextFrame = 0;
 const requests = new Map();
+const idleCallbacks = new Map();
 const trackedOpens = [];
 const drafts = new Map();
 let pushedUrl = "";
@@ -79,6 +80,7 @@ const useEffect = (effect, deps) => {
 const number = "0100106.131.01.097";
 let searchParams = new URLSearchParams({ cadastral_number: number });
 let addressRequest = null;
+let managementAddress = null;
 let authSession = null;
 const router = { push: (url) => { pushedUrl = url; }, replace: (url) => {
   searchParams = new URLSearchParams(url.split("?")[1]);
@@ -91,7 +93,8 @@ const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
   "@/lib/payment-urls.mjs": { featureCheckoutUrl: () => "/payment/checkout" },
   "@/lib/ga4-payment-client": { trackPaymentAnalytics: noop },
   "@/lib/cadastru-map": { cadastruMapLocation: () => null },
-  "@/lib/cadastru-nearby": { nearbyAddressFromCadastru: () => null },
+  "@/lib/cadastru-nearby": { nearbyAddressFromCadastru: () => managementAddress },
+  "@/lib/cadastru-property-details": { isCadastruNonResidential: (unit) => unit?.unit_kind === "non_residential" },
   "@/lib/cadastru-lookup-tracking": { ...lookupModule.namespace },
   "@/lib/cadastru-share-tracking": { recordCadastruShareOpen: (slug) => trackedOpens.push(slug) },
   react: { Suspense: noop, useState, useRef: (value) => useState(() => ({ current: value }))[0], useEffect },
@@ -107,7 +110,10 @@ const page = await loadJsx("src/app/cadastru/rezultat/CadastruResultPage.js", {
       ...(skipCache ? { skipcache: "true" } : {}) }) },
   "@/lib/cadastru-municipal-reports": { municipalReportsAvailableForCadastru: (data) => data?.form_fields?.city === "Chișinău" || data?.request_address?.startsWith("Chișinău,"), validMunicipalReportsResult: (data) => data?.summary?.total >= 0 },
 }, {
-  window: {}, localStorage: { getItem: (key) => drafts.get(key) || null,
+  window: {
+    requestIdleCallback: (callback) => { const id = ++nextFrame; idleCallbacks.set(id, callback); return id; },
+    cancelIdleCallback: (id) => idleCallbacks.delete(id),
+  }, localStorage: { getItem: (key) => drafts.get(key) || null,
     setItem: (key, value) => drafts.set(key, value), removeItem: (key) => drafts.delete(key) },
   sessionStorage: { getItem: (key) => key.includes("lookup-request") && addressRequest ? JSON.stringify(addressRequest) : null },
   requestAnimationFrame: (callback) => { const id = ++nextFrame; frames.set(id, callback); return id; },
@@ -612,3 +618,112 @@ for (lang of ["ro", "ru"]) {
   assert.equal(freshnessNote.default({ freshness: { property: { fetched_at: "invalid", stale: false } } }), null);
 }
 console.log("Snapshot notices passed: saved-data warnings in Romanian and Russian.");
+
+slots.length = 0;
+requests.clear();
+frames.clear();
+searchParams = new URLSearchParams({ cadastral_number: number });
+managementAddress = { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" };
+const apartmentResult = { cadastral_number: number, form_fields: { city: "Chișinău" } };
+render();
+requests.get("/api/cadastral").resolve({ ok: true, json: async () => apartmentResult });
+await flush();
+const getManagementSection = (tree) => findNode(tree, (node) => node.props?.cadastral)?.props.footer;
+assert(!getManagementSection(render()));
+paint();
+paint();
+for (const endpoint of ["nearby", "public-transport", "municipal-reports"]) {
+  requests.get(`/api/cadastru/${endpoint}`).resolve({ ok: false, json: async () => ({}) });
+}
+await flush();
+assert(!getManagementSection(render()));
+for (const callback of idleCallbacks.values()) callback();
+idleCallbacks.clear();
+assert(!getManagementSection(render()), "building management waits for the market response");
+requests.get("/api/cadastru/market").resolve({ ok: false });
+await flush();
+assert.deepEqual(getManagementSection(render()).props.address, managementAddress);
+const managementMainSlot = slots.findIndex((slot) => slot?.data === apartmentResult);
+slots[managementMainSlot] = { ...slots[managementMainSlot], data: {
+  ...apartmentResult, locked_sections: { address: true, cadastru_details: true },
+} };
+const lockedSection = getManagementSection(render());
+assert.equal(lockedSection.props.address, null);
+assert.equal(lockedSection.props.cadastralNumber, number);
+assert.equal(lockedSection.props.accessToken, undefined);
+for (const data of [
+  { ...apartmentResult, apartment: { unit_kind: "non_residential" } },
+  { ...apartmentResult, cadastral_number: "0100106.131.01" },
+]) {
+  slots[managementMainSlot] = { ...slots[managementMainSlot], data };
+  assert(!getManagementSection(render()), "management requires an apartment result");
+}
+for (const slot of slots) slot?.cleanup?.();
+managementAddress = null;
+
+const contactSlots = [];
+let contactEffect;
+let contactResponse;
+let contactRequest;
+const tooltip = () => null;
+const loadingIcon = () => null;
+const management = await loadJsx("src/components/CadastruBuildingManagement.js", {
+  "@/context/LanguageContext": translation,
+  "@/components/Tooltip": { default: tooltip },
+  "@/components/CadastruLoadingIcon": { default: loadingIcon },
+  "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: "Fragment" },
+  react: { useState: (initial) => [contactSlots.length ? contactSlots[0] : initial, (value) => { contactSlots[0] = value; }],
+    useEffect: (effect) => { contactEffect = effect; } },
+}, {
+  fetch: (url, options) => {
+    contactRequest = { url, options };
+    return new Promise((resolve) => { contactResponse = resolve; });
+  },
+});
+const address = { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" };
+const contacts = [{ name: "ÎMGFL nr. 1", office_address: "str. Nicolae Titulescu 6", phones: ["022550094"],
+  assignment: { status: "historical", year: 2023, source_url: "https://storage.mtender.gov.md/example" } }];
+for (const response of [{ ok: true, contacts }, { ok: true, contacts: [] }, { ok: false }]) {
+  contactSlots.length = 0;
+  assert(findNode(management.default({ address }), (node) => node.type === loadingIcon && node.props.bold));
+  const cleanup = contactEffect();
+  assert.equal(contactRequest.url, "/api/cadastru/building-management");
+  assert.deepEqual(JSON.parse(contactRequest.options.body), address);
+  contactResponse({ ok: response.ok, json: async () => ({ contacts: response.contacts }) });
+  await flush();
+  if (response.contacts?.length) {
+    for (lang of ["ro", "ru", "en"]) {
+      const section = management.default({ address });
+      assert(textOf(section).includes(t("cadastru.buildingManagementTitle")));
+      assert(!textOf(section).includes("2023"));
+      assert(findNode(section, (node) => node.type === tooltip && node.props.text === t("cadastru.buildingManagementFullName")));
+      assert(findNode(section, (node) => node.props?.href === "tel:022550094"));
+    }
+  } else assert.equal(management.default({ address }), null);
+  cleanup();
+  assert(contactRequest.options.signal.aborted);
+}
+contactSlots[0] = [{ name: "ÎMGFL nr. 1", locked: true, has_office_address: true, phone_count: 2 }];
+let checkoutOpened = 0;
+const locked = management.default({ address, onLockedClick: () => { checkoutOpened++; } });
+assert(textOf(locked).includes("ÎMGFL nr. 1"));
+assert(!findNode(locked, (node) => node.props?.href));
+for (const key of ["cadastru.buildingManagementOfficeAddress", "cadastru.buildingManagementPhones"]) {
+  const label = findNode(locked, (node) => node.type === "dt" && textOf(node).trim() === t(key));
+  assert(label && !label.props.className.includes("blur-sm"));
+  const unlock = findNode(locked, (node) => node.type === "button" && node.props["aria-label"] === `${t(key)} · ${t("cadastru.payToUnlock")}`);
+  assert(findNode(unlock, (node) => node.props?.className?.includes("blur-sm")));
+  unlock.props.onClick();
+}
+assert.equal(checkoutOpened, 2);
+const phoneLabel = findNode(locked, (node) => node.props?.className === "sr-only" && node.props.children === t("cadastru.buildingManagementPhones"));
+assert(phoneLabel, "the phone icon has a screen-reader label only");
+const phoneRows = findNode(locked, (node) => node.type === "dd" && Array.isArray(node.props?.children));
+assert.equal(phoneRows.props.children.length, 2);
+for (const row of phoneRows.props.children) {
+  assert(findNode(row, (node) => node.type === "svg"));
+  assert(findNode(row, (node) => node.props?.className?.includes("blur-sm")));
+}
+contactSlots[0][0].phone_count = 0;
+assert(!textOf(management.default({ address })).includes(t("cadastru.buildingManagementPhones")));
+console.log("Building management passed: market-last scheduling, apartment eligibility, shared loader and tooltip, localized contacts, and no section on empty/error responses.");

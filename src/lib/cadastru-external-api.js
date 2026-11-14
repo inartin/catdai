@@ -43,7 +43,7 @@ async function fetchSignedExternalCadastru(path, body, explicitUrl, service, opt
   }
   return withApiWorkerFallback(workers, (worker) => fetchSignedExternalCadastruAttempt(
     worker.url, body, service, { ...options, nodeName: worker.name }
-  ));
+  ), { retryNotFound: options.retryNotFound });
 }
 
 async function fetchSignedExternalCadastruAttempt(url, body, service, options = {}) {
@@ -202,6 +202,16 @@ export async function fetchExternalMunicipalReportsData(location, options = {}) 
     process.env.MUNICIPAL_REPORTS_EXTERNAL_API_URL,
     "cadastru_nearby",
     { ...options, timeoutMs: 70_000, preserveWorkerError: true }
+  );
+}
+
+export function fetchExternalBuildingManagementData(address) {
+  return fetchSignedExternalCadastru(
+    "v1/building-management/address",
+    address,
+    undefined,
+    "building_management",
+    { timeoutMs: 5_000, trackUsage: false, retryNotFound: true }
   );
 }
 

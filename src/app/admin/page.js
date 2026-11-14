@@ -834,13 +834,46 @@ function CadastruSearchDetails({ row, userName }) {
   if (!data) return <p role="status" className="p-4 text-sm text-gray-500">Loading search details...</p>;
 
   const search = data.search;
+  const results = cadastruResultSummary({ ...search, suggestion_activity: row.suggestion_activity }, row);
+  const failedSecondaryPaths = data.events.filter((event) => event.service === "cadastru_nearby" && event.status === "failure")
+    .map((event) => (event.endpoint || "").split("?")[0]);
+  const nearbyFailed = failedSecondaryPaths.some((path) => /\/nearby\/address\/?$/.test(path));
+  const transportFailed = failedSecondaryPaths.some((path) => /\/public-transport\/?$/.test(path));
   const request = fmtExternalApiPayload(search.search_request
     || (search.search_type === "number" ? { cadastral_number: search.cadastral_number } : { address: search.search_address }));
   return (
     <div className="min-w-0 space-y-4 p-4">
+      <section>
+        <h4 className="font-semibold text-gray-900">Search results · {results.count} of {results.categories.length} available</h4>
+        <dl className="mt-2 flex flex-wrap gap-2">
+          {results.categories.map(({ key, label, success }) => {
+            let status = "No result recorded";
+            let statusClass = "text-gray-600";
+            if (success) {
+              status = key === "result_cadastru" && results.recovered ? "Recovered" : "Available";
+              statusClass = "text-green-700";
+            } else if (key === "result_cadastru" && search.result_type === "error") {
+              status = "Lookup failed";
+              statusClass = "text-red-600";
+            } else if (key === "result_cadastru" && search.result_type === "no_data") {
+              status = "No data returned";
+            } else if ((key === "result_nearby" && nearbyFailed) || (key === "result_transport" && transportFailed)) {
+              status = "Worker call failed";
+              statusClass = "text-red-600";
+            }
+            return (
+              <div key={key} className="min-w-36 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm">
+                <dt className="font-medium text-gray-900">{label}</dt>
+                <dd className={`mt-0.5 text-xs ${statusClass}`}>{status}</dd>
+              </div>
+            );
+          })}
+        </dl>
+        <p className="mt-2 text-xs text-gray-500">Map availability is based on saved location data. Access restrictions can limit what the visitor saw.</p>
+      </section>
       <div className="grid min-w-0 gap-4 sm:grid-cols-2">
         <div className="min-w-0 space-y-2 text-sm text-gray-700 [overflow-wrap:anywhere]">
-          <h4 className="font-semibold text-gray-900">Search details</h4>
+          <h4 className="font-semibold text-gray-900">Cadastral lookup details</h4>
           <p>Result type: {search.result_type || "Not recorded"}</p>
           <SuggestionActivity activity={row.suggestion_activity} />
           <p>Returned value: {search.result_value || "Not recorded"}</p>
@@ -852,8 +885,8 @@ function CadastruSearchDetails({ row, userName }) {
         </div>
       </div>
       <div>
-        <h4 className="font-semibold text-gray-900">External API calls · {fmtNum(data.events.length)}</h4>
-        <p className="mt-1 text-xs text-gray-500">Recorded worker responses. Cached results, local fallbacks and access masking can change what was displayed; the exact page shown to the user was not saved.</p>
+        <h4 className="font-semibold text-gray-900">Worker calls · {fmtNum(data.events.length)}</h4>
+        <p className="mt-1 text-xs text-gray-500">Cached results can be available without a worker call.</p>
         {data.match === "inferred" && <p className="mt-1 text-xs text-amber-700">Older logs matched by the full search query and time.</p>}
       </div>
       {data.events.length ? (
@@ -887,7 +920,7 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
           <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase">
             <th className="px-4 py-3">Date</th>
             <th className="px-4 py-3">Type</th>
-            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3">Results</th>
             <th className="px-4 py-3">Search</th>
             <th className="px-4 py-3">District</th>
             <th className="px-4 py-3">Evaluation</th>
@@ -931,6 +964,13 @@ function CadastruSearchTable({ rows, onDelete, deletingId, userName }) {
                             : row.result_type === "error" ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-600"}`}>
                           {`${resultSummary.count}/4`}
                         </span>
+                        {resultSummary.count > 0 && (
+                          <ul className="mt-1 space-y-0.5 text-xs text-gray-600">
+                            {resultSummary.categories.filter(({ success }) => success).map(({ key, label }) => (
+                              <li key={key}>{label}</li>
+                            ))}
+                          </ul>
+                        )}
                         {recovered && <p className="mt-1 text-xs text-gray-500">Recovered · Original: {originalStatus}</p>}
                       </div>
                     ) : "-"}

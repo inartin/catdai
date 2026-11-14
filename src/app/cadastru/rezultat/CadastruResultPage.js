@@ -9,6 +9,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BackButton from "@/components/BackButton";
 import CadastralDataCard from "@/components/CadastralDataCard";
+import CadastruBuildingManagement from "@/components/CadastruBuildingManagement";
 import CadastruListingsCard from "@/components/CadastruListingsCard";
 import CadastruNearbyCard from "@/components/CadastruNearbyCard";
 import CadastruPublicTransportCard from "@/components/CadastruPublicTransportCard";
@@ -1122,6 +1123,12 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
   }) : isAddressPreviewHandoff && !savedAddress ? favoritePath : undefined;
   const hasSecondaryActions = showPdfAction || showShareAction;
   const reportReady = !authLoading && marketReady && marketState.key === marketKey;
+  const managementEligible = reportReady && !state.data?.apartment_unavailable && hasApartmentNumber(state.data);
+  const managementAddress = managementEligible && !state.data?.locked_sections?.address
+    ? nearbyAddressFromCadastru(state.data) : null;
+  const managementNumber = managementEligible && !shareSlug && !state.data?.locked_sections?.cadastral_number && validateCadastralNumber(nearbyNumber).valid
+    ? nearbyNumber : "";
+  const managementShare = managementEligible ? shareSlug : "";
   const marketData = marketReady && marketState.key === marketKey ? marketState.data : null;
   const showFavoriteAction = isAuthenticated && Boolean(favoritePath);
 
@@ -1302,6 +1309,16 @@ function CadastruResultContent({ sharedReportSlug = "", initialSharedReport = nu
                 desktopRevealButtonLabel={t("cadastru.unlockCompleteCta", { price: unlockPriceLabel })}
                 desktopRevealDescription={t("cadastru.unlockCompleteDescription")}
                 onLockedClick={canUnlock ? startCheckout : undefined}
+                footer={managementAddress || managementNumber || managementShare ? (
+                  <CadastruBuildingManagement
+                    key={JSON.stringify([marketKey, searchLookupId, session?.user?.id, isLockedPreview, managementAddress, managementNumber, managementShare])}
+                    address={managementAddress}
+                    cadastralNumber={managementNumber}
+                    shareSlug={managementShare}
+                    accessToken={managementNumber && !isLockedPreview ? session?.access_token : undefined}
+                    onLockedClick={canUnlock ? startCheckout : undefined}
+                  />
+                ) : null}
               >
                 {map}
               </CadastralDataCard>

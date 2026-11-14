@@ -171,6 +171,16 @@ Checks: `pnpm exec node --experimental-vm-modules scripts/test-cadastru-building
 - Municipal reports use the same worker base URL and HMAC secret. `MUNICIPAL_REPORTS_EXTERNAL_API_URL` can override its endpoint when the base URL is unset. All three secondary worker requests have a 70-second timeout and never delay the main result.
 - Local development calls the configured signed worker too. A nearby 503 does not block the Cadastru result; the app log includes the worker's error code, HTTP status, and message to distinguish location, map, routing, and worker availability failures.
 
+## Apartment building management
+
+Apartment results with a visible house address show ÎMGFL / ЖЭК at the bottom of the cadastral card when a manager is listed for that exact building. The section starts loading after the cadastral, nearby, transport, applicable municipal report and market requests settle. It uses the shared animated loader and tooltip. Contacts show the organization, available office address and phone numbers, with a note for unverified public directory entries. No section remains when the worker returns no building manager or is unavailable.
+
+Cached apartment results with a visible house address trigger the same lookup. `POST /api/cadastru/building-management` sends the locality, street, road type and house number through the existing HMAC worker client to `POST /v1/building-management/address`. It uses the normal worker order (`pi`, `mac`, `curiosity`). For this endpoint, a worker `404 not_found` advances to the next configured host because older workers return the same response when the route is missing. The apartment number stays out of the request. The app excludes general city and sector contacts from this section.
+
+The building address shares one 30-day snapshot across apartments, using Redis first and `cadastru_building_management` as the durable store. Expired entries refresh in the background. See [Cadastru cache](cache.md#cadastru-cache).
+
+Locked previews show the manager name and blurred contact placeholders that open checkout. The API removes real contact details after cache reads and fresh lookups. Full contacts require an already-unlocked lookup for the exact apartment or a valid public share. Number previews resolve the house on the server without sending its address to the browser.
+
 ## Building listing market card
 
 `POST /api/cadastru/market` reads collected sale listings and sector price snapshots. The result page starts this low-priority request only after main/number-detail lookups and the existing nearby, transport and applicable municipal-report requests settle, including failures. It renders at the end with the listing body hidden by default, without a loading placeholder; its 15-second client timeout and failures cannot block other cards. Navigation aborts the request and discards stale results.
@@ -248,7 +258,7 @@ Checks: `pnpm exec node --experimental-vm-modules scripts/test-cadastru-outage.m
 
 ## Worker host failover
 
-All six worker endpoints (cadastral number, address, nearby places, transport, municipal reports and 999 listing) try configured hosts in this order: `pi` → `mac` → `curiosity`. Set server-only values in the main CatDai app:
+The cadastral number, address, nearby places, transport, municipal reports, building management and 999 listing lookups try configured hosts in this order: `pi` → `mac` → `curiosity`. Set server-only values in the main CatDai app:
 
 ```env
 CATDAI_API_PI_BASE_URL=https://cadastru-worker.catdai.md
@@ -259,7 +269,7 @@ CADASTRU_EXTERNAL_API_SECRET=the-same-secret-on-all-workers
 
 These are deployment hostname choices; the two new Cloudflare tunnel routes must be created before they work. Unset or invalid host URLs are skipped and appear as Not configured in admin. Duplicate endpoint URLs are tried only once. Explicit per-host values take precedence over legacy settings; with no new settings, existing `CADASTRU_EXTERNAL_API_BASE_URL`/endpoint overrides still configure `pi`. Existing listing-specific URL and signing-secret overrides remain supported.
 
-Failover is sequential and only handles unavailable worker hosts. A recognizable worker response (its node header or JSON result/error contract) stops host failover, including provider `service_unavailable`/5xx errors, rate limits, no-result, invalid-input, authentication and address-confirmation responses. A provider outage is not retried through other workers. Each attempt gets a fresh HMAC timestamp and request ID; lookup correlation stays the same and never enters the signed body. Existing usage telemetry records each real attempt, its configured target node, and safe returned node/version headers. No schema migration is required.
+Failover is sequential and handles unavailable worker hosts, plus the building-management 404 described above. A recognizable worker response (its node header or JSON result/error contract) otherwise stops host failover, including provider `service_unavailable`/5xx errors, rate limits, no-result, invalid-input, authentication and address-confirmation responses. A provider outage is not retried through other workers. Each attempt gets a fresh HMAC timestamp and request ID; lookup correlation stays the same and never enters the signed body. Existing usage telemetry records each real attempt, its configured target node, and safe returned node/version headers. No schema migration is required.
 
 Network failures, lookup timeouts, gateway 5xx responses and unusable 2xx responses can be ambiguous. Before moving to the next host, CatDai checks the failed worker's `/health` once, with a five-second timeout, no cache and no credentials. If that endpoint returns `{ "ok": true }`, the original lookup error is returned without another worker call. Only a failed/invalid health check allows failover. HTTP 408/429 responses do not trigger host failover. Lookup timeouts still apply per attempted host, including response body reads; each possible failover can add up to five seconds for its health probe. Health probes create no usage events. There is no preflight/background routing poll or automatic provider lookup from the main app. Admin status checks remain independent and do not guarantee provider availability. Property persistence and credit authorization happen after the final lookup result, as before.
 

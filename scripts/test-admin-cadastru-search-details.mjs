@@ -237,6 +237,36 @@ function visibleText(node) {
   if (typeof node !== 'object') return String(node);
   return visibleText(typeof node.type === 'function' ? node.type(node.props) : node.props?.children);
 }
+
+const partialSearch = { ...search, result_type: "error", result_value: null, lookup_source: null,
+  result_cadastru: false, result_nearby: true, result_map: true, result_transport: null };
+const calls = [main, { ...main, id: 22 }, { ...main, id: 23 }, secondary]
+  .map((event) => ({ ...event, status: "failure", http_status: 503 }));
+tree = render(CadastruSearchTable, { ...props, rows: [partialSearch] }, []);
+assert.deepEqual(nodes(tree, (node) => node.type === "li").map(visibleText), ["Nearby", "Map"]);
+function availableStatuses(detailTree) {
+  const labels = nodes(detailTree, (node) => node.type === "dt");
+  const statuses = nodes(detailTree, (node) => node.type === "dd");
+  return Object.fromEntries(labels.map((node, index) => [visibleText(node), visibleText(statuses[index])]));
+}
+tree = render(CadastruSearchDetails, { row: partialSearch }, [{ search: partialSearch, events: calls }, null, 0, null]);
+assert.deepEqual(availableStatuses(tree), {
+  "Cadastral data": "Lookup failed", Nearby: "Available", "Public transport": "Worker call failed", Map: "Available",
+});
+const headings = nodes(tree, (node) => node.type === "h4").map((node) => visibleText(node).replace(/\s+/g, " "));
+assert.match(headings[0], /Search results · 2 of 4 available/);
+assert.match(headings.at(-1), /Worker calls · 4/);
+
+// Historical categories can have been reconstructed for the list only.
+tree = render(CadastruSearchDetails, { row: { ...partialSearch, result_transport: true } },
+  [{ search: { ...partialSearch, result_nearby: null, result_map: null }, events: calls }, null, 0, null]);
+assert.equal(availableStatuses(tree).Nearby, "Available");
+assert.equal(availableStatuses(tree).Map, "Available");
+assert.equal(availableStatuses(tree)["Public transport"], "Available", "A failed call does not override an available result");
+
+tree = render(CadastruSearchDetails, { row: search }, [{ search, events: [] }, null, 0, null]);
+assert.equal(availableStatuses(tree)["Public transport"], "No result recorded");
+
 const selectedActivity = { role: 'original', clicked_at: '2026-11-02T08:23:00Z',
   resolved_address: 'Bălți, str Tudor Vladimirescu 6 ap 16' };
 const selectedProps = { ...props, rows: [{ ...search, result_type: 'no_data', suggestion_activity: selectedActivity }] };

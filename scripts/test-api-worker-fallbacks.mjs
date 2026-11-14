@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import vm from "node:vm";
 import crypto from "node:crypto";
+import { PGlite } from "@electric-sql/pglite";
 
 const env = { CADASTRU_EXTERNAL_API_BASE_URL: "https://pi.test", CADASTRU_EXTERNAL_API_SECRET: "test-secret" };
 const attempts = [], events = [], healthChecks = [];
@@ -32,8 +33,49 @@ const context = vm.createContext({ console, process: { env }, Date, URL, AbortSi
     return reply(url, options);
   },
 });
+const redis = new Map();
+const refreshes = [];
+let database;
+let savedProperty;
+const unlockedNumber = "0100106.131.01.059";
+const publicShare = "a".repeat(48);
 const mocks = {
   "node:crypto": { default: crypto },
+  "next/server": { NextResponse: Response },
+  "@/lib/rate-limit": { rateLimit: () => ({ check: () => ({ allowed: true }) }) },
+  "@/lib/validation": { validateCadastralNumber: (value) => ({ value: /^\d{7}\.\d{3}\.\d{2}\.\d{3}$/.test(value) ? value : null }) },
+  "@/lib/cadastru-records": { getCadastruRecordByNumber: async (number) => number === unlockedNumber && { payload: savedProperty } },
+  "@/lib/cadastru-nearby": { nearbyAddressFromCadastru: (payload) => payload?.house },
+  "@/lib/cadastru-share-metadata": { getCadastruSharedReport: async (slug) => slug === publicShare && { payload: savedProperty } },
+  "@/lib/access-tier": { resolveAccessTier: async (request) => ({ user_id: request.headers.get("authorization")?.slice(7) }) },
+  "@/lib/paid-feature-usage": {
+    makePaidFeatureUsageKey: (feature, fields) => `${feature}:${fields.cadastral_number}`,
+    checkFeatureAccess: async ({ userId, idempotencyKey }) => ({ allowed: true,
+      reason: userId === "buyer" && idempotencyKey === `cadastru_lookup:${unlockedNumber}` ? "already_consumed" : "has_credit" }),
+  },
+  "@/lib/cache": {
+    getSharedCache: async (key) => redis.has(key) ? { value: redis.get(key).value } : null,
+    setSharedCache: async (key, value, ttl) => redis.set(key, { value, ttl }),
+  },
+  "@/lib/cadastru-refresh": { scheduleCadastruRefresh: (key, refresh) => refreshes.push({ key, refresh }) },
+  "@/lib/supabase-admin": { supabaseAdmin: { from(table) {
+    assert.equal(table, "cadastru_building_management");
+    return {
+      select: () => ({ eq: (column, key) => ({ limit: async () => {
+        assert.equal(column, "origin_key");
+        const result = await database.query("select raw_payload, fetched_at, expires_at from cadastru_building_management where origin_key = $1", [key]);
+        return { data: result.rows };
+      } }) }),
+      upsert: async (row, options) => {
+        assert.equal(options.onConflict, "origin_key");
+        await database.query(`insert into cadastru_building_management (origin_key, lookup_input, raw_payload, fetched_at, expires_at)
+          values ($1, $2, $3, $4, $5) on conflict (origin_key) do update set raw_payload = excluded.raw_payload,
+          fetched_at = excluded.fetched_at, expires_at = excluded.expires_at`,
+        [row.origin_key, row.lookup_input, row.raw_payload, row.fetched_at, row.expires_at]);
+        return { error: null };
+      },
+    };
+  } } },
   "@/lib/external-api-usage": {
     getExternalApiDiagnosticHeaders: (response) => Object.fromEntries(
       ["x-catdai-node", "x-catdai-app-version", "x-catdai-node-version"]
@@ -232,3 +274,106 @@ reset();
 await assert.rejects(cadastru.fetchExternalCadastralData("0100101.001.01.001"), (error) => error.code === "external_cadastru_not_configured");
 assert.equal(attempts.length, 0);
 console.log("Worker fallbacks passed: all six endpoints, host outages, provider errors, healthy-worker timeouts, health-probe isolation, legacy responses, signing and telemetry.");
+
+env.CADASTRU_EXTERNAL_API_SECRET = "test-secret";
+env.CATDAI_API_PI_BASE_URL = "https://pi.test";
+env.CATDAI_API_MAC_BASE_URL = "https://mac.test";
+env.CATDAI_API_CURIOSITY_BASE_URL = "https://curiosity.test";
+const buildingManagement = await load("@/app/api/cadastru/building-management/route");
+const address = { city: "Chișinău", road_type: "bulevard", street: "Decebal", house_number: "63" };
+const manager = { category: "building_management", scope: "building", name: "ÎMGFL nr. 1", phones: ["022550094"],
+  office_address: "str. Nicolae Titulescu 6", assignment: { status: "historical", source_url: "https://example.test/source" } };
+const preview = { contacts: [{ name: manager.name, has_office_address: true, phone_count: 1, locked: true }] };
+const municipalContact = { category: "municipal_housing_enquiries", scope: "sector", name: "Pretura Botanica" };
+const lookupManagement = (fields = address, viewer) => buildingManagement.POST(new Request("https://app.test/api/cadastru/building-management", {
+  method: "POST", body: JSON.stringify(fields), headers: viewer ? { Authorization: `Bearer ${viewer}` } : {},
+}));
+reply = (url, options) => {
+  assert.equal(new URL(url).pathname, "/v1/building-management/address");
+  assert.deepEqual(JSON.parse(options.body), address);
+  if (new URL(url).hostname === "pi.test") {
+    return Response.json({ ok: false, error: "not_found" }, { status: 404, headers: { "x-catdai-node": "pi" } });
+  }
+  return Response.json({ ok: true, data: { contacts: [manager, municipalContact] } });
+};
+const freshPreview = await lookupManagement({ ...address, apartment_number: "59", unlocked: true });
+assert.deepEqual(await freshPreview.json(), preview);
+assert.equal(freshPreview.headers.get("Cache-Control"), "private, no-store");
+assert.deepEqual(attempts.map(({ url }) => new URL(url).hostname), ["pi.test", "mac.test"]);
+assert.equal(healthChecks.length, 0, "a healthy old worker can lack the building-management route");
+redis.clear();
+reply = () => Response.json({ ok: true, data: { contacts: [municipalContact] } });
+assert.deepEqual(await (await lookupManagement()).json(), { contacts: [] });
+redis.clear();
+reset();
+reply = () => Response.json({ ok: false, error: "not_found" }, { status: 404 });
+assert.deepEqual(await (await lookupManagement()).json(), { contacts: [] });
+assert.deepEqual(attempts.map(({ url }) => new URL(url).hostname), ["pi.test", "mac.test", "curiosity.test"]);
+reply = () => Response.json({ ok: false, error: "service_unavailable" }, { status: 503 });
+assert.equal((await lookupManagement()).status, 503);
+const attemptsBeforeInvalidAddress = attempts.length;
+assert.equal((await lookupManagement({ ...address, house_number: "63 or 65" })).status, 400);
+assert.equal(attempts.length, attemptsBeforeInvalidAddress);
+console.log("Building management route passed: signed fallback from Pi to Mac, exact-building contacts, empty matches, invalid input and unavailable worker.");
+
+redis.clear();
+reset();
+env.ENABLE_RUNTIME_PERSISTENCE = "true";
+database = new PGlite();
+await database.exec("create role anon; create role authenticated; create role service_role bypassrls;");
+await database.exec(await fs.readFile("supabase/migrations/20261114093711_cadastru_building_management.sql", "utf8"));
+const table = "cadastru_building_management";
+const dbRows = async () => (await database.query(`select * from ${table}`)).rows;
+try {
+  await database.exec("set role service_role");
+  reply = () => Response.json({ ok: true, data: { contacts: [manager] } });
+  const house = { ...address, house_number: "13 / 3a" };
+  assert.deepEqual(await (await lookupManagement({ ...house, apartment_number: "59" })).json(), preview);
+  const [saved] = await dbRows();
+  assert.deepEqual(saved.lookup_input, { ...address, house_number: "13/3A" });
+  assert.deepEqual(saved.raw_payload, { contacts: [manager] });
+  assert.equal(saved.expires_at - saved.fetched_at, 30 * 24 * 60 * 60 * 1000);
+  assert.equal(redis.values().next().value.ttl, 30 * 24 * 60 * 60);
+
+  const sameBuilding = { ...house, street: "DECEBAL", house_number: "13/3A", apartment_number: "60" };
+  assert.deepEqual(await (await lookupManagement(sameBuilding)).json(), preview);
+  assert.equal(attempts.length, 1, "a different apartment uses the same Redis entry");
+  savedProperty = { house };
+  assert.deepEqual(await (await lookupManagement({ cadastral_number: unlockedNumber })).json(), preview);
+  assert.deepEqual(await (await lookupManagement({ cadastral_number: unlockedNumber }, "unused-credit")).json(), preview);
+  assert.deepEqual(await (await lookupManagement(house, "buyer")).json(), preview);
+  assert.deepEqual(await (await lookupManagement({ ...house, cadastral_number: "0100106.131.01.060" }, "buyer")).json(), preview);
+  assert.deepEqual(await (await lookupManagement({ ...address, cadastral_number: unlockedNumber }, "buyer")).json(), { contacts: [manager] });
+  assert.deepEqual(await (await lookupManagement({ ...address, share_slug: publicShare })).json(), { contacts: [manager] });
+  assert.equal((await lookupManagement({ ...address, share_slug: "invalid" })).status, 404);
+  assert.equal(attempts.length, 1, "authorized requests use the verified stored address, ignoring a substituted address");
+  redis.clear();
+  assert.deepEqual(await (await lookupManagement(sameBuilding)).json(), preview);
+  assert.equal(attempts.length, 1, "a Redis miss reads Supabase before the worker");
+  assert.equal(redis.size, 1, "the DB hit repopulates Redis");
+  assert.deepEqual(await dbRows(), [saved], "reads leave source dates intact");
+
+  redis.clear();
+  await database.exec(`update ${table} set fetched_at = now() - interval '31 days', expires_at = now() - interval '1 day'`);
+  const [expired] = await dbRows();
+  assert.deepEqual(await (await lookupManagement(house)).json(), preview);
+  assert.equal(attempts.length, 1, "expired contacts return before the background refresh");
+  reply = () => Response.json({ ok: false, error: "not_found" }, { status: 404 });
+  await refreshes.shift().refresh();
+  assert.deepEqual(await dbRows(), [expired], "ambiguous 404s do not replace saved contacts");
+  assert.deepEqual(await (await lookupManagement(house)).json(), preview);
+  reply = () => Response.json({ ok: true, data: { contacts: [municipalContact] } });
+  await refreshes.shift().refresh();
+  assert.deepEqual(await (await lookupManagement(house)).json(), { contacts: [] });
+  assert.deepEqual((await dbRows())[0].raw_payload, { contacts: [] });
+
+  assert.deepEqual(await (await lookupManagement({ ...house, house_number: "13/3" })).json(), { contacts: [] });
+  assert.equal((await dbRows()).length, 2, "different house suffixes use separate rows");
+  for (const role of ["anon", "authenticated"]) {
+    await database.exec(`set role ${role}`);
+    await assert.rejects(database.query(`select * from ${table}`), /permission denied/);
+  }
+} finally {
+  await database.close();
+}
+console.log("Building management cache passed: shared building keys, Redis hits, database refill, stale refresh, empty snapshots and service-role access.");

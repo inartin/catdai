@@ -40,15 +40,17 @@ async function isApiWorkerAvailable(url) {
   }
 }
 
-export async function withApiWorkerFallback(workers, request) {
+export async function withApiWorkerFallback(workers, request, { retryNotFound = false } = {}) {
   for (const [index, worker] of workers.entries()) {
     try {
       return await request(worker);
     } catch (error) {
       const status = error?.status;
+      if (index === workers.length - 1) throw error;
+      // Older workers use the same 404 for an unimplemented route and an empty lookup.
+      if (retryNotFound && status === 404 && error.code === "not_found") continue;
       const unavailable = !status || status >= 500 || (status >= 200 && status < 300);
-      if (!error?.fallbackEligible || !unavailable || error.workerResponded
-        || index === workers.length - 1) throw error;
+      if (!error?.fallbackEligible || !unavailable || error.workerResponded) throw error;
       // An unanswered lookup can be waiting on a shared provider. Only move to
       // another host when this worker's independent health endpoint also fails.
       if (await isApiWorkerAvailable(worker.url)) throw error;

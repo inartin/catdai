@@ -18,6 +18,7 @@ export default function CadastralDataCard({
   desktopRevealDescription,
   onRegistryRetry,
   registryRetrying = false,
+  footer,
   children,
 }) {
   const { lang, t } = useTranslation();
@@ -231,6 +232,7 @@ export default function CadastralDataCard({
           </div>
         ) : null}
         <CadastruFreshnessNote freshness={cadastral.data_freshness} />
+        {footer}
       </div>
     </div>
   );

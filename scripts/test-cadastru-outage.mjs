@@ -158,8 +158,8 @@ assert.equal(data.access_limit.purchase, null, "bare recovery has no purchase of
 assert.equal(data.full_access, false);
 assert.equal(data.locked_sections.map, true);
 assert.notEqual(data.lands[0].area_m2, "1000", "existing preview masking is retained");
-assert.deepEqual(data.lands[0].utilities, { water: "||", gas: "||" });
-assert.equal(data.lands[0].traffic_intensity, "|||||");
+assert.deepEqual(data.lands[0].utilities, { water: "||||", gas: "||||" });
+assert.equal(data.lands[0].traffic_intensity, "||||||||||");
 assert.equal(data.lands[0].map_geometry, undefined, "preview never leaks geometry");
 assert.equal(credits, 0);
 allowed = true;

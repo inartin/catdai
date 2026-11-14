@@ -62,9 +62,15 @@ export function cadastruPropertyDetails(cadastral, { lang, t, locked = false }) 
     : null;
   const formatSquareMeters = (value) => {
     if (value === null || value === undefined || value === "") return null;
-    const number = Number(value);
-    if (!Number.isFinite(number)) return value ? `${value} m²` : null;
+    const numericValue = String(value).trim().replace(/\s*(?:m²|m2|m\^2)$/iu, "");
+    const number = Number(numericValue);
+    if (!Number.isFinite(number)) return value ? `${numericValue} m²` : null;
     return `${new Intl.NumberFormat(lang === "en" ? "en-GB" : lang === "ru" ? "ru-RU" : "ro-MD", { maximumFractionDigits: 2 }).format(number)} m²`;
+  };
+  const formatApartmentArea = (value) => {
+    if (value === null || value === undefined || value === "") return null;
+    const text = String(value).trim();
+    return /(?:m²|m2|m\^2)$/iu.test(text) ? text : `${text} m²`;
   };
   const formatEstimatedValue = (value) => (
     value === null || value === undefined || value === "" ? null : `${value} MDL`
@@ -128,7 +134,7 @@ export function cadastruPropertyDetails(cadastral, { lang, t, locked = false }) 
     displayAddress,
     unitTitle,
     apartmentRows: [
-      ["area_m2", t("form.cadastralArea"), cadastral.apartment?.area_m2 ? `${cadastral.apartment.area_m2} m²` : null],
+      ["area_m2", t("form.cadastralArea"), formatApartmentArea(cadastral.apartment?.area_m2)],
       ["floor", t("form.cadastralFloor"), floorValue],
       ["toilet", t("form.cadastralToilet"), cadastral.apartment?.toilet],
       ["bathroom", t("form.cadastralBathroom"), cadastral.apartment?.bathroom],

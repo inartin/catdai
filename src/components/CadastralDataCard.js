@@ -108,12 +108,24 @@ export default function CadastralDataCard({
   const detailRow = (section, field, label, value) => {
     if (value === null || value === undefined || value === "") return null;
     const fieldLocked = isFieldLocked(section, field);
+    const displayValue = String(cadastruValueLabel(value, field, lang));
+    const valueUnit = displayValue.match(/^(.*?)(\s+(?:m²|m2|m\^2|ha|MDL|lei))$/iu);
+    const renderedValue = valueUnit ? (
+      <span className={`${detailValueClass} inline-flex items-baseline justify-end gap-1`}>
+        <span className={fieldLocked ? lockedValueClass : ""} {...(fieldLocked ? lockedActionProps : {})}>
+          {valueUnit[1]}
+        </span>
+        <span className="shrink-0 whitespace-nowrap">{valueUnit[2]}</span>
+      </span>
+    ) : (
+      <span className={`${detailValueClass} ${fieldLocked ? lockedValueClass : ""}`} {...(fieldLocked ? lockedActionProps : {})}>
+        {displayValue}
+      </span>
+    );
     return (
       <div key={field} className="flex items-start justify-between gap-4 text-base">
         <span className="text-gray-500">{label}</span>
-        <span className={`${detailValueClass} ${fieldLocked ? lockedValueClass : ""}`} {...(fieldLocked ? lockedActionProps : {})}>
-          {cadastruValueLabel(value, field, lang)}
-        </span>
+        {renderedValue}
       </div>
     );
   };

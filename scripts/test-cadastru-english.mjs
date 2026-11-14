@@ -105,7 +105,7 @@ assert(!shopHtml.includes("Unit use"));
 const { buildCadastruPreviewPayload } = await load("src/lib/cadastru-preview.js");
 const preview = buildCadastruPreviewPayload(shop);
 assert.equal(preview.apartment.unit_kind, "non_residential");
-assert.match(preview.apartment.room_usage, /^\|+$/);
+assert.equal(preview.apartment.room_usage, "||".repeat(shop.apartment.room_usage.length));
 assert.match(preview.apartment.heating, /^\|+$/);
 assert.match(preview.apartment.located_in_basement, /^\|+$/);
 assert.equal(isCadastruNonResidential({ destination: "Nelocativă" }), true);
@@ -131,15 +131,19 @@ const commercialParcel = { ...commercialBuilding, cadastral_number: "0100104.003
   utilities: { electricity: "Da", water: "Da", sewage: "Da", gas: "Da" }, estimated_value_lei: "8 325 737",
 }] };
 const parcelHtml = renderToStaticMarkup(React.createElement(card, { cadastral: commercialParcel }));
-for (const text of ["0.14 ha", "8 325 737", "Commercial", "Access road", "Position relative to the street",
+for (const text of ["0.14", "8 325 737", "Commercial", "Access road", "Position relative to the street",
   "Overall traffic intensity", "Electricity supply", "Total interior area", "556.7"]) assert(parcelHtml.includes(text), text);
+assert.match(parcelHtml, /0\.14<\/span><span[^>]*> ha<\/span>/);
 const parcelPreview = buildCadastruPreviewPayload(commercialParcel, "no_credit", { maskAddress: true });
-assert.match(parcelPreview.lands[0].utilities.water, /^\|+$/);
+assert.equal(parcelPreview.lands[0].area, "|||||||| ha");
+assert.equal(parcelPreview.lands[0].cadastral_number, "||".repeat(commercialParcel.lands[0].cadastral_number.length));
+assert.equal(parcelPreview.lands[0].utilities.water, "||||");
 assert.match(parcelPreview.lands[0].traffic_intensity, /^\|+$/);
 assert.match(parcelPreview.buildings[0].electricity, /^\|+$/);
-assert.match(parcelPreview.buildings[0].address, /^\|+$/);
+assert.equal(parcelPreview.buildings[0].address, "||".repeat(commercialBuilding.buildings[0].address.length));
 assert.equal(parcelPreview.buildings[0].area_m2, undefined);
-assert.equal((buildingHtml.match(/246 m²/g) || []).length, 1);
+assert.equal((buildingHtml.match(/246<\/span>/g) || []).length, 1);
+assert.match(buildingHtml, /246<\/span><span[^>]*> m²<\/span>/);
 assert(parcelHtml.includes("corpul B"));
 assert(!parcelHtml.includes("blur-sm"));
 
@@ -156,9 +160,9 @@ function assertPaidAndBlurred(fullRows, lockedRows, fields, lockedHtml) {
   for (const field of fields) {
     assert(full.get(field)?.value, `Missing paid row ${field}`);
     const row = masked.get(field);
-    assert.match(row?.value || "", /^\|+(?: m²| MDL|%)?$/, `Unmasked or missing row ${field}`);
+    assert.match(row?.value || "", /^\|+(?: m²| ha| MDL|%)?$/, `Unmasked or missing row ${field}`);
     const rowMarkup = lockedHtml.split(`>${row.label}</span>`).slice(1);
-    assert(rowMarkup.some((markup) => /^<span[^>]*blur-sm[^>]*>\|+/.test(markup)), `Missing blur ${field}`);
+    assert(rowMarkup.some((markup) => /blur-sm[^>]*>\|+/.test(markup)), `Missing blur ${field}`);
   }
 }
 
@@ -181,12 +185,14 @@ assert(!lockedParcelHtml.includes("corpul B"));
 assert(!lockedShopHtml.includes(">Shop<"));
 assert.match(lockedShopHtml, /Unit use<\/span><span[^>]*blur-sm[^>]*>\|+/);
 assert.match(lockedParcelHtml, /blur-sm[^>]*>str\. Exemplu 10/);
+assert.match(lockedParcelHtml, /blur-sm[^>]*>\|+<\/span><span[^>]*> ha<\/span>/);
+assert.match(lockedParcelHtml, /blur-sm[^>]*>\|+<\/span><span[^>]*> MDL<\/span>/);
 const fromAddress = buildCadastruPreviewPayload(commercialParcel, "no_credit", { maskCadastralNumber: true });
 assert.equal(cadastruDisplayAddress(fromAddress), commercialParcel.lands[0].address);
 assert.match(fromAddress.buildings[0].address, /^\|+$/);
 const distinct = buildCadastruPreviewPayload({ buildings: [{ area_m2: "300", footprint_area_m2: "246" }] });
-assert.equal(distinct.buildings[0].area_m2, "|||");
-assert.equal(distinct.buildings[0].footprint_area_m2, "|||");
+assert.equal(distinct.buildings[0].area_m2, "||||||");
+assert.equal(distinct.buildings[0].footprint_area_m2, "||||||");
 const resultCard=(await load('src/components/MaibPaymentResultCard.js')).default;
 for(const status of ['paid','pending','failed','canceled','expired','refunded','partially_refunded']){
  for(const count of [1,2]){

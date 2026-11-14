@@ -7,16 +7,28 @@ const CADASTRU_LOOKUP_FEATURE_KEY = "cadastru_lookup";
 
 function maskValue(value) {
   if (value === null || value === undefined || value === "") return value;
-  return String(value).replace(/[\s\S]/g, "|");
+  return String(value).replace(/[\s\S]/g, "||");
 }
 
-function maskObjectFields(source, visibleFields = []) {
+const AREA_FIELDS = new Set(["area", "area_m2", "footprint_area_m2", "interior_area_m2", "exterior_area_m2"]);
+const AREA_UNIT_SUFFIX = /(\s+(?:m²|m2|m\^2|ha))$/iu;
+
+function maskAreaValue(value) {
+  if (value === null || value === undefined || value === "") return value;
+  const text = String(value);
+  const unit = text.match(AREA_UNIT_SUFFIX);
+  const number = unit ? text.slice(0, unit.index) : text;
+  return `${maskValue(number)}${unit?.[1] || ""}`;
+}
+
+function maskObjectFields(source, visibleFields = [], options = {}) {
   if (!source || typeof source !== "object" || Array.isArray(source)) return {};
   const visible = new Set(visibleFields);
   return Object.fromEntries(
     Object.entries(source).map(([key, value]) => [
       key,
-      visible.has(key) ? value : maskValue(value),
+      visible.has(key) ? value : options.preserveAreaUnits && AREA_FIELDS.has(key)
+        ? maskAreaValue(value) : maskValue(value),
     ])
   );
 }
@@ -26,7 +38,7 @@ function maskPropertyCollection(items, displayAddress, construction = false) {
   return items.map((item) => {
     const visibleFields = ["map_location", "map_geometry"];
     if (item?.address === displayAddress) visibleFields.push("address");
-    const masked = maskObjectFields(item, visibleFields);
+    const masked = maskObjectFields(item, visibleFields, { preserveAreaUnits: true });
     if (construction && hasDuplicateFootprintArea(item)) delete masked.area_m2;
     const utilities = item?.utilities;
     return utilities && typeof utilities === "object" && !Array.isArray(utilities)
@@ -98,10 +110,10 @@ export function buildCadastruPreviewPayload(payload, reason = "no_credit", optio
     map_location: payload?.map_location || null,
     map_geometry: payload?.map_geometry || null,
     apartment: {
-      ...maskObjectFields(apartment, ["address", "floor", "map_location"]),
+      ...maskObjectFields(apartment, ["address", "floor", "map_location"], { preserveAreaUnits: true }),
       ...(isCadastruNonResidential(apartment) ? { unit_kind: "non_residential" } : {}),
     },
-    building: maskObjectFields(building, ["address", "classifier", "map_location", "map_geometry"]),
+    building: maskObjectFields(building, ["address", "classifier", "map_location", "map_geometry"], { preserveAreaUnits: true }),
     lands: maskPropertyCollection(payload?.lands, displayAddress),
     buildings: maskPropertyCollection(payload?.buildings, displayAddress, true),
     location: maskObjectFields(payload?.location || {}, ["display_name", "road", "house_number", "suburb", "city", "postcode"]),

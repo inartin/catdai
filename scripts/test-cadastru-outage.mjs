@@ -217,4 +217,40 @@ data = await (await lookup()).json();
 assert.equal(data.lands[0].estimated_value_lei, "120000");
 assert.equal(data.lands[0].address, "Orhei, str. Test 1");
 assert.equal(credits, 1, "a verified report uses the normal credit path despite optional registry failure");
-console.log("Outage checks passed: masking, purchase eligibility, early refresh, recovery and richer-record preservation.");
+persistEnabled = true;
+const construction = "4801106.235.01";
+const previous = { cadastral_number: construction, matched_address: "Glodeni, str. Alecu Russo 23",
+  buildings: [{ cadastral_number: construction, construction_year: "1980", estimated_value_lei: "20 747" }] };
+await storage.persistCadastruRecord(previous, { officialFetch: true });
+const constructionRow = tables.cadastru_records.find(record => record.cadastral_number === construction);
+const previousDate = constructionRow.last_official_fetch_at;
+workerPayload = {
+  status: "success", cadastral_number: construction, registry_unavailable: true, partial: true,
+  lands: [{ cadastral_number: "4801106.235", area_m2: "1000", partial: true }],
+  buildings: [
+    { cadastral_number: "4801106.0235.01", construction_year: null, footprint_area_m2: "119", partial: true },
+    { cadastral_number: "4801106.235.02", partial: true },
+    { cadastral_number: "4801106.235.03", partial: true },
+  ],
+};
+data = await (await lookup({ cadastral_number: construction })).json();
+assert.equal(data.lands[0].cadastral_number, "4801106.235");
+assert.equal(data.buildings.length, 3, "newly verified constructions are shown during a registry outage");
+assert.equal(data.buildings[0].construction_year, "1980", "keep saved registry fields when the fresh field is missing");
+assert.equal(data.buildings[0].footprint_area_m2, "119");
+assert.equal(data.matched_address, previous.matched_address);
+assert.equal(constructionRow.last_official_fetch_at, previousDate);
+assert.ok(Date.parse(constructionRow.next_refresh_after) - Date.now() <= 300_000);
+cache.clear();
+const savedConstruction = await storage.getCadastruRecordByNumber(construction);
+assert.equal(savedConstruction.payload.buildings.length, 3, "persist the same cards for repeat reads and reports");
+workerPayload.buildings.pop();
+data = await (await lookup({ cadastral_number: construction, skip_cache: true })).json();
+assert.equal(data.buildings.length, 3, "a later outage cannot erase verified construction cards");
+assert.equal(data.buildings[0].estimated_value_lei, "20 747");
+assert.equal(constructionRow.last_official_fetch_at, previousDate);
+allowed = false;
+data = await (await lookup({ cadastral_number: construction })).json();
+assert.equal(data.buildings.length, 3);
+assert.notEqual(data.buildings[0].estimated_value_lei, "20 747", "preview masks retained registry values");
+console.log("Outage checks passed: masking, purchase eligibility, early refresh, registry recovery and construction parcel upgrades.");

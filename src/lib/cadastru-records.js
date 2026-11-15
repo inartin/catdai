@@ -497,6 +497,34 @@ async function persistBuildingBundles(payload, options) {
   }
 }
 
+function parcelPropertyKey(number) {
+  const match = String(number ?? "").match(/^(\d{7})\.?(\d{1,4})(\.\d{2})?$/);
+  return match ? `${match[1]}.${Number(match[2])}${match[3] || ""}` : null;
+}
+
+function mergeConstructionOutage(payload, saved) {
+  const parcel = parcelPropertyKey(payload.cadastral_number)?.slice(0, -3);
+  const merge = (previous, fresh, belongs) => {
+    const properties = new Map();
+    for (const property of [...(previous || []), ...(fresh || [])]) {
+      const key = parcelPropertyKey(property.cadastral_number);
+      if (!key || !belongs(key)) continue;
+      const fields = Object.fromEntries(Object.entries(property)
+        .filter(([, value]) => value != null && value !== ""));
+      properties.set(key, { ...properties.get(key), ...fields });
+    }
+    return [...properties.values()];
+  };
+  return {
+    ...payload,
+    matched_address: payload.matched_address || saved.matched_address,
+    map_location: payload.map_location || saved.map_location,
+    map_geometry: payload.map_geometry || saved.map_geometry,
+    lands: merge(saved.lands, payload.lands, key => key === parcel),
+    buildings: merge(saved.buildings, payload.buildings, key => key.slice(0, -3) === parcel),
+  };
+}
+
 export async function persistCadastruRecord(payload, options = {}) {
   if (!isCadastruDbEnabled() || hasDerivedIdentity(payload)) return null;
 
@@ -513,13 +541,24 @@ export async function persistCadastruRecord(payload, options = {}) {
     }
     if (!options.skipBuildingBundles) await persistBuildingBundles(payload, options);
     const existing = await findRecordByNumber(payload?.cadastral_number || options.cadastralNumber);
-    // A forced lookup during an outage must not replace a richer saved result
-    // or renew its original source dates.
-    if (payload?.registry_unavailable && existing && !existing.raw_payload?.registry_unavailable) {
-      return (await composeBuildingEntry(recordEntry(existing))).payload;
+    let savedSourceDate;
+    if (payload?.registry_unavailable && existing) {
+      const expandsConstruction = CONSTRUCTION_CADASTRAL_RE.test(payload.cadastral_number)
+        && payload.lands?.length
+        && (existing.shared_building_number || !existing.raw_payload?.lands?.length
+          || existing.raw_payload.registry_unavailable);
+      if (expandsConstruction) {
+        const saved = await composeBuildingEntry(recordEntry(existing));
+        payload = mergeConstructionOutage(payload, saved.payload);
+        savedSourceDate = saved.fetchedAt;
+      } else if (!existing.raw_payload?.registry_unavailable) {
+        // Keep the richer result and its original source dates.
+        return (await composeBuildingEntry(recordEntry(existing))).payload;
+      }
     }
     const row = buildRecordRow(payload, options, existing);
     if (!row) return null;
+    if (savedSourceDate) row.last_official_fetch_at = savedSourceDate;
 
     const parentNumber = apartmentBuildingNumber(row.cadastral_number);
     const constructionParcel = CONSTRUCTION_CADASTRAL_RE.test(row.cadastral_number) && payload.lands?.length;

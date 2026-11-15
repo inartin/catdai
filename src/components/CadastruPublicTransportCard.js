@@ -6,9 +6,59 @@ import { useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import CadastruLoadingIcon from "@/components/CadastruLoadingIcon";
 
+function VillageTimetable({ timetable, onLockedClick }) {
+  const { t, lang } = useTranslation();
+  const weekday = new Intl.DateTimeFormat(lang, { weekday: "short", timeZone: "UTC" });
+  const sourceDate = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeZone: "UTC" });
+
+  return (
+    <div className="mt-5 border-t border-gray-100 pt-4">
+      <h3 className="font-semibold text-gray-900">{t("cadastru.transportVillageRoutes", { locality: timetable.locality })}</h3>
+      <ul className="mt-3 space-y-3">
+        {timetable.routes.map((route, index) => (
+          <li key={index} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
+            {route.locked ? (
+              <button type="button" onClick={onLockedClick} disabled={!onLockedClick} aria-label={t("cadastru.payToUnlock")}
+                className="cursor-pointer rounded text-left text-sm font-medium text-emerald-950 focus-visible:outline-2 disabled:cursor-default">
+                <span aria-hidden="true" className="select-none blur-sm">{t("cadastru.transportLockedRoute")}</span>
+              </button>
+            ) : (
+              <>
+                {route.to_chisinau ? <p className="text-sm font-semibold text-emerald-800">{t("cadastru.transportDirectCapital")}</p> : null}
+                <p className="break-words font-semibold text-gray-900">{route.ref ? route.ref + " · " : ""}{route.from} → {route.to}</p>
+                {route.via.length ? <p className="mt-1 text-sm text-gray-600">{t("cadastru.transportVia", { places: route.via.join(", ") })}</p> : null}
+                {route.departures.length ? (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-gray-600">{t("cadastru.transportVillageDepartures", { locality: timetable.locality })}</p>
+                    <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                      {route.departures.map(({ time, days }, tripIndex) => (
+                        <li key={tripIndex} className="text-sm text-gray-700">
+                          <span className="font-semibold tabular-nums text-gray-900">{time}</span>
+                          {days.length === 7 ? " · " + t("cadastru.transportDaily") : days.length
+                            ? " · " + days.map((day) => weekday.format(new Date(Date.UTC(2024, 0, day)))).join(", ") : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                <p className="mt-2 text-xs text-gray-600">
+                  <a href={route.source.url} target="_blank" rel="noreferrer" className="underline underline-offset-2">{route.source.name}</a>
+                  {" · "}{sourceDate.format(new Date(route.source.date + "T00:00:00Z"))}
+                </p>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function CadastruPublicTransportCard({ transport, loading, unavailable, onLockedClick }) {
   const { t } = useTranslation();
   const [expandedModes, setExpandedModes] = useState({});
+  const timetable = transport?.village_timetable;
+  const hasTimetable = Boolean(timetable?.routes?.length);
   const groups = (Array.isArray(transport?.route_groups) ? transport.route_groups : [])
     .filter((group) => Array.isArray(group?.routes) && group.routes.length);
 
@@ -24,7 +74,7 @@ export default function CadastruPublicTransportCard({ transport, loading, unavai
         </p>
       ) : null}
       {unavailable ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.transportUnavailable")}</p> : null}
-      {!loading && !unavailable && transport && !groups.length
+      {!loading && !unavailable && transport && !groups.length && !hasTimetable
         ? <p className="mt-4 text-sm text-gray-500">{t("cadastru.transportEmpty")}</p>
         : null}
       {transport?.scope === "locality" && groups.length ? (
@@ -92,6 +142,7 @@ export default function CadastruPublicTransportCard({ transport, loading, unavai
           })}
         </div>
       ) : null}
+      {hasTimetable ? <VillageTimetable timetable={timetable} onLockedClick={onLockedClick} /> : null}
       {transport ? (
         <div className="mt-5 space-y-1 text-xs text-gray-500">
           <CadastruFreshnessNote freshness={{ property: transport.cache }} />

@@ -24,7 +24,14 @@ const transport = { location, cache, scope: "nearby", route_groups:
       ref: index ? `SECRET-${mode}-${index}` : `${100 + group}`,
       name: index ? `SECRET-route-name-${mode}-${index}` : `Visible-${mode}`,
     })),
-  })), stops: [{ routes: ["SECRET-duplicate-route"] }] };
+  })), stops: [{ routes: ["SECRET-duplicate-route"] }], village_timetable: { locality: "Dumitreni", routes: [
+    { from: "Dumitreni", to: "Florești", to_chisinau: false, via: ["Alexeevca"],
+      departures: [{ time: "07:30", days: [2, 4, 7] }],
+      source: { name: "Consiliul raional Florești", date: "2026-06-26", url: "https://floresti.md/" } },
+    { from: "Dumitreni", to: "SECRET-village-route", to_chisinau: false, via: [],
+      departures: [{ time: "15:00", days: [] }],
+      source: { name: "SECRET-source", date: "2026-06-26", url: "https://floresti.md/secret-schedule" } },
+  ] } };
 const report = index => ({ id: `SECRET-report-${index}`, title: `SECRET-complaint-${index}`,
   status: "SOLVED", reported_at: "2026-10-01T12:00:00Z", is_public: true, distance_m: 100,
   description: "SECRET-description", source_url: "https://eu.chisinau.md/raport/SECRET-link" });
@@ -115,6 +122,9 @@ for (const [path, key, storage, getter, formatter, writer, fetcher] of [
           assert(group.routes.slice(1).every(route => route.locked));
         });
         assert.equal(data.stops, undefined, "alternate copies cannot expose hidden routes");
+        assert.deepEqual(data.village_timetable.routes, [
+          fixture.village_timetable.routes[0], { locked: true },
+        ]);
       } else {
         assert.deepEqual(data.summary, fixture.summary, "free previews retain all category totals");
         assert.equal(data.at_address, undefined);
@@ -203,6 +213,19 @@ for (lang of ["ro", "ru", "en"]) {
     const full = render(Card, { [prop]: prop === "nearby" ? nearby : transport });
     assert.equal(find(full, node => node.props?.className?.includes("blur-sm")).length, 0);
   }
+  state = [];
+  const timetableOnly = { ...previews.public_transport, route_groups: [] };
+  const timetableCard = render(Transport, { transport: timetableOnly, onLockedClick: () => clicks++ });
+  const timetableNode = find(timetableCard, node => typeof node.type === "function" && node.props.timetable)[0];
+  const schedule = timetableNode.type(timetableNode.props);
+  assert(textOf(schedule).includes(t("cadastru.transportVillageRoutes", { locality: "Dumitreni" })));
+  assert(textOf(schedule).includes("07:30"));
+  assert(!textOf(timetableCard).includes(t("cadastru.transportEmpty")));
+  assert(!textOf(schedule).includes("SECRET"));
+  const capital = { ...transport.village_timetable.routes[0], to: "Chișinău", to_chisinau: true };
+  const direct = timetableNode.type({ timetable: { locality: "Dumitreni", routes: [capital] } });
+  assert(textOf(direct).includes(t("cadastru.transportDirectCapital")));
+
   state = [];
   let tree = render(Reports, { reports: previews.municipal_reports });
   assert.deepEqual(find(tree, node => node.type === "dd").map(textOf), ["1", "2", "2"]);

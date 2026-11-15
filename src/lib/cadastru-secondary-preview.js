@@ -26,6 +26,12 @@ export function buildCadastruTransportPreview(transport) {
   return {
     full_access: false,
     scope: data.scope,
+    ...(data.village_timetable ? {
+      village_timetable: {
+        locality: data.village_timetable.locality,
+        routes: data.village_timetable.routes.map((route, index) => index === 0 ? route : { locked: true }),
+      },
+    } : {}),
     cache: data.cache,
     incomplete: data.incomplete,
     route_groups: (Array.isArray(data.route_groups) ? data.route_groups : []).map((group) => ({

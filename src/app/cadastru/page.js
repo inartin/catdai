@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CadastruSourceNote from "@/components/CadastruSourceNote";
 import CadastruSearchForm from "@/components/CadastruSearchForm";
 import CadastruLoadingPage from "@/components/CadastruLoadingPage";
 import CadastruHistory from "@/components/CadastruHistory";
+import usePaymentProvider from "@/components/usePaymentProvider";
 import { useTranslation } from "@/context/LanguageContext";
+import { maibCreditSavingsPercent, maibProduct } from "@/lib/maib/products.mjs";
+
+const cadastruProduct = maibProduct("cadastru_lookup_single");
+const maxPackageSavings = Math.max(...["credits_10", "credits_50"].map(maibCreditSavingsPercent));
 
 const exampleImages = [
   {
@@ -26,6 +32,9 @@ const exampleImages = [
 
 export default function CadastruPage() {
   const { lang, t } = useTranslation();
+  const paymentProvider = usePaymentProvider();
+  const priceLocale = lang === "en" ? "en-GB" : lang === "ru" ? "ru-MD" : "ro-MD";
+  const reportPrice = `${cadastruProduct.amount_mdl.toLocaleString(priceLocale)} ${cadastruProduct.currency_code}`;
   const images = lang === "en"
     ? exampleImages.map((image) => ({ ...image, src: image.src.replace(".png", "-en.png") }))
     : exampleImages;
@@ -86,6 +95,15 @@ export default function CadastruPage() {
               </svg>
             </summary>
             <div className="px-5 pb-5 text-sm leading-6 text-gray-600">
+              <div className="mb-4 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-gray-900">
+                <p>{t("cadastru.infoPaidReport", { price: reportPrice })}</p>
+                {paymentProvider === "maib" && (
+                  <p className="mt-1 text-gray-700">{t("cadastru.infoPaymentMethods")}</p>
+                )}
+                <Link href="/pricing" className="mt-1 inline-block rounded-sm font-semibold text-emerald-800 underline underline-offset-4 hover:text-emerald-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
+                  {t("cadastru.infoDiscountPackages", { percent: maxPackageSavings })}
+                </Link>
+              </div>
               <span className="whitespace-pre-line">{t("cadastru.infoText")}</span>
               <section aria-labelledby="cadastru-property-data" className="mt-4 border-t border-gray-200 pt-4">
                 <h3 id="cadastru-property-data" className="font-semibold text-gray-900">

@@ -7,7 +7,7 @@ const sections = [
   {
     title: "1. Despre serviciu",
     paragraphs: [
-      `Serviciul CatDai (catdai.md) este operat de ${MERCHANT.legalName}, IDNO ${MERCHANT.idno}, adresă: ${MERCHANT.address}.`,
+      `IDNO: ${MERCHANT.idno}`,
       "CatDai este un serviciu informativ care oferă analiză de piață și estimări orientative de preț pentru proprietăți și alte categorii care pot fi disponibile în platformă la un moment dat.",
       "CatDai nu este agenție imobiliară, broker, evaluator autorizat, consultant financiar sau consultant juridic.",
     ],
@@ -171,9 +171,7 @@ const sections = [
   {
     title: "19. Datele operatorului",
     paragraphs: [
-      `Operator / comerciant: ${MERCHANT.legalName}`,
       `IDNO: ${MERCHANT.idno}`,
-      `Adresă: ${MERCHANT.address}`,
       `Website: catdai.md. E-mail de contact: ${MERCHANT.email}`,
       "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
       "Data ultimei actualizări: 10 Octombrie 2026",

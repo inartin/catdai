@@ -43,7 +43,7 @@ Implemented.
 - `/terms`.
 - `/privacy`.
 - `/refund`.
-- Terms describe MAIB ordering, one-time credit purchases, digital delivery, system requirements, personal-data processing, card-currency conversion and linked Privacy/Refund policies. Terms, Privacy and Refund publish the supplied merchant name, IDNO, address and email from `src/lib/merchant.mjs`. MAIB refunds go to the original card; general acceptance and credit activation do not waive statutory withdrawal rights. The precise withdrawal period/exceptions still need review for the digital service model.
+- Terms describe MAIB ordering, one-time credit purchases, digital delivery, system requirements, personal-data processing, card-currency conversion and linked Privacy/Refund policies. Terms, Privacy and Refund publish only the merchant IDNO and contact email from `src/lib/merchant.mjs`. MAIB refunds go to the original card; general acceptance and credit activation do not waive statutory withdrawal rights. The precise withdrawal period/exceptions still need review for the digital service model.
 
 ## App Shell
 - Shared navbar with logo, small beta badge with localized custom tooltip that flips below near the top edge, Evaluare link to `/estimeaza`, localized Cadastru link, Calculator link to `/calculator`, Prețuri link to `/pricing` placed right after Calculator, login/profile link, language switcher, and an always-visible notification button.

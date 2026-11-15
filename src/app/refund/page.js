@@ -55,9 +55,7 @@ const sections = [
   {
     title: "8. Contact",
     paragraphs: [
-      `Comerciant: ${MERCHANT.legalName}`,
       `IDNO: ${MERCHANT.idno}`,
-      `Adresă: ${MERCHANT.address}`,
       `E-mail: ${MERCHANT.email}`,
       "Program suport: Luni-Vineri, 09:00-18:00, ora Republicii Moldova.",
       "Data ultimei actualizări: 5 Octombrie 2026",

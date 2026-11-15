@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import nodemailer from 'nodemailer';
 import { receiptConfig, buildReceipt, retryableReceiptError, deliverReceipts } from '../src/lib/maib/receipts.mjs';
 import { receiptEmail, maibProductTitle } from '../src/lib/maib/purchase.mjs';
-import { MERCHANT } from '../src/lib/merchant.mjs';
 import { getCadastruSharePath } from '../src/lib/cadastru-share-url.js';
 const config = receiptConfig({ MAIB_SMTP_HOST: 'smtp.example.com', MAIB_SMTP_USER: 'user', MAIB_SMTP_PASSWORD: 'test', MAIB_RECEIPT_FROM: 'receipts@example.com', MAIB_MERCHANT_NAME: 'Test Merchant SRL' });
 assert.equal(config.transport.requireTLS,true);assert.equal(config.transport.port,587);
@@ -30,7 +29,6 @@ for(const mode of ['development','production']) for(const [language,copy] of Obj
   assert.doesNotMatch(`${receipt.subject}\n${receipt.text}`,/[\u2013\u2014]/u,'receipts use normal dashes');
   for(const required of [order.id,'CatDai','99','MDL','2026','Europe/Chisinau',expectedOrigin]) assert.ok(receipt.text.includes(required),required);
   assert.ok(!receipt.text.includes('{merchant}'));
-  assert.ok(!receipt.text.includes(MERCHANT.legalName));
   assert.ok(!/Comerciant:|Продавец:/.test(receipt.text));
   const urls=receipt.text.match(/https:\/\/\S+/g);
   assert.equal(urls.length,2);
@@ -88,7 +86,7 @@ const db={
   async rpc(name,args){dbCalls++;if(name==='publish_maib_cadastru_result'){published++;assert.equal(args.p_order_id,order.id);assert.match(args.p_slug,/^[a-f0-9]{48}$/);return reportError?{error:reportError}:{data:reportSlug};}if(state.status!=='pending')return {data:[]};state.status='sending';state.attempts++;state.lease_token='claim-token';return {data:[{...state}]};},
   from(table){let update;const filters=[];const query={select(){return query;},eq(k,v){filters.push([k,v]);return query;},single(){return query;},update(value){update=value;return query;},then(resolve,reject){dbCalls++;if(table==='maib_payment_orders')return Promise.resolve({data:order}).then(resolve,reject);if(saveError)return Promise.resolve({error:Error('DB unavailable after SMTP')}).then(resolve,reject);if(update&&filters.every(([k,v])=>state[k]===v))Object.assign(state,update);return Promise.resolve({data:null}).then(resolve,reject);}};return query;},
 };
-const createTransport=()=>({async sendMail(mail){sends++;assert.deepEqual(mail.from,{name:'CatDai',address:config.from});assert.ok(!mail.text.includes(MERCHANT.legalName));assert.ok(!mail.text.includes('Test Merchant SRL'));assert.equal(mail.to,order.receipt_email);assert.equal(mail.messageId,`<maib-${order.id}@catdai.md>`);if(order.cadastru_delivery){assert.ok(mail.text.includes('/ro/c/'));assert.ok(mail.text.includes(order.cadastru_delivery.search_label));}if(deliveryError)throw deliveryError;return {accepted:[order.receipt_email]};},close(){}});
+const createTransport=()=>({async sendMail(mail){sends++;assert.deepEqual(mail.from,{name:'CatDai',address:config.from});assert.ok(!mail.text.includes('Test Merchant SRL'));assert.equal(mail.to,order.receipt_email);assert.equal(mail.messageId,`<maib-${order.id}@catdai.md>`);if(order.cadastru_delivery){assert.ok(mail.text.includes('/ro/c/'));assert.ok(mail.text.includes(order.cadastru_delivery.search_label));}if(deliveryError)throw deliveryError;return {accepted:[order.receipt_email]};},close(){}});
 reset();assert.equal(await deliverReceipts(db,'sandbox',{config:null,createTransport}),0);assert.equal(dbCalls,0,'missing config does not claim receipts');
 reset();assert.equal(await deliverReceipts(db,'sandbox',{config,createTransport}),1);assert.equal(state.status,'sent');assert.ok(state.sent_at);
 await deliverReceipts(db,'sandbox',{config,createTransport});assert.equal(sends,1,'sent receipt is not sent twice');

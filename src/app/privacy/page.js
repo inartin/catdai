@@ -13,9 +13,7 @@ const sections = [
   {
     title: "2. Cine este operatorul",
     paragraphs: [
-      `Operator: ${MERCHANT.legalName}, pentru serviciul CatDai (catdai.md).`,
       `IDNO: ${MERCHANT.idno}`,
-      `Adresă: ${MERCHANT.address}`,
       `E-mail de contact: ${MERCHANT.email}`,
     ],
   },

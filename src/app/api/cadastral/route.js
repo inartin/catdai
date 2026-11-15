@@ -19,7 +19,7 @@ import {
   consumeFeatureCredit,
   makePaidFeatureUsageKey,
 } from "@/lib/paid-feature-usage";
-import { matchDistrict, validateCadastralNumber } from "@/lib/validation";
+import { CONSTRUCTION_CADASTRAL_RE, matchDistrict, validateCadastralNumber } from "@/lib/validation";
 import { after, NextResponse } from "next/server";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15 });
@@ -592,13 +592,19 @@ async function handlePost(request) {
     );
   };
 
-  if (stored) {
-    if (cadastruNeedsRefresh(stored)) scheduleCadastruNumberRefresh(stored);
+  // Older construction snapshots can lack the parcel or contain only a shared building.
+  const needsConstructionParcel = stored && CONSTRUCTION_CADASTRAL_RE.test(trimmed)
+    && (stored.buildingNumber || !stored.payload.lands?.length);
+  const respondWithStored = () => {
     lookupSource = stored.lookupSource;
     return respondWithCadastralPayload(
       normalizeCadastralPayload(withCadastruFreshness(stored), trimmed, access.tier),
       { cached: true, countLookup: true, resultType: classifyCadastralResult(stored.payload), expiresAt: stored.expiresAt }
     );
+  };
+  if (stored && !needsConstructionParcel) {
+    if (cadastruNeedsRefresh(stored)) scheduleCadastruNumberRefresh(stored);
+    return respondWithStored();
   }
 
   try {
@@ -619,6 +625,7 @@ async function handlePost(request) {
     );
   } catch (error) {
     if (!skipCache && ![400, 401, 403, 422].includes(error?.status)) {
+      if (needsConstructionParcel && error?.status !== 404) return respondWithStored();
       const stale = await getCadastruRecordByNumber(trimmed, { requireDetailPayload: true, allowExpired: true });
       if (stale?.buildingNumber) {
         lookupSource = stale.lookupSource;

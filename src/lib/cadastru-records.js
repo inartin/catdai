@@ -2,7 +2,7 @@ import { shouldCollectStatistics } from "@/lib/statistics-context";
 import crypto from "node:crypto";
 import { shouldPersistRuntimeData } from "@/lib/runtime-persistence";
 import { supabaseAdmin } from "@/lib/supabase-admin";
-import { matchDistrict } from "@/lib/validation";
+import { CONSTRUCTION_CADASTRAL_RE, matchDistrict } from "@/lib/validation";
 import { resolveCadastruSupportedCity, resolveCadastruCityFromAddress } from "@/lib/cadastru-supported-cities";
 import { cadastruPayloadExpiresAt, cadastruExpiresAt, isFreshCadastru, cleanCadastruPayload, readCadastruCache, writeCadastruCache, withCadastruFreshness } from "@/lib/cadastru-cache";
 import { apartmentBuildingNumber, isApartmentBlock, storeSharedBuilding, getSharedBuilding, composeBuildingEntry } from "@/lib/cadastru-buildings";
@@ -522,7 +522,10 @@ export async function persistCadastruRecord(payload, options = {}) {
     if (!row) return null;
 
     const parentNumber = apartmentBuildingNumber(row.cadastral_number);
-    const blockProperty = !parentNumber && payload.buildings?.find((property) => property.cadastral_number === row.cadastral_number);
+    const constructionParcel = CONSTRUCTION_CADASTRAL_RE.test(row.cadastral_number) && payload.lands?.length;
+    // A parcel report needs its own snapshot, even if the construction has a shared record.
+    if (constructionParcel) row.shared_building_number = null;
+    const blockProperty = !constructionParcel && !parentNumber && payload.buildings?.find((property) => property.cadastral_number === row.cadastral_number);
     let sharedBuilding = null;
     if (parentNumber && !String(payload.source || "").includes("derived")) {
       if (isApartmentBlock(row.building_data) && (options.officialFetch || !existing?.shared_building_number)) {

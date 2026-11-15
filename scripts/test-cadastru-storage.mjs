@@ -1860,3 +1860,46 @@ console.log('Derived apartment identity cache and storage regressions passed.');
   assert.equal(fresh.buildings[0].area_m2, "120", "older separate construction records cannot overwrite freshly fetched details");
   console.log("Parcel-number regressions passed: Stăuceni address parity, saved/fresh results and preview masking.");
 }
+
+// A legacy shared construction record must refresh into a full parcel report.
+{
+  const number = "9622412.025.01";
+  const building = { cadastral_number: number, area_m2: "144" };
+  const sibling = { cadastral_number: "9622412.025.02", area_m2: "28" };
+  const land = { cadastral_number: "9622412.025", area_m2: "1239" };
+  await storage.persistCadastruRecord({ cadastral_number: number, buildings: [building] }, { officialFetch: true });
+  const row = tables.cadastru_records.find(row => row.cadastral_number === number);
+  row.shared_building_number = number;
+  tables.cadastru_buildings.push({ cadastral_number: number, raw_payload: { registry: building } });
+  cache.clear();
+
+  let unavailable = true, fetches = 0;
+  const route = await load("src/app/api/cadastral/route.js", {
+    ...routeMocks,
+    "@/lib/cadastru-external-api": { fetchExternalCadastralData: async (queried) => {
+      assert.equal(queried, number);
+      fetches++;
+      if (unavailable) throw Object.assign(new Error("Unavailable"), { status: 503 });
+      return { cadastral_number: number, lands: [land], buildings: [building, sibling] };
+    } },
+  });
+  const query = () => route.POST(request({ cadastral_number: number }));
+  hasCredit = true;
+  assert.equal((await (await query()).json()).buildings.length, 1, "keep the saved construction during an outage");
+  unavailable = false;
+  const report = await (await query()).json();
+  assert.equal(report.cadastral_number, number);
+  assert.deepEqual(report.lands, [land]);
+  assert.deepEqual(report.buildings, [building, sibling]);
+  assert.equal(row.shared_building_number, null);
+  cache.clear();
+  const saved = await (await query()).json();
+  assert.deepEqual(saved.buildings, [building, sibling]);
+  assert.equal(fetches, 2, "the upgraded snapshot is reused on later searches");
+  hasCredit = false;
+  const preview = await (await query()).json();
+  assert.equal(preview.lands.length, 1);
+  assert.equal(preview.buildings.length, 2);
+  assert.notEqual(preview.buildings[1].area_m2, sibling.area_m2);
+  console.log("Construction-number regression passed: legacy fallback, full parcel persistence and preview masking.");
+}

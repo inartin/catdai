@@ -17,6 +17,7 @@ import { isFreshCadastru } from "@/lib/cadastru-cache";
 import { getStoredPublicTransport, storePublicTransport, publicTransportFromStorage } from "@/lib/cadastru-public-transport-storage";
 
 const limiter = rateLimit({ interval: 60_000, limit: 15, namespace: "cadastru-public-transport" });
+const localDay = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Chisinau", dateStyle: "short" });
 
 function clientIp(request) {
   return request.headers.get("cf-connecting-ip")?.trim()
@@ -62,7 +63,15 @@ async function handlePost(request) {
     canReadCadastruMapData(request, { payload: entry?.payload, number, address }),
     getStoredPublicTransport(input),
   ]);
+  const today = localDay.format();
   const respond = async (publicTransport) => {
+    const timetable = publicTransport.village_timetable;
+    if (timetable) {
+      const routes = timetable.routes.filter((route) => !route.service_date || route.service_date >= today);
+      if (routes.length !== timetable.routes.length) {
+        publicTransport = { ...publicTransport, village_timetable: routes.length ? { ...timetable, routes } : undefined };
+      }
+    }
     await recordCadastruResultCategories(body.lookup_id, { result_transport: true });
     return NextResponse.json({ public_transport: mapAccess ? publicTransport : buildCadastruTransportPreview(publicTransport) }, {
       headers: { "Cache-Control": "private, no-store" },
@@ -90,7 +99,10 @@ async function handlePost(request) {
     }
   };
   if (stored) {
-    if (!isFreshCadastru(stored.expiresAt)) {
+    const timetable = stored.payload.village_timetable;
+    const refreshDue = timetable && (Date.parse(timetable.refresh_at) <= Date.now()
+      || timetable.routes.some((route) => route.service_date && route.service_date < today));
+    if (!isFreshCadastru(stored.expiresAt) || refreshDue) {
       scheduleCadastruRefresh(`public-transport:${cadastruLocationOriginKey(input)}`, refresh);
     }
     return respond(publicTransportFromStorage(stored));

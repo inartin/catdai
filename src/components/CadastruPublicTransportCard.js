@@ -10,13 +10,18 @@ function VillageTimetable({ timetable, onLockedClick }) {
   const { t, lang } = useTranslation();
   const weekday = new Intl.DateTimeFormat(lang, { weekday: "short", timeZone: "UTC" });
   const sourceDate = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeZone: "UTC" });
+  const fare = new Intl.NumberFormat(lang, { style: "currency", currency: "MDL", currencyDisplay: "code" });
+  const km = new Intl.NumberFormat(lang, { style: "unit", unit: "kilometer" });
 
   return (
     <div className="mt-5 border-t border-gray-100 pt-4">
       <h3 className="font-semibold text-gray-900">{t("cadastru.transportVillageRoutes", { locality: timetable.locality })}</h3>
       <ul className="mt-3 space-y-3">
-        {timetable.routes.map((route, index) => (
-          <li key={index} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
+        {timetable.routes.map((route, index) => {
+          const firstDays = route.departures?.[0]?.days;
+          const dailyCount = firstDays?.length && route.departures.every(({ days }) => days.join() === firstDays.join())
+            ? route.departures.length : null;
+          return <li key={index} className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-3">
             {route.locked ? (
               <button type="button" onClick={onLockedClick} disabled={!onLockedClick} aria-label={t("cadastru.payToUnlock")}
                 className="cursor-pointer rounded text-left text-sm font-medium text-emerald-950 focus-visible:outline-2 disabled:cursor-default">
@@ -27,15 +32,21 @@ function VillageTimetable({ timetable, onLockedClick }) {
                 {route.to_chisinau ? <p className="text-sm font-semibold text-emerald-800">{t("cadastru.transportDirectCapital")}</p> : null}
                 <p className="break-words font-semibold text-gray-900">{route.ref ? route.ref + " · " : ""}{route.from} → {route.to}</p>
                 {route.via.length ? <p className="mt-1 text-sm text-gray-600">{t("cadastru.transportVia", { places: route.via.join(", ") })}</p> : null}
+                {Number.isFinite(route.distance_km) ? <p className="mt-1 text-sm text-gray-600">{km.format(route.distance_km)}</p> : null}
                 {route.departures.length ? (
                   <div className="mt-2">
-                    <p className="text-xs font-medium text-gray-600">{t("cadastru.transportVillageDepartures", { locality: timetable.locality })}</p>
+                    <p className="text-xs font-medium text-gray-600">{route.service_date
+                      ? t("cadastru.transportDatedDepartures", { count: route.departures.length, date: sourceDate.format(new Date(route.service_date + "T00:00:00Z")) })
+                      : dailyCount ? t("cadastru.transportDeparturesPerServiceDay", { count: dailyCount })
+                        : t("cadastru.transportVillageDepartures", { locality: timetable.locality })}</p>
                     <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                      {route.departures.map(({ time, days }, tripIndex) => (
+                      {route.departures.map(({ time, days, distance_km, fare_mdl }, tripIndex) => (
                         <li key={tripIndex} className="text-sm text-gray-700">
                           <span className="font-semibold tabular-nums text-gray-900">{time}</span>
                           {days.length === 7 ? " · " + t("cadastru.transportDaily") : days.length
                             ? " · " + days.map((day) => weekday.format(new Date(Date.UTC(2024, 0, day)))).join(", ") : ""}
+                          {Number.isFinite(distance_km) ? " · " + km.format(distance_km) : ""}
+                          {Number.isFinite(fare_mdl) ? " · " + fare.format(fare_mdl) : ""}
                         </li>
                       ))}
                     </ul>
@@ -47,8 +58,8 @@ function VillageTimetable({ timetable, onLockedClick }) {
                 </p>
               </>
             )}
-          </li>
-        ))}
+          </li>;
+        })}
       </ul>
     </div>
   );

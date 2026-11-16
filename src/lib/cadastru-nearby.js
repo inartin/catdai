@@ -1,5 +1,16 @@
 import { resolveCadastruCityFromAddress, resolveCadastruSupportedCity } from "@/lib/cadastru-supported-cities";
 
+const STANDARD_CATEGORIES = ["schools", "supermarkets", "pharmacies", "food", "parks", "public_transport"];
+export const NEARBY_CATEGORIES = [...STANDARD_CATEGORIES, "landmarks"];
+export const GIGA_SCHOOL_ATTRIBUTION = "Moldova Ministry of Education and Research / UNICEF–ITU Giga";
+export const GIGA_SCHOOL_SOURCE = "https://maps.giga.global/country/md";
+
+export function nearbyPlaceName(place, t) {
+  const type = place.landmark_type;
+  return place.name || (["townhall", "place_of_worship", "post_office", "community_centre"].includes(type)
+    ? t(`cadastru.nearby.landmark.${type}`) : t("cadastru.nearbyUnnamed"));
+}
+
 const ROAD_TYPES = {
   "str-la": "str-la",
   stradela: "str-la",
@@ -66,12 +77,13 @@ export function nearbyInputFromCadastru(payload) {
 }
 
 export function validNearbyResult(data) {
-  return data && typeof data === "object" && ["schools", "supermarkets", "pharmacies", "food", "parks", "public_transport"]
-    .every((category) => {
-      const places = data.categories?.[category]?.places;
-      return Array.isArray(places) && places.length <= 3 && places.every((place) =>
-        place && typeof place === "object" && Number.isFinite(place.walking_distance_m)
-        && place.walking_distance_m >= 0 && Number.isFinite(place.walking_duration_min)
-        && place.walking_duration_min >= 1);
-    });
+  if (!data || typeof data !== "object") return false;
+  const categories = data.categories?.landmarks === undefined ? STANDARD_CATEGORIES : NEARBY_CATEGORIES;
+  return categories.every((category) => {
+    const places = data.categories?.[category]?.places;
+    return Array.isArray(places) && places.length <= 3 && places.every((place) =>
+      place && typeof place === "object" && Number.isFinite(place.walking_distance_m)
+      && place.walking_distance_m >= 0 && Number.isFinite(place.walking_duration_min)
+      && place.walking_duration_min >= 1);
+  });
 }

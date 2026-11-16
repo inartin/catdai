@@ -225,6 +225,16 @@ for (lang of ["ro", "ru", "en"]) {
   const capital = { ...transport.village_timetable.routes[0], to: "Chișinău", to_chisinau: true };
   const direct = timetableNode.type({ timetable: { locality: "Dumitreni", routes: [capital] } });
   assert(textOf(direct).includes(t("cadastru.transportDirectCapital")));
+  assert(textOf(schedule).includes(t("cadastru.transportDeparturesPerServiceDay", { count: 1 })));
+  const datedRoute = { ...capital, service_date: "2026-11-17", departures: [
+    { time: "07:30", days: [], distance_km: 31, fare_mdl: 36.3 },
+    { time: "09:15", days: [], distance_km: 39, fare_mdl: 42.1 },
+  ] };
+  const dated = timetableNode.type({ timetable: { locality: "Dumitreni", routes: [datedRoute] } });
+  const day = new Intl.DateTimeFormat(lang, { dateStyle: "medium", timeZone: "UTC" }).format(new Date("2026-11-17T00:00:00Z"));
+  assert(textOf(dated).includes(t("cadastru.transportDatedDepartures", { count: 2, date: day })));
+  assert(textOf(dated).includes(new Intl.NumberFormat(lang, { style: "unit", unit: "kilometer" }).format(31)));
+  assert(textOf(dated).includes(new Intl.NumberFormat(lang, { style: "currency", currency: "MDL", currencyDisplay: "code" }).format(42.1)));
 
   state = [];
   let tree = render(Reports, { reports: previews.municipal_reports });

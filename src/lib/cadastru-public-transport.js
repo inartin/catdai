@@ -38,17 +38,28 @@ export function publicTransportInputFromCadastru(payload) {
   };
 }
 
+function validServiceDate(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value));
+}
+
+function optionalNonnegative(value) {
+  return value === undefined || (Number.isFinite(value) && value >= 0);
+}
+
 function validVillageTimetable(timetable) {
   return typeof timetable?.locality === "string" && Boolean(timetable.locality.trim())
+    && (timetable.refresh_at === undefined || Number.isFinite(Date.parse(timetable.refresh_at)))
     && Array.isArray(timetable.routes) && timetable.routes.length > 0
     && timetable.routes.every((route) => route && typeof route.from === "string" && typeof route.to === "string"
       && typeof route.to_chisinau === "boolean" && Array.isArray(route.via)
+      && (route.service_date === undefined || validServiceDate(route.service_date))
+      && optionalNonnegative(route.distance_km)
       && route.via.every((place) => typeof place === "string")
       && Array.isArray(route.departures) && route.departures.every((departure) =>
         /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(departure?.time)
+        && optionalNonnegative(departure.distance_km) && optionalNonnegative(departure.fare_mdl)
         && Array.isArray(departure.days) && departure.days.every((day) => Number.isInteger(day) && day >= 1 && day <= 7))
-      && typeof route.source?.name === "string" && /^\d{4}-\d{2}-\d{2}$/.test(route.source.date)
-      && Number.isFinite(Date.parse(route.source.date)) && typeof route.source.url === "string"
+      && typeof route.source?.name === "string" && validServiceDate(route.source.date) && typeof route.source.url === "string"
       && route.source.url.startsWith("https://"));
 }
 

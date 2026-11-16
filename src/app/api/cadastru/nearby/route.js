@@ -79,11 +79,15 @@ async function handlePost(request) {
       expiresAt: entry.expiresAt,
     });
   }
+  const savedCategories = stored?.payload?.categories;
+  const savedPlaceCount = Object.values(savedCategories || {}).reduce((count, group) => count + (group?.places?.length || 0), 0);
   const refresh = async () => {
     try {
       const nearby = await fetchExternalNearbyData(input, stored ? { trackUsage: false } : getCadastruLookupTracking(body));
       if (!validNearbyResult(nearby)) throw new Error("Invalid nearby response");
-      if ((nearby.incomplete || nearby.cache?.stale) && stored) return respond(nearbyFromStorage(stored));
+      if ((nearby.incomplete || nearby.cache?.stale) && stored && savedPlaceCount) {
+        return respond(nearbyFromStorage(stored));
+      }
       const saved = await storeNearby(input, nearby);
       return respond(saved ? nearbyFromStorage(saved) : nearby);
     } catch (error) {
@@ -97,7 +101,10 @@ async function handlePost(request) {
     }
   };
   if (stored) {
-    if (!isFreshCadastru(stored.expiresAt)) {
+    const needsRuralRefresh = savedCategories && !savedCategories.landmarks
+      && (!savedCategories.schools?.places?.length || savedPlaceCount < 3);
+    if (needsRuralRefresh && savedPlaceCount === 0) return refresh();
+    if (!isFreshCadastru(stored.expiresAt) || needsRuralRefresh) {
       scheduleCadastruRefresh(`nearby:${cadastruLocationOriginKey(input)}`, refresh);
     }
     return respond(nearbyFromStorage(stored));

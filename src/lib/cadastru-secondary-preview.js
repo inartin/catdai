@@ -8,6 +8,7 @@ export function buildCadastruNearbyPreview(nearby) {
     location: data.location,
     cache: data.cache,
     incomplete: data.incomplete,
+    attribution: data.attribution,
     map_preview: { available: Number.isFinite(nearby?.location?.latitude) && Number.isFinite(nearby?.location?.longitude) },
     categories: Object.fromEntries(Object.entries(data.categories || {}).map(([category, group]) => [category, {
       available: group.available,

@@ -1,3 +1,4 @@
+import { NEARBY_CATEGORIES, nearbyPlaceName } from "@/lib/cadastru-nearby";
 import { readFile } from "node:fs/promises";
 import sharp from "sharp";
 import { buildPdfFromJpegs, PDF_CANVAS_HEIGHT, PDF_CANVAS_WIDTH, PDF_CANVAS_SCALE } from "./browser-pdf.js";
@@ -221,14 +222,14 @@ function drawNearby(report, nearby, { t, number }) {
     report.paragraph(t("cadastru.nearbyUnavailable"));
     return;
   }
-  const groups = ["schools", "supermarkets", "pharmacies", "food", "parks", "public_transport"]
+  const groups = NEARBY_CATEGORIES
     .map((key) => [key, (nearby.categories?.[key]?.places || []).filter((place) => !place.locked)])
     .filter(([, places]) => places.length);
   if (!groups.length) report.paragraph(t("cadastru.nearbyEmpty"));
   for (const [key, places] of groups) {
     report.heading(t(`cadastru.nearby.${key}`));
     report.rows(places.map((place) => [
-      place.name || t("cadastru.nearbyUnnamed"),
+      nearbyPlaceName(place, t),
       t("cadastru.nearbyWalk", {
         minutes: place.walking_duration_min, distance: number.format(place.walking_distance_m),
       }),
@@ -236,7 +237,7 @@ function drawNearby(report, nearby, { t, number }) {
   }
   if (nearby.cache?.stale) report.paragraph(t("cadastru.savedDataStale"));
   if (nearby.incomplete) report.paragraph(t("cadastru.nearbyIncomplete"));
-  report.paragraph("© OpenStreetMap contributors · Powered by Geoapify", { size: 12, color: MUTED });
+  report.paragraph(nearby.attribution || "© OpenStreetMap contributors", { size: 12, color: MUTED });
 }
 
 function drawTransport(report, transport, { t }) {

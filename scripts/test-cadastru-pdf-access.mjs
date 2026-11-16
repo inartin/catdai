@@ -161,8 +161,11 @@ delete payload.lands;
 orders.push({ ...order, status: "registered", paid_at: null });
 assert.equal((await post(search)).status, 402, "pending order cannot export");
 orders[0] = { ...order, environment: "sandbox" };
+assert.equal((await post(search)).status, 402, "sandbox receipt cannot authorize production checkout delivery");
 usage.set(buyerUsage, { source: "paid_credit", metadata: { maib_order_id: order.id } });
-assert.equal((await post(search)).status, 402, "sandbox payment cannot authorize a production PDF");
+assert.equal((await post({ ...search, check_only: true })).status, 200, "a recorded paid debit authorizes export regardless of the order environment");
+orders[0] = { ...order, user_id: "other" };
+assert.equal((await post(search)).status, 402, "the linked order must still belong to the lookup owner");
 orders[0] = { ...order, status: "refunded" };
 assert.equal((await post(search)).status, 402, "refunded MAIB credit cannot authorize a PDF");
 
@@ -208,4 +211,12 @@ assert.equal((await post({ address })).status, 200);
 await deferred.shift()();
 assert.equal(pdfEvents.length, 5);
 assert(errors.some(([message]) => message === "[cadastru/pdf] statistics insert failed:"));
+
+orders.push({ ...order, environment: "sandbox", product_key: "extra_pack", cadastru_delivery: null });
+usage.set(`buyer:${key({ address: address.toLowerCase() })}`, {
+  source: "paid_credit", metadata: { maib_order_id: order.id },
+});
+const spentBeforeDownload = spends;
+assert.equal(await (await post({ address })).text(), "%PDF", "an address unlocked with a recorded pack credit can export");
+assert.equal(spends, spentBeforeDownload, "exporting the unlocked address does not spend another credit");
 console.log("Cadastru PDF entitlement and generation statistics checks passed.");

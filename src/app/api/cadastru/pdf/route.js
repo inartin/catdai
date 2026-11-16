@@ -40,10 +40,13 @@ function json(data, status, headers = {}) {
 
 async function paidOrder(userId, { orderId, delivery }) {
   let query = supabaseAdmin.from("maib_payment_orders").select(orderId ? "id" : "id, cadastru_delivery")
-    .eq("user_id", userId).eq("environment", maibEnvironment())
+    .eq("user_id", userId)
     .in("status", ["paid", "partially_refunded"]).not("paid_at", "is", null);
+  // An existing Cadastru debit follows the shared credit ledger. Direct checkout
+  // receipts still have to match the app's payment environment.
   query = orderId ? query.eq("id", orderId)
-    : query.eq("product_key", "cadastru_lookup_single").contains("cadastru_delivery", delivery);
+    : query.eq("environment", maibEnvironment())
+      .eq("product_key", "cadastru_lookup_single").contains("cadastru_delivery", delivery);
   const { data, error } = await query.limit(1).maybeSingle();
   if (error) throw error;
   return data;

@@ -27,7 +27,7 @@ for (const [key, amount, grants] of [
   ['property_combo_1', 59, { cadastru_lookup: 1, sale_estimate: 1, pdf_report: 1 }],
   ['credits_4', 98, { cadastru_lookup: 4 }],
   ['credits_10', 245, { cadastru_lookup: 10 }],
-  ['credits_20', 196, { cadastru_lookup: 20 }],
+  ['credits_20', 290, { cadastru_lookup: 20 }],
   ['credits_50', 490, { cadastru_lookup: 50 }],
 ]) {
   const product = maibProduct(key);

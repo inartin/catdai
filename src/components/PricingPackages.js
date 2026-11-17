@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import usePaymentProvider from "@/components/usePaymentProvider";
-import { MAIB_PRICING_PRODUCTS, maibProduct, maibCreditSavingsPercent } from "@/lib/maib/products.mjs";
+import { MAIB_PRICING_PRODUCTS, maibProduct, maibCreditSavingsLabel } from "@/lib/maib/products.mjs";
 import { maibProductTitle } from "@/lib/maib/purchase.mjs";
 import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
@@ -47,7 +47,6 @@ export default function PricingPackages() {
             const uses = Object.values(product.grants).reduce((sum, count) => sum + count, 0);
             const title = maibProductTitle(productKey, lang, product.quantity, "pricing");
             const recommended = key === "four";
-            const savingsPercent = maibCreditSavingsPercent(productKey);
             const locale = lang === "ru" ? "ru-MD" : "ro-MD";
             const unitPrice = (product.amount_mdl / uses).toLocaleString(locale, {
               minimumFractionDigits: uses === 1 ? 0 : 2, maximumFractionDigits: 2,
@@ -67,7 +66,7 @@ export default function PricingPackages() {
                 <div className="mt-3">
                   <p className="text-sm text-gray-900">{t("pricing.sharedUnitPrice", { price: unitPrice })}</p>
                   {uses > 1 && (
-                    <p className="mt-1 text-sm text-primary">{t("pricing.sharedSavingsPerUse", { percent: savingsPercent })}</p>
+                    <p className="mt-1 text-sm text-primary">{t("pricing.sharedSavingsPerUse", { percent: maibCreditSavingsLabel(productKey) })}</p>
                   )}
                 </div>
                 {provider === "maib" && (

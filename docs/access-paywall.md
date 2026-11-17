@@ -23,7 +23,7 @@ Preview paywall implemented. Shared checkout selects MAIB by default, with Paddl
 - `db/paddle_payments.sql` prepares Paddle payment orders, Extra subscription state, webhook audit rows, one-time grants, and idempotent monthly subscription resets into the same feature-credit system.
 - `POST /api/payments/paddle/create` (only with `PAYMENT_PROVIDER=paddle`) and `POST /api/paddle/webhooks` create Paddle transactions and grant or reset credits only after verified `transaction.completed` notifications.
 - `POST /api/paddle/webhooks` also handles approved full Paddle refund/chargeback adjustments and revokes remaining credits so refunded orders no longer keep paid access.
-- MAIB feature popups show the selected feature for 49 MDL and grant one universal credit. Pricing-page packs grant 4 credits for 98 MDL or 20 for 196 MDL.
+- MAIB feature popups show the selected feature for 49 MDL and grant one universal credit. Pricing-page packs grant 4 credits for 98 MDL or 20 for 290 MDL.
 - Logged-out result pages and their popups show the same matching single-use offer even when the preview has no purchase offer; checkout preserves that product through login.
 - Desktop sale/rent previews also show a green priced unlock button directly beneath the main estimate. The result sidebar retains the unlock card above the PDF/share/compare actions; PDF uses the same neutral secondary styling as the other actions.
 - Shared purchase cards use the same green border and subtle green ring as the recommended pricing-page card.

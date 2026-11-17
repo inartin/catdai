@@ -10,7 +10,7 @@ import CadastruLoadingPage from "@/components/CadastruLoadingPage";
 import CadastruHistory from "@/components/CadastruHistory";
 import usePaymentProvider from "@/components/usePaymentProvider";
 import { useTranslation } from "@/context/LanguageContext";
-import { MAIB_MAX_PRICING_SAVINGS_PERCENT, maibProduct } from "@/lib/maib/products.mjs";
+import { MAIB_MAX_PRICING_SAVINGS_LABEL, maibProduct } from "@/lib/maib/products.mjs";
 
 const cadastruProduct = maibProduct("cadastru_lookup_single");
 
@@ -107,7 +107,7 @@ export default function CadastruPage() {
                   <p className="mt-1 text-gray-700">{t("cadastru.infoPaymentMethods")}</p>
                 )}
                 <Link href="/pricing" className="mt-1 inline-block rounded-sm font-semibold text-emerald-800 underline underline-offset-4 hover:text-emerald-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
-                  {t("cadastru.infoDiscountPackages", { percent: MAIB_MAX_PRICING_SAVINGS_PERCENT })}
+                  {t("cadastru.infoDiscountPackages", { percent: MAIB_MAX_PRICING_SAVINGS_LABEL })}
                 </Link>
               </div>
               <span className="whitespace-pre-line">{t("cadastru.infoText")}</span>

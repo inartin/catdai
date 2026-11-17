@@ -68,11 +68,13 @@ function text(node) {
 }
 
 const PricingPackages = await loadComponent('src/components/PricingPackages.js');
+const CheckoutPackagesCard = await loadComponent('src/components/CheckoutPackagesCard.js');
+mocks['@/components/CheckoutPackagesCard'] = { default: CheckoutPackagesCard };
 const Checkout = await loadComponent('src/components/MaibPaymentPage.js');
 const offers = [
   { key: 'cadastru_lookup_single', total: 49, unitPrice: 49, discount: null, titles: { ro: '1 utilizare', ru: '1 использование', en: '1 use' } },
-  { key: 'credits_4', total: 98, unitPrice: 24.5, discount: 50, titles: { ro: '4 utilizări', ru: '4 использования', en: '4 uses' } },
-  { key: 'credits_20', total: 196, unitPrice: 9.8, discount: 80, titles: { ro: '20 de utilizări', ru: '20 использований', en: '20 uses' } },
+  { key: 'credits_4', total: 98, unitPrice: 24.5, discount: '50%', titles: { ro: '4 utilizări', ru: '4 использования', en: '4 uses' } },
+  { key: 'credits_20', total: 290, unitPrice: 14.5, discount: '~70%', titles: { ro: '20 de utilizări', ru: '20 использований', en: '20 uses' } },
 ];
 for (lang of ['ro', 'ru']) {
   checkoutParams = null;
@@ -89,18 +91,39 @@ for (lang of ['ro', 'ru']) {
   }
 }
 for (lang of ['ro', 'ru', 'en']) {
+  function checkSavingsCard(tree) {
+    const cards = nodes(tree).filter(node => node.type === CheckoutPackagesCard);
+    assert.equal(cards.length, 1);
+    const card = CheckoutPackagesCard(cards[0].props);
+    assert(text(card).includes(t('payment.checkoutPackagesTitle')));
+    const savings = t('payment.checkoutPackagesSavingsAmount', { percent: '~70%' });
+    assert(text(card).includes(t('payment.checkoutPackagesSavings', { savings })));
+    assert(savings.includes('~70%'));
+    assert(!savings.includes('%%'));
+    assert.equal(text(nodes(card).find(node => node.type === 'strong')), savings);
+    const link = nodes(card).find(node => node.type === 'Link');
+    assert.equal(link.props.href, '/pricing');
+    assert.equal(text(link.props.children[0]), t('payment.checkoutPackagesLink'));
+  }
+
   for (const { key, total, titles } of offers) {
     checkoutParams = new URLSearchParams({ product_key: key, checkout_source: 'pricing' });
     stateIndex = 0;
     const tree = Checkout({});
     assert(nodes(tree).some(node => node.type === 'strong' && text(node) === `${total} MDL`));
     assert(nodes(tree).some(node => node.type === 'h2' && text(node) === titles[lang]));
+    checkSavingsCard(tree);
   }
-  checkoutParams = new URLSearchParams({ product_key: 'cadastru_lookup_single', return_to: '/cadastru/rezultat?number=123' });
+  for (const [product_key, return_to] of [
+    ['cadastru_lookup_single', '/cadastru/rezultat?number=123'],
+    ['sale_estimate_single', '/evaluare?city=Chisinau'],
+  ]) {
+    checkoutParams = new URLSearchParams({ product_key, return_to });
+    stateIndex = 0;
+    checkSavingsCard(Checkout({}));
+  }
   stateIndex = 0;
-  const savingsLink = nodes(Checkout({})).find(node => node.type === 'Link' && node.props.href === '/pricing');
-  assert.equal(text(savingsLink), t('payment.cadastruSaveMore', { percent: 80 }));
-  assert(text(savingsLink).includes('80%'));
-  assert(!text(savingsLink).includes('{percent}'));
+  assert(!nodes(Checkout({ result: true })).some(node => node.type === CheckoutPackagesCard));
+  assert(!nodes(CheckoutPackagesCard({})).some(node => node.type === 'p'));
 }
-console.log('Pricing cards, per-use rates, 50%/80% discounts, metadata and RO/RU/EN checkout prices/savings passed.');
+console.log('Pricing cards, per-use rates, 50%/~70% discounts, metadata and RO/RU/EN checkout prices/savings passed.');

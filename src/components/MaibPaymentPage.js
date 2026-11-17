@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTranslation } from '@/context/LanguageContext';
 import AuthOptions from '@/components/AuthOptions';
-import CheckoutAccountPrompt from '@/components/CheckoutAccountPrompt';
+import CheckoutPackagesCard from '@/components/CheckoutPackagesCard';
 import Footer from '@/components/Footer';
-import { MAIB_MAX_PRICING_SAVINGS_PERCENT, maibProduct } from '@/lib/maib/products.mjs';
+import { maibProduct } from '@/lib/maib/products.mjs';
 import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '@/lib/maib/purchase.mjs';
 import { MAIB_FINAL_STATUSES, maibResultContext } from '@/lib/maib/result.mjs';
 import MaibPaymentResultCard from '@/components/MaibPaymentResultCard';
@@ -207,7 +207,6 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
           {!pricingCheckout && !guestAllowed && <p>{t('payment.checkoutContextRequired')}</p>}
         </> : product ? <>
           <form onSubmit={start}>
-            {guestAllowed && (!session || isGuest) && <CheckoutAccountPrompt />}
             <label htmlFor="receipt-email" className="block text-sm font-semibold">{t('maib.receiptEmail')}</label>
             <input id="receipt-email" type="email" autoComplete="email" placeholder={t('maib.receiptEmailPlaceholder')} required maxLength={254} value={email} onChange={event => setEmailInput(event.target.value)} disabled={busy} className="mt-2 mb-5 w-full rounded-lg border border-gray-300 px-3 py-3" />
             <label className="mb-4 flex items-start gap-3 text-sm"><input type="checkbox" required checked={accepted} onChange={event => setAccepted(event.target.checked)} disabled={busy} className="mt-1 h-4 w-4 shrink-0 accent-emerald-700" /><span>{t('maib.acceptTerms')} <Link href={paymentAppLink('/terms')} target="_blank" rel="noopener noreferrer" className="underline">{t('footer.terms')}</Link></span></label>
@@ -217,17 +216,7 @@ export default function MaibPaymentPage({ result = false, sandbox = false }) {
         </> : <p>{t('maib.invalidProduct')}</p>}
         {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
       </section>
-      {!result && (isContextualCheckout && product.key === 'cadastru_lookup_single' ? <p className="mx-auto mt-5 flex flex-wrap items-center justify-center gap-x-1 gap-y-1 text-center text-sm text-gray-500">
-        <span className="inline-flex items-center gap-2">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true"><path d="M20 13 13 20a2 2 0 0 1-2.8 0L3 12.8V3h9.8L20 10.2a2 2 0 0 1 0 2.8Z" /><circle cx="7.5" cy="7.5" r="1" /></svg>
-          {t('payment.cadastruMoreChecks')}
-        </span>
-        <Link href={paymentAppLink('/pricing')} className="rounded text-emerald-700 underline underline-offset-4 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
-          {t('payment.cadastruSaveMore', { percent: MAIB_MAX_PRICING_SAVINGS_PERCENT })}
-        </Link>
-      </p> : <Link href={paymentAppLink('/pricing')} className="mx-auto mt-5 block w-fit text-sm text-gray-500 underline underline-offset-4 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
-        {t('payment.showAllPackages')}
-      </Link>)}
+      <CheckoutPackagesCard showSavings />
       </>}
     </main>
     {!result && <Footer checkout />}

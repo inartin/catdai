@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import AuthOptions from "@/components/AuthOptions";
-import CheckoutAccountPrompt from "@/components/CheckoutAccountPrompt";
+import CheckoutPackagesCard from "@/components/CheckoutPackagesCard";
 import LockIcon from "@/components/icons/LockIcon";
 import { paymentSiteOrigin, paymentAppLink } from "@/lib/payment-urls.mjs";
 import { allowsGuestCheckout } from '@/lib/guest-checkout.mjs';
@@ -503,7 +503,6 @@ export default function PaddleCheckoutPage() {
               </div>
             )}
 
-            {guestAllowed && (!session || isGuest) && <CheckoutAccountPrompt />}
             {isAuthRequired ? (
               <div className="flex min-h-[520px] items-center justify-center">
                 <div className="w-full max-w-sm">
@@ -546,9 +545,7 @@ export default function PaddleCheckoutPage() {
           </div>
         </section>
 
-        <Link href={paymentAppLink("/pricing")} className="mx-auto mt-5 block w-fit text-sm text-gray-500 underline underline-offset-4 hover:text-gray-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
-          {t("payment.showAllPackages")}
-        </Link>
+        <CheckoutPackagesCard />
 
         <div className="mt-3 mb-8 space-y-3">
           <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-6">

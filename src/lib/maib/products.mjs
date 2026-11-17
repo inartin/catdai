@@ -14,7 +14,7 @@ const products = {
   // One source bucket funds the shared balance for every feature.
   credits_4: { amount_mdl: 98, grants: { cadastru_lookup: 4 } },
   credits_10: { amount_mdl: 245, grants: { cadastru_lookup: 10 } },
-  credits_20: { amount_mdl: 196, grants: { cadastru_lookup: 20 } },
+  credits_20: { amount_mdl: 290, grants: { cadastru_lookup: 20 } },
   credits_50: { amount_mdl: 490, grants: { cadastru_lookup: 50 } },
   all_features_20: { amount_mdl: 299, grants: allFeatures(20) },
   all_features_5: { amount_mdl: 99, grants: allFeatures(5) },
@@ -44,16 +44,25 @@ export function maibProduct(key, quantity = 1) {
     grants: Object.fromEntries(Object.entries(grants).map(([feature, count]) => [feature, count * quantity])) };
 }
 
-export function maibCreditSavingsPercent(key) {
+function maibCreditSavingsPercent(key) {
   const product = maibProduct(key);
   if (!product) return 0;
   const uses = Object.values(product.grants).reduce((total, count) => total + count, 0);
   const standardAmount = uses * products.cadastru_lookup_single.amount_mdl;
-  return Math.round(100 - product.amount_mdl * 100 / standardAmount);
+  return (standardAmount - product.amount_mdl) * 100 / standardAmount;
 }
 
-export const MAIB_MAX_PRICING_SAVINGS_PERCENT = Math.max(
-  ...Object.values(MAIB_PRICING_PRODUCTS).map(maibCreditSavingsPercent),
+function formatSavingsPercent(percent) {
+  const rounded = Math.round(percent);
+  return `${percent === rounded ? "" : "~"}${rounded}%`;
+}
+
+export function maibCreditSavingsLabel(key) {
+  return formatSavingsPercent(maibCreditSavingsPercent(key));
+}
+
+export const MAIB_MAX_PRICING_SAVINGS_LABEL = formatSavingsPercent(
+  Math.max(...Object.values(MAIB_PRICING_PRODUCTS).map(maibCreditSavingsPercent)),
 );
 
 export function maibOrderQuantity(order) {

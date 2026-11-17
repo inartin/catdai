@@ -261,8 +261,6 @@ assert.equal(find(view.tree,node=>node.type==='button'&&node.props.children==='p
 assert.equal(find(view.preparingTree,node=>node.type==='input'&&node.props.id==='receipt-email').length,1,'email appears before guest-session initialization finishes');
 assert.equal(find(view.preparingTree,node=>node.type==='button'&&node.props.type==='submit').length,1,'Pay is visible immediately');
 assert.equal(view.fetches.length,0,'opening checkout never starts a payment');
-assert.equal(find(view.tree,node=>node.type==='@/components/AuthOptions').length,0,'feature checkout keeps providers behind the optional sign-in button');
-assert.equal(find(view.tree,node=>node.type==='@/components/CheckoutAccountPrompt').length,1,'signed-out feature checkout offers the compact account card');
 assert.equal(find(view.tree,node=>node.props?.children==='payment.guestOrLogin').length,0,'feature checkout omits the alternative-login label');
 view=await paymentHarness(featureQuery+'&checkout_source=pricing');
 assert.equal(find(view.tree,node=>node.type==='button'&&node.props.children==='payment.continueAsGuest').length,0);
@@ -278,8 +276,7 @@ for(const provider of ['maib','paddle']) {
     const query=`?product_key=sale_estimate_single&return_to=${encodeURIComponent(returnTo)}`;
     const before=guestSetups;
     const feature=await paymentHarness(query,false,provider);
-    assert.equal(find(feature.tree,node=>node.type==='@/components/AuthOptions').length,0,`${provider}: feature checkout hides providers until requested`);
-    assert.equal(find(feature.tree,node=>node.type==='@/components/CheckoutAccountPrompt').length,1,`${provider}: feature checkout offers optional sign-in`);
+    assert.equal(find(feature.tree,node=>node.type==='@/components/AuthOptions'||node.type==='@/components/CheckoutAccountPrompt').length,0,`${provider}: signed-out feature checkout skips sign-in UI`);
     assert.equal(find(feature.tree,node=>node.type==='button'&&node.props.children==='payment.continueAsGuest').length,0,`${provider}: no intermediate guest action`);
     assert.equal(guestSetups,before+1,`${provider}: start one guest session automatically`);
     if(provider==='maib') assert.equal(find(feature.tree,node=>node.type==='form').length,1,'failed guest startup keeps the form visible');
@@ -290,10 +287,12 @@ for(const provider of ['maib','paddle']) {
   }
   const pricing=await paymentHarness('?product_key=sale_estimate_single&checkout_source=pricing',false,provider);
   assert.equal(find(pricing.tree,node=>node.type==='@/components/AuthOptions').length,1,`${provider}: pricing keeps its required login`);
-  assert.equal(find(pricing.tree,node=>node.type==='@/components/CheckoutAccountPrompt').length,0,`${provider}: pricing does not promise optional login`);
+  const packagesCards=find(pricing.tree,node=>node.type==='@/components/CheckoutPackagesCard');
+  assert.equal(packagesCards.length,1,`${provider}: checkout links to pricing in the packages card`);
+  assert.equal(Boolean(packagesCards[0].props.showSavings),provider==='maib','Only MAIB offers the discounted packs');
   paymentAuth={...paymentAuth,session:accountSession,user:accountSession.user,isGuest:false};
   const registered=await paymentHarness(featureQuery,false,provider);
-  assert.equal(find(registered.tree,node=>node.type==='@/components/CheckoutAccountPrompt').length,0,`${provider}: registered buyers do not see the sign-in card`);
+  assert.equal(find(registered.tree,node=>node.type==='@/components/AuthOptions').length,0,`${provider}: registered feature checkout skips sign-in UI`);
   paymentAuth={...paymentAuth,session:null,user:null};
 }
 paymentAuth.loading=true;
@@ -327,7 +326,7 @@ assert.equal(find(view.tree,node=>node.type==='form').length,0,'existing guest s
 assert.equal(find(view.tree,node=>node.type==='@/components/AuthOptions').length,1,'existing guests still see pricing login');
 view=await paymentHarness(featureQuery);
 assert.equal(find(view.tree,node=>node.type==='form').length,1);
-assert.equal(find(view.tree,node=>node.type==='@/components/CheckoutAccountPrompt').length,1,'anonymous sessions still see the optional account card');
+assert.equal(find(view.tree,node=>node.type==='@/components/AuthOptions'||node.type==='@/components/CheckoutAccountPrompt').length,0,'anonymous sessions skip sign-in UI');
 view=await paymentHarness('?order_id=order',true);
 assert.equal(redirects.length,0,'pending or redirect parameters never grant access');
 status='paid'; await view.timers[0]();

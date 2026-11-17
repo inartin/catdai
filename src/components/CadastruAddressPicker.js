@@ -6,8 +6,8 @@ const text = {
   ru: { manual:'Ввести вручную', numbers:'Известные номера домов', loading:'Загрузка…' },
   en: { manual:'Enter manually', numbers:'Known house numbers', loading:'Loading…' },
 };
-const inputClass = 'mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary-light';
-export default function CadastruAddressPicker({ value, onChange, onReady, lang, t }) {
+export default function CadastruAddressPicker({ value, onChange, onReady, lang, t, compactOnMobile = false }) {
+  const inputClass = `h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary-light ${compactOnMobile ? 'mt-[6.5px] sm:mt-2' : 'mt-2'}`;
   const copy = text[lang] || text.ro;
   const [savedOptions,setOptions] = useState([]);
   const [selected,setSelected] = useState(null);
@@ -80,7 +80,7 @@ export default function CadastruAddressPicker({ value, onChange, onReady, lang, 
     onChange({...value,street:option.street,roadType:option.road_type,...(option.house_number ? {houseNumber:option.house_number} : {})});
   }
   const filtered = numbers.filter(number => number.toUpperCase().startsWith(value.houseNumber.toUpperCase()));
-  return <div className="space-y-4">
+  return <div className={compactOnMobile ? "space-y-[13px] sm:space-y-4" : "space-y-4"}>
     <div className="relative">
       <label htmlFor="address-street" className="text-sm font-semibold text-gray-700">{t('cadastru.street')}</label>
       <input ref={inputRef} type="text" autoComplete="off" name="lookup-road-query" spellCheck={false} id="address-street" className={inputClass} value={value.street} maxLength={80} placeholder="Dacia, Eminescu…"
@@ -114,11 +114,11 @@ export default function CadastruAddressPicker({ value, onChange, onReady, lang, 
           <div className="text-xs text-gray-500">{value.city}</div>
         </li>)}
       </ul>}
-      {manual && <label className="mt-3 block text-sm">{t('cadastru.roadType')}<select className={inputClass} value={value.roadType} onChange={e => onChange({...value,roadType:e.target.value})}>
+      {manual && <label className={`block text-sm ${compactOnMobile ? 'mt-2.5 sm:mt-3' : 'mt-3'}`}>{t('cadastru.roadType')}<select className={inputClass} value={value.roadType} onChange={e => onChange({...value,roadType:e.target.value})}>
         {[['strada','cadastru.roadTypeStreetFull'],['str-la','cadastru.roadTypeLaneFull'],['bulevard','cadastru.roadTypeBoulevardFull'],['sos','cadastru.roadTypeHighwayFull']].map(([key,label]) => <option key={key} value={key}>{t(label)}</option>)}
       </select></label>}
     </div>
-    <div className="grid grid-cols-2 gap-4">
+    <div className={`grid grid-cols-2 ${compactOnMobile ? 'gap-[13px] sm:gap-4' : 'gap-4'}`}>
       <label className="text-sm font-semibold text-gray-700">{t('cadastru.houseNumber')}<input type="text" autoComplete="off" name="lookup-building-query" spellCheck={false} className={inputClass} value={value.houseNumber} maxLength={10} placeholder="18/2, 45A"
         onFocus={() => setNumbersOpen(true)} onClick={() => setNumbersOpen(true)}
         onBlur={e => {if (!e.relatedTarget?.closest('[data-house-suggestions]')) setNumbersOpen(false);}}
@@ -132,8 +132,8 @@ export default function CadastruAddressPicker({ value, onChange, onReady, lang, 
       {numbersOpen && loading && <p className="text-sm text-gray-500">{copy.loading}</p>}
 
       {numbersOpen && filtered.length>0 && <>
-        <p className="mb-2 text-sm text-gray-600">{copy.numbers}</p>
-        <div className="grid max-h-64 grid-cols-4 gap-2 overflow-y-auto rounded-2xl bg-gray-100 p-3 sm:grid-cols-6" role="group" aria-label={copy.numbers}>
+        <p className={`text-sm text-gray-600 ${compactOnMobile ? 'mb-[6.5px] sm:mb-2' : 'mb-2'}`}>{copy.numbers}</p>
+        <div className={`grid max-h-64 grid-cols-4 overflow-y-auto rounded-2xl bg-gray-100 sm:grid-cols-6 ${compactOnMobile ? 'gap-[6.5px] p-2.5 sm:gap-2 sm:p-3' : 'gap-2 p-3'}`} role="group" aria-label={copy.numbers}>
           {filtered.map(number => <button type="button" key={number} aria-pressed={value.houseNumber===number} onMouseDown={e => e.preventDefault()} onClick={() => {onChange({...value,houseNumber:number});setNumbersOpen(false);}} className={`min-h-12 rounded-xl px-2 py-3 text-base font-semibold focus-visible:ring-2 focus-visible:ring-primary ${value.houseNumber===number?'bg-primary text-white':'bg-white text-gray-800 hover:bg-gray-50'}`}>{number}</button>)}
         </div><p className="mt-1 text-xs text-gray-500">{numbersAttribution}</p>
       </>}

@@ -391,19 +391,19 @@ export default function Navbar() {
   return (
     <>
     <header className="relative sticky top-0 z-50 border-b border-gray-100 bg-white">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between h-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
         <Link
           href="/"
           aria-label={t("nav.homeAriaLabel")}
-          className="flex items-center gap-3 whitespace-nowrap"
+          className="flex shrink-0 items-center gap-2 whitespace-nowrap sm:gap-3"
           onClick={handleLogoClick}
           >
           <img
             src="/icon0.svg"
             alt=""
-            className="h-11 w-auto object-contain"
+            className="h-9 w-auto object-contain sm:h-11"
           />
-          <span className="text-lg font-semibold tracking-tight">Cât Dai?</span>
+          <span className="hidden text-base font-semibold tracking-tight min-[400px]:inline sm:text-lg">Cât Dai?</span>
           {/* <Tooltip text={t("nav.betaTooltip")}>
             <span className="inline-flex h-5 items-center rounded-full border border-gray-200 bg-gray-50 px-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">
               beta
@@ -463,7 +463,17 @@ export default function Navbar() {
           <LanguageSelector lang={lang} includeEnglish={isCadastruRoute || isBuyRentRoute} onChange={handleLangChange} label={t("nav.langAriaLabel")} />
         </div>
 
-      <div ref={mobileMenuRef} className="flex items-center gap-2 md:hidden">
+        <div ref={mobileMenuRef} className="flex items-center gap-1.5 sm:gap-2 md:hidden">
+          <Link
+            href="/pricing"
+            aria-current={isPricingPath ? "page" : undefined}
+            onClick={() => setMobileMenuPath(null)}
+            className={`inline-flex h-9 items-center whitespace-nowrap rounded-lg border px-2.5 text-sm font-medium leading-none transition-colors hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900 ${
+              isPricingPath ? "border-gray-300 bg-gray-100 text-gray-900" : "border-gray-200 bg-gray-50 text-gray-700"
+            }`}
+          >
+            {t("nav.pricing")}
+          </Link>
           <LoginButton
             className="inline-flex h-9 items-center rounded-lg border border-gray-200 bg-gray-50 px-2.5 leading-none text-gray-700 hover:border-gray-300 hover:bg-gray-100 hover:text-gray-900"
             onPress={() => setMobileMenuPath(null)}
@@ -522,17 +532,6 @@ export default function Navbar() {
                   }`}
                 >
                   {t("nav.calculator")}
-                </Link>
-                <Link
-                  href="/pricing"
-                  onClick={() => setMobileMenuPath(null)}
-                  className={`flex w-full items-center rounded-xl px-3 py-2 text-left text-sm font-medium ${
-                    isPricingPath
-                      ? "bg-gray-50 text-gray-900"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
-                  }`}
-                >
-                  {t("nav.pricing")}
                 </Link>
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-1">
                   <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-widest text-gray-400">

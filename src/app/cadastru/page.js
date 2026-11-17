@@ -5,15 +5,14 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import CadastruSourceNote from "@/components/CadastruSourceNote";
-import CadastruSearchForm from "@/components/CadastruSearchForm";
+import CadastruSearchForm, { CadastruMapAttribution } from "@/components/CadastruSearchForm";
 import CadastruLoadingPage from "@/components/CadastruLoadingPage";
 import CadastruHistory from "@/components/CadastruHistory";
 import usePaymentProvider from "@/components/usePaymentProvider";
 import { useTranslation } from "@/context/LanguageContext";
-import { maibCreditSavingsPercent, maibProduct } from "@/lib/maib/products.mjs";
+import { MAIB_MAX_PRICING_SAVINGS_PERCENT, maibProduct } from "@/lib/maib/products.mjs";
 
 const cadastruProduct = maibProduct("cadastru_lookup_single");
-const maxPackageSavings = Math.max(...["credits_10", "credits_50"].map(maibCreditSavingsPercent));
 
 const exampleImages = [
   {
@@ -34,7 +33,8 @@ export default function CadastruPage() {
   const { lang, t } = useTranslation();
   const paymentProvider = usePaymentProvider();
   const priceLocale = lang === "en" ? "en-GB" : lang === "ru" ? "ru-MD" : "ro-MD";
-  const reportPrice = `${cadastruProduct.amount_mdl.toLocaleString(priceLocale)} ${cadastruProduct.currency_code}`;
+  const singleUsePrice = cadastruProduct.amount_mdl.toLocaleString(priceLocale);
+  const reportPrice = `${singleUsePrice} ${cadastruProduct.currency_code}`;
   const images = lang === "en"
     ? exampleImages.map((image) => ({ ...image, src: image.src.replace(".png", "-en.png") }))
     : exampleImages;
@@ -65,15 +65,21 @@ export default function CadastruPage() {
       <main className="flex-1">
         <section className="mx-auto w-full max-w-4xl px-6 pb-12 pt-8 sm:pb-16 sm:pt-10 lg:pb-20 lg:pt-12">
           <div className="mb-6">
-            <h1 className="text-3xl font-extrabold tracking-tight text-gray-950 sm:text-4xl">
+            <h1 className="text-[26px]/[1.2] font-extrabold tracking-tight text-gray-950 md:text-4xl lg:-mx-16 lg:text-center xl:-mx-32">
               {t("cadastru.pageTitle")}
             </h1>
-            <p className="mt-3 hidden max-w-2xl text-base text-gray-600 sm:block">
+            <p className="mt-3 hidden max-w-2xl text-base text-gray-600 sm:block lg:max-w-none">
               {t("cadastru.subtitle")}
             </p>
           </div>
 
-          <CadastruSearchForm allowAnonymousSearch onSearchStart={setLoadingSearch} />
+          <CadastruSearchForm
+            allowAnonymousSearch
+            compactOnMobile
+            onSearchStart={setLoadingSearch}
+            pricingNote={paymentProvider === "maib" ? t("cadastru.searchPricingNote", { price: singleUsePrice }) : undefined}
+            showMapAttribution={false}
+          />
           <p className="mt-6 text-base text-gray-600 sm:hidden">
             {t("cadastru.subtitle")}
           </p>
@@ -101,7 +107,7 @@ export default function CadastruPage() {
                   <p className="mt-1 text-gray-700">{t("cadastru.infoPaymentMethods")}</p>
                 )}
                 <Link href="/pricing" className="mt-1 inline-block rounded-sm font-semibold text-emerald-800 underline underline-offset-4 hover:text-emerald-950 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-700">
-                  {t("cadastru.infoDiscountPackages", { percent: maxPackageSavings })}
+                  {t("cadastru.infoDiscountPackages", { percent: MAIB_MAX_PRICING_SAVINGS_PERCENT })}
                 </Link>
               </div>
               <span className="whitespace-pre-line">{t("cadastru.infoText")}</span>
@@ -144,6 +150,7 @@ export default function CadastruPage() {
           </details>
           <CadastruHistory />
           <p className="mt-6 text-center text-sm text-gray-500">{t("cadastru.disclaimer")}</p>
+          <CadastruMapAttribution className="mt-3 text-center text-gray-500" />
         </section>
       </main>
       {openImage && (

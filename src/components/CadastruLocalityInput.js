@@ -24,7 +24,7 @@ function selectedLabel(row, lang) {
   return context.length ? `${name} (${context.join(' · ')})` : name;
 }
 
-export default function CadastruLocalityInput({ value, onChange, lang }) {
+export default function CadastruLocalityInput({ value, onChange, lang, compactOnMobile = false }) {
   const id = useId();
   const inputRef = useRef(null);
   const [query, setQuery] = useState(null);
@@ -62,7 +62,7 @@ export default function CadastruLocalityInput({ value, onChange, lang }) {
         if (event.key === 'Enter' && open) {event.preventDefault();if(options[active]) choose(options[active]);}
       }}
       placeholder={lang === 'en' ? 'Enter a city or village' : lang === 'ru' ? 'Введите город или село' : 'Scrie orașul sau satul'}
-      className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary-light" />
+      className={`h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary-light ${compactOnMobile ? "mt-[6.5px] sm:mt-2" : "mt-2"}`} />
     {open && <ul id={`${id}-list`} role="listbox" className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-gray-200 bg-white p-1 shadow-lg">
       {options.map((row,index) => <li key={row.id} id={`${id}-${index}`} role="option" aria-selected={index===active} onMouseDown={event => event.preventDefault()} onClick={event => { event.preventDefault(); event.stopPropagation(); choose(row); }} className={`cursor-pointer rounded-lg px-3 py-2 ${index===active?'bg-primary/10':'hover:bg-gray-50'}`}>
         <div className="font-medium text-gray-900">{label(row)} <span className="text-xs font-normal text-gray-500">{localityType(row, lang)}</span></div>

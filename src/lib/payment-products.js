@@ -59,11 +59,23 @@ const SINGLE_PRODUCTS = {
     maibOnly: true,
     grants: { cadastru_lookup: 20 },
   },
+  credits_4: {
+    title: "4 utilizări",
+    description: "Four universal uses",
+    maibOnly: true,
+    grants: { cadastru_lookup: 4 },
+  },
   credits_10: {
     title: "10 utilizări",
     description: "Ten universal uses",
     maibOnly: true,
     grants: { cadastru_lookup: 10 },
+  },
+  credits_20: {
+    title: "20 de utilizări",
+    description: "Twenty universal uses",
+    maibOnly: true,
+    grants: { cadastru_lookup: 20 },
   },
   credits_50: {
     title: "50 de utilizări",

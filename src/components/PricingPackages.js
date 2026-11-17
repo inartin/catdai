@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import usePaymentProvider from "@/components/usePaymentProvider";
-import { maibProduct, maibCreditSavingsPercent } from "@/lib/maib/products.mjs";
+import { MAIB_PRICING_PRODUCTS, maibProduct, maibCreditSavingsPercent } from "@/lib/maib/products.mjs";
+import { maibProductTitle } from "@/lib/maib/purchase.mjs";
 import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import { trackPaymentAnalytics } from "@/lib/ga4-payment-client";
@@ -23,12 +24,6 @@ export default function PricingPackages() {
     });
   }, [authLoading, session?.access_token]);
 
-  const offers = [
-    { key: "single", productKey: "cadastru_lookup_single" },
-    { key: "ten", productKey: "credits_10" },
-    { key: "fifty", productKey: "credits_50" },
-  ];
-
   const startCheckout = (productKey) => {
     trackPaymentAnalytics('checkout_button_clicked', productKey, { checkout_source: 'pricing',
       buyer_type: user && !isGuest ? 'account' : 'guest', language: lang });
@@ -40,17 +35,18 @@ export default function PricingPackages() {
   };
 
   return (
-    <section className="px-4 py-14 sm:py-20">
+    <section className="px-4 pb-14 pt-8 sm:py-20">
       <div className="mx-auto max-w-5xl">
         <div className="mx-auto max-w-2xl text-center">
           <h1 className="text-3xl font-bold tracking-tight text-gray-950 sm:text-4xl">{t("pricing.sharedTitle")}</h1>
           <p className="mt-4 text-base leading-7 text-gray-500">{t("pricing.sharedSubtitle")}</p>
         </div>
-        <div className="mt-10 grid gap-4 md:grid-cols-3 md:gap-5">
-          {offers.map(({ key, productKey }) => {
+        <div className="mt-6 grid gap-4 sm:mt-10 md:grid-cols-3 md:gap-5">
+          {Object.entries(MAIB_PRICING_PRODUCTS).map(([key, productKey]) => {
             const product = maibProduct(productKey);
             const uses = Object.values(product.grants).reduce((sum, count) => sum + count, 0);
-            const recommended = key === "ten";
+            const title = maibProductTitle(productKey, lang, product.quantity, "pricing");
+            const recommended = key === "four";
             const savingsPercent = maibCreditSavingsPercent(productKey);
             const locale = lang === "ru" ? "ru-MD" : "ro-MD";
             const unitPrice = (product.amount_mdl / uses).toLocaleString(locale, {
@@ -62,8 +58,7 @@ export default function PricingPackages() {
                   buyerType={user && !isGuest ? 'account' : 'guest'} language={lang} />}
                 <p className={`text-sm ${recommended ? "font-semibold text-primary" : "text-gray-500"}`}>{t(`pricing.shared.${key}.label`)}</p>
                 <h2 className="mt-3 whitespace-nowrap text-2xl font-bold tracking-tight text-gray-950 md:text-xl lg:text-2xl">
-                  {uses}{" "}
-                  {t(uses === 1 ? "pricing.sharedUseSingular" : "pricing.sharedUsePlural")}
+                  {title}
                 </h2>
                 <div className="mt-5 border-t border-gray-100 pt-5">
                   <p className="text-3xl font-bold tracking-tight text-gray-900">{product.amount_mdl} <span className="text-base font-semibold text-gray-500">MDL</span></p>
@@ -79,7 +74,7 @@ export default function PricingPackages() {
                   <div className="mt-auto pt-8">
                     <button type="button" onClick={() => startCheckout(productKey)}
                       className={`inline-flex w-full cursor-pointer items-center justify-center rounded-xl border px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary ${recommended ? "border-primary bg-primary text-white hover:border-primary-dark hover:bg-primary-dark" : "border-primary bg-white text-primary-dark hover:bg-primary/5 active:bg-primary/10"}`}
-                      aria-label={`${t("pricing.sharedChoose")} - ${t(`pricing.shared.${key}.uses`)}`}>
+                      aria-label={`${t("pricing.sharedChoose")} - ${title}`}>
                       {t("pricing.sharedChoose")}
                     </button>
                   </div>

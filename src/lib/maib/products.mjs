@@ -12,7 +12,9 @@ const products = {
   cadastru_lookup_5: { amount_mdl: 99, grants: { cadastru_lookup: 5 } },
   cadastru_lookup_20: { amount_mdl: 299, grants: { cadastru_lookup: 20 } },
   // One source bucket funds the shared balance for every feature.
+  credits_4: { amount_mdl: 98, grants: { cadastru_lookup: 4 } },
   credits_10: { amount_mdl: 245, grants: { cadastru_lookup: 10 } },
+  credits_20: { amount_mdl: 196, grants: { cadastru_lookup: 20 } },
   credits_50: { amount_mdl: 490, grants: { cadastru_lookup: 50 } },
   all_features_20: { amount_mdl: 299, grants: allFeatures(20) },
   all_features_5: { amount_mdl: 99, grants: allFeatures(5) },
@@ -22,6 +24,11 @@ const products = {
 };
 
 export const MAX_SINGLE_QUANTITY = 100;
+export const MAIB_PRICING_PRODUCTS = {
+  single: "cadastru_lookup_single",
+  four: "credits_4",
+  twenty: "credits_20",
+};
 
 export function maibProduct(key, quantity = 1) {
   if (typeof key !== "string" || !Object.hasOwn(products, key)) return null;
@@ -44,6 +51,10 @@ export function maibCreditSavingsPercent(key) {
   const standardAmount = uses * products.cadastru_lookup_single.amount_mdl;
   return Math.round(100 - product.amount_mdl * 100 / standardAmount);
 }
+
+export const MAIB_MAX_PRICING_SAVINGS_PERCENT = Math.max(
+  ...Object.values(MAIB_PRICING_PRODUCTS).map(maibCreditSavingsPercent),
+);
 
 export function maibOrderQuantity(order) {
   const product = products[order?.product_key];

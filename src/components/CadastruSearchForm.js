@@ -69,15 +69,29 @@ function clearAddressLookupRequest() {
   }
 }
 
+export function CadastruMapAttribution({ className }) {
+  return (
+    <p className={`text-xs ${className}`}>
+      <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
+      {" · "}
+      <a href="https://map.md/" target="_blank" rel="noreferrer">© map.md</a>
+    </p>
+  );
+}
+
 export default function CadastruSearchForm({
   className = "",
   quickSearchPlacement = "bottom",
   showLocationHeader = false,
   locationStepNumber = 2,
   allowAnonymousSearch = false,
+  compactOnMobile = false,
   onSearchStart,
+  pricingNote,
+  showMapAttribution = true,
 }) {
   const { lang, t } = useTranslation();
+  const fieldSpacing = compactOnMobile ? "mt-[6.5px] sm:mt-2" : "mt-2";
   const { isAuthenticated, loading: authLoading, clearAuthError } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -229,13 +243,19 @@ export default function CadastruSearchForm({
       />
     </div>
   ) : (
-    <div className="border-t border-gray-200 pt-8">
-      <h2 className="text-lg font-semibold tracking-tight text-gray-950">
-        {t("cadastru.numberSectionTitle")}
+    <div className={`border-t border-gray-200 ${compactOnMobile ? "pt-[26px] sm:pt-8" : "pt-8"}`}>
+      <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-950">
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="4" x2="20" y1="9" y2="9" />
+          <line x1="4" x2="20" y1="15" y2="15" />
+          <line x1="10" x2="8" y1="3" y2="21" />
+          <line x1="16" x2="14" y1="3" y2="21" />
+        </svg>
+        <span>{t("cadastru.numberSectionTitle")}</span>
       </h2>
   
 
-      <div className="mt-5 grid gap-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+      <div className={`grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end ${compactOnMobile ? "mt-4 gap-4 sm:mt-5 sm:gap-5" : "mt-5 gap-5"}`}>
         <label className="block">
           <span className="text-sm font-semibold text-gray-700">
             {t("cadastru.numberLabel")}
@@ -246,7 +266,7 @@ export default function CadastruSearchForm({
             value={cadastralNumber}
             onChange={(event) => setCadastralNumber(event.target.value)}
             placeholder={t("form.cadastralPlaceholder")}
-            className="mt-2 h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light"
+            className={`${fieldSpacing} h-12 w-full rounded-xl border border-gray-200 bg-white px-4 text-base text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary-light`}
           />
         </label>
 
@@ -270,39 +290,60 @@ export default function CadastruSearchForm({
         onClose={() => setIsAuthModalOpen(false)}
       />
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 lg:p-10">
-        <form autoComplete="off" className="space-y-6" onSubmit={(event) => event.preventDefault()}>
+      <div className={`rounded-2xl border border-gray-200 bg-white px-6 shadow-sm sm:p-8 lg:p-10 ${compactOnMobile ? "py-5" : "py-6"}`}>
+        <form autoComplete="off" className={compactOnMobile ? "space-y-5 sm:space-y-6" : "space-y-6"} onSubmit={(event) => event.preventDefault()}>
           {quickSearchPlacement === "top" && quickSearchBlock}
 
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-gray-950">
-              {t("cadastru.addressSectionTitle")}
+            <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-gray-950">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 10c0 6-8 11-8 11S4 16 4 10a8 8 0 1 1 16 0Z" />
+                <circle cx="12" cy="10" r="2.5" />
+              </svg>
+              <span>{t("cadastru.addressSectionTitle")}</span>
             </h2>
-            <p className="mt-1 text-sm text-gray-500">
+            <p className={`text-sm text-gray-500 ${compactOnMobile ? "mt-[3.25px] sm:mt-1" : "mt-1"}`}>
               {t("cadastru.addressSectionSubtitle")}
             </p>
           </div>
 
           <label className="block">
             <span className="text-sm font-semibold text-gray-700">{lang === "en" ? "Locality" : lang === "ru" ? "Населённый пункт" : "Localitate"}</span>
-            <CadastruLocalityInput value={addressForm.city} lang={lang} onChange={(value) => setAddressField("city", value)} />
+            <CadastruLocalityInput value={addressForm.city} lang={lang} onChange={(value) => setAddressField("city", value)} compactOnMobile={compactOnMobile} />
           </label>
-          <CadastruAddressPicker value={addressForm} onChange={updateAddressForm} onReady={setAddressReady} lang={lang} t={t} />
+          <CadastruAddressPicker value={addressForm} onChange={updateAddressForm} onReady={setAddressReady} lang={lang} t={t} compactOnMobile={compactOnMobile} />
 
-          <div className="pt-2">
+          <div className={compactOnMobile ? "pt-[6.5px] sm:pt-2" : "pt-2"}>
             <button
               type="button"
               onClick={() => submitAddressSearch()}
               disabled={authLoading || !addressForm.city || !addressForm.street.trim() || !addressForm.houseNumber}
-              className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-800 sm:w-auto"
+              className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-base font-semibold text-white shadow-sm transition-colors enabled:hover:bg-primary-dark disabled:cursor-not-allowed disabled:border disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-700 disabled:hover:border-gray-300 sm:w-auto"
             >
               {t("cadastru.searchButton")}
             </button>
           </div>
 
           {quickSearchPlacement === "bottom" && quickSearchBlock}
+          {pricingNote && (
+            <p className="flex items-start justify-center gap-1.5 text-center text-xs text-gray-600 sm:justify-start sm:gap-2 sm:text-left sm:text-sm">
+              <svg
+                viewBox="0 0 24 24"
+                className="mt-px h-3.5 w-3.5 shrink-0 text-gray-500 sm:mt-0.5 sm:h-4 sm:w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4m0-4h.01" />
+              </svg>
+              <span className="text-balance sm:text-wrap">{pricingNote}</span>
+            </p>
+          )}
         </form>
-        <p className="mt-4 text-xs text-gray-400"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a> · <a href="https://map.md/" target="_blank" rel="noreferrer">© map.md</a></p>
+        {showMapAttribution && <CadastruMapAttribution className="mt-4 text-gray-400" />}
       </div>
     </div>
   );

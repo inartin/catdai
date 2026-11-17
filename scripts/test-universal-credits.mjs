@@ -67,15 +67,16 @@ assert.equal((await balance(packs)).total_used,7);
 await second.apply('refunded',second.order.amount_minor);
 assert.equal((await balance(packs)).remaining_uses,0);
 // New pricing packs grant their exact universal total through one source bucket.
-for (const [key, uses] of [['credits_10', 10], ['credits_50', 50]]) {
+for (const [key, uses] of [['credits_4', 4], ['credits_10', 10], ['credits_20', 20], ['credits_50', 50]]) {
   const buyer = await newUser();
   const { order, apply } = await purchase(buyer, key);
   assert.equal((await balance(buyer)).remaining_uses, uses, 'Duplicate confirmation never multiplies pack credits');
-  for (const feature of features) assert.equal((await consume(buyer, feature)).allowed, true, 'Universal packs unlock every feature');
-  assert.equal((await balance(buyer)).remaining_uses, uses - features.length);
+  const usedFeatures = features.slice(0, Math.min(uses - 1, features.length));
+  for (const feature of usedFeatures) assert.equal((await consume(buyer, feature)).allowed, true, 'Universal packs can be spent across features');
+  assert.equal((await balance(buyer)).remaining_uses, uses - usedFeatures.length);
   await apply('refunded', order.amount_minor);
   assert.equal((await balance(buyer)).remaining_uses, 0, 'Refund revokes only unused pack credits');
-  assert.equal((await balance(buyer)).total_used, features.length);
+  assert.equal((await balance(buyer)).total_used, usedFeatures.length);
 }
 const limited = await newUser();
 await purchase(limited,'sale_estimate_single',3);

@@ -25,7 +25,9 @@ for (const [key, amount, grants] of [
   ['cadastru_lookup_5', 99, { cadastru_lookup: 5 }],
   ['cadastru_lookup_20', 299, { cadastru_lookup: 20 }],
   ['property_combo_1', 59, { cadastru_lookup: 1, sale_estimate: 1, pdf_report: 1 }],
+  ['credits_4', 98, { cadastru_lookup: 4 }],
   ['credits_10', 245, { cadastru_lookup: 10 }],
+  ['credits_20', 196, { cadastru_lookup: 20 }],
   ['credits_50', 490, { cadastru_lookup: 50 }],
 ]) {
   const product = maibProduct(key);
@@ -64,7 +66,7 @@ for (const key of ['sale_estimate_single','rent_estimate_single','listing_analys
 for (const quantity of [null,0,-1,1.5,'4',NaN,Infinity,MAX_SINGLE_QUANTITY + 1]) assert.equal(maibProduct('cadastru_lookup_single',quantity),null);
 assert.equal(maibProduct('all_features_5',2),null,'pack quantity cannot be multiplied with the individual discount');
 assert.equal(maibOrderQuantity({product_key:'all_features_5',grants:maibProduct('all_features_5').grants}),1);
-for (const key of ['credits_10', 'credits_50']) {
+for (const key of ['credits_4', 'credits_10', 'credits_20', 'credits_50']) {
   assert.equal(maibProduct(key, 2), null, 'Universal packs are sold as one bundle');
   assert.equal(maibOrderQuantity({ product_key: key, grants: maibProduct(key).grants }), 1);
 }
@@ -288,7 +290,7 @@ assert.equal((await create.POST(createRequest({...purchaseBody,product_key:'prop
 assert.equal(insertSnapshot.amount_minor,5900);
 assert.deepEqual(insertSnapshot.grants,{cadastru_lookup:1,sale_estimate:1,pdf_report:1});
 assert.equal(insertSnapshot.product_title,maibProductTitle('property_combo_1','ro'));
-for (const key of ['all_features_5', 'all_features_20', 'credits_10', 'credits_50', 'pdf_report_single']) {
+for (const key of ['all_features_5', 'all_features_20', 'credits_4', 'credits_10', 'credits_20', 'credits_50', 'pdf_report_single']) {
   const product = maibProduct(key);
   expectedBankAmount = product.amount_mdl;
   assert.equal((await create.POST(createRequest({...purchaseBody, product_key:key, request_key:crypto.randomUUID(), grants:{pdf_report:999}, amount_minor:1}))).status,200);

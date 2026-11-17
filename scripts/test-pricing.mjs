@@ -69,25 +69,32 @@ function text(node) {
 
 const PricingPackages = await loadComponent('src/components/PricingPackages.js');
 const Checkout = await loadComponent('src/components/MaibPaymentPage.js');
+const offers = [
+  { key: 'cadastru_lookup_single', total: 49, unitPrice: 49, discount: null, titles: { ro: '1 utilizare', ru: '1 использование', en: '1 use' } },
+  { key: 'credits_4', total: 98, unitPrice: 24.5, discount: 50, titles: { ro: '4 utilizări', ru: '4 использования', en: '4 uses' } },
+  { key: 'credits_20', total: 196, unitPrice: 9.8, discount: 80, titles: { ro: '20 de utilizări', ru: '20 использований', en: '20 uses' } },
+];
 for (lang of ['ro', 'ru']) {
   checkoutParams = null;
   const cards = nodes(PricingPackages()).filter(node => node.type === 'article');
   assert.equal(cards.length, 3);
-  for (const [index, total, unitPrice, discount] of [[0, 49, 49, null], [1, 245, 24.5, 50], [2, 490, 9.8, 80]]) {
+  for (const [index, { total, unitPrice, discount, titles }] of offers.entries()) {
     const content = text(cards[index]);
+    assert.equal(text(nodes(cards[index]).find(node => node.type === 'h2')), titles[lang]);
     assert(content.includes(`${total} MDL`));
     const unit = unitPrice.toLocaleString(lang === 'ru' ? 'ru-MD' : 'ro-MD', { minimumFractionDigits: index ? 2 : 0 });
     assert(content.includes(t('pricing.sharedUnitPrice', { price: unit })));
     if (discount !== null) assert(content.includes(t('pricing.sharedSavingsPerUse', { percent: discount })));
+    assert(locales[lang]['pricing.metaDescription'].includes(`${total} MDL`));
   }
-  for (const amount of [49, 245, 490]) assert(locales[lang]['pricing.metaDescription'].includes(`${amount} MDL`));
 }
 for (lang of ['ro', 'ru', 'en']) {
-  for (const [key, amount] of [['cadastru_lookup_single', 49], ['credits_10', 245], ['credits_50', 490]]) {
+  for (const { key, total, titles } of offers) {
     checkoutParams = new URLSearchParams({ product_key: key, checkout_source: 'pricing' });
     stateIndex = 0;
     const tree = Checkout({});
-    assert(nodes(tree).some(node => node.type === 'strong' && text(node) === `${amount} MDL`));
+    assert(nodes(tree).some(node => node.type === 'strong' && text(node) === `${total} MDL`));
+    assert(nodes(tree).some(node => node.type === 'h2' && text(node) === titles[lang]));
   }
   checkoutParams = new URLSearchParams({ product_key: 'cadastru_lookup_single', return_to: '/cadastru/rezultat?number=123' });
   stateIndex = 0;

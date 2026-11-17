@@ -39,7 +39,8 @@ export const PAYMENT_PRODUCT_LABELS = {
   sale_estimate_single: "Sale estimate", rent_estimate_single: "Rent estimate",
   listing_analysis_single: "Listing analysis", cadastru_lookup_single: "Cadastru lookup",
   yield_calculator_single: "Yield calculator", pdf_report_single: "PDF report",
-  credits_10: "10 uses", credits_50: "50 uses", cadastru_lookup_5: "5 Cadastru lookups",
+  credits_4: "4 uses", credits_10: "10 uses", credits_20: "20 uses", credits_50: "50 uses",
+  cadastru_lookup_5: "5 Cadastru lookups",
   cadastru_lookup_20: "20 Cadastru lookups", all_features_5: "5 uses per feature",
   all_features_20: "20 uses per feature", property_combo_1: "Property package",
 };

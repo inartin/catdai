@@ -1,33 +1,32 @@
 # Rent Yield Calculator
 
 ## Stage
-Implemented for rent-yield calculations.
+Free to use with or without an account.
 
 ## Route
 - `/calculator` shows the starting form.
 - Submitting the form keeps the same route and appends `rezultat=1` plus the selected criteria in the query string.
 - Result URLs stay on `/calculator?rezultat=1...`.
-- Result mode calls `/api/estimate-rent` with the property criteria and `calculator_usage`, consumes a `yield_calculator` credit for full results, then applies calculator-only investment fields after the rent estimate returns.
-- Calculator rent-estimate calls are separate from `/evaluare?type=rent` monetization: full results consume any retained free credit first, then a shared paid credit, recording the action as `yield_calculator`.
+- Result mode calls `/api/estimate-rent` with the property criteria and `calculator_usage`. It returns full results with `access_source: "free_calculator"` and uses no credits. The standalone rent evaluation keeps its existing access checks.
 
 ## Form
 - Reuses `PropertyForm` with the `rentYieldCalculator` variant.
 - Keeps cadastral quick fill, location, property details, and optional property details from the estimate flow.
 - Adds investment fields: apartment price, optional additional investments, and an optional official 7% monthly rent tax checkbox.
 - The rent tax checkbox is labeled `Include impozitul pe chirie de 7%` in Romanian.
-- Apartment price, additional investments, and rent tax are not sent to the rent-estimate API; they are used only for yield and payback calculations.
+- Apartment price, additional investments, and tax selection are sent in the analytics payload and used in the calculator. They do not affect the rent estimate.
+- The cadastral shortcut uses the public Cadastru preview to fill available city, sector, and floor for every visitor. Full cadastral reports are available through Cadastru.
 - The calculator variant hides the sale/rent tabs, estimate accuracy meter, and 999.md prompt.
 - On `/calculator` only, the form uses separate cards ordered as investment, quick fill plus location, and `Despre Proprietate`. The regular estimator keeps the original single divided card.
-- In the location card, the card header appears first, followed by a centered compact optional cadastral quick-fill block and then the full-width city/sector fields.
-- The compact cadastral quick-fill block uses the shared `CadastralQuickSearchCard` component and presents the cadastral number as an optional shortcut collapsed by default; expanding it shows the input and search button.
+- Below the location heading, the calculator uses the same muted, full-width cadastral disclosure as `/evaluare`. It starts collapsed and opens to show the input and search button above the city/sector fields.
 - Calculator optional property details do not show the sale-specific first-floor and last-floor checkboxes.
 - The calculator page header uses a calculator icon instead of the estimate form's house icon.
 - Sector/zone fields no longer use fade-in animation, preventing animation replay during normal typing or checkbox changes.
 
 ## Result
 - Reuses the rent result layout from `EstimateResult`.
-- Without a `yield_calculator` credit, the calculator keeps the result page visible but locks and blurs the rent-yield, tax, market-stat, district, and listing details.
-- Its unlock popup reuses the shared Cadastru layout with the calculator price and benefits for estimated rental income, annual yield/payback, selected tax calculations and the income/tax chart.
+- Rent, yield, tax, payback, market statistics, district comparison and comparable listings are visible when available.
+- Selecting a district from the comparison opens a new free calculator result with the selected district, investment amounts, and current tax setting.
 - The calculator result top card removes the lowest/highest rent listing columns.
 - `Preț Chirie Recomandată` is shown on the left only for the calculator result.
 - On mobile calculator results, the top rent-analysis card hides the renovation/building/floor/bathroom badges to keep the header compact.

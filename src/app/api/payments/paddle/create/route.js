@@ -1,5 +1,5 @@
 import { getPaymentProvider } from "@/lib/payment-provider";
-import { paymentSiteOrigin } from "@/lib/payment-urls.mjs";
+import { LEGACY_CALCULATOR_PRODUCT, paymentSiteOrigin } from "@/lib/payment-urls.mjs";
 import { allowsGuestCheckout } from '@/lib/guest-checkout.mjs';
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
@@ -165,6 +165,9 @@ export async function POST(request) {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  if (String(body?.product_key || "").trim() === LEGACY_CALCULATOR_PRODUCT) {
+    return NextResponse.json({ error: "The rental yield calculator is free." }, { status: 410 });
   }
   if (user.is_anonymous && !allowsGuestCheckout(body)) return NextResponse.json({ error: 'Sign in to buy from pricing.' }, { status: 401 });
   if (user.is_anonymous) {

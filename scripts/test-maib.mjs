@@ -10,7 +10,7 @@ import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '../src/lib/m
 import * as client from '../src/lib/maib/client.mjs';
 import { getPaymentProvider } from '../src/lib/payment-provider.js';
 import { encodePaymentCursor, decodePaymentCursor } from '../src/lib/payment-history.js';
-import { paymentSiteOrigin, paymentAppLink } from '../src/lib/payment-urls.mjs';
+import { calculatorCheckoutRedirect, LEGACY_CALCULATOR_PRODUCT, paymentSiteOrigin, paymentAppLink } from '../src/lib/payment-urls.mjs';
 import { getPaddleCheckoutUrl, normalizePaddleLang, buildPaddleCustomerSnapshot, extractPaddleTransactionSummary } from '../src/lib/paddle.js';
 process.env.MAIB_ENVIRONMENT='sandbox';
 process.env.MAIB_SIGNATURE_KEY='test-signature-key';
@@ -217,7 +217,7 @@ console.log('MAIB pending, accepted, rejected, manual and uncertain-refund check
 let redirectedTo;
 const entry=await loadRoute('src/app/payment/checkout/page.js',{
   'next/navigation':{redirect:value=>{redirectedTo=value;}},'@/lib/payment-provider':{getPaymentProvider},
-  '@/lib/payment-urls.mjs':{paymentAppLink},
+  '@/lib/payment-urls.mjs':{calculatorCheckoutRedirect, LEGACY_CALCULATOR_PRODUCT, paymentAppLink},
   '@/lib/request-language':{getRequestLanguage:async()=>'ro'},
 });
 for(const mode of ['development','production']) for(const provider of ['maib','paddle']) {
@@ -231,6 +231,10 @@ for(const mode of ['development','production']) for(const provider of ['maib','p
   assert.equal(parsed.searchParams.get('quantity'),'4');
   assert.equal(parsed.searchParams.get('checkout_source'),'pricing');
   assert.equal(parsed.searchParams.get('return_to'),'/evaluare?a=1');assert.equal(parsed.searchParams.has('injected'),false);
+  await entry.default({searchParams:Promise.resolve({product_key:LEGACY_CALCULATOR_PRODUCT,lang:'ru',return_to:'/ru/calculator?rezultat=1'})});
+  assert.equal(redirectedTo, paymentAppLink('/ru/calculator?rezultat=1'));
+  await entry.default({searchParams:Promise.resolve({product_key:LEGACY_CALCULATOR_PRODUCT,lang:'ru',return_to:'//example.com/calculator'})});
+  assert.equal(redirectedTo, paymentAppLink('/ru/calculator'));
 }
 delete process.env.PAYMENT_PROVIDER;
 let insertSnapshot, existingSnapshot=null, createUser=null, bankCreates=0, bankPayload, expectedBankAmount=99;
@@ -240,6 +244,7 @@ const createDb={from(){let single=false;const query={select(){return query;},eq(
 const create=await loadRoute('src/app/api/payments/maib/create/route.js',{
   ...next,'@/lib/supabase-admin':{supabaseAdmin:createDb},'@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
   '@/lib/payment-provider':{getPaymentProvider},'@/lib/maib/products.mjs':{maibProduct,maibOrderQuantity},
+  '@/lib/payment-urls.mjs':{LEGACY_CALCULATOR_PRODUCT},
   '@/lib/maib/purchase.mjs':{MAIB_TERMS_VERSION,receiptEmail,maibProductTitle},
   '@/lib/maib/cadastru-delivery':{buildMaibCadastruDelivery:async input=>{deliveryInput=input;return deliverySnapshot;}},
   '@/lib/ga4-payment.mjs':{verifiedAnalyticsContext},
@@ -250,6 +255,7 @@ const create=await loadRoute('src/app/api/payments/maib/create/route.js',{
 const createRequest=(payload)=>new Request('https://catdai.test/api/payments/maib/create',{method:'POST',body:JSON.stringify(payload)});
 assert.equal((await create.POST(createRequest({}))).status,401);
 createUser={id:crypto.randomUUID()};
+assert.equal((await create.POST(createRequest({product_key:LEGACY_CALCULATOR_PRODUCT,request_key:id}))).status,410);
 assert.equal((await create.POST(createRequest({product_key:'invalid',request_key:id}))).status,400);
 assert.equal((await create.POST(createRequest({product_key:'standard_pack',request_key:'bad'}))).status,400);
 assert.equal(bankCreates,0);
@@ -462,13 +468,18 @@ const paddleProduct={key:'standard_pack',priceReference:'pri_test',priceId:'pri_
 let paddleUser={id,email:'buyer@example.com'};
 const paddleDb={auth:{getUser:async()=>({data:{user:paddleUser}})},from(){const query={upsert:async row=>{guestRegistrations.push(row);return {};},insert(){return query;},select(){return query;},single:async()=>({data:{id}}),update(){return query;},eq:async()=>({error:null})};return query;}};
 const paddleCreate=await loadRoute('src/app/api/payments/paddle/create/route.js',{
-  ...next, '@/lib/payment-provider':{getPaymentProvider}, '@/lib/payment-urls.mjs':{paymentSiteOrigin},
+  ...next, '@/lib/payment-provider':{getPaymentProvider}, '@/lib/payment-urls.mjs':{LEGACY_CALCULATOR_PRODUCT,paymentSiteOrigin},
   '@/lib/supabase-admin':{supabaseAdmin:paddleDb}, '@/lib/rate-limit':{rateLimit:()=>({check:()=>({allowed:true})})},
   '@/lib/paddle-products':{getPaddleProduct:()=>paddleProduct,isValidPaddlePriceId:()=>true,resolvePaddleCatalogPrice:async product=>product},
   '@/lib/paddle':{getPaddleCheckoutUrl,normalizePaddleLang,buildPaddleCustomerSnapshot,extractPaddleTransactionSummary,
     createPaddleTransaction:async()=>({raw:{},transaction:{id:'txn_test',items:[{price:{id:'pri_test'}}],checkout:{url:'https://catdai.md/payment/paddle/checkout?_ptxn=txn_test'}}})},
 });
 process.env.PAYMENT_PROVIDER='paddle';
+const retiredPaddleRequest = new Request('https://catdai.test/api/payments/paddle/create', {
+  method: 'POST', headers: { Authorization: 'Bearer test' },
+  body: JSON.stringify({ product_key: LEGACY_CALCULATOR_PRODUCT }),
+});
+assert.equal((await paddleCreate.POST(retiredPaddleRequest)).status,410);
 for (const mode of ['development','production']) {
   process.env.NODE_ENV=mode;
   process.env.PADDLE_CHECKOUT_URL='https://catdai.md/payment/paddle/checkout?existing=1';

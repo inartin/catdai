@@ -4,7 +4,7 @@
 Feedback widget for registered users; private result reviews also accept anonymous checkout buyers.
 
 ## Result Reviews
-- A small, dismissible card appears at the bottom of a successfully loaded paid result (Cadastru, sale/rent evaluation, listing analysis or yield calculator). Checkout, payment confirmation, locked/free results, failures and shared reports do not prompt for a review.
+- A small, dismissible card appears at the bottom of a successfully loaded paid result (Cadastru, sale/rent evaluation or listing analysis). Checkout, payment confirmation, locked/free results, failures and shared reports do not prompt for a review.
 - A rating from one to five stars is required. Selecting a rating reveals a comment field (optional, up to 500 characters) and an explicit send button. Submission confirms inline; there is no popup or public review display.
 - Dismissing or submitting suppresses future prompts for that user across results and devices. Browser storage also remembers the choice immediately. A guest's response continues to suppress prompts after their purchases are claimed by a registered account. Guest buyers use their existing anonymous checkout session and never need to register or supply contact details.
 - Result APIs attach `review_usage_id` only for a consumed `paid_credit` usage event. `GET /api/result-reviews?usage_id=...` returns eligibility only; `POST /api/result-reviews` validates the session, owned paid usage, stars/comment and first-response uniqueness. Browser roles cannot read or write the storage table directly.

@@ -500,7 +500,6 @@ export default function Pricing({
     rent: t("pricing.featureRent"),
     listing: t("pricing.feature999"),
     cadastru: t("pricing.featureCadastru"),
-    yield: t("pricing.featureYield"),
     pdf: t("pricing.featurePdf"),
   };
 

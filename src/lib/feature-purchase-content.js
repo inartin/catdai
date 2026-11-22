@@ -23,12 +23,6 @@ export const FEATURE_PURCHASE_CONTENT = {
     summary: "payment.featureListingSummary",
     benefits: ["Comparison", "Price", "History", "Listings", "Duplicates"].map((key) => `payment.featureListing${key}`),
   },
-  yield_calculator_single: {
-    title: "payment.featureYieldTitle",
-    checkoutTitle: "payment.featureYieldCheckoutTitle",
-    summary: "payment.featureYieldSummary",
-    benefits: ["Income", "Return", "Tax", "Chart"].map((key) => `payment.featureYield${key}`),
-  },
   pdf_report_single: {
     title: "payment.featurePdfTitle",
     checkoutTitle: "payment.featurePdfCheckoutTitle",

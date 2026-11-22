@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin as db } from '@/lib/supabase-admin';
 import { rateLimit } from '@/lib/rate-limit';
 import { getPaymentProvider } from '@/lib/payment-provider';
+import { LEGACY_CALCULATOR_PRODUCT } from '@/lib/payment-urls.mjs';
 import { environment, maibRequest, safeReturnTo, validateCheckoutUrl } from '@/lib/maib/client.mjs';
 import { maibProduct, maibOrderQuantity } from '@/lib/maib/products.mjs';
 import { MAIB_TERMS_VERSION, receiptEmail, maibProductTitle } from '@/lib/maib/purchase.mjs';
@@ -17,6 +18,7 @@ export async function POST(request) {
   if (!user) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   if (!limiter.check(user.id).allowed) return NextResponse.json({ error: 'Too many requests.' }, { status: 429 });
   const body = await request.json().catch(() => null);
+  if (body?.product_key === LEGACY_CALCULATOR_PRODUCT) return NextResponse.json({ error: 'The rental yield calculator is free.' }, { status: 410 });
   if (user.is_anonymous && !allowsGuestCheckout(body)) return NextResponse.json({ error: 'Sign in to buy from pricing.' }, { status: 401 });
   const product = maibProduct(body?.product_key, body?.quantity);
   if (!product || !UUID.test(body?.request_key || '')) return NextResponse.json({ error: 'Invalid product or request key.' }, { status: 400 });

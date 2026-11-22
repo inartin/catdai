@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
 import { trackPaymentCheckoutEvent } from "@/lib/tracking";
 import AuthOptions from "@/components/AuthOptions";
 import CheckoutPackagesCard from "@/components/CheckoutPackagesCard";
 import LockIcon from "@/components/icons/LockIcon";
-import { paymentSiteOrigin, paymentAppLink } from "@/lib/payment-urls.mjs";
+import { calculatorCheckoutRedirect, LEGACY_CALCULATOR_PRODUCT, paymentSiteOrigin, paymentAppLink } from "@/lib/payment-urls.mjs";
 import { allowsGuestCheckout } from '@/lib/guest-checkout.mjs';
 
 const PADDLE_SCRIPT_SRC = "https://cdn.paddle.com/paddle/v2/paddle.js";
@@ -401,6 +402,9 @@ export default function PaddleCheckoutPage() {
     };
   }, [authLoading, checkoutEmail, lang, params.lang, params.orderId, params.productKey, params.returnTo, params.transactionId, requiresLogin, session?.access_token, setLang]);
 
+  if (params.productKey === LEGACY_CALCULATOR_PRODUCT && !params.transactionId) {
+    return redirect(calculatorCheckoutRedirect(params.returnTo, params.lang || lang));
+  }
   const returnHref = paymentAppLink(normalizeReturnTo(params.returnTo));
   const isError = status === "error";
   const isAuthRequired = status === "auth_required";

@@ -84,7 +84,6 @@ All source grants below are pooled into universal credits: Standard 12, Pro 60, 
   - `rent_estimate_single`
   - `listing_analysis_single`
   - `cadastru_lookup_single`
-  - `yield_calculator_single`
   - `pdf_report_single`
 - Product grants are shared in app code through `src/lib/payment-products.js`.
 - Standard and Pro grant 2 and 10 uses respectively for every paid feature, with no time expiry.
@@ -122,7 +121,6 @@ PADDLE_PRICE_EXTRA_PACK=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST=
 PADDLE_PRICE_CADASTRU_LOOKUP_SINGLE=
-PADDLE_PRICE_YIELD_CALCULATOR_SINGLE=
 PADDLE_PRICE_PDF_REPORT_SINGLE=
 PADDLE_WEBHOOK_TOLERANCE_SECONDS=300
 ```

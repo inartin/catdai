@@ -1,5 +1,6 @@
 import { featureResultPath } from '../guest-checkout.mjs';
 import { maibProduct } from './products.mjs';
+import { LEGACY_CALCULATOR_PRODUCT } from '../payment-urls.mjs';
 
 export const MAIB_FINAL_STATUSES = ['paid', 'partially_refunded', 'refunded', 'failed', 'expired', 'canceled'];
 export const MAIB_RETRY_STATUSES = ['failed', 'expired', 'canceled'];
@@ -19,6 +20,7 @@ export function maibResultContext(order) {
 }
 
 export function maibRetryUrl(order, lang) {
+  if (order?.product_key === LEGACY_CALCULATOR_PRODUCT) return null;
   if (!MAIB_RETRY_STATUSES.includes(order?.status) || !maibProduct(order.product_key, order.quantity || 1)) return null;
   const context = maibResultContext(order);
   const params = new URLSearchParams({ product_key: order.product_key, quantity: String(order.quantity || 1),

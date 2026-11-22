@@ -10,6 +10,7 @@ import * as upgradeCookie from '../src/lib/guest-upgrade-cookie.mjs';
 import * as maibProducts from '../src/lib/maib/products.mjs';
 import * as purchase from '../src/lib/maib/purchase.mjs';
 import * as paymentResult from '../src/lib/maib/result.mjs';
+import { calculatorCheckoutRedirect, LEGACY_CALCULATOR_PRODUCT } from '../src/lib/payment-urls.mjs';
 import { FEATURE_PURCHASE_CONTENT } from '../src/lib/feature-purchase-content.js';
 const require = createRequire(import.meta.url);
 const { transform, loadBindings } = require('next/dist/build/swc');
@@ -241,13 +242,13 @@ async function paymentHarness(query,result=false,provider='maib') {
   const react=hooks(); const timers=[], fetches=[]; const requestStorage=new Map();
   const language={t:key=>key,lang:'ro',setLang:noop};
   const mod=await load(provider==='paddle'?'src/app/payment/paddle/checkout/page.js':'src/components/MaibPaymentPage.js',{
-    react,'next/link':{default:'Link'},'@/context/AuthContext':{useAuth:()=>paymentAuth},
+    react,'next/link':{default:'Link'},'next/navigation':{redirect:path=>{throw new Error(path);}},'@/context/AuthContext':{useAuth:()=>paymentAuth},
     '@/context/LanguageContext':{useTranslation:()=>language},
     '@/lib/guest-checkout.mjs':guestCheckout,'@/lib/maib/products.mjs':maibProducts,'@/lib/maib/purchase.mjs':purchase,
     '@/lib/maib/result.mjs':paymentResult,
     '@/lib/feature-purchase-content':{FEATURE_PURCHASE_CONTENT},'@/lib/tracking':{trackPaymentCheckoutEvent:noop},
     '@/lib/ga4-payment-client':{trackPaymentAnalytics:noop,capturePaymentAnalytics:async()=>null},
-    '@/lib/payment-urls.mjs':{paymentAppLink:path=>path,paymentSiteOrigin:()=> 'https://catdai.test'},
+    '@/lib/payment-urls.mjs':{calculatorCheckoutRedirect,LEGACY_CALCULATOR_PRODUCT,paymentAppLink:path=>path,paymentSiteOrigin:()=> 'https://catdai.test'},
   },{window:{addEventListener:noop,removeEventListener:noop,location:{search:query,replace:url=>redirects.push(url),assign:url=>redirects.push(url)}},crypto,
     sessionStorage:{getItem:key=>requestStorage.get(key),setItem:(key,value)=>requestStorage.set(key,value),removeItem:key=>clearedRequests.push(key)},setTimeout:fn=>{timers.push(fn);return 1;},clearTimeout:noop,
     fetch:async(url,options)=>{fetches.push({url,options});return Response.json(options?.method==='POST'?{order_id:'order',checkout:{url:'https://checkout-sandbox.maib.md/test'}}:{order_id:'order',product_key:'sale_estimate_single',status,grants:{sale_estimate:1},return_to:'/evaluare?city=Chisinau'});},
@@ -256,6 +257,10 @@ async function paymentHarness(query,result=false,provider='maib') {
   render();await react.flush();const preparingTree=render();await react.flush();const tree=render();return {tree,preparingTree,timers,fetches,render};
 }
 const featureQuery='?product_key=sale_estimate_single&return_to=%2Fevaluare%3Fcity%3DChisinau';
+await assert.rejects(
+  paymentHarness(`?product_key=${LEGACY_CALCULATOR_PRODUCT}&return_to=%2Fcalculator%3Frezultat%3D1`, false, 'paddle'),
+  /\/calculator\?rezultat=1/,
+);
 let view=await paymentHarness(featureQuery);
 assert.equal(find(view.tree,node=>node.type==='button'&&node.props.children==='payment.continueAsGuest').length,0);
 assert.equal(find(view.preparingTree,node=>node.type==='input'&&node.props.id==='receipt-email').length,1,'email appears before guest-session initialization finishes');

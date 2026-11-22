@@ -1,4 +1,15 @@
 import { getCanonicalSiteUrl } from './seo.js';
+import { featureResultPath } from './guest-checkout.mjs';
+
+export const LEGACY_CALCULATOR_PRODUCT = 'yield_calculator_single';
+
+export function calculatorCheckoutRedirect(returnTo, lang) {
+  const path = featureResultPath(returnTo);
+  if (path && /^\/(?:ro\/|ru\/|en\/)?calculator\/?$/.test(new URL(path, 'https://catdai.local').pathname)) {
+    return paymentAppLink(path);
+  }
+  return paymentAppLink(lang === 'ru' || lang === 'en' ? `/${lang}/calculator` : '/calculator');
+}
 
 export function paymentSiteOrigin(fallback = process.env.MAIB_PUBLIC_URL || getCanonicalSiteUrl()) {
   return new URL(process.env.NODE_ENV === 'development' ? 'https://dev.catdai.md' : fallback).origin;

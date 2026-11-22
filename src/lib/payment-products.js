@@ -16,7 +16,6 @@ const SINGLE_PRODUCT_BY_FEATURE = {
   rent_estimate: "rent_estimate_single",
   listing_analysis: "listing_analysis_single",
   cadastru_lookup: "cadastru_lookup_single",
-  yield_calculator: "yield_calculator_single",
   pdf_report: "pdf_report_single",
 };
 

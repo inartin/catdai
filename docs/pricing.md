@@ -19,7 +19,7 @@ The standalone `/pricing` page sells individual feature uses and all-feature pac
 - Checkout uses `cadastru_lookup_single`, `credits_4`, and `credits_20`. Each pack funds one Cadastru source bucket with its advertised number of universal credits. Legacy `credits_10`, `credits_50`, `all_features_5`, and `all_features_20` retain their catalog prices, titles, and grants.
 - Pricing links include `checkout_source=pricing`. The 49 MDL checkout uses the generic `1 utilizare` label, while feature-popup checkout retains the selected feature name. The pricing cards, checkout, and new MAIB orders use the same localized package titles. Existing orders keep their saved titles on retries. Checkout copy explains that credits work with any function.
 - When the checkout title already shows the use count, the subtitle shows only `Plată unică` (localized), without repeating that count.
-- All six MAIB single-use product keys cost 49 MDL. Legacy quantity URLs/API requests remain supported at 49 MDL per use; the old quantity discount tiers are removed. Existing orders retain their immutable saved prices/grants.
+- Active MAIB single-use products cost 49 MDL. The rental yield calculator is free, and old calculator checkout links return to the calculator. Legacy quantity URLs/API requests remain supported at 49 MDL per use; the old quantity discount tiers are removed. Existing orders retain their immutable saved prices/grants.
 - Prices come from the server catalog; browser-supplied amounts are ignored. Confirmed payments add uses once. The shared-credit migration must be applied before releasing this page.
 - Pricing-origin purchases still require a registered account, including browsers with an existing guest session. Both checkout UIs and provider create APIs enforce `checkout_source=pricing`. Guest continuation is offered only for checkout carrying a safe feature-result return path.
 - There are no new or recurring free credits. Existing unused allowances are retained once. See [Access and Paywall](access-paywall.md).
@@ -37,7 +37,6 @@ PADDLE_PRICE_EXTRA_PACK=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE=
 PADDLE_PRICE_LISTING_ANALYSIS_SINGLE_COST=
 PADDLE_PRICE_CADASTRU_LOOKUP_SINGLE=
-PADDLE_PRICE_YIELD_CALCULATOR_SINGLE=
 PADDLE_PRICE_PDF_REPORT_SINGLE=
 ```
 

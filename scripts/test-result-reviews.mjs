@@ -70,10 +70,18 @@ for (const usage of [
     assert.equal(result.access_limit.feature_key, 'listing_analysis');
   }
 }
-const calculatorResponse = await resultFunction('src/app/api/estimate-rent/route.js', 'resolveRentResponse', {
-  consumeYieldCalculatorCredit: async () => ({ allowed: true, source: 'paid_credit', usage_event_id: 'calculator-unlock' }),
-}, true);
-assert.equal((await calculatorResponse({}, { calculator_usage: {} }, {}, {}, { check: { allowed: true }, access: {} })).payload.review_usage_id, 'calculator-unlock');
+const resolveCalculator = await resultFunction('src/app/api/estimate-rent/route.js', 'resolveRentResponse', {}, true);
+const calculatorData = { estimate: { market_rate: 400 }, relevant_listings: [{ id: 'comparable' }] };
+for (const headers of [{}, { Authorization: 'Bearer registered-user' }]) {
+  const request = new Request('https://catdai.test/api/estimate-rent', { headers });
+  const { payload } = await resolveCalculator(request, { calculator_usage: { apartment_price: 70000 } }, {}, calculatorData);
+  assert.equal(payload.full_access, true);
+  assert.equal(payload.estimate, calculatorData.estimate);
+  assert.equal(payload.relevant_listings, calculatorData.relevant_listings);
+  assert.equal(Object.keys(payload.locked_sections).length, 0);
+  assert.equal(payload.review_usage_id, undefined);
+  assert.equal(payload.paid_credit_usage, undefined);
+}
 
 await db.exec(`create schema auth; create table auth.users(id uuid primary key);
   create role anon; create role authenticated; create role service_role bypassrls;

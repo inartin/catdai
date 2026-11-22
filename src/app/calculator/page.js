@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import EstimateResult from "@/components/EstimateResult";
-import ResultReviewCard from "@/components/ResultReviewCard";
 import PropertyForm from "@/components/PropertyForm";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "@/context/LanguageContext";
@@ -111,9 +110,7 @@ function buildRentEstimateRequest(params) {
 }
 
 function buildRentYieldCalculation(data, calculator) {
-  const lockedSections = data?.locked_sections || {};
-  const isLocked = data?.full_access !== true && lockedSections.rent_yield_calculation === true;
-  const monthlyRent = isLocked ? 9999 : Number(data?.estimate?.market_rate);
+  const monthlyRent = Number(data?.estimate?.market_rate);
   const apartmentPrice = Number(calculator.apartment_price);
   const additionalInvestments = Number(calculator.additional_investments) || 0;
   const totalInvestment = apartmentPrice + additionalInvestments;
@@ -311,7 +308,6 @@ function CalculatorContent() {
       return (
         <div className="mx-auto max-w-6xl px-4 py-10">
           <EstimateResult data={result} onReset={handleEdit} />
-          <ResultReviewCard usageId={result.review_usage_id} />
         </div>
       );
     }

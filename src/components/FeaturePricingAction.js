@@ -127,13 +127,12 @@ export default function FeaturePricingAction({
     product_key: selectedProductKey,
     price_mdl: provider === "maib" ? selectedMaibProduct.amount_mdl : process.env.NEXT_PUBLIC_PRICE_EXTRA_PACK_MDL_COST || 499,
   };
-  const featureLabels = { sale_estimate: "pricing.featureSale", rent_estimate: "pricing.featureRent", listing_analysis: "pricing.feature999", cadastru_lookup: "pricing.featureCadastru", yield_calculator: "pricing.featureYield", pdf_report: "pricing.featurePdf" };
+  const featureLabels = { sale_estimate: "pricing.featureSale", rent_estimate: "pricing.featureRent", listing_analysis: "pricing.feature999", cadastru_lookup: "pricing.featureCadastru", pdf_report: "pricing.featurePdf" };
   const includedFeatures = isSingleOffer ? Object.keys(selectedMaibProduct.grants).map((feature) => t(featureLabels[feature])) : [
     t("pricing.featureSale"),
     t("pricing.featureRent"),
     t("pricing.feature999"),
     t("pricing.featureCadastru"),
-    t("pricing.featureYield"),
     t("pricing.featurePdf"),
   ];
 

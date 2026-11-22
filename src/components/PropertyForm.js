@@ -338,7 +338,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   };
 
   const handleCadastralSearch = async () => {
-    if (!isAuthenticated) {
+    if (!isCalculatorMode && !isAuthenticated) {
       clearAuthError();
       setIsAuthModalOpen(true);
       return;
@@ -358,15 +358,18 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
+          ...(!isCalculatorMode && { Authorization: `Bearer ${session.access_token}` }),
         },
-        body: JSON.stringify({ cadastral_number: validation.value }),
+        body: JSON.stringify({
+          cadastral_number: validation.value,
+          ...(isCalculatorMode && { search_context: "cadastru", search_type: "number" }),
+        }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        if (res.status === 401 || data.error === "unauthorized") {
+        if (!isCalculatorMode && (res.status === 401 || data.error === "unauthorized")) {
           clearAuthError();
           setIsAuthModalOpen(true);
         } else if (data.error === "not_found") {
@@ -380,7 +383,8 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
       }
 
 
-      const isLockedCadastralPreview = data.locked_sections?.cadastru_details === true;
+      const isLockedCadastralPreview = isCalculatorMode || data.locked_sections?.cadastru_details === true;
+      const { city, district } = data.form_fields || {};
       setCadastralData({
         building: data.building,
         apartment: data.apartment,
@@ -388,9 +392,11 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
         partial: data.partial || false,
         locked_sections: data.locked_sections || {},
         access_limit: data.access_limit || null,
+        formLocation: isCalculatorMode && city
+          ? [t(`data.city.${city}`), district && t(`data.district.${district}`)].filter(Boolean).join(", ")
+          : "",
       });
 
-      const { city, district } = data.form_fields || {};
       const f = isCadastruNonResidential(data.apartment) ? { city, district } : data.form_fields || {};
       setForm((prev) => ({
         ...prev,
@@ -548,10 +554,14 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
   const calculatorStandaloneCardClass = `${calculatorCardShellClass} p-5 sm:p-6`;
   const formCardClass = "mt-6 space-y-5";
   const locationSectionClass = "p-5 sm:p-6";
+  const showCadastralResult = !cadastralError && cadastralData;
+  const cadastralSuccessText = isCalculatorMode
+    ? cadastralData?.formLocation
+    : !cadastralData?.partial && (cadastralData?.apartment?.address || " ");
 
-  const renderCadastralQuickSearch = (className = "") => (
+  const renderCadastralQuickSearch = () => (
     <CadastralQuickSearchCard
-      compact={!isCalculatorMode}
+      compact
       value={cadastralInput}
       defaultOpen={Boolean(initialValues?.cadastral_number)}
       onChange={(value) => {
@@ -562,9 +572,9 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
       onSearch={handleCadastralSearch}
       loading={cadastralLoading}
       error={cadastralError ? t(`form.${cadastralError}`) : ""}
-      successText={!cadastralError && cadastralData && !cadastralData.partial ? cadastralData.apartment?.address || " " : ""}
-      partialText={!cadastralError && cadastralData?.partial ? cadastralData.location?.display_name || " " : ""}
-      className={className}
+      successText={showCadastralResult ? cadastralSuccessText : ""}
+      partialText={showCadastralResult && !isCalculatorMode && cadastralData.partial ? cadastralData.location?.display_name || " " : ""}
+      className="mb-4"
     />
   );
 
@@ -827,7 +837,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
           <div className={calculatorCardShellClass}>
           {isCalculatorMode ? (
           <div className="p-5 sm:p-6">
-            <div className="flex items-center gap-2 mb-5">
+            <div className="flex items-center gap-2 mb-4">
               <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
                 2
               </span>
@@ -836,7 +846,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
               </span>
             </div>
 
-            {renderCadastralQuickSearch("mb-6")}
+            {renderCadastralQuickSearch()}
 
             <div className="space-y-3">
               <div
@@ -891,11 +901,7 @@ export default function PropertyForm({ onBack, initialValues, onSubmit, onValidS
               </span>
             </div>
 
-            {!isRentMode && (
-              <div className="mb-4">
-                {renderCadastralQuickSearch()}
-              </div>
-            )}
+            {!isRentMode && renderCadastralQuickSearch()}
 
             <div className="space-y-3">
               <div

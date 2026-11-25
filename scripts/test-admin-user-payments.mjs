@@ -13,7 +13,27 @@ const queries = [];
 const users = [
   { id: "buyer" }, { id: "failed" }, { id: "pending" }, { id: "free" },
   { id: "manual", app_metadata: { catdai_admin_package_key: "extra_pack" } },
+  { id: "checkout-guest", is_anonymous: true }, { id: "cadastru-guest", is_anonymous: true },
+  { id: "unknown-guest", is_anonymous: true },
 ];
+const checkoutVisitor = { device_type: "Mobile", os: "Android", browser: "Chrome" };
+const cadastruVisitor = { device_type: "Desktop", os: "Windows", browser: "Edge" };
+const buyerVisitor = { device_type: "Mobile", os: "iOS", browser: "Safari" };
+const visitorsByTable = {
+  user_activity: [{ user_id: "buyer", visitor: buyerVisitor }],
+  payment_checkout_events: [
+    { user_id: "checkout-guest", visitor: {} },
+    { user_id: "checkout-guest", visitor: checkoutVisitor },
+    { user_id: "checkout-guest", visitor: cadastruVisitor },
+    { user_id: "buyer", visitor: checkoutVisitor },
+    { user_id: null, visitor: checkoutVisitor },
+  ],
+  cadastru_search_events: [
+    { user_id: "checkout-guest", visitor: cadastruVisitor },
+    { user_id: "cadastru-guest", duplicate_of: 1, visitor: checkoutVisitor },
+    { user_id: "cadastru-guest", visitor: cadastruVisitor },
+  ],
+};
 const order = (user_id, product_key, status, index) => ({
   id: String(index), user_id, product_key, status, provider: "maib", environment: "production",
   created_at: `2026-10-${String(index).padStart(2, "0")}T12:00:00Z`,
@@ -44,11 +64,16 @@ const mocks = {
       queries.push(query);
       const builder = {
         select(columns) { query.columns = columns; return builder; },
-        not() { return builder; }, is() { return builder; }, eq() { return builder; },
+        not() { return builder; }, eq() { return builder; },
+        is(column, value) { query.is = [column, value]; return builder; },
+        in(column, values) { query.in = [column, Array.from(values)]; return builder; },
         order(column) { query.orders.push(column); return builder; },
         range(from, to) {
           query.range = [from, to];
-          return { data: table === "reporting_payment_orders" ? orders.slice(from, to + 1) : [],
+          let rows = table === "reporting_payment_orders" ? orders : visitorsByTable[table] || [];
+          if (query.in) rows = rows.filter((row) => query.in[1].includes(row[query.in[0]]));
+          if (query.is) rows = rows.filter((row) => (row[query.is[0]] ?? null) === query.is[1]);
+          return { data: rows.slice(from, to + 1),
             error: table === "reporting_payment_orders" ? paymentError : null };
         },
       };
@@ -101,8 +126,25 @@ assert.equal(result.find((user) => user.id === "pending").paymentSummary.pending
 assert.equal(result.find((user) => user.id === "free").paymentSummary, null);
 assert.equal(result.find((user) => user.id === "manual").paymentSummary, null);
 assert.equal(result.find((user) => user.id === "manual").packageKey, "extra_pack");
+assert.deepEqual(buyer.visitor, buyerVisitor, "Registered accounts retain their activity snapshot");
+const checkoutGuest = result.find((user) => user.id === "checkout-guest");
+assert.equal(checkoutGuest.name, "Guest");
+assert.equal(checkoutGuest.authProvider, "Guest");
+assert.deepEqual(checkoutGuest.visitor, checkoutVisitor, "Use the latest checkout with device details");
+assert.deepEqual(result.find((user) => user.id === "cadastru-guest").visitor, cadastruVisitor, "Fall back to a non-duplicate Cadastru search");
+assert.equal(result.find((user) => user.id === "unknown-guest").visitor, null, "Missing details stay blank");
+assert.deepEqual(queries.find((query) => query.table === "payment_checkout_events").in,
+  ["user_id", ["checkout-guest", "cadastru-guest", "unknown-guest"]]);
+assert.deepEqual(queries.find((query) => query.table === "payment_checkout_events").orders, ["created_at", "id"]);
 assert.deepEqual(queries.find((query) => query.table === "reporting_payment_orders").orders, ["created_at", "id", "provider"]);
 assert.ok(!queries.some((query) => query.table === "payment_orders_all"), "Only the production reporting view supplies purchases");
+
+visitorsByTable.payment_checkout_events = [
+  ...Array.from({ length: 1000 }, () => ({ user_id: "checkout-guest", visitor: checkoutVisitor })),
+  { user_id: "unknown-guest", visitor: cadastruVisitor },
+];
+assert.deepEqual((await list()).find((user) => user.id === "unknown-guest").visitor, cadastruVisitor,
+  "Guest device lookup reads past the API page limit");
 
 orders = Array.from({ length: 1001 }, (_, index) => order("buyer", "cadastru_lookup_single", "paid", index + 1));
 assert.equal((await list()).find((user) => user.id === "buyer").paymentSummary.paid, 1001);

@@ -1092,7 +1092,7 @@ function DashboardContent() {
   const [dashboardPeriod, setDashboardPeriod] = useState("day");
   const [error, setError] = useState(null);
   const [showUsersList, setShowUsersList] = useState(false);
-  const [activeUsersTab, setActiveUsersTab] = useState("chart");
+  const [activeUsersTab, setActiveUsersTab] = useState("users");
   const [showPaymentsList, setShowPaymentsList] = useState(false);
   const [users, setUsers] = useState([]);
   const [userSearch, setUserSearch] = useState("");
@@ -1823,7 +1823,11 @@ function DashboardContent() {
                   <tbody className="divide-y divide-gray-100">
                     {s.payments.orders.map((payment) => (
                       <tr key={`${payment.provider}:${payment.id}`} className="hover:bg-gray-50 [&>*+*]:border-l [&>*+*]:border-gray-100">
-                        <td className="px-4 py-3 text-gray-900 font-medium"><div title="Last recorded browser for this account"><AdminUserCell row={payment} name={payment.name || payment.user_id || "Deleted user"} /></div></td>
+                        <td className="px-4 py-3 text-gray-900 font-medium">
+                          <div title={payment.isGuest ? "Recorded browser for this guest" : "Last recorded browser for this account"}>
+                            <AdminUserCell row={payment} name={payment.name || payment.user_id || "Deleted user"} />
+                          </div>
+                        </td>
                         <td className="px-4 py-3 text-gray-600">{payment.email || "-"}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDateTime(payment.paid_at || payment.created_at)}</td>
                         <td className="px-4 py-3 text-gray-600">
@@ -1875,7 +1879,7 @@ function DashboardContent() {
                       : "text-gray-600 hover:text-gray-900 dark:text-slate-400 dark:hover:text-slate-200"
                   }`}
                 >
-                  👥 Registered Users {users.length > 0 ? `(${fmtNum(users.length)})` : ""}
+                  👥 Users List {users.length > 0 ? `(${fmtNum(users.length)})` : ""}
                 </button>
               </div>
 
@@ -1899,7 +1903,7 @@ function DashboardContent() {
                   }}
                   className="text-xs text-primary hover:underline cursor-pointer"
                 >
-                  View registered users list →
+                  View users list →
                 </button>
               )}
             </div>
@@ -1983,6 +1987,7 @@ function DashboardContent() {
                             <button
                               type="button"
                               onClick={() => setSelectedUser(u)}
+                              title={u.authProvider === "Guest" ? u.id : undefined}
                               className="cursor-pointer text-left font-medium text-primary hover:underline"
                             >
                               {u.name || "-"}

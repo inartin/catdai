@@ -13,6 +13,7 @@ const query = new Proxy({}, {
 });
 const mocks = {
   "next/server": { NextResponse: { json: Response.json } },
+  "@/lib/admin-guest-visitors": { loadGuestVisitors: async () => new Map() },
   "@/lib/admin-auth": { requireAdminApiAuth: () => authorized ? null : Response.json({}, { status: 401 }) },
   "@/lib/maib/http": { UUID: /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i, sameOrigin: () => origin },
   "@/lib/supabase-admin": { supabaseAdmin: {

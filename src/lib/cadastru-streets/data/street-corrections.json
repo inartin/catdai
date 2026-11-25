@@ -19,6 +19,13 @@
     "merge_streets": ["Lenin", "Vladimir Lenin"]
   },
   {
+    "city": "Comrat",
+    "road_type": "str",
+    "street": "Pușkina",
+    "aliases": ["Pușkin", "Alexandr Pușkin"],
+    "merge_streets": ["Pușkin", "Alexandr Pușkin"]
+  },
+  {
     "city": "Congaz",
     "road_type": "str",
     "street": "Montajnaia",

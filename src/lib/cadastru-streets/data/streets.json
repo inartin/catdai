@@ -93091,19 +93091,6 @@
     {
       "city": "Comrat",
       "road_type": "str",
-      "street": "Alexandr Pușkin",
-      "aliases": [
-        "Strada Alexandr Pușkin",
-        "улица Александра Пушкина"
-      ],
-      "osm_way_ids": [
-        45859557,
-        132071854
-      ]
-    },
-    {
-      "city": "Comrat",
-      "road_type": "str",
       "street": "Alexei Șciusev",
       "aliases": [
         "Strada Alexei Șciusev",
@@ -94122,13 +94109,17 @@
     {
       "city": "Comrat",
       "road_type": "str",
-      "street": "Pușkin",
+      "street": "Pușkina",
       "aliases": [
+        "Alexandr Pușkin",
+        "Pușkin",
         "Strada Alexandr Pușkin",
         "Strada Pușkin",
         "улица Александра Пушкина"
       ],
       "osm_way_ids": [
+        45859557,
+        132071854,
         73352446
       ]
     },

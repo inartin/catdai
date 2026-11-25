@@ -22,7 +22,9 @@ Conflicting numbers return 422 `address_fields_conflict` with two corrected stre
 
 ## Data updates
 
-The synced worker snapshot contains 29,580 streets in 1,200 localities (12,561 with Russian aliases, including 15 șoseaua entries), sourced from the 2026-10-20 Geofabrik Moldova extract. Coverage is partial; Tiraspol retains the original search. Attribution: © OpenStreetMap contributors, [ODbL 1.0](https://www.openstreetmap.org/copyright). Source URL, checksum, boundary IDs and sample way IDs are retained in `data/streets.json`.
+The synced worker snapshot contains 29,579 streets in 1,200 localities (12,560 with Russian aliases, including 15 șoseaua entries), sourced from the 2026-10-20 Geofabrik Moldova extract. Coverage is partial; Tiraspol retains the original search. Attribution: © OpenStreetMap contributors, [ODbL 1.0](https://www.openstreetmap.org/copyright). Source URL, checksum, boundary IDs and sample way IDs are retained in `data/streets.json`.
+
+For Comrat strada, the picker displays `Pușkina` for searches using `Pușkin`, `Alexandr Pușkin`, or `Pușkina`.
 
 Maintain corrections and regenerate data in `catdai-api`, then run from this repository:
 

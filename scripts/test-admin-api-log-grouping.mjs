@@ -343,6 +343,7 @@ mocks["@/lib/supabase-admin"] = { supabaseAdmin: { from(table) {
 mocks["@/lib/admin-auth"] = { requireAdminApiAuth: () => null };
 // Category hydration is exercised by test-cadastru-result-categories.mjs.
 mocks["@/lib/admin-cadastru-result-categories"] = { loadCadastruResultCategories: async (rows) => rows };
+mocks["@/lib/admin-guest-visitors"] = { loadGuestVisitors: async () => new Map() };
 mocks["@/lib/admin-cadastru-favorites"] = { loadCadastruFavorites: async (rows) => rows };
 mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
 mocks["@/lib/cadastru-share-statistics"] = { loadCadastruShareStatistics: async (rows) => rows };

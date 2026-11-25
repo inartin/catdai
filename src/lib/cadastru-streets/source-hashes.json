@@ -3,6 +3,6 @@
   "street-resolver.js": "90c1190804c124ee5ac94d6a4cd7d10f58c9ccc8fc63b026f6faba14523a9587",
   "data/localities.json": "c6027372423dbc07b0be2fd0e8424dced39eb393131833458b7b9396eac6fb9a",
   "supported-cities.js": "e9263cb7333f62c4472fb5c4fc79255bbb8fc7e3a471ad64658d351151a9d4ff",
-  "data/streets.json": "f8773dced7a48d4a51c850f580df67b11ab3af95bb5cf55986a49222bfd9beb8",
-  "data/street-corrections.json": "994705fcd03707694f0c1301f92225536c8e44992a6ef3fec6fd0c36486a1229"
+  "data/streets.json": "986345dfca18137085229a340aa8651cd8a23c89d8006c1b8c976a4820f0002b",
+  "data/street-corrections.json": "34679e79b6dbd69cd7fa1bf3a99cf9980045f52d9dfe4e6da82e3827ee4e5ef7"
 }

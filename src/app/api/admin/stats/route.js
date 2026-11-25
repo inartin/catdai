@@ -6,6 +6,7 @@ import { loadCadastruFavorites } from "@/lib/admin-cadastru-favorites";
 import { loadCadastruShareStatistics } from "@/lib/cadastru-share-statistics";
 import { loadCadastruSuggestionActivity } from "@/lib/admin-cadastru-suggestion-activity";
 import { loadCadastruResultCategories } from "@/lib/admin-cadastru-result-categories";
+import { loadGuestVisitors } from "@/lib/admin-guest-visitors";
 
 const PAGE = 1000;
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -882,15 +883,19 @@ export async function GET(request) {
     const { data } = await supabaseAdmin.from("user_activity").select("user_id, visitor").in("user_id", paymentUserIds);
     for (const row of data || []) paymentVisitors.set(row.user_id, row.visitor);
   }
+  const guestVisitors = await loadGuestVisitors(paymentUserIds.filter((id) =>
+    authUsersById.get(id)?.is_anonymous && !paymentVisitors.get(id)));
   const payments = {
     ...paymentSummary,
     total: paymentSummary.available ? paymentOrders.length : null,
     orders: paymentOrders.map((item) => {
       const user = authUsersById.get(item.user_id);
+      const isGuest = user?.is_anonymous === true;
       return {
         ...item,
-        name: user ? userDisplayName(user) : item.user_id,
-        visitor: paymentVisitors.get(item.user_id) || null,
+        name: isGuest ? "Guest" : user ? userDisplayName(user) : item.user_id,
+        isGuest,
+        visitor: paymentVisitors.get(item.user_id) || guestVisitors.get(item.user_id) || null,
         email: user?.email || null,
       };
     }),

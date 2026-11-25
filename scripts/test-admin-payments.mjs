@@ -16,6 +16,7 @@ let failingPage = null;
 const queries = [];
 const user = { id: "buyer", email: "buyer@example.com", user_metadata: { full_name: "Buyer", catdai_is_admin: true } };
 const admin = { id: "admin", app_metadata: { catdai_is_admin: true } };
+const guest = { id: "guest-buyer", is_anonymous: true };
 const json = (data, { status = 200 } = {}) => Response.json(data, { status });
 const mocks = {
   "next/server": { NextResponse: { json } },
@@ -27,7 +28,7 @@ const mocks = {
   "@/lib/supabase-admin": {
     supabaseAdmin: {
       rpc: async () => ({ data: [], error: null }),
-      auth: { admin: { listUsers: async () => ({ data: { users: [user, admin] } }) } },
+      auth: { admin: { listUsers: async () => ({ data: { users: [user, admin, guest] } }) } },
       from(table) {
         assert.notEqual(table, "reporting_feature_credit_balances", "Payments never depend on remaining credits");
         const query = { table, filters: [], orderBy: [], from: 0, to: Infinity };
@@ -39,7 +40,11 @@ const mocks = {
           let data = table === "payment_checkout_events" ? [...checkoutEvents]
             : orders.filter((row) => row.provider === "paddle" || row.environment === "production");
           for (const [op, column, value] of query.filters) {
-            data = data.filter((row) => op === "in" ? value.includes(row[column]) : row[column] && (op === "lt" ? Date.parse(row[column]) < Date.parse(value) : Date.parse(row[column]) >= Date.parse(value)));
+            data = data.filter((row) => {
+              if (op === "in") return value.includes(row[column]);
+              if (op === "not-null") return row[column] != null;
+              return row[column] && (op === "lt" ? Date.parse(row[column]) < Date.parse(value) : Date.parse(row[column]) >= Date.parse(value));
+            });
           }
           data.sort((a, b) => {
             for (const [column, { ascending, nullsFirst }] of query.orderBy) {
@@ -56,6 +61,12 @@ const mocks = {
           select() { return builder; },
           eq() { return builder; },
           is() { return builder; },
+          not(column, operator, value) {
+            assert.equal(operator, "is");
+            assert.equal(value, null);
+            query.filters.push(["not-null", column]);
+            return builder;
+          },
           in(column, value) { query.filters.push(["in", column, Array.from(value)]); return builder; },
           lt(column, value) { query.filters.push(["lt", column, value]); return builder; },
           gte(column, value) { query.filters.push(["gte", column, value]); return builder; },
@@ -74,14 +85,18 @@ await periods.link(() => { throw new Error("Unexpected period dependency"); });
 await periods.evaluate();
 mocks["@/lib/admin-periods"] = periods.namespace;
 mocks["@/lib/admin-cadastru-suggestion-activity"] = { loadCadastruSuggestionActivity: async (rows) => rows };
-const route = new vm.SourceTextModule(await fs.readFile("src/app/api/admin/stats/route.js", "utf8"), { context });
-await route.link((id) => {
+mocks["@/lib/admin-cadastru-result-categories"] = { loadCadastruResultCategories: async (rows) => rows };
+function mockModule(id) {
   const mock = mocks[id];
   assert.ok(mock, `Unexpected import: ${id}`);
   return new vm.SyntheticModule(Object.keys(mock), function () {
     for (const [key, value] of Object.entries(mock)) this.setExport(key, value);
   }, { context });
-});
+}
+const guestVisitors = new vm.SourceTextModule(await fs.readFile("src/lib/admin-guest-visitors.js", "utf8"), { context });
+await guestVisitors.link(mockModule);
+const route = new vm.SourceTextModule(await fs.readFile("src/app/api/admin/stats/route.js", "utf8"), { context });
+await route.link((id) => id === "@/lib/admin-guest-visitors" ? guestVisitors : mockModule(id));
 await route.evaluate();
 const get = (params = "period=all&fresh=1") => route.namespace.GET({ nextUrl: new URL(`https://catdai.md/api/admin/stats?${params}`) });
 const payment = (id, fields = {}) => ({
@@ -160,4 +175,16 @@ assert.equal(response.paymentCheckout.maibContinue.total, 3, "Count attempts sep
 assert.equal(response.paymentCheckout.maibContinue.uniqueVisitors, 2, "Retries count once per user in the visitor total");
 assert.equal(response.paymentCheckout.page.total, 1);
 assert.equal((await (await get()).json()).paymentCheckout.maibContinue.total, 4, "All time includes older clicks");
+
+const visitor = { device_type: "Mobile", os: "Android", browser: "Chrome" };
+orders = [payment("guest-payment", { user_id: guest.id })];
+checkoutEvents = [
+  { id: "guest-checkout", event_type: "checkout_order_created", user_id: guest.id, visitor, created_at: "2026-10-17T20:58:00Z" },
+  { id: "anonymous-checkout", event_type: "checkout_order_created", user_id: null, visitor: { browser: "Firefox" }, created_at: "2026-10-18T09:00:00Z" },
+];
+response = await (await get("period=day&fresh=1")).json();
+assert.equal(response.payments.total, 1);
+assert.equal(response.payments.orders[0].name, "Guest");
+assert.equal(response.payments.orders[0].isGuest, true);
+assert.deepEqual(response.payments.orders[0].visitor, visitor, "Guest device details can come from checkout before the payment period");
 console.log("Admin payment dashboard checks passed.");

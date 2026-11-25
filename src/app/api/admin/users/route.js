@@ -1,6 +1,7 @@
 import { sharedPaidCreditBalance, sharedFreeMonthlyCredit } from "@/lib/shared-credit-balance.mjs";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { requireAdminApiAuth } from "@/lib/admin-auth";
+import { loadGuestVisitors } from "@/lib/admin-guest-visitors";
 import { NextResponse } from "next/server";
 import {
   FREE_MONTHLY_FEATURE_KEYS,
@@ -363,6 +364,10 @@ export async function GET(request) {
     const paymentsByUser = toPaymentSummaryMap(paymentRows);
     const creditsByUser = groupRowsByUser(creditRows);
     const freeMonthlyUsageByUser = groupRowsByUser(freeMonthlyUsageRows);
+    const activityVisitors = new Map(activityRows.map((row) => [row.user_id, row.visitor]));
+    const guestVisitors = await loadGuestVisitors(users
+      .filter((user) => user.is_anonymous && !activityVisitors.get(user.id))
+      .map((user) => user.id));
 
     const data = {
       version: CACHE_VERSION,
@@ -378,11 +383,11 @@ export async function GET(request) {
 
         return {
           id: user.id,
-          name: userDisplayName(user),
-          visitor: activityRows.find((row) => row.user_id === user.id)?.visitor || null,
+          name: user.is_anonymous ? "Guest" : userDisplayName(user),
+          visitor: activityVisitors.get(user.id) || guestVisitors.get(user.id) || null,
           email: user.email || null,
           isAdmin: user.app_metadata?.catdai_is_admin === true,
-          authProvider: userAuthProvider(user),
+          authProvider: user.is_anonymous ? "Guest" : userAuthProvider(user),
           packageKey,
           packageSource: adminPackageKey ? "admin" : paidPackage ? "paid" : "free",
           packagePaidAt: paidPackage?.paidAt || null,
